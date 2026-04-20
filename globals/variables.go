@@ -170,8 +170,8 @@ var VisionModels = []string{
 	GPT4VisionPreview, GPT41106VisionPreview, GPT4Turbo, GPT4Turbo20240409, GPT4O, GPT4O20240513, // openai
 	GeminiProVision, Gemini15Pro002, Gemini15Flash002, Gemini15ProLatest, Gemini15FlashLatest,
 	Gemini20Flash, Gemini20Flash001, Gemini20FlashLite,
-	Gemini25Flash, Gemini25Pro, Gemini25FlashLitePreview,
-	Gemini3Flash, Gemini3ProPreview, Gemini3ProImagePreview, // gemini
+	Gemini25Flash, Gemini25Pro, Gemini25FlashLitePreview, "gemini-2.5-flash-lite", "gemini-2.5-flash-preview-09-2025",
+	Gemini3Flash, Gemini3ProPreview, Gemini3ProImagePreview, "gemini-3-flash-preview", "gemini-3.1-pro-preview", "gemini-3.1-pro-preview-customtools", "gemini-3.1-flash-lite-preview", "gemini-3.1-flash-image-preview", // gemini
 	Claude3,             // anthropic
 	ZhiPuChatGLM4Vision, // chatglm
 }
@@ -204,9 +204,31 @@ func IsGeminiModel(model string) bool {
 		strings.HasPrefix(model, "gemini-")
 }
 
+func SupportGeminiThinkingLevel(model string) bool {
+	return model == "gemini-3-flash-preview" ||
+		strings.HasPrefix(model, "gemini-3-flash-preview-") ||
+		model == "gemini-3.1-flash-lite-preview" ||
+		strings.HasPrefix(model, "gemini-3.1-flash-lite-preview-") ||
+		model == "gemini-3.1-pro-preview" ||
+		strings.HasPrefix(model, "gemini-3.1-pro-preview-") ||
+		model == "gemini-3.1-pro-preview-customtools" ||
+		strings.HasPrefix(model, "gemini-3.1-pro-preview-customtools-") ||
+		model == "gemini-3.1-flash-image-preview" ||
+		strings.HasPrefix(model, "gemini-3.1-flash-image-preview-") ||
+		model == "gemini-3-pro-image-preview" ||
+		strings.HasPrefix(model, "gemini-3-pro-image-preview-") ||
+		model == "gemini-3-pro-preview" ||
+		strings.HasPrefix(model, "gemini-3-pro-preview-")
+}
+
 func SupportGeminiThinkingBudget(model string) bool {
-	return model == "gemini-3.1-flash-lite-preview" ||
-		strings.HasPrefix(model, "gemini-3.1-flash-lite-preview-")
+	return model == "gemini-2.5-flash" ||
+		strings.HasPrefix(model, "gemini-2.5-flash-preview-") ||
+		model == "gemini-2.5-flash-lite" ||
+		strings.HasPrefix(model, "gemini-2.5-flash-lite-preview-") ||
+		model == "gemini-2.5-pro" ||
+		strings.HasPrefix(model, "gemini-2.5-pro-preview-") ||
+		strings.HasPrefix(model, "gemini-2.5-pro-exp-")
 }
 
 func IsGoogleImagenModel(model string) bool {

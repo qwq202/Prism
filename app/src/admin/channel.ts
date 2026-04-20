@@ -283,17 +283,26 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "gemini-2.0-flash-001",
       "gemini-2.0-flash-lite",
       "gemini-2.5-flash",
+      "gemini-2.5-flash-preview-09-2025",
       "gemini-2.5-pro",
+      "gemini-2.5-flash-lite",
       "gemini-2.5-flash-lite-preview-06-17",
+      "gemini-2.5-flash-lite-preview-09-2025",
       "gemini-3-flash",
+      "gemini-3-flash-preview",
       "gemini-3-pro-preview",
       "gemini-3-pro-image-preview",
+      "gemini-3.1-pro-preview",
+      "gemini-3.1-pro-preview-customtools",
+      "gemini-3.1-flash-lite-preview",
+      "gemini-3.1-flash-image-preview",
       "gemini-1.5-pro-latest",
       "gemini-1.5-flash-latest",
     ],
     description:
       "> Google Gemini 密钥格式为 **api-key**，接入点填写 *https://generativelanguage.googleapis.com* 或其反代地址。 \n" +
       "> 系统已适配当前官方 `generateContent` / `streamGenerateContent` 请求结构，并支持 `system_instruction` 与 function calling。 \n" +
+      "> Gemini 2.5 系列使用 `thinkingBudget`，Gemini 3 系列使用官方推荐的 `thinkingLevel` 参数，系统会按模型自动选择。 \n" +
       "> 为兼容官方稳定版与预览版模型，系统会自动在 `v1` 与 `v1beta` 之间选择合适的 Gemini API 版本。 \n" +
       "> Google 对请求 IP 地域有限制，可能出现 **User Location Is Not Supported** 的错误，可通过可用地区 IP 或反代接入解决。\n",
   },

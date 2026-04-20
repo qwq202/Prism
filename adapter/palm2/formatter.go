@@ -228,19 +228,85 @@ func getGeminiThinkingConfig(props *adaptercommon.ChatProps) *GeminiThinkingConf
 		return nil
 	}
 
+	if globals.SupportGeminiThinkingLevel(props.Model) {
+		level := getGeminiThinkingLevel(props.Model, *props.GeminiThinkingBudget)
+		if level == "" {
+			return nil
+		}
+
+		config := &GeminiThinkingConfig{
+			ThinkingLevel: utils.ToPtr(level),
+		}
+		if level != "minimal" {
+			config.IncludeThoughts = utils.ToPtr(true)
+		}
+		return config
+	}
+
 	if !globals.SupportGeminiThinkingBudget(props.Model) {
 		return nil
 	}
 
+	thinkingBudget := normalizeGeminiThinkingBudget(props.Model, *props.GeminiThinkingBudget)
 	config := &GeminiThinkingConfig{
-		ThinkingBudget: props.GeminiThinkingBudget,
+		ThinkingBudget: &thinkingBudget,
 	}
 
-	if *props.GeminiThinkingBudget > 0 {
+	if thinkingBudget > 0 {
 		config.IncludeThoughts = utils.ToPtr(true)
 	}
 
 	return config
+}
+
+func getGeminiThinkingLevel(model string, value int) string {
+	switch {
+	case value <= 0 && strings.HasPrefix(model, "gemini-3.1-pro"):
+		return "low"
+	case value <= 0:
+		return "minimal"
+	case value <= 2048:
+		return "low"
+	case value <= 6144:
+		return "medium"
+	default:
+		return "high"
+	}
+}
+
+func normalizeGeminiThinkingBudget(model string, value int) int {
+	switch {
+	case strings.HasPrefix(model, "gemini-2.5-pro"):
+		if value <= 0 {
+			return 128
+		}
+		if value < 128 {
+			return 128
+		}
+		if value > 32768 {
+			return 32768
+		}
+		return value
+	case strings.HasPrefix(model, "gemini-2.5-flash-lite"):
+		if value == -1 {
+			return -1
+		}
+		if value > 0 && value < 512 {
+			return 512
+		}
+		if value > 24576 {
+			return 24576
+		}
+		return value
+	default:
+		if value == -1 {
+			return -1
+		}
+		if value > 24576 {
+			return 24576
+		}
+		return value
+	}
 }
 
 func (c *ChatInstance) GetGeminiContents(model string, message []globals.Message) []GeminiContent {

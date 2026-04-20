@@ -113,8 +113,27 @@ export function supportsGeminiThinkingBudgetControl(
 ): boolean {
   if (!model) return false;
   return (
+    model === "gemini-2.5-flash" ||
+    model.startsWith("gemini-2.5-flash-preview-") ||
+    model === "gemini-2.5-flash-lite" ||
+    model.startsWith("gemini-2.5-flash-lite-preview-") ||
+    model === "gemini-2.5-pro" ||
+    model.startsWith("gemini-2.5-pro-preview-") ||
+    model.startsWith("gemini-2.5-pro-exp-") ||
+    model === "gemini-3-flash-preview" ||
+    model.startsWith("gemini-3-flash-preview-") ||
     model === "gemini-3.1-flash-lite-preview" ||
-    model.startsWith("gemini-3.1-flash-lite-preview-")
+    model.startsWith("gemini-3.1-flash-lite-preview-") ||
+    model === "gemini-3.1-pro-preview" ||
+    model.startsWith("gemini-3.1-pro-preview-") ||
+    model === "gemini-3.1-pro-preview-customtools" ||
+    model.startsWith("gemini-3.1-pro-preview-customtools-") ||
+    model === "gemini-3.1-flash-image-preview" ||
+    model.startsWith("gemini-3.1-flash-image-preview-") ||
+    model === "gemini-3-pro-image-preview" ||
+    model.startsWith("gemini-3-pro-image-preview-") ||
+    model === "gemini-3-pro-preview" ||
+    model.startsWith("gemini-3-pro-preview-")
   );
 }
 
