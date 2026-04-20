@@ -350,9 +350,13 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 		Plan:  plan,
 	})
 
+	content := buffer.ReadWithDefault(defaultMessage)
+
 	return globals.Message{
 		Role:                 globals.Assistant,
-		Content:              buffer.ReadWithDefault(defaultMessage),
+		Content:              content,
+		ToolCalls:            buffer.GetToolCalls(),
+		FunctionCall:         buffer.GetFunctionCall(),
 		GeminiHiddenMetadata: buffer.GetGeminiHiddenMetadata(),
 	}
 }
