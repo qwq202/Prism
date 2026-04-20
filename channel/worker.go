@@ -15,6 +15,23 @@ func hasToolCalls(toolCalls *globals.ToolCalls) bool {
 	return toolCalls != nil && len(*toolCalls) > 0
 }
 
+func buildCacheChunk(cacheBuffer *utils.Buffer, liveBuffer *utils.Buffer) *globals.Chunk {
+	if cacheBuffer == nil {
+		return &globals.Chunk{}
+	}
+
+	if liveBuffer != nil {
+		liveBuffer.SetInputTokens(cacheBuffer.CountInputToken())
+	}
+
+	return &globals.Chunk{
+		Content:              cacheBuffer.Read(),
+		FunctionCall:         cacheBuffer.GetFunctionCall(),
+		ToolCall:             cacheBuffer.GetToolCalls(),
+		GeminiHiddenMetadata: cacheBuffer.GetGeminiHiddenMetadata(),
+	}
+}
+
 func NewChatRequest(group string, props *adaptercommon.ChatProps, hook globals.Hook) error {
 	ticker := ConduitInstance.GetTicker(props.OriginalModel, group)
 	if ticker == nil || ticker.IsEmpty() {
@@ -63,25 +80,16 @@ func PreflightCache(cache *redis.Client, model string, hash string, buffer *util
 		return idx, false, nil
 	}
 
-	data := buf.Read()
-	toolCalls := buf.GetToolCalls()
-	functionCall := buf.GetFunctionCall()
-	hiddenMetadata := buf.GetGeminiHiddenMetadata()
+	chunk := buildCacheChunk(&buf, buffer)
+	data := chunk.Content
+	toolCalls := chunk.ToolCall
+	functionCall := chunk.FunctionCall
+	hiddenMetadata := chunk.GeminiHiddenMetadata
 	if data == "" && !hasToolCalls(toolCalls) && functionCall == nil && hiddenMetadata.IsEmpty() {
 		return idx, false, nil
 	}
 
-	buffer.SetInputTokens(buf.CountInputToken())
-	buffer.SetToolCalls(toolCalls)
-	buffer.SetFunctionCall(functionCall)
-	buffer.SetGeminiHiddenMetadata(hiddenMetadata)
-
-	return idx, true, hook(&globals.Chunk{
-		Content:              data,
-		FunctionCall:         functionCall,
-		ToolCall:             toolCalls,
-		GeminiHiddenMetadata: hiddenMetadata,
-	})
+	return idx, true, hook(chunk)
 }
 
 func StoreCache(cache *redis.Client, hash string, index int64, buffer *utils.Buffer) {

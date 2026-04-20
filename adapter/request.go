@@ -9,6 +9,60 @@ import (
 	"time"
 )
 
+func isGeminiAdapterRequest(channelType string, model string) bool {
+	return channelType == globals.PalmChannelType && globals.IsGeminiModel(model)
+}
+
+func stripGeminiHiddenMetadata(messages []globals.Message) ([]globals.Message, bool) {
+	sanitized := make([]globals.Message, len(messages))
+	changed := false
+
+	for idx, message := range messages {
+		sanitized[idx] = message
+
+		if message.GeminiHiddenMetadata == nil {
+			continue
+		}
+
+		sanitized[idx].GeminiHiddenMetadata = nil
+		changed = true
+	}
+
+	if !changed {
+		return messages, false
+	}
+
+	return sanitized, true
+}
+
+func sanitizeChatMessagesForRequest(conf globals.ChannelConfig, props *adaptercommon.ChatProps) func() {
+	if props == nil || len(props.Message) == 0 {
+		return func() {}
+	}
+
+	originalModel := props.OriginalModel
+	if originalModel == "" {
+		originalModel = props.Model
+	}
+
+	reflectedModel := conf.GetModelReflect(originalModel)
+	if isGeminiAdapterRequest(conf.GetType(), reflectedModel) {
+		return func() {}
+	}
+
+	sanitized, changed := stripGeminiHiddenMetadata(props.Message)
+	if !changed {
+		return func() {}
+	}
+
+	original := props.Message
+	props.Message = sanitized
+
+	return func() {
+		props.Message = original
+	}
+}
+
 func IsAvailableError(err error) bool {
 	return err != nil && (err.Error() != "signal" && !strings.Contains(err.Error(), "signal"))
 }
@@ -25,6 +79,9 @@ func isQPSOverLimit(model string, err error) bool {
 }
 
 func NewChatRequest(conf globals.ChannelConfig, props *adaptercommon.ChatProps, hook globals.Hook) error {
+	restore := sanitizeChatMessagesForRequest(conf, props)
+	defer restore()
+
 	err := createChatRequest(conf, props, hook)
 
 	retries := conf.GetRetry()
