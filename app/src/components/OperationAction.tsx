@@ -28,58 +28,67 @@ type ActionProps = ButtonProps & {
     | null
     | undefined;
 };
-function OperationAction({
-  tooltip,
-  children,
-  onClick,
-  variant,
-  native,
-  className,
-  ...props
-}: ActionProps) {
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          {variant === "destructive" ? (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  size={`icon`}
-                  className={cn(!native && `w-8 h-8`, className)}
-                  variant={variant}
-                  {...props}
-                >
-                  {children}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className={`w-max`}>
-                <Button
-                  className={`flex flex-row items-center mx-1`}
-                  onClick={onClick}
-                  variant={variant}
-                >
-                  {children}
-                  <p className={`ml-1 translate-y-[-1px]`}>{tooltip}</p>
-                </Button>
-              </PopoverContent>
-            </Popover>
-          ) : (
-            <Button
-              size={`icon`}
-              className={cn(!native && `w-8 h-8`, className)}
-              onClick={onClick}
-              variant={variant}
-              {...props}
-            >
-              {children}
-            </Button>
-          )}
-        </TooltipTrigger>
-        <TooltipContent>{tooltip}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
-}
+const OperationAction = React.forwardRef<HTMLButtonElement, ActionProps>(
+  (
+    {
+      tooltip,
+      children,
+      onClick,
+      variant,
+      native,
+      className,
+      ...props
+    },
+    ref,
+  ) => {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            {variant === "destructive" ? (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    ref={ref}
+                    size={`icon`}
+                    className={cn(!native && `w-8 h-8`, className)}
+                    variant={variant}
+                    {...props}
+                  >
+                    {children}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className={`w-max`}>
+                  <Button
+                    className={`flex flex-row items-center mx-1`}
+                    onClick={onClick}
+                    variant={variant}
+                  >
+                    {children}
+                    <p className={`ml-1 translate-y-[-1px]`}>{tooltip}</p>
+                  </Button>
+                </PopoverContent>
+              </Popover>
+            ) : (
+              <Button
+                ref={ref}
+                size={`icon`}
+                className={cn(!native && `w-8 h-8`, className)}
+                onClick={onClick}
+                variant={variant}
+                {...props}
+              >
+                {children}
+              </Button>
+            )}
+          </TooltipTrigger>
+          <TooltipContent>{tooltip}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  },
+);
+
+OperationAction.displayName = "OperationAction";
 
 export default OperationAction;
