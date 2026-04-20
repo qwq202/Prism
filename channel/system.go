@@ -24,6 +24,7 @@ type ApiInfo struct {
 	Generation   []string `json:"generation"`
 	RelayPlan    bool     `json:"relay_plan"`
 	WebSearch    bool     `json:"web_search"`
+	HasTaskModel bool     `json:"has_task_model"`
 }
 
 type generalState struct {
@@ -156,6 +157,7 @@ func (c *SystemConfig) AsInfo() ApiInfo {
 		Generation:   c.Common.Generation,
 		RelayPlan:    c.Site.RelayPlan,
 		WebSearch:    strings.TrimSpace(globals.SearchApiKey) != "",
+		HasTaskModel: strings.TrimSpace(globals.TaskModel) != "",
 	}
 }
 

@@ -39,6 +39,7 @@ export const infoSlice = createSlice({
     auth_footer: getBooleanMemory("auth_footer", false),
     relay_plan: getBooleanMemory("relay_plan", false),
     web_search: getBooleanMemory("web_search", false),
+    has_task_model: getBooleanMemory("has_task_model", false),
     payment: getArrayMemory("payment"),
     payment_aggregation: getBooleanMemory("payment_aggregation", false),
     title: getMemory("title"),
@@ -73,6 +74,7 @@ export const infoSlice = createSlice({
       state.auth_footer = form.auth_footer ?? false;
       state.relay_plan = form.relay_plan ?? false;
       state.web_search = form.web_search ?? false;
+      state.has_task_model = form.has_task_model ?? false;
       state.payment = form.payment ?? [];
       state.title = form.title ?? "";
       state.logo = form.logo ?? "";
@@ -104,6 +106,7 @@ export const infoSlice = createSlice({
       setBooleanMemory("auth_footer", state.auth_footer);
       setBooleanMemory("relay_plan", state.relay_plan);
       setBooleanMemory("web_search", state.web_search);
+      setBooleanMemory("has_task_model", state.has_task_model);
       setArrayMemory("payment", state.payment);
       setBooleanMemory("payment_aggregation", state.payment_aggregation);
       setMemory("broadcast_data", JSON.stringify(state.broadcast));
@@ -130,6 +133,8 @@ export const infoRelayPlanSelector = (state: RootState): boolean =>
   state.info.relay_plan;
 export const infoWebSearchSelector = (state: RootState): boolean =>
   (state.info as any).web_search ?? false;
+export const infoHasTaskModelSelector = (state: RootState): boolean =>
+  (state.info as any).has_task_model ?? false;
 export const infoPaymentSelector = (state: RootState): string[] =>
   state.info.payment;
 export const isPaymentAggregationSelector = (state: RootState): boolean =>

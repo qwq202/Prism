@@ -19,7 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { useTranslation } from "react-i18next";
 import { ConversationInstance } from "@/api/types.tsx";
 import { useEffect, useState } from "react";
@@ -28,6 +28,7 @@ import { cn } from "@/components/ui/lib/utils.ts";
 import PopupDialog, { popupTypes } from "@/components/PopupDialog.tsx";
 import { withNotify } from "@/api/common.ts";
 import Clickable from "@/components/ui/clickable.tsx";
+import { infoHasTaskModelSelector } from "@/store/info.ts";
 
 type ConversationItemProps = {
   conversation: ConversationInstance;
@@ -44,6 +45,7 @@ function ConversationItem({
 }: ConversationItemProps) {
   const conversationTitle = filterMessage(conversation.name);
   const dispatch = useDispatch();
+  const hasTaskModel = useSelector(infoHasTaskModelSelector);
   const { toggle } = useConversationActions();
   const { t } = useTranslation();
   const { rename, retitle } = useConversationActions();
@@ -194,37 +196,39 @@ function ConversationItem({
             <PencilLine className={`h-4 w-4 mx-1`} />
             {t("conversation.edit-title")}
           </DropdownMenuItem>
-          <DropdownMenuItem
-            disabled={retitleStage !== "idle"}
-            onClick={async (e) => {
-              if (offset + 500 > new Date().getTime()) return;
+          {hasTaskModel && (
+            <DropdownMenuItem
+              disabled={retitleStage !== "idle"}
+              onClick={async (e) => {
+                if (offset + 500 > new Date().getTime()) return;
 
-              e.preventDefault();
-              e.stopPropagation();
+                e.preventDefault();
+                e.stopPropagation();
 
-              if (retitleStage !== "idle") return;
+                if (retitleStage !== "idle") return;
 
-              setOpen(false);
-              setRetitleStage("loading");
+                setOpen(false);
+                setRetitleStage("loading");
 
-              const resp = await retitle(conversation.id);
-              if (!resp.status) {
-                setRetitleStage("idle");
-                withNotify(t, resp);
-                return;
-              }
+                const resp = await retitle(conversation.id);
+                if (!resp.status) {
+                  setRetitleStage("idle");
+                  withNotify(t, resp);
+                  return;
+                }
 
-              setTypingTarget(
-                typeof resp.data?.name === "string"
-                  ? resp.data.name
-                  : conversation.name,
-              );
-              setRetitleStage("typing");
-            }}
-          >
-            <Sparkles className={`h-4 w-4 mx-1`} />
-            {t("conversation.retitle")}
-          </DropdownMenuItem>
+                setTypingTarget(
+                  typeof resp.data?.name === "string"
+                    ? resp.data.name
+                    : conversation.name,
+                );
+                setRetitleStage("typing");
+              }}
+            >
+              <Sparkles className={`h-4 w-4 mx-1`} />
+              {t("conversation.retitle")}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
             onClick={(e) => {
               e.preventDefault();
