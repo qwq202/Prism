@@ -3,6 +3,9 @@ package adaptercommon
 import (
 	"chat/globals"
 	"chat/utils"
+	"fmt"
+	"strings"
+	"time"
 )
 
 type RequestProps struct {
@@ -51,7 +54,62 @@ type ChatProps struct {
 	Buffer               *utils.Buffer          `json:"-"`
 }
 
+const currentDateTimePromptPrefix = "Current date and time reference:"
+
+func buildCurrentDateTimePrompt() string {
+	now := time.Now()
+	return fmt.Sprintf(
+		"%s %s (%s). Treat this as the current local time unless the user specifies a different timezone.",
+		currentDateTimePromptPrefix,
+		now.Format("2006-01-02 15:04:05"),
+		now.Location().String(),
+	)
+}
+
+func injectCurrentDateTime(messages []globals.Message) []globals.Message {
+	if len(messages) == 0 {
+		return []globals.Message{
+			{
+				Role:    globals.System,
+				Content: buildCurrentDateTimePrompt(),
+			},
+		}
+	}
+
+	cloned := utils.DeepCopy[[]globals.Message](messages)
+	prompt := buildCurrentDateTimePrompt()
+
+	for i := range cloned {
+		if cloned[i].Role != globals.System {
+			continue
+		}
+
+		content := strings.TrimSpace(cloned[i].Content)
+		if strings.HasPrefix(content, currentDateTimePromptPrefix) {
+			return cloned
+		}
+
+		if content == "" {
+			cloned[i].Content = prompt
+		} else {
+			cloned[i].Content = fmt.Sprintf("%s\n\n%s", prompt, cloned[i].Content)
+		}
+		return cloned
+	}
+
+	return append([]globals.Message{
+		{
+			Role:    globals.System,
+			Content: prompt,
+		},
+	}, cloned...)
+}
+
 func (c *ChatProps) SetupBuffer(buf *utils.Buffer) {
+	c.Message = injectCurrentDateTime(c.Message)
+	if buf == nil {
+		return
+	}
 	buf.SetPrompts(c)
 	c.Buffer = buf
 }
