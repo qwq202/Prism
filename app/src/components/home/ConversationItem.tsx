@@ -8,6 +8,7 @@ import {
   MoreHorizontal,
   PencilLine,
   Share2,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import {
@@ -21,7 +22,7 @@ import {
 import { useDispatch } from "react-redux";
 import { useTranslation } from "react-i18next";
 import { ConversationInstance } from "@/api/types.tsx";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useConversationActions } from "@/store/chat.ts";
 import { cn } from "@/components/ui/lib/utils.ts";
 import PopupDialog, { popupTypes } from "@/components/PopupDialog.tsx";
@@ -41,16 +42,69 @@ function ConversationItem({
   current,
   operate,
 }: ConversationItemProps) {
+  const conversationTitle = filterMessage(conversation.name);
   const dispatch = useDispatch();
   const { toggle } = useConversationActions();
   const { t } = useTranslation();
-  const { rename } = useConversationActions();
+  const { rename, retitle } = useConversationActions();
   const [open, setOpen] = useState(false);
   const [offset, setOffset] = useState(0);
 
   const [editDialog, setEditDialog] = useState(false);
+  const [displayTitle, setDisplayTitle] = useState(conversationTitle);
+  const [retitleStage, setRetitleStage] = useState<
+    "idle" | "loading" | "typing"
+  >("idle");
+  const [typingTarget, setTypingTarget] = useState("");
 
   const loading = conversation.id <= 0;
+
+  useEffect(() => {
+    if (retitleStage !== "idle") return;
+    setDisplayTitle(conversationTitle);
+  }, [conversationTitle, retitleStage]);
+
+  useEffect(() => {
+    if (retitleStage !== "loading") return;
+
+    const loadingText = t("conversation.retitle-loading");
+    let dots = 1;
+    setDisplayTitle(`${loadingText}.`);
+
+    const timer = window.setInterval(() => {
+      dots = (dots % 3) + 1;
+      setDisplayTitle(`${loadingText}${".".repeat(dots)}`);
+    }, 350);
+
+    return () => window.clearInterval(timer);
+  }, [retitleStage, t]);
+
+  useEffect(() => {
+    if (retitleStage !== "typing") return;
+
+    const target = filterMessage(typingTarget || conversation.name);
+    const chars = Array.from(target);
+    let index = 0;
+    setDisplayTitle("");
+
+    if (chars.length === 0) {
+      setRetitleStage("idle");
+      setTypingTarget("");
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      index += 1;
+      setDisplayTitle(chars.slice(0, index).join(""));
+      if (index >= chars.length) {
+        window.clearInterval(timer);
+        setRetitleStage("idle");
+        setTypingTarget("");
+      }
+    }, 40);
+
+    return () => window.clearInterval(timer);
+  }, [conversation.name, retitleStage, typingTarget]);
 
   return (
     <Clickable
@@ -76,7 +130,7 @@ function ConversationItem({
       <MessageSquare
         className={`h-6 w-6 p-1 mr-1 text-secondary bg-input/25 rounded-sm`}
       />
-      <div className={`title`}>{filterMessage(conversation.name)}</div>
+      <div className={`title`}>{displayTitle}</div>
       <DropdownMenu
         open={open}
         onOpenChange={(state: boolean) => {
@@ -139,6 +193,37 @@ function ConversationItem({
           >
             <PencilLine className={`h-4 w-4 mx-1`} />
             {t("conversation.edit-title")}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={retitleStage !== "idle"}
+            onClick={async (e) => {
+              if (offset + 500 > new Date().getTime()) return;
+
+              e.preventDefault();
+              e.stopPropagation();
+
+              if (retitleStage !== "idle") return;
+
+              setOpen(false);
+              setRetitleStage("loading");
+
+              const resp = await retitle(conversation.id);
+              if (!resp.status) {
+                setRetitleStage("idle");
+                withNotify(t, resp);
+                return;
+              }
+
+              setTypingTarget(
+                typeof resp.data?.name === "string"
+                  ? resp.data.name
+                  : conversation.name,
+              );
+              setRetitleStage("typing");
+            }}
+          >
+            <Sparkles className={`h-4 w-4 mx-1`} />
+            {t("conversation.retitle")}
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={(e) => {

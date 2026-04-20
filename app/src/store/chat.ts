@@ -11,6 +11,7 @@ import {
   getArrayMemory,
   getBooleanMemory,
   getMemory,
+  getNumberMemory,
   setArrayMemory,
   setMemory,
   setNumberMemory,
@@ -24,6 +25,7 @@ import {
   deleteConversation as doDeleteConversation,
   deleteAllConversations as doDeleteAllConversations,
   renameConversation as doRenameConversation,
+  retitleConversation as doRetitleConversation,
   loadConversation,
   getConversationList,
 } from "@/api/history.ts";
@@ -62,6 +64,9 @@ type initialStateType = {
   conversations: Record<number, ConversationSerialized>;
   model: string;
   web: boolean;
+  gemini_google_search: boolean;
+  gemini_url_context: boolean;
+  gemini_thinking_budget: number;
   current: number;
   model_list: string[];
   market: boolean;
@@ -90,12 +95,27 @@ export function getModel(
 export function getModelList(
   supportModels: Model[],
   models: string[],
-  select: string,
 ): string[] {
-  const list = models.filter((item) => inModel(supportModels, item));
-  const selection = getModel(supportModels, select);
-  if (!list.includes(selection)) list.push(selection);
-  return list;
+  return models.filter((item) => inModel(supportModels, item));
+}
+
+export function isGeminiModelId(model: string | undefined | null): boolean {
+  if (!model) return false;
+  return (
+    model === "gemini-pro" ||
+    model === "gemini-pro-vision" ||
+    model.startsWith("gemini-")
+  );
+}
+
+export function supportsGeminiThinkingBudgetControl(
+  model: string | undefined | null,
+): boolean {
+  if (!model) return false;
+  return (
+    model === "gemini-3.1-flash-lite-preview" ||
+    model.startsWith("gemini-3.1-flash-lite-preview-")
+  );
 }
 
 export const stack = new ConnectionStack();
@@ -109,13 +129,12 @@ const chatSlice = createSlice({
       [-1]: { ...defaultConversation },
     },
     web: getBooleanMemory("web", false),
+    gemini_google_search: getBooleanMemory("gemini_google_search", true),
+    gemini_url_context: getBooleanMemory("gemini_url_context", true),
+    gemini_thinking_budget: getNumberMemory("gemini_thinking_budget", 0),
     current: -1,
     model: getModel(offline, getMemory("model")),
-    model_list: getModelList(
-      offline,
-      getArrayMemory("model_mark_list"),
-      getMemory("model"),
-    ),
+    model_list: getModelList(offline, getArrayMemory("model_mark_list")),
     market: false,
     mask_item: null,
     custom_masks: [],
@@ -283,6 +302,18 @@ const chatSlice = createSlice({
       setMemory("web", web ? "true" : "false");
       state.web = web;
     },
+    setGeminiGoogleSearch: (state, action) => {
+      setMemory("gemini_google_search", action.payload ? "true" : "false");
+      state.gemini_google_search = action.payload as boolean;
+    },
+    setGeminiURLContext: (state, action) => {
+      setMemory("gemini_url_context", action.payload ? "true" : "false");
+      state.gemini_url_context = action.payload as boolean;
+    },
+    setGeminiThinkingBudget: (state, action) => {
+      setNumberMemory("gemini_thinking_budget", action.payload as number);
+      state.gemini_thinking_budget = action.payload as number;
+    },
     setCurrent: (state, action) => {
       const current = action.payload as number;
       state.current = current;
@@ -301,7 +332,7 @@ const chatSlice = createSlice({
       state.model_list = models.filter((item) =>
         inModel(state.support_models, item),
       );
-      setArrayMemory("model_mark_list", models);
+      setArrayMemory("model_mark_list", state.model_list);
     },
     addModelList: (state, action) => {
       const model = action.payload as string;
@@ -340,12 +371,10 @@ const chatSlice = createSlice({
       state.model_list = getModelList(
         models,
         getArrayMemory("model_mark_list"),
-        getMemory("model"),
       );
 
       setOfflineModels(models);
     },
-
   },
 });
 
@@ -356,6 +385,9 @@ export const {
   setModel,
   setWeb,
   toggleWeb,
+  setGeminiGoogleSearch,
+  setGeminiURLContext,
+  setGeminiThinkingBudget,
   setModelList,
   addModelList,
   removeModelList,
@@ -383,6 +415,12 @@ export const selectConversations = (
 ): Record<number, ConversationSerialized> => state.chat.conversations;
 export const selectModel = (state: RootState): string => state.chat.model;
 export const selectWeb = (state: RootState): boolean => state.chat.web;
+export const selectGeminiGoogleSearch = (state: RootState): boolean =>
+  state.chat.gemini_google_search;
+export const selectGeminiURLContext = (state: RootState): boolean =>
+  state.chat.gemini_url_context;
+export const selectGeminiThinkingBudget = (state: RootState): number =>
+  state.chat.gemini_thinking_budget;
 export const selectCurrent = (state: RootState): number => state.chat.current;
 export const selectModelList = (state: RootState): string[] =>
   state.chat.model_list;
@@ -437,6 +475,15 @@ export function useConversationActions() {
 
       return resp;
     },
+    retitle: async (id: number) => {
+      const resp = await doRetitleConversation(id);
+      const name = resp.data?.name;
+      if (resp.status && typeof name === "string" && name.length > 0) {
+        dispatch(renameHistory({ id, name }));
+      }
+
+      return resp;
+    },
     remove: async (id: number) => {
       const state = await doDeleteConversation(id);
       state && dispatch(deleteConversation(id));
@@ -478,6 +525,9 @@ export function useMessageActions() {
 
   const model = useSelector(selectModel);
   const web = useSelector(selectWeb);
+  const gemini_google_search = useSelector(selectGeminiGoogleSearch);
+  const gemini_url_context = useSelector(selectGeminiURLContext);
+  const gemini_thinking_budget = useSelector(selectGeminiThinkingBudget);
   const history = useSelector(historySelector);
   const context = useSelector(contextSelector);
   const max_tokens = useSelector(maxTokensSelector);
@@ -490,6 +540,9 @@ export function useMessageActions() {
 
   return {
     send: async (message: string, using_model?: string) => {
+      const targetModel = using_model || model;
+      const enableGeminiNativeWeb = isGeminiModelId(targetModel);
+
       if (current === -1 && conversations[-1].messages.length === 0) {
         // preflight history if it's a new conversation
         dispatch(preflightHistory(message));
@@ -507,11 +560,18 @@ export function useMessageActions() {
       const state = stack.send(current, t, {
         type: "chat",
         message,
-        web,
-        model: using_model || model,
+        web: enableGeminiNativeWeb
+          ? gemini_google_search || gemini_url_context
+          : web,
+        web_search: gemini_google_search,
+        url_context: gemini_url_context,
+        gemini_thinking_budget: supportsGeminiThinkingBudgetControl(targetModel)
+          ? gemini_thinking_budget
+          : undefined,
+        model: targetModel,
         context: history,
         ignore_context: !context,
-        max_tokens,
+        max_tokens: max_tokens > 0 ? max_tokens : undefined,
         temperature,
         top_p,
         top_k,
@@ -534,15 +594,23 @@ export function useMessageActions() {
       dispatch(stopMessage(current));
     },
     restart: () => {
+      const enableGeminiNativeWeb = isGeminiModelId(model);
       if (!stack.hasConnection(current)) {
         stack.createConnection(current);
       }
       stack.sendRestartEvent(current, t, {
-        web,
+        web: enableGeminiNativeWeb
+          ? gemini_google_search || gemini_url_context
+          : web,
+        web_search: gemini_google_search,
+        url_context: gemini_url_context,
+        gemini_thinking_budget: supportsGeminiThinkingBudgetControl(model)
+          ? gemini_thinking_budget
+          : undefined,
         model,
         context: history,
         ignore_context: !context,
-        max_tokens,
+        max_tokens: max_tokens > 0 ? max_tokens : undefined,
         temperature,
         top_p,
         top_k,
@@ -572,6 +640,9 @@ export function useMessageActions() {
     },
     receive: async (id: number, message: StreamMessage) => {
       dispatch(updateMessage({ id, message }));
+      if (message.title) {
+        dispatch(renameHistory({ id, name: message.title }));
+      }
 
       // raise conversation if it is -1
       if (id === -1 && message.conversation) {

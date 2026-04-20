@@ -1,6 +1,7 @@
 package conversation
 
 import (
+	"chat/addition/title"
 	"chat/auth"
 	"chat/utils"
 	"github.com/gin-gonic/gin"
@@ -17,6 +18,10 @@ type ShareForm struct {
 type RenameConversationForm struct {
 	Id   int64  `json:"id"`
 	Name string `json:"name"`
+}
+
+type RetitleConversationForm struct {
+	Id int64 `json:"id"`
 }
 
 type DeleteMaskForm struct {
@@ -153,6 +158,55 @@ func RenameAPI(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":  true,
 		"message": "",
+	})
+}
+
+func RetitleAPI(c *gin.Context) {
+	user := auth.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": "user not found",
+		})
+		return
+	}
+
+	db := utils.GetDBFromContext(c)
+	cache := utils.GetCacheFromContext(c)
+	var form RetitleConversationForm
+	if err := c.ShouldBindJSON(&form); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": "invalid form",
+		})
+		return
+	}
+
+	conversation := LoadConversation(db, user.GetID(db), form.Id)
+	if conversation == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": "conversation not found",
+		})
+		return
+	}
+
+	name := title.GenerateConversationTitle(auth.GetGroup(db, user), conversation.GetMessage(), cache)
+	if strings.TrimSpace(name) == "" {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": "failed to generate title",
+		})
+		return
+	}
+
+	conversation.SetName(db, name)
+	c.JSON(http.StatusOK, gin.H{
+		"status":  true,
+		"message": "",
+		"data": gin.H{
+			"name": conversation.GetName(),
+		},
 	})
 }
 

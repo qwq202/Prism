@@ -1,7 +1,9 @@
 package manager
 
 import (
+	autotitle "chat/addition/title"
 	"chat/auth"
+	"chat/globals"
 	"chat/manager/conversation"
 	"chat/utils"
 	"fmt"
@@ -52,6 +54,30 @@ func getId(message string) (int, error) {
 	return 0, fmt.Errorf("message type error")
 }
 
+func maybeAutoTitle(conn *Connection, user *auth.User, instance *conversation.Conversation) {
+	if user == nil || instance == nil {
+		return
+	}
+
+	if instance.CountMessagesByRole(globals.User) != 1 || instance.CountMessagesByRole(globals.Assistant) != 1 {
+		return
+	}
+
+	title := autotitle.GenerateConversationTitle(
+		auth.GetGroup(conn.GetDB(), user),
+		instance.GetMessage(),
+		conn.GetCache(),
+	)
+	if strings.TrimSpace(title) == "" {
+		return
+	}
+
+	instance.SetName(conn.GetDB(), title)
+	_ = conn.SendClient(globals.ChatSegmentResponse{
+		Title: title,
+	})
+}
+
 func ChatAPI(c *gin.Context) {
 	var conn *utils.WebSocket
 	if conn = utils.NewWebsocket(c, false); conn == nil {
@@ -85,6 +111,7 @@ func ChatAPI(c *gin.Context) {
 			if instance.HandleMessage(db, form) {
 				response := ChatHandler(buf, user, instance, false)
 				instance.SaveResponse(db, response)
+				maybeAutoTitle(buf, user, instance)
 			}
 		case StopType:
 			break
@@ -96,6 +123,7 @@ func ChatAPI(c *gin.Context) {
 
 			response := ChatHandler(buf, user, instance, true)
 			instance.SaveResponse(db, response)
+			maybeAutoTitle(buf, user, instance)
 		case MaskType:
 			instance.LoadMask(form.Message)
 		case EditType:

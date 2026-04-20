@@ -8,6 +8,7 @@ func Register(app *gin.RouterGroup) {
 		router.GET("/list", ListAPI)
 		router.GET("/load", LoadAPI)
 		router.POST("/rename", RenameAPI)
+		router.POST("/retitle", RetitleAPI)
 		router.GET("/delete", DeleteAPI)
 		router.GET("/clean", CleanAPI)
 
