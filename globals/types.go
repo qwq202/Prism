@@ -2,20 +2,26 @@ package globals
 
 type Hook func(data *Chunk) error
 
+type GeminiHiddenMetadata struct {
+	ThoughtSignature *string `json:"thought_signature,omitempty"`
+}
+
 type Message struct {
-	Role             string        `json:"role"`
-	Content          string        `json:"content"`
-	Name             *string       `json:"name,omitempty"`
-	FunctionCall     *FunctionCall `json:"function_call,omitempty"`     // only `function` role
-	ToolCallId       *string       `json:"tool_call_id,omitempty"`      // only `tool` role
-	ToolCalls        *ToolCalls    `json:"tool_calls,omitempty"`        // only `assistant` role
-	ReasoningContent *string       `json:"reasoning_content,omitempty"` // only for deepseek reasoner models
+	Role                 string                `json:"role"`
+	Content              string                `json:"content"`
+	Name                 *string               `json:"name,omitempty"`
+	FunctionCall         *FunctionCall         `json:"function_call,omitempty"`          // only `function` role
+	ToolCallId           *string               `json:"tool_call_id,omitempty"`           // only `tool` role
+	ToolCalls            *ToolCalls            `json:"tool_calls,omitempty"`             // only `assistant` role
+	ReasoningContent     *string               `json:"reasoning_content,omitempty"`      // only for deepseek reasoner models
+	GeminiHiddenMetadata *GeminiHiddenMetadata `json:"gemini_hidden_metadata,omitempty"` // hidden gemini metadata for replay
 }
 
 type Chunk struct {
-	Content      string        `json:"content"`
-	ToolCall     *ToolCalls    `json:"tool_call,omitempty"`
-	FunctionCall *FunctionCall `json:"function_call,omitempty"`
+	Content              string                `json:"content"`
+	ToolCall             *ToolCalls            `json:"tool_call,omitempty"`
+	FunctionCall         *FunctionCall         `json:"function_call,omitempty"`
+	GeminiHiddenMetadata *GeminiHiddenMetadata `json:"gemini_hidden_metadata,omitempty"` // hidden gemini metadata for replay
 }
 
 type ChatSegmentResponse struct {

@@ -19,24 +19,25 @@ type Charge interface {
 }
 
 type Buffer struct {
-	Model           string                `json:"model"`
-	Quota           float32               `json:"quota"`
-	Data            string                `json:"data"`
-	Latest          string                `json:"latest"`
-	Cursor          int                   `json:"cursor"`
-	Times           int                   `json:"times"`
-	InputTokens     int                   `json:"input_tokens"`
-	Images          Images                `json:"images"`
-	ToolCalls       *globals.ToolCalls    `json:"tool_calls"`
-	ToolCallsCursor int                   `json:"tool_calls_cursor"`
-	FunctionCall    *globals.FunctionCall `json:"function_call"`
-	StartTime       *time.Time            `json:"-"`
-	Prompts         string                `json:"prompts"`
-	TokenName       string                `json:"-"`
-	ChannelId       int                   `json:"-"`
-	ChannelName     string                `json:"-"`
-	Charge          Charge                `json:"-"`
-	VisionRecall    bool                  `json:"-"`
+	Model                string                        `json:"model"`
+	Quota                float32                       `json:"quota"`
+	Data                 string                        `json:"data"`
+	Latest               string                        `json:"latest"`
+	Cursor               int                           `json:"cursor"`
+	Times                int                           `json:"times"`
+	InputTokens          int                           `json:"input_tokens"`
+	Images               Images                        `json:"images"`
+	ToolCalls            *globals.ToolCalls            `json:"tool_calls"`
+	ToolCallsCursor      int                           `json:"tool_calls_cursor"`
+	FunctionCall         *globals.FunctionCall         `json:"function_call"`
+	GeminiHiddenMetadata *globals.GeminiHiddenMetadata `json:"gemini_hidden_metadata,omitempty"`
+	StartTime            *time.Time                    `json:"-"`
+	Prompts              string                        `json:"prompts"`
+	TokenName            string                        `json:"-"`
+	ChannelId            int                           `json:"-"`
+	ChannelName          string                        `json:"-"`
+	Charge               Charge                        `json:"-"`
+	VisionRecall         bool                          `json:"-"`
 }
 
 func initInputToken(model string, history []globals.Message) int {
@@ -112,6 +113,7 @@ func (b *Buffer) WriteChunk(data *globals.Chunk) string {
 	b.Write(data.Content)
 	b.AddToolCalls(data.ToolCall)
 	b.SetFunctionCall(data.FunctionCall)
+	b.SetGeminiHiddenMetadata(data.GeminiHiddenMetadata)
 
 	return data.Content
 }
@@ -211,6 +213,51 @@ func (b *Buffer) SetFunctionCall(functionCall *globals.FunctionCall) {
 	b.FunctionCall = functionCall
 }
 
+func cloneGeminiHiddenMetadata(metadata *globals.GeminiHiddenMetadata) *globals.GeminiHiddenMetadata {
+	if metadata == nil {
+		return nil
+	}
+
+	copy := *metadata
+	if metadata.ThoughtSignature != nil {
+		signature := *metadata.ThoughtSignature
+		copy.ThoughtSignature = &signature
+	}
+	return &copy
+}
+
+func (b *Buffer) SetGeminiHiddenMetadata(metadata *globals.GeminiHiddenMetadata) {
+	if metadata == nil || metadata.IsEmpty() {
+		return
+	}
+
+	if b.GeminiHiddenMetadata == nil || b.GeminiHiddenMetadata.IsEmpty() {
+		b.GeminiHiddenMetadata = cloneGeminiHiddenMetadata(metadata)
+		return
+	}
+
+	if metadata.ThoughtSignature == nil || len(*metadata.ThoughtSignature) == 0 {
+		return
+	}
+
+	if b.GeminiHiddenMetadata.ThoughtSignature == nil {
+		signature := *metadata.ThoughtSignature
+		b.GeminiHiddenMetadata.ThoughtSignature = &signature
+		return
+	}
+
+	merged := *b.GeminiHiddenMetadata.ThoughtSignature + *metadata.ThoughtSignature
+	b.GeminiHiddenMetadata.ThoughtSignature = &merged
+}
+
+func (b *Buffer) GetGeminiHiddenMetadata() *globals.GeminiHiddenMetadata {
+	return cloneGeminiHiddenMetadata(b.GeminiHiddenMetadata)
+}
+
+func (b *Buffer) HasGeminiHiddenMetadata() bool {
+	return !b.GeminiHiddenMetadata.IsEmpty()
+}
+
 func (b *Buffer) GetToolCalls() *globals.ToolCalls {
 	calls := b.ToolCalls
 	b.ToolCalls = nil
@@ -227,7 +274,7 @@ func (b *Buffer) IsFunctionCalling() bool {
 }
 
 func (b *Buffer) IsEmpty() bool {
-	return b.Cursor == 0 && !b.IsFunctionCalling()
+	return b.Cursor == 0 && !b.IsFunctionCalling() && !b.HasGeminiHiddenMetadata()
 }
 
 func (b *Buffer) GetModel() string {
@@ -268,7 +315,7 @@ func (b *Buffer) ReadBytes() []byte {
 }
 
 func (b *Buffer) ReadWithDefault(_default string) string {
-	if b.IsEmpty() || (len(strings.TrimSpace(b.Data)) == 0 && !b.IsFunctionCalling()) {
+	if b.IsEmpty() || (len(strings.TrimSpace(b.Data)) == 0 && !b.IsFunctionCalling() && !b.HasGeminiHiddenMetadata()) {
 		return _default
 	}
 	return b.Data
