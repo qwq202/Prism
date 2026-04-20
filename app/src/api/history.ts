@@ -149,16 +149,6 @@ export async function retitleConversation(id: number): Promise<CommonResponse> {
   }
 }
 
-export async function retitleConversation(id: number): Promise<CommonResponse> {
-  try {
-    const resp = await axios.post("/conversation/retitle", { id });
-    return resp.data as CommonResponse;
-  } catch (e) {
-    console.warn(e);
-    return { status: false, error: getErrorMessage(e) };
-  }
-}
-
 export async function deleteAllConversations(): Promise<boolean> {
   try {
     const resp = await axios.get("/conversation/clean");
