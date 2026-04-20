@@ -14,7 +14,7 @@ export const initialSettings = {
   align: false,
   history: 8,
   sender: !isMobile(), // default [mobile: Ctrl + Enter, pc: Enter]
-  max_tokens: 2000,
+  max_tokens: 0,
   temperature: 0.6,
   top_p: 1,
   top_k: 5,
@@ -24,6 +24,7 @@ export const initialSettings = {
   hide_model: false,
   hide_toolbar: false,
   hide_toolbar_text: true,
+  collapse_thinking: false,
 };
 
 export const settingsSlice = createSlice({
@@ -34,7 +35,7 @@ export const settingsSlice = createSlice({
     align: getBooleanMemory("align", false), // chat textarea align center
     history: getNumberMemory("history_context", 8), // max history context length
     sender: getBooleanMemory("sender", !isMobile()), // sender (false: Ctrl + Enter, true: Enter)
-    max_tokens: getNumberMemory("max_tokens", 2000), // max tokens
+    max_tokens: getNumberMemory("max_tokens", 0), // max tokens, 0 means unlimited
     temperature: getNumberMemory("temperature", 0.6), // temperature
     top_p: getNumberMemory("top_p", 1), // top_p
     top_k: getNumberMemory("top_k", 5), // top_k
@@ -44,6 +45,7 @@ export const settingsSlice = createSlice({
     hide_model: getBooleanMemory("hide_model", false), // hide model
     hide_toolbar: getBooleanMemory("hide_toolbar", false), // hide toolbar
     hide_toolbar_text: getBooleanMemory("hide_toolbar_text", true), // hide toolbar text
+    collapse_thinking: getBooleanMemory("collapse_thinking", false), // collapse thinking content by default
   },
   reducers: {
     toggleDialog: (state) => {
@@ -114,6 +116,10 @@ export const settingsSlice = createSlice({
       state.hide_toolbar_text = action.payload as boolean;
       setBooleanMemory("hide_toolbar_text", action.payload);
     },
+    setCollapseThinking: (state, action) => {
+      state.collapse_thinking = action.payload as boolean;
+      setBooleanMemory("collapse_thinking", action.payload);
+    },
     resetSettings: (state) => {
       state.context = initialSettings.context;
       state.align = initialSettings.align;
@@ -129,6 +135,7 @@ export const settingsSlice = createSlice({
       state.hide_model = initialSettings.hide_model;
       state.hide_toolbar = initialSettings.hide_toolbar;
       state.hide_toolbar_text = initialSettings.hide_toolbar_text;
+      state.collapse_thinking = initialSettings.collapse_thinking;
 
       setBooleanMemory("context", initialSettings.context);
       setBooleanMemory("align", initialSettings.align);
@@ -144,6 +151,7 @@ export const settingsSlice = createSlice({
       setBooleanMemory("hide_model", initialSettings.hide_model);
       setBooleanMemory("hide_toolbar", initialSettings.hide_toolbar);
       setBooleanMemory("hide_toolbar_text", initialSettings.hide_toolbar_text);
+      setBooleanMemory("collapse_thinking", initialSettings.collapse_thinking);
     },
   },
 });
@@ -168,6 +176,7 @@ export const {
   setHideModel,
   setHideToolbar,
   setHideToolbarText,
+  setCollapseThinking,
 } = settingsSlice.actions;
 export default settingsSlice.reducer;
 
@@ -199,3 +208,5 @@ export const hideToolbarSelector = (state: RootState): boolean =>
   state.settings.hide_toolbar;
 export const hideToolbarTextSelector = (state: RootState): boolean =>
   state.settings.hide_toolbar_text;
+export const collapseThinkingSelector = (state: RootState): boolean =>
+  state.settings.collapse_thinking;
