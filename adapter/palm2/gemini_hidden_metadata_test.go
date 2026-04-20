@@ -76,9 +76,65 @@ func TestGetGeminiContentsReplaySignaturesOnFunctionCalls(t *testing.T) {
 	}
 }
 
-func TestGetGeminiContentsKeepsSignatureBoundariesAcrossSameRoleMessages(t *testing.T) {
+func TestGetGeminiContentsWithoutMetadataKeepsLegacySameRoleMerge(t *testing.T) {
 	instance := &ChatInstance{}
+	toolCalls1 := globals.ToolCalls{
+		{
+			Type: "function",
+			Id:   "call-1",
+			Function: globals.ToolCallFunction{
+				Name:      "lookup_weather",
+				Arguments: `{"city":"beijing"}`,
+			},
+		},
+	}
+	toolCalls2 := globals.ToolCalls{
+		{
+			Type: "function",
+			Id:   "call-2",
+			Function: globals.ToolCallFunction{
+				Name:      "lookup_air_quality",
+				Arguments: `{"city":"beijing"}`,
+			},
+		},
+	}
+
 	messages := []globals.Message{
+		{
+			Role:    globals.User,
+			Content: "start tool chain",
+		},
+		{
+			Role:      globals.Assistant,
+			ToolCalls: &toolCalls1,
+		},
+		{
+			Role:      globals.Assistant,
+			ToolCalls: &toolCalls2,
+		},
+	}
+
+	contents := instance.GetGeminiContents("gemini-3.0-flash", messages)
+	if len(contents) != 2 {
+		t.Fatalf("expected legacy same-role merge when no metadata exists, got %d contents", len(contents))
+	}
+
+	parts := contents[1].Parts
+	if len(parts) != 2 {
+		t.Fatalf("expected merged assistant function-call parts, got %d parts", len(parts))
+	}
+
+	if parts[0].FunctionCall == nil || parts[1].FunctionCall == nil {
+		t.Fatalf("expected both merged parts to remain function-call parts, got %#v", parts)
+	}
+	if parts[0].ThoughtSignature != nil || parts[1].ThoughtSignature != nil {
+		t.Fatalf("expected no signature injection without metadata, got %#v", parts)
+	}
+}
+
+func TestGetGeminiContentsBoundaryOnlyWithSignatureBearingParts(t *testing.T) {
+	instance := &ChatInstance{}
+	withSignature := []globals.Message{
 		{
 			Role:    globals.User,
 			Content: "start",
@@ -96,13 +152,61 @@ func TestGetGeminiContentsKeepsSignatureBoundariesAcrossSameRoleMessages(t *test
 		},
 	}
 
-	contents := instance.GetGeminiContents("gemini-3.0-flash", messages)
-	if len(contents) != 3 {
-		t.Fatalf("expected signature-bearing assistant content to keep a boundary, got %d contents", len(contents))
+	withoutSignature := []globals.Message{
+		{
+			Role:    globals.User,
+			Content: "start",
+		},
+		{
+			Role:    globals.Assistant,
+			Content: "first",
+		},
+		{
+			Role:    globals.Assistant,
+			Content: "second",
+		},
 	}
 
-	if contents[1].Role != GeminiModelType || contents[2].Role != GeminiModelType {
-		t.Fatalf("expected both assistant messages to map to model role, got %#v", contents)
+	withSignatureContents := instance.GetGeminiContents("gemini-3.0-flash", withSignature)
+	withoutSignatureContents := instance.GetGeminiContents("gemini-3.0-flash", withoutSignature)
+
+	if len(withSignatureContents) != 3 {
+		t.Fatalf("expected signature-bearing assistant content to force boundary, got %d contents", len(withSignatureContents))
+	}
+	if len(withoutSignatureContents) != 2 {
+		t.Fatalf("expected legacy merge without signature-bearing parts, got %d contents", len(withoutSignatureContents))
+	}
+}
+
+func TestGetGeminiPartsReplayNotInjectedOutsideAssistantTurns(t *testing.T) {
+	userMessage := globals.Message{
+		Role:    globals.User,
+		Content: "hello",
+		GeminiHiddenMetadata: &globals.GeminiHiddenMetadata{
+			ThoughtSignatures: []string{"sig-user"},
+		},
+	}
+	userParts := getGeminiParts("gemini-3.0-flash", nil, userMessage)
+	for _, part := range userParts {
+		if part.ThoughtSignature != nil {
+			t.Fatalf("expected no signature replay on user turn, got part %#v", part)
+		}
+	}
+
+	toolName := "lookup_weather"
+	toolMessage := globals.Message{
+		Role:    globals.Tool,
+		Content: `{"temp":"27"}`,
+		Name:    &toolName,
+		GeminiHiddenMetadata: &globals.GeminiHiddenMetadata{
+			ThoughtSignatures: []string{"sig-tool"},
+		},
+	}
+	toolParts := getGeminiParts("gemini-3.0-flash", nil, toolMessage)
+	for _, part := range toolParts {
+		if part.ThoughtSignature != nil {
+			t.Fatalf("expected no signature replay on tool turn, got part %#v", part)
+		}
 	}
 }
 

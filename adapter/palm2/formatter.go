@@ -169,27 +169,14 @@ func replayGeminiHiddenMetadata(parts []GeminiChatPart, metadata *globals.Gemini
 	index := 0
 	// We only persist a flat signature list, so original per-part placement is unavailable.
 	// For deterministic replay and Gemini function-calling continuity, map signatures to
-	// functionCall parts first, then earliest remaining parts, and append signature-only
-	// thought parts when signatures outnumber visible parts.
+	// functionCall parts first (especially the first call), and append any remaining
+	// signatures as metadata-only thought parts instead of mutating unrelated visible parts.
 	for i := range result {
 		if index >= len(normalized.ThoughtSignatures) {
 			return result
 		}
 
 		if result[i].FunctionCall == nil || result[i].ThoughtSignature != nil {
-			continue
-		}
-
-		result[i].ThoughtSignature = utils.ToPtr(normalized.ThoughtSignatures[index])
-		index++
-	}
-
-	for i := range result {
-		if index >= len(normalized.ThoughtSignatures) {
-			return result
-		}
-
-		if result[i].ThoughtSignature != nil {
 			continue
 		}
 
@@ -215,25 +202,23 @@ func getGeminiParts(model string, history []globals.Message, message globals.Mes
 		for _, call := range *message.ToolCalls {
 			parts = append(parts, getGeminiFunctionCallPart(call.Function.Name, call.Function.Arguments))
 		}
-		return replayGeminiHiddenMetadata(parts, message.GeminiHiddenMetadata)
-	}
-
-	if message.FunctionCall != nil {
+	} else if message.FunctionCall != nil {
 		parts = []GeminiChatPart{
 			getGeminiFunctionCallPart(message.FunctionCall.Name, message.FunctionCall.Arguments),
 		}
-		return replayGeminiHiddenMetadata(parts, message.GeminiHiddenMetadata)
-	}
-
-	if message.Role == globals.Tool {
+	} else if message.Role == globals.Tool {
 		part := getGeminiToolResponsePart(history, message)
 		if part != nil {
 			parts = []GeminiChatPart{*part}
-			return replayGeminiHiddenMetadata(parts, message.GeminiHiddenMetadata)
 		}
+	} else {
+		parts = getGeminiContent(make([]GeminiChatPart, 0), message.Content, model)
 	}
 
-	parts = getGeminiContent(make([]GeminiChatPart, 0), message.Content, model)
+	if message.Role != globals.Assistant {
+		return parts
+	}
+
 	return replayGeminiHiddenMetadata(parts, message.GeminiHiddenMetadata)
 }
 
@@ -244,7 +229,7 @@ func appendGeminiContent(result []GeminiContent, role string, parts []GeminiChat
 
 	if len(result) > 0 && role == result[len(result)-1].Role {
 		last := result[len(result)-1].Parts
-		if !hasGeminiReplayBoundaryParts(last) && !hasGeminiReplayBoundaryParts(parts) {
+		if !hasGeminiThoughtSignatureParts(last) && !hasGeminiThoughtSignatureParts(parts) {
 			result[len(result)-1].Parts = append(last, parts...)
 			return result
 		}
@@ -256,9 +241,9 @@ func appendGeminiContent(result []GeminiContent, role string, parts []GeminiChat
 	})
 }
 
-func hasGeminiReplayBoundaryParts(parts []GeminiChatPart) bool {
+func hasGeminiThoughtSignatureParts(parts []GeminiChatPart) bool {
 	for _, part := range parts {
-		if part.ThoughtSignature != nil || part.FunctionCall != nil || part.FunctionResponse != nil {
+		if part.ThoughtSignature != nil {
 			return true
 		}
 	}
