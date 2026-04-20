@@ -28,6 +28,7 @@ export const getRoleIcon = (role: string) => {
 export type Message = {
   role: string;
   content: string;
+  model?: string;
   keyword?: string;
   quota?: number;
   end?: boolean;

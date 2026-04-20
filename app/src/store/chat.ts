@@ -176,18 +176,24 @@ const chatSlice = createSlice({
   } as initialStateType,
   reducers: {
     createMessage: (state, action) => {
-      const { id, role, content } = action.payload as {
+      const { id, role, content, model } = action.payload as {
         id: number;
         role: string;
         content?: string;
+        model?: string;
       };
 
       const conversation = state.conversations[id];
       if (!conversation) return;
 
+      if (role === AssistantRole && model) {
+        conversation.model = model;
+      }
+
       conversation.messages.push({
         role: role ?? AssistantRole,
         content: content ?? "",
+        model,
         end: role === AssistantRole ? false : undefined,
       });
     },
@@ -200,25 +206,32 @@ const chatSlice = createSlice({
       }
     },
     updateMessage: (state, action) => {
-      const { id, message } = action.payload as {
+      const { id, message, model } = action.payload as {
         id: number;
         message: StreamMessage;
+        model?: string;
       };
       const conversation = state.conversations[id];
       if (!conversation) return;
 
-      if (conversation.messages.length === 0)
+      if (conversation.messages.length === 0) {
+        if (model) {
+          conversation.model = model;
+        }
         conversation.messages.push({
           role: AssistantRole,
-          content: message.message,
+          content: "",
+          model,
           keyword: message.keyword,
           quota: message.quota,
           end: message.end,
           plan: message.plan,
         });
+      }
 
       const instance = conversation.messages[conversation.messages.length - 1];
       if (message.message.length > 0) instance.content += message.message;
+      if (!instance.model && model) instance.model = model;
       if (message.keyword) instance.keyword = message.keyword;
       if (message.quota) instance.quota = message.quota;
       if (message.end) instance.end = message.end;
@@ -232,13 +245,18 @@ const chatSlice = createSlice({
       conversation.messages.splice(idx, 1);
     },
     restartMessage: (state, action) => {
-      const id = action.payload as number;
+      const { id, model } = action.payload as { id: number; model?: string };
       const conversation = state.conversations[id];
       if (!conversation || conversation.messages.length === 0) return;
+
+      if (model) {
+        conversation.model = model;
+      }
 
       conversation.messages.push({
         role: AssistantRole,
         content: "",
+        model,
         end: false,
       });
     },
@@ -642,7 +660,13 @@ export function useMessageActions() {
       dispatch(
         createMessage({ id: current, role: UserRole, content: message }),
       );
-      dispatch(createMessage({ id: current, role: AssistantRole }));
+      dispatch(
+        createMessage({
+          id: current,
+          role: AssistantRole,
+          model: targetModel,
+        }),
+      );
 
       return true;
     },
@@ -687,7 +711,7 @@ export function useMessageActions() {
       });
 
       // remove the last message if it's from assistant and create a new message
-      dispatch(restartMessage(current));
+      dispatch(restartMessage({ id: current, model }));
     },
     remove: (idx: number) => {
       if (idx < 0 || idx >= conversations[current].messages.length) return;
@@ -705,7 +729,8 @@ export function useMessageActions() {
       stack.sendEditEvent(current, t, idx, message);
     },
     receive: async (id: number, message: StreamMessage) => {
-      dispatch(updateMessage({ id, message }));
+      const conversationModel = conversations[id]?.model;
+      dispatch(updateMessage({ id, message, model: conversationModel }));
       if (message.title) {
         dispatch(renameHistory({ id, name: message.title }));
       }

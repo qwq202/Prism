@@ -74,6 +74,7 @@ function ChatInterface({ scrollable, setTarget }: ChatInterfaceProps) {
               >
                 <MessageSegment
                   message={message}
+                  model={message.model}
                   end={originalIndex === messages.length - 1}
                   onEvent={(event: string, index?: number, message?: string) => {
                     process({ id: current, event, index: index ?? originalIndex, message });

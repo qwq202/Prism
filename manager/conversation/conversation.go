@@ -334,6 +334,7 @@ func (c *Conversation) AddMessageFromAssistant(message string) {
 	c.AddMessage(globals.Message{
 		Role:    globals.Assistant,
 		Content: message,
+		Model:   c.GetModel(),
 	})
 }
 
@@ -430,6 +431,9 @@ func (c *Conversation) GetLatestMessage() string {
 
 func (c *Conversation) SaveResponse(db *sql.DB, message globals.Message) bool {
 	message.Role = globals.Assistant
+	if message.Model == "" {
+		message.Model = c.GetModel()
+	}
 
 	// Keep UI semantics stable: do not persist assistant messages with no visible payload.
 	if strings.TrimSpace(message.Content) == "" && message.FunctionCall == nil && (message.ToolCalls == nil || len(*message.ToolCalls) == 0) {

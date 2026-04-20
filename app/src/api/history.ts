@@ -41,6 +41,14 @@ export async function loadConversation(
         for (let i = 0; i < conversation.message.length; i++) {
           const currentMsg = conversation.message[i];
 
+          if (
+            currentMsg.role === "assistant" &&
+            !currentMsg.model &&
+            conversation.model
+          ) {
+            currentMsg.model = conversation.model;
+          }
+
           if (currentMsg.role === VirtualWebSearchRole) {
             let nextMsgIndex = i + 1;
             while (

@@ -40,6 +40,7 @@ func (m *GeminiHiddenMetadata) UnmarshalJSON(data []byte) error {
 type Message struct {
 	Role                 string                `json:"role"`
 	Content              string                `json:"content"`
+	Model                string                `json:"model,omitempty"`
 	Name                 *string               `json:"name,omitempty"`
 	FunctionCall         *FunctionCall         `json:"function_call,omitempty"`          // only `function` role
 	ToolCallId           *string               `json:"tool_call_id,omitempty"`           // only `tool` role

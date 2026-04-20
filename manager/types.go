@@ -9,6 +9,7 @@ import (
 type Message struct {
 	Role                 string                        `json:"role,omitempty"`
 	Content              interface{}                   `json:"content"`
+	Model                string                        `json:"model,omitempty"`
 	Name                 *string                       `json:"name,omitempty"`
 	FunctionCall         *globals.FunctionCall         `json:"function_call,omitempty"`          // only `function` role
 	ToolCallId           *string                       `json:"tool_call_id,omitempty"`           // only `tool` role
@@ -186,6 +187,7 @@ func transform(m []Message) []globals.Message {
 		messages = append(messages, globals.Message{
 			Role:                 v.Role,
 			Content:              transformContent(v.Content),
+			Model:                v.Model,
 			Name:                 v.Name,
 			FunctionCall:         v.FunctionCall,
 			ToolCallId:           v.ToolCallId,

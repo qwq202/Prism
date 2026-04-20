@@ -89,3 +89,21 @@ func TestSaveResponsePersistsFunctionCallWithoutText(t *testing.T) {
 		t.Fatalf("expected function call payload to be preserved, got %#v", last.FunctionCall)
 	}
 }
+
+func TestSaveResponsePersistsConversationModelOnAssistantReply(t *testing.T) {
+	instance := NewAnonymousConversation()
+	instance.SetModel("grok-4.20-reasoning")
+
+	saved := instance.SaveResponse(nil, globals.Message{
+		Content: "hello from grok",
+	})
+
+	if !saved {
+		t.Fatalf("expected assistant response to be persisted")
+	}
+
+	last := instance.GetLastMessage()
+	if last.Model != "grok-4.20-reasoning" {
+		t.Fatalf("expected persisted model to be preserved, got %q", last.Model)
+	}
+}

@@ -36,7 +36,7 @@ import { selectUsername } from "@/store/auth.ts";
 import { motion } from "framer-motion";
 import { ThinkContent } from "@/components/ThinkContent";
 import ModelAvatar from "@/components/ModelAvatar.tsx";
-import { selectModel, selectSupportModels } from "@/store/chat.ts";
+import { selectSupportModels } from "@/store/chat.ts";
 
 type MessageProps = {
   index: number;
@@ -258,13 +258,12 @@ function MessageContent({
   const isAssistant = message.role === "assistant";
   const isOutput = message.end === false;
   const user = useSelector(selectUsername);
-  const currentModel = useSelector(selectModel);
   const supportModels = useSelector(selectSupportModels);
 
   const [open, setOpen] = useState(false);
   const [editedMessage, setEditedMessage] = useState<string | undefined>("");
 
-  const modelId = model || currentModel;
+  const modelId = model;
   const messageModel =
     supportModels.find((item) => item.id === modelId) || {
       id: modelId || "assistant",
