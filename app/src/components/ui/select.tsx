@@ -80,13 +80,19 @@ SelectScrollDownButton.displayName =
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = "popper", ...props }) => {
+>(({ className, children, position = "popper", ...props }, ref) => {
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
-        ref={(ref) => {
-          if (!ref) return;
-          ref.ontouchend = (e) => {
+        ref={(node) => {
+          if (typeof ref === "function") {
+            ref(node);
+          } else if (ref) {
+            ref.current = node;
+          }
+
+          if (!node) return;
+          node.ontouchend = (e) => {
             e.preventDefault();
             e.stopPropagation();
           };

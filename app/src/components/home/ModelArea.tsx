@@ -46,9 +46,9 @@ import {
   SelectLabel,
   SelectSeparator,
 } from "@/components/ui/select.tsx";
-import { ChatAction } from "@/components/home/assemblies/ChatAction.tsx";
 import Icon from "@/components/utils/Icon.tsx";
 import { toast } from "sonner";
+import { cn } from "@/components/ui/lib/utils.ts";
 
 const tagIcons: { [key: string]: React.ReactNode } = {
   official: <Award />,
@@ -268,10 +268,15 @@ export function ModelArea() {
         dispatch(setModel(value));
       }}
     >
-      <NativeSelectTrigger>
-        <ChatAction text={t("model")}>
+      <NativeSelectTrigger
+        className={cn(
+          "mr-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-all duration-300 hover:bg-muted-foreground/5",
+        )}
+        aria-label={t("model")}
+      >
+        <span className="flex items-center justify-center">
           <Icon icon={current.icon} className={`h-4 w-4`} />
-        </ChatAction>
+        </span>
       </NativeSelectTrigger>
       <SelectContent>
         <SelectGroupUI>

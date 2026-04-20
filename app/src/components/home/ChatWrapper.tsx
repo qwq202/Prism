@@ -170,6 +170,7 @@ function ChatWrapper() {
           >
             <AnimatePresence key="model">
               <motion.div
+                key="model-area"
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
@@ -178,6 +179,7 @@ function ChatWrapper() {
                 <ModelArea />
               </motion.div>
               <motion.div
+                key="web-action"
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
@@ -186,6 +188,7 @@ function ChatWrapper() {
                 <WebAction />
               </motion.div>
               <motion.div
+                key="gemini-thinking-action"
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
@@ -194,6 +197,7 @@ function ChatWrapper() {
                 <GeminiThinkingAction />
               </motion.div>
               <motion.div
+                key="file-action"
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
@@ -202,6 +206,7 @@ function ChatWrapper() {
                 <FileAction files={files} dispatch={fileDispatch} />
               </motion.div>
               <motion.div
+                key="voice-action"
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
@@ -210,6 +215,7 @@ function ChatWrapper() {
                 <VoiceAction />
               </motion.div>
               <motion.div
+                key="scroll-action"
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
@@ -230,6 +236,7 @@ function ChatWrapper() {
             />
             <AnimatePresence key="new">
               <motion.div
+                key="new-conversation-action"
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}

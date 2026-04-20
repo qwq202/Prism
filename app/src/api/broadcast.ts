@@ -41,7 +41,7 @@ export type BroadcastEvent = {
 
 export async function getBroadcast(): Promise<BroadcastEvent> {
   const data = await getRawBroadcast();
-  const content = data.content.trim();
+  const content = (data?.content ?? "").trim();
 
   if (content.length === 0)
     return {
