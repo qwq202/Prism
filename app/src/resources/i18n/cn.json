@@ -249,7 +249,7 @@
     "web-aria": "切换网络搜索功能",
     "web-enable-toast": "已开启联网搜索",
     "web-enable-tip": "联网搜索可能会消耗更多 Token",
-    "gemini-web-enable-tip": "当前使用的是 Gemini 模型自带联网功能，你可以单独开启 Gemini 联网搜索和网页上下文，这些能力可能会消耗更多 Token。",
+    "gemini-web-enable-tip": "使用 Gemini 原生联网，可单独开启搜索和网页上下文，会消耗更多 Token。",
     "gemini-thinking-tip": "支持 Gemini 原生思考。开启后会按思考深度消耗更多 Token。",
     "web-disable-toast": "已关闭联网搜索",
     "web-enable-page-summary-toast": "已开启逐页总结",
