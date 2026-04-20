@@ -60,18 +60,23 @@ func PreflightCache(cache *redis.Client, model string, hash string, buffer *util
 	}
 
 	data := buf.Read()
-	if data == "" {
+	toolCalls := buf.GetToolCalls()
+	functionCall := buf.GetFunctionCall()
+	hiddenMetadata := buf.GetGeminiHiddenMetadata()
+	if data == "" && hiddenMetadata.IsEmpty() {
 		return idx, false, nil
 	}
 
 	buffer.SetInputTokens(buf.CountInputToken())
-	buffer.SetToolCalls(buf.GetToolCalls())
-	buffer.SetFunctionCall(buf.GetFunctionCall())
+	buffer.SetToolCalls(toolCalls)
+	buffer.SetFunctionCall(functionCall)
+	buffer.SetGeminiHiddenMetadata(hiddenMetadata)
 
 	return idx, true, hook(&globals.Chunk{
-		Content:      data,
-		FunctionCall: buf.GetFunctionCall(),
-		ToolCall:     buf.GetToolCalls(),
+		Content:              data,
+		FunctionCall:         functionCall,
+		ToolCall:             toolCalls,
+		GeminiHiddenMetadata: hiddenMetadata,
 	})
 }
 

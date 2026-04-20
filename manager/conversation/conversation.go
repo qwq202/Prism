@@ -417,8 +417,9 @@ func (c *Conversation) GetLatestMessage() string {
 	return c.Message[len(c.Message)-1].Content
 }
 
-func (c *Conversation) SaveResponse(db *sql.DB, message string) {
-	c.AddMessageFromAssistant(message)
+func (c *Conversation) SaveResponse(db *sql.DB, message globals.Message) {
+	message.Role = globals.Assistant
+	c.AddMessage(message)
 	c.SaveConversation(db)
 }
 

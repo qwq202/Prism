@@ -252,7 +252,7 @@ func createChatTask(
 	}
 }
 
-func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conversation, restart bool) string {
+func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conversation, restart bool) globals.Message {
 	defer func() {
 		if err := recover(); err != nil {
 			stack := debug.Stack()
@@ -281,7 +281,10 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 			Quota:   0,
 			End:     true,
 		})
-		return message
+		return globals.Message{
+			Role:    globals.Assistant,
+			Content: message,
+		}
 	}
 
 	buffer := utils.NewBuffer(model, segment, channel.ChargeInstance.GetCharge(model))
@@ -296,7 +299,10 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 			Message: err.Error(),
 			End:     true,
 		})
-		return err.Error()
+		return globals.Message{
+			Role:    globals.Assistant,
+			Content: err.Error(),
+		}
 	}
 
 	if !hit {
@@ -320,7 +326,10 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 			Message: defaultMessage,
 			End:     true,
 		})
-		return defaultMessage
+		return globals.Message{
+			Role:    globals.Assistant,
+			Content: defaultMessage,
+		}
 	}
 
 	conn.Send(globals.ChatSegmentResponse{
@@ -329,5 +338,9 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 		Plan:  plan,
 	})
 
-	return buffer.ReadWithDefault(defaultMessage)
+	return globals.Message{
+		Role:                 globals.Assistant,
+		Content:              buffer.ReadWithDefault(defaultMessage),
+		GeminiHiddenMetadata: buffer.GetGeminiHiddenMetadata(),
+	}
 }

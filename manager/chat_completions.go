@@ -157,6 +157,7 @@ func sendTranshipmentResponse(c *gin.Context, form RelayForm, messages []globals
 	}
 
 	tools := buffer.GetToolCalls()
+	hiddenMetadata := buffer.GetGeminiHiddenMetadata()
 
 	c.JSON(http.StatusOK, RelayResponse{
 		Id:      fmt.Sprintf("chatcmpl-%s", id),
@@ -167,10 +168,11 @@ func sendTranshipmentResponse(c *gin.Context, form RelayForm, messages []globals
 			{
 				Index: 0,
 				Message: globals.Message{
-					Role:         globals.Assistant,
-					Content:      buffer.Read(),
-					ToolCalls:    tools,
-					FunctionCall: buffer.GetFunctionCall(),
+					Role:                 globals.Assistant,
+					Content:              buffer.Read(),
+					ToolCalls:            tools,
+					FunctionCall:         buffer.GetFunctionCall(),
+					GeminiHiddenMetadata: hiddenMetadata,
 				},
 				FinishReason: utils.Multi(tools != nil, ReasonToolCalls, ReasonStop),
 			},
@@ -218,10 +220,11 @@ func getStreamTranshipmentForm(id string, created int64, form RelayForm, data *g
 			{
 				Index: 0,
 				Delta: Message{
-					Role:         getRole(data),
-					Content:      data.Content,
-					ToolCalls:    data.ToolCall,
-					FunctionCall: data.FunctionCall,
+					Role:                 getRole(data),
+					Content:              data.Content,
+					ToolCalls:            data.ToolCall,
+					FunctionCall:         data.FunctionCall,
+					GeminiHiddenMetadata: data.GeminiHiddenMetadata,
 				},
 				FinishReason: getFinishReason(buffer, end),
 			},
