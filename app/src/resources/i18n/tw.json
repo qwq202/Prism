@@ -546,11 +546,20 @@
       "about-user-placeholder": "告訴助手一些關於你的背景、偏好或常見場景",
       "options": {
         "style": {
+          "default": "預設",
+          "default-desc": "預設風格和語調",
+          "professional": "專業可靠",
+          "professional-desc": "精雕細琢",
           "friendly": "親和友善",
-          "professional": "專業穩重",
-          "concise": "簡潔利落",
-          "direct": "直接明確",
-          "playful": "輕鬆活潑"
+          "friendly-desc": "溫和建議",
+          "direct": "直言不諱",
+          "direct-desc": "直率樂觀",
+          "creative": "天馬行空",
+          "creative-desc": "趣味幻想",
+          "efficient": "高效務實",
+          "efficient-desc": "簡練直白",
+          "sarcastic": "吐槽達人",
+          "sarcastic-desc": "犀利毒舌型"
         },
         "level": {
           "default": "預設",

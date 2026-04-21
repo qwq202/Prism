@@ -87,24 +87,39 @@ function Personalization() {
 
   const styleOptions: SelectOption[] = [
     {
-      value: "friendly",
-      label: t("settings.personalization.options.style.friendly"),
+      value: "default",
+      label: t("settings.personalization.options.style.default"),
+      desc: t("settings.personalization.options.style.default-desc"),
     },
     {
       value: "professional",
       label: t("settings.personalization.options.style.professional"),
+      desc: t("settings.personalization.options.style.professional-desc"),
     },
     {
-      value: "concise",
-      label: t("settings.personalization.options.style.concise"),
+      value: "friendly",
+      label: t("settings.personalization.options.style.friendly"),
+      desc: t("settings.personalization.options.style.friendly-desc"),
     },
     {
       value: "direct",
       label: t("settings.personalization.options.style.direct"),
+      desc: t("settings.personalization.options.style.direct-desc"),
     },
     {
-      value: "playful",
-      label: t("settings.personalization.options.style.playful"),
+      value: "creative",
+      label: t("settings.personalization.options.style.creative"),
+      desc: t("settings.personalization.options.style.creative-desc"),
+    },
+    {
+      value: "efficient",
+      label: t("settings.personalization.options.style.efficient"),
+      desc: t("settings.personalization.options.style.efficient-desc"),
+    },
+    {
+      value: "sarcastic",
+      label: t("settings.personalization.options.style.sarcastic"),
+      desc: t("settings.personalization.options.style.sarcastic-desc"),
     },
   ];
 

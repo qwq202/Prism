@@ -474,11 +474,20 @@
       "about-user-placeholder": "Interests, values, or preferences to remember",
       "options": {
         "style": {
-          "friendly": "Friendly",
+          "default": "Default",
+          "default-desc": "Preset style and tone",
           "professional": "Professional",
-          "concise": "Concise",
-          "direct": "Straightforward",
-          "playful": "Playful"
+          "professional-desc": "Refined and precise",
+          "friendly": "Friendly",
+          "friendly-desc": "Warm and gentle",
+          "direct": "Candid",
+          "direct-desc": "Frank and upbeat",
+          "creative": "Creative",
+          "creative-desc": "Imaginative and whimsical",
+          "efficient": "Efficient",
+          "efficient-desc": "Concise and practical",
+          "sarcastic": "Sarcastic",
+          "sarcastic-desc": "Witty and sharp-tongued"
         },
         "level": {
           "default": "Default",

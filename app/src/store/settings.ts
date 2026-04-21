@@ -27,7 +27,7 @@ export const initialSettings = {
   hide_toolbar: false,
   hide_toolbar_text: true,
   collapse_thinking: false,
-  persona_style: "friendly",
+  persona_style: "default",
   persona_warmth: "default",
   persona_enthusiasm: "default",
   persona_lists: "default",
@@ -51,11 +51,12 @@ export type PersonalizationSettings = {
 };
 
 const stylePromptMap: Record<string, string> = {
-  friendly: "Keep the default response style warm, approachable, and collaborative.",
-  concise: "Keep the default response style concise, crisp, and efficient.",
-  professional: "Keep the default response style polished, calm, and professional.",
-  playful: "Keep the default response style lively, witty, and playful when appropriate.",
-  direct: "Keep the default response style straightforward, candid, and low-frills.",
+  professional: "Keep the response style polished, precise, and professional — refined and detail-oriented.",
+  friendly: "Keep the response style warm, approachable, and gently supportive.",
+  direct: "Keep the response style candid, frank, and optimistically straightforward.",
+  creative: "Keep the response style imaginative, playful, and wonderfully whimsical.",
+  efficient: "Keep the response style concise, practical, and straight to the point.",
+  sarcastic: "Feel free to be witty, sharp-tongued, and humorously sarcastic when fitting.",
 };
 
 const warmthPromptMap: Record<string, string> = {

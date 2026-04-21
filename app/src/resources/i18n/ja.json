@@ -474,11 +474,20 @@
       "about-user-placeholder": "あなたの経歴、好み、または一般的なシナリオについてアシスタントに何かを伝えます",
       "options": {
         "style": {
+          "default": "デフォルト",
+          "default-desc": "プリセットスタイル",
+          "professional": "プロフェッショナル",
+          "professional-desc": "洗練、精緻",
           "friendly": "フレンドリー",
-          "professional": "プロフェッショナルで安定している",
-          "concise": "シンプルで清潔",
-          "direct": "わかりやすい",
-          "playful": "リラックスして活気がある"
+          "friendly-desc": "温かく優しい",
+          "direct": "率直",
+          "direct-desc": "直率で前向き",
+          "creative": "クリエイティブ",
+          "creative-desc": "想像力豊か",
+          "efficient": "効率的",
+          "efficient-desc": "簡潔で実用的",
+          "sarcastic": "毒舌",
+          "sarcastic-desc": "鋭くウィットがある"
         },
         "level": {
           "default": "デフォルト",

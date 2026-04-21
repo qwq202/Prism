@@ -740,11 +740,20 @@
       "about-user-placeholder": "需要记住的兴趣、价值观或偏好",
       "options": {
         "style": {
+          "default": "默认",
+          "default-desc": "预设风格和语调",
+          "professional": "专业可靠",
+          "professional-desc": "精雕细琢",
           "friendly": "亲和友善",
-          "professional": "专业稳重",
-          "concise": "简洁利落",
-          "direct": "直接明确",
-          "playful": "轻松活泼"
+          "friendly-desc": "温和建议",
+          "direct": "直言不讳",
+          "direct-desc": "直率乐观",
+          "creative": "天马行空",
+          "creative-desc": "趣味幻想",
+          "efficient": "高效务实",
+          "efficient-desc": "简练直白",
+          "sarcastic": "吐槽达人",
+          "sarcastic-desc": "犀利毒舌型"
         },
         "level": {
           "default": "默认",
