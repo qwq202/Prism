@@ -65,7 +65,6 @@ import {
 import { toast } from "sonner";
 import Emoji from "@/components/Emoji";
 import { motion } from "framer-motion";
-import { useInView } from "react-intersection-observer";
 
 type AccountCardProps = {
   title: string;
@@ -87,48 +86,16 @@ function AccountCard({
   classNameWrapper,
 }: AccountCardProps) {
   const { t } = useTranslation();
-  const [ref, inView] = useInView({
-    triggerOnce: true,
-    threshold: 0.12,
-  });
-
-  const containerVariants = {
-    hidden: { opacity: 0, y: 32 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.45,
-        ease: "easeOut",
-        when: "beforeChildren",
-        staggerChildren: 0.08,
-      },
-    },
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 18 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.35, ease: "easeOut" },
-    },
-  };
 
   return (
-    <motion.div
-      ref={ref}
+    <div
       className={cn(
         `flex flex-col bg-background rounded-lg shadow border overflow-hidden`,
         classNameWrapper,
       )}
-      variants={containerVariants}
-      initial="hidden"
-      animate={inView ? "visible" : "hidden"}
     >
-      <motion.div
+      <div
         className={`select-none inline-flex flex-row items-center h-fit w-full border-b px-4 py-2.5 bg-muted/20`}
-        variants={itemVariants}
       >
         <div className="flex items-center mr-2.5">
           {icon && (
@@ -144,19 +111,16 @@ function AccountCard({
             <p className="text-xs text-secondary">{t(description)}</p>
           )}
         </div>
-      </motion.div>
-      <motion.div className={cn("p-4", className)} variants={itemVariants}>
+      </div>
+      <div className={cn("p-4", className)}>
         {children}
-      </motion.div>
+      </div>
       {footer && (
-        <motion.div
-          className={`flex flex-row items-center px-4 pb-4 pt-2`}
-          variants={itemVariants}
-        >
+        <div className={`flex flex-row items-center px-4 pb-4 pt-2`}>
           {footer}
-        </motion.div>
+        </div>
       )}
-    </motion.div>
+    </div>
   );
 }
 
@@ -183,10 +147,8 @@ function ShareContent({ data }: ShareContentProps) {
           key={row.conversation_id}
           onClick={() => openWindow(getSharedLink(row.hash), "_blank")}
           className="flex items-center justify-between w-full border border-input p-4 rounded-lg hover:bg-muted/20 duration-200 cursor-pointer transition-colors"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
           whileHover={{ y: -2 }}
+          transition={{ type: "spring", stiffness: 320, damping: 24 }}
         >
           <div className="flex-grow mr-4">
             <div className="flex items-center mb-1">
@@ -246,6 +208,38 @@ function Account() {
   const apiKey = useSelector(keySelector);
   const [loadingApiKey, setLoadingApiKey] = useState(false);
   const [openResetApiKey, setOpenResetApiKey] = useState(false);
+
+  const pageVariants = {
+    hidden: { opacity: 0, y: 18 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.35,
+        ease: "easeOut",
+        when: "beforeChildren",
+        staggerChildren: 0.08,
+      },
+    },
+  };
+
+  const cardVariants = {
+    hidden: { opacity: 0, y: 22 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.4, ease: "easeOut" },
+    },
+  };
+
+  const contentVariants = {
+    hidden: { opacity: 0, y: 14 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.3, ease: "easeOut" },
+    },
+  };
 
   const getSystemKey = async () => {
     if (!init) return;
@@ -310,286 +304,291 @@ function Account() {
     <ScrollArea
       className={`relative w-full h-full flex flex-col bg-background`}
     >
-      <div
+      <motion.div
         className={`px-4 py-6 md:py-12 lg:py-16 h-full flex flex-col w-full max-w-3xl mx-auto space-y-4`}
+        variants={pageVariants}
+        initial="hidden"
+        animate="visible"
       >
-        <AccountCard
-          icon={<UserRoundIcon />}
-          title={"account.my-account"}
-          description={t("account.my-account-description")}
-          footer={
-            !auth ? (
-              <Button
-                classNameWrapper={`ml-auto`}
-                className={`flex flex-row items-center`}
-                onClick={goAuth}
-              >
-                <HandIcon className={`h-4 w-4 mr-1.5`} />
-                {t("login")}
-              </Button>
-            ) : (
-              <Button
-                classNameWrapper={`ml-auto`}
-                className={`flex flex-row items-center`}
-                onClick={() => dispatch(logout())}
-              >
-                <Undo2 className={`h-4 w-4 mr-1.5`} />
-                {t("logout")}
-              </Button>
-            )
-          }
-        >
-          <div className="flex flex-col space-y-4">
-            <motion.div
-              className="flex items-center space-x-4"
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: 0.05 }}
-            >
-              <Avatar
-                username={username}
-                className="w-16 h-16 shrink-0 shadow text-lg rounded-full"
-              />
-              <div className="flex flex-row w-full">
-                <div className="flex flex-col w-fit">
-                  <p
-                    className="text-xl font-semibold cursor-pointer select-none"
-                    onClick={() => copy(username)}
-                  >
-                    {auth ? username : t("anonymous")}
-                  </p>
-                  <p className="text-sm text-muted-foreground">#{info.id}</p>
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div
-              className="flex flex-wrap gap-2"
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: 0.12 }}
-            >
-              <Badge className="px-3 py-1 text-sm font-medium">
-                {t(`admin.channels.groups.${group}`)}
-              </Badge>
-              <Badge
-                variant="outline"
-                className="px-3 py-1 text-sm font-medium"
-              >
-                {t(`account.registerDays`, {
-                  days: Math.ceil(info.register_days),
-                })}
-              </Badge>
-            </motion.div>
-          </div>
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <motion.div
-              className="bg-card shadow-sm rounded-lg p-4 transition-all border"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: 0.18 }}
-              whileHover={{ y: -3 }}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">
-                  {t("account.current-quota")}
-                </span>
-                <Cloud className="w-10 h-10 p-2 rounded-lg bg-muted/40 text-secondary stroke-[1]" />
-              </div>
-              <p className="text-md">{quota.toFixed(2)}</p>
-            </motion.div>
-            <motion.div
-              className="bg-card shadow-sm rounded-lg p-4 transition-all border"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: 0.24 }}
-              whileHover={{ y: -3 }}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">
-                  {t("account.used-quota")}
-                </span>
-                <CloudRain className="w-10 h-10 p-2 rounded-lg bg-muted/40 text-secondary stroke-[1]" />
-              </div>
-              <p className="text-md">{info.used_quota.toFixed(2)}</p>
-            </motion.div>
-            <motion.div
-              className="bg-card shadow-sm rounded-lg p-4 transition-all border"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: 0.3 }}
-              whileHover={{ y: -3 }}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">
-                  {t("account.plan-total-month")}
-                </span>
-                <CalendarClock className="w-10 h-10 p-2 rounded-lg bg-muted/40 text-secondary stroke-[1]" />
-              </div>
-              <div className="flex items-center">
-                <p className="text-md mr-2">{info.plan_total_month}</p>
-                <Tips
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                  content={t("account.plan-total-month-tips")}
-                />
-              </div>
-            </motion.div>
-          </div>
-        </AccountCard>
-        <DeeptrainOnly>
+        <motion.div variants={cardVariants}>
           <AccountCard
-            title={"account.deeptrain"}
-            description={t("account.deeptrain-description")}
-            icon={<UserRoundCog />}
+            icon={<UserRoundIcon />}
+            title={"account.my-account"}
+            description={t("account.my-account-description")}
             footer={
-              auth ? (
+              !auth ? (
                 <Button
-                  className={`flex flex-row items-center`}
                   classNameWrapper={`ml-auto`}
-                  onClick={() => openWindow(`${deeptrainEndpoint}/home`)}
+                  className={`flex flex-row items-center`}
+                  onClick={goAuth}
                 >
-                  <ExternalLink className={`h-4 w-4 mr-1.5`} />
-                  {t("manage")}
-                </Button>
-              ) : (
-                <Button classNameWrapper={`ml-auto`} onClick={goAuth}>
                   <HandIcon className={`h-4 w-4 mr-1.5`} />
                   {t("login")}
+                </Button>
+              ) : (
+                <Button
+                  classNameWrapper={`ml-auto`}
+                  className={`flex flex-row items-center`}
+                  onClick={() => dispatch(logout())}
+                >
+                  <Undo2 className={`h-4 w-4 mr-1.5`} />
+                  {t("logout")}
                 </Button>
               )
             }
           >
-            <div className={`flex flex-row items-center space-x-2`}>
-              <img
-                src={`${deeptrainEndpoint}/favicon.ico`}
-                alt={``}
-                className={`w-12 h-12 select-none cursor-pointer`}
-                onClick={() => openWindow(`${deeptrainEndpoint}/home`)}
-              />
-              <div className={`inline-flex flex-col`}>
-                <p className={`text-common text-sm font-bold`}>DeepTrain SSO</p>
-                <p className={`text-secondary text-xs`}>
-                  {t("account.deeptrain-description")}
-                </p>
-              </div>
-            </div>
-          </AccountCard>
-        </DeeptrainOnly>
-        <AccountCard
-          title={"api.title"}
-          description={t("account.api-description")}
-          icon={<Plug />}
-        >
-          <div className={`api-dialog`}>
-            <div className={`api-wrapper flex flex-row space-x-1`}>
-              <Button
-                variant={`outline`}
-                size={`icon-sm`}
-                className={`shrink-0`}
-                onClick={getSystemKey}
+            <div className="flex flex-col space-y-4">
+              <motion.div
+                className="flex items-center space-x-4"
+                variants={contentVariants}
               >
-                <RotateCw
-                  className={cn("h-3.5 w-3.5", loadingApiKey && "animate-spin")}
+                <Avatar
+                  username={username}
+                  className="w-16 h-16 shrink-0 shadow text-lg rounded-full"
                 />
-              </Button>
-              <Input
-                type={`password`}
-                value={apiKey}
-                readOnly={true}
-                classNameWrapper={`grow`}
-                className={`text-xs h-8`}
-              />
-              <Button
-                variant={`default`}
-                className={`shrink-0`}
-                size={`icon-sm`}
-                onClick={copySystemKey}
-              >
-                <Copy className={`h-3.5 w-3.5`} />
-              </Button>
+                <div className="flex flex-row w-full">
+                  <div className="flex flex-col w-fit">
+                    <p
+                      className="text-xl font-semibold cursor-pointer select-none"
+                      onClick={() => copy(username)}
+                    >
+                      {auth ? username : t("anonymous")}
+                    </p>
+                    <p className="text-sm text-muted-foreground">#{info.id}</p>
+                  </div>
+                </div>
+              </motion.div>
+
+              <motion.div className="flex flex-wrap gap-2" variants={contentVariants}>
+                <Badge className="px-3 py-1 text-sm font-medium">
+                  {t(`admin.channels.groups.${group}`)}
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className="px-3 py-1 text-sm font-medium"
+                >
+                  {t(`account.registerDays`, {
+                    days: Math.ceil(info.register_days),
+                  })}
+                </Badge>
+              </motion.div>
             </div>
-            <div className={`flex flex-row mt-2 items-center justify-center`}>
-              <AlertDialog
-                open={openResetApiKey}
-                onOpenChange={setOpenResetApiKey}
+            <motion.div
+              className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3"
+              variants={contentVariants}
+            >
+              <motion.div
+                className="bg-card shadow-sm rounded-lg p-4 transition-all border"
+                variants={contentVariants}
+                whileHover={{ y: -3 }}
               >
-                <AlertDialogTrigger asChild>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {t("account.current-quota")}
+                  </span>
+                  <Cloud className="w-10 h-10 p-2 rounded-lg bg-muted/40 text-secondary stroke-[1]" />
+                </div>
+                <p className="text-md">{quota.toFixed(2)}</p>
+              </motion.div>
+              <motion.div
+                className="bg-card shadow-sm rounded-lg p-4 transition-all border"
+                variants={contentVariants}
+                whileHover={{ y: -3 }}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {t("account.used-quota")}
+                  </span>
+                  <CloudRain className="w-10 h-10 p-2 rounded-lg bg-muted/40 text-secondary stroke-[1]" />
+                </div>
+                <p className="text-md">{info.used_quota.toFixed(2)}</p>
+              </motion.div>
+              <motion.div
+                className="bg-card shadow-sm rounded-lg p-4 transition-all border"
+                variants={contentVariants}
+                whileHover={{ y: -3 }}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {t("account.plan-total-month")}
+                  </span>
+                  <CalendarClock className="w-10 h-10 p-2 rounded-lg bg-muted/40 text-secondary stroke-[1]" />
+                </div>
+                <div className="flex items-center">
+                  <p className="text-md mr-2">{info.plan_total_month}</p>
+                  <Tips
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    content={t("account.plan-total-month-tips")}
+                  />
+                </div>
+              </motion.div>
+            </motion.div>
+          </AccountCard>
+        </motion.div>
+        <DeeptrainOnly>
+          <motion.div variants={cardVariants}>
+            <AccountCard
+              title={"account.deeptrain"}
+              description={t("account.deeptrain-description")}
+              icon={<UserRoundCog />}
+              footer={
+                auth ? (
                   <Button
-                    variant={`destructive`}
-                    size={`default-sm`}
-                    className={`text-xs mr-2`}
+                    className={`flex flex-row items-center`}
+                    classNameWrapper={`ml-auto`}
+                    onClick={() => openWindow(`${deeptrainEndpoint}/home`)}
                   >
-                    <Power className={`h-3.5 w-3.5 mr-2`} />
-                    {t("api.reset")}
+                    <ExternalLink className={`h-4 w-4 mr-1.5`} />
+                    {t("manage")}
                   </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>{t("api.reset")}</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {t("api.reset-description")}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
+                ) : (
+                  <Button classNameWrapper={`ml-auto`} onClick={goAuth}>
+                    <HandIcon className={`h-4 w-4 mr-1.5`} />
+                    {t("login")}
+                  </Button>
+                )
+              }
+            >
+              <motion.div
+                className={`flex flex-row items-center space-x-2`}
+                variants={contentVariants}
+              >
+                <img
+                  src={`${deeptrainEndpoint}/favicon.ico`}
+                  alt={``}
+                  className={`w-12 h-12 select-none cursor-pointer`}
+                  onClick={() => openWindow(`${deeptrainEndpoint}/home`)}
+                />
+                <div className={`inline-flex flex-col`}>
+                  <p className={`text-common text-sm font-bold`}>DeepTrain SSO</p>
+                  <p className={`text-secondary text-xs`}>
+                    {t("account.deeptrain-description")}
+                  </p>
+                </div>
+              </motion.div>
+            </AccountCard>
+          </motion.div>
+        </DeeptrainOnly>
+        <motion.div variants={cardVariants}>
+          <AccountCard
+            title={"api.title"}
+            description={t("account.api-description")}
+            icon={<Plug />}
+          >
+            <motion.div className={`api-dialog`} variants={contentVariants}>
+              <div className={`api-wrapper flex flex-row space-x-1`}>
+                <Button
+                  variant={`outline`}
+                  size={`icon-sm`}
+                  className={`shrink-0`}
+                  onClick={getSystemKey}
+                >
+                  <RotateCw
+                    className={cn("h-3.5 w-3.5", loadingApiKey && "animate-spin")}
+                  />
+                </Button>
+                <Input
+                  type={`password`}
+                  value={apiKey}
+                  readOnly={true}
+                  classNameWrapper={`grow`}
+                  className={`text-xs h-8`}
+                />
+                <Button
+                  variant={`default`}
+                  className={`shrink-0`}
+                  size={`icon-sm`}
+                  onClick={copySystemKey}
+                >
+                  <Copy className={`h-3.5 w-3.5`} />
+                </Button>
+              </div>
+              <div className={`flex flex-row mt-2 items-center justify-center`}>
+                <AlertDialog
+                  open={openResetApiKey}
+                  onOpenChange={setOpenResetApiKey}
+                >
+                  <AlertDialogTrigger asChild>
                     <Button
                       variant={`destructive`}
-                      loading={true}
-                      onClick={resetSystemKey}
-                      unClickable
+                      size={`default-sm`}
+                      className={`text-xs mr-2`}
                     >
-                      {t("confirm")}
+                      <Power className={`h-3.5 w-3.5 mr-2`} />
+                      {t("api.reset")}
                     </Button>
-                    <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>{t("api.reset")}</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {t("api.reset-description")}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <Button
+                        variant={`destructive`}
+                        loading={true}
+                        onClick={resetSystemKey}
+                        unClickable
+                      >
+                        {t("confirm")}
+                      </Button>
+                      <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
 
-              <Button
-                variant={`outline`}
-                size={`default-sm`}
-                className={`text-xs`}
-                asChild
-              >
-                <a href={docsEndpoint} target={`_blank`}>
-                  <ExternalLink className={`h-3.5 w-3.5 mr-2`} />
-                  {t("api.learn-more")}
-                </a>
-              </Button>
-            </div>
-          </div>
-        </AccountCard>
-        <AccountCard
-          icon={<Share2 />}
-          title={"share.manage"}
-          description={t("account.share-description")}
-          className={`bg-background px-1`}
-        >
-          {sharingData.length > 0 ? (
-            <ScrollArea className={`h-48 md:h-64 px-4`}>
-              <div className={`w-full`}>
-                <ShareContent data={sharingData} />
+                <Button
+                  variant={`outline`}
+                  size={`default-sm`}
+                  className={`text-xs`}
+                  asChild
+                >
+                  <a href={docsEndpoint} target={`_blank`}>
+                    <ExternalLink className={`h-3.5 w-3.5 mr-2`} />
+                    {t("api.learn-more")}
+                  </a>
+                </Button>
               </div>
-            </ScrollArea>
-          ) : (
-            <div
-              className={`flex flex-col items-center text-sm select-none py-8`}
-            >
-              <Emoji
-                emoji={`1f4c2`}
-                className="w-12 h-12 p-2 rounded-md bg-muted/80 mb-4"
-              />
-              <p>{t("share.empty")}</p>
-
-              <p
-                className={`flex flex-row items-center text-xs text-secondary mt-1.5`}
+            </motion.div>
+          </AccountCard>
+        </motion.div>
+        <motion.div variants={cardVariants}>
+          <AccountCard
+            icon={<Share2 />}
+            title={"share.manage"}
+            description={t("account.share-description")}
+            className={`bg-background px-1`}
+          >
+            {sharingData.length > 0 ? (
+              <ScrollArea className={`h-48 md:h-64 px-4`}>
+                <div className={`w-full`}>
+                  <ShareContent data={sharingData} />
+                </div>
+              </ScrollArea>
+            ) : (
+              <motion.div
+                className={`flex flex-col items-center text-sm select-none py-8`}
+                variants={contentVariants}
               >
-                <HelpCircle className={`h-3 w-3 mr-1`} />
-                {t("share.share-tip")}
-              </p>
-            </div>
-          )}
-        </AccountCard>
-      </div>
+                <Emoji
+                  emoji={`1f4c2`}
+                  className="w-12 h-12 p-2 rounded-md bg-muted/80 mb-4"
+                />
+                <p>{t("share.empty")}</p>
+
+                <p
+                  className={`flex flex-row items-center text-xs text-secondary mt-1.5`}
+                >
+                  <HelpCircle className={`h-3 w-3 mr-1`} />
+                  {t("share.share-tip")}
+                </p>
+              </motion.div>
+            )}
+          </AccountCard>
+        </motion.div>
+      </motion.div>
     </ScrollArea>
   );
 }
