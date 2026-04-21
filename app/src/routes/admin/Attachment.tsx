@@ -17,81 +17,18 @@ import { withNotify } from "@/api/common.ts";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { cn } from "@/components/ui/lib/utils.ts";
-import { ExternalLink, RotateCcw, Trash2 } from "lucide-react";
+import { ExternalLink, RotateCw, Trash2 } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table.tsx";
+import { mobile } from "@/utils/device.ts";
 
-function AttachmentItem({
-  name,
-  size,
-  updated_at,
-  storage_mode,
-  public_url,
-  referenced,
-  reference_count,
-  onUpdate,
-}: Attachment & { onUpdate: () => Promise<void> }) {
-  const { t } = useTranslation();
-
-  const onDelete = async () => {
-    const confirmed = window.confirm(
-      referenced
-        ? t("admin.attachment.delete-referenced-confirm", {
-            name,
-            count: reference_count,
-          })
-        : t("admin.attachment.delete-confirm", { name }),
-    );
-    if (!confirmed) return;
-
-    const res = await deleteAttachment(name);
-    withNotify(t, res, true);
-    if (res.status) await onUpdate();
-  };
-
-  return (
-    <div className="flex items-center gap-3 p-3 w-full max-w-full bg-background rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 mb-2">
-      <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium text-foreground break-all whitespace-pre-wrap">
-          {name}
-        </div>
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <span>{getSizeUnit(size)}</span>
-          <span>{new Date(updated_at).toLocaleString()}</span>
-          <Badge variant="outline" className="uppercase">
-            {storage_mode}
-          </Badge>
-          <Badge
-            variant={referenced ? "default" : "secondary"}
-            className={cn(!referenced && "text-muted-foreground")}
-          >
-            {referenced
-              ? t("admin.attachment.referenced-count", { count: reference_count })
-              : t("admin.attachment.orphan")}
-          </Badge>
-        </div>
-      </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => window.open(public_url, "_blank", "noopener,noreferrer")}
-          title={t("admin.attachment.open")}
-        >
-          <ExternalLink className="w-4 h-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onDelete}
-          title={t("delete")}
-        >
-          <Trash2 className="w-4 h-4 text-destructive" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function AttachmentManager() {
+function AdminAttachment() {
   const { t } = useTranslation();
   const [data, setData] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -107,37 +44,127 @@ function AttachmentManager() {
     await sync();
   }, []);
 
+  const onDelete = async (item: Attachment) => {
+    const confirmed = window.confirm(
+      item.referenced
+        ? t("admin.attachment.delete-referenced-confirm", {
+            name: item.name,
+            count: item.reference_count,
+          })
+        : t("admin.attachment.delete-confirm", { name: item.name }),
+    );
+    if (!confirmed) return;
+
+    const res = await deleteAttachment(item.name);
+    withNotify(t, res, true);
+    if (res.status) await sync();
+  };
+
   return (
-    <div className="attachment">
+    <div className={cn("user-interface", mobile && "mobile")}>
       <Card className="admin-card">
         <CardHeader className="select-none">
           <div className="flex items-center gap-2">
             <CardTitle>{t("admin.attachment.title")}</CardTitle>
             <div className="grow" />
             <Button onClick={sync} variant="outline" size="icon">
-              <RotateCcw className={cn("w-4 h-4", loading && "animate-spin")} />
+              <RotateCw className={cn("w-4 h-4", loading && "animate-spin")} />
             </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="text-sm text-muted-foreground mb-3">
+          <div className="text-sm text-muted-foreground mb-4">
             {t("admin.attachment.description")}
           </div>
-          {data.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-6 text-center">
-              {t("admin.attachment.empty")}
-            </div>
-          ) : (
-            <div className="attachment-list">
-              {data.map((item) => (
-                <AttachmentItem key={item.name} {...item} onUpdate={sync} />
-              ))}
-            </div>
-          )}
+
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("admin.attachment.file-name")}</TableHead>
+                  <TableHead>{t("admin.attachment.storage-mode")}</TableHead>
+                  <TableHead>{t("admin.attachment.file-size")}</TableHead>
+                  <TableHead>{t("admin.attachment.reference-status")}</TableHead>
+                  <TableHead>{t("admin.attachment.updated-at")}</TableHead>
+                  <TableHead>{t("admin.attachment.action")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.length === 0 && !loading && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="text-center text-muted-foreground py-8"
+                    >
+                      {t("admin.attachment.empty")}
+                    </TableCell>
+                  </TableRow>
+                )}
+                {data.map((item) => (
+                  <TableRow key={item.name}>
+                    <TableCell className="font-medium max-w-[280px]">
+                      <div className="break-all whitespace-pre-wrap">
+                        {item.name}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="uppercase">
+                        {item.storage_mode}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{getSizeUnit(item.size)}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={item.referenced ? "default" : "secondary"}
+                        className={cn(
+                          !item.referenced && "text-muted-foreground",
+                        )}
+                      >
+                        {item.referenced
+                          ? t("admin.attachment.referenced-count", {
+                              count: item.reference_count,
+                            })
+                          : t("admin.attachment.orphan")}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                      {new Date(item.updated_at).toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            window.open(
+                              item.public_url,
+                              "_blank",
+                              "noopener,noreferrer",
+                            )
+                          }
+                          title={t("admin.attachment.open")}
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onDelete(item)}
+                          title={t("delete")}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
   );
 }
 
-export default AttachmentManager;
+export default AdminAttachment;

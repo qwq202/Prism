@@ -552,7 +552,13 @@
       "orphan": "孤兒附件",
       "referenced-count": "已被引用 {{count}} 次",
       "delete-confirm": "確定刪除附件 {{name}} 嗎？",
-      "delete-referenced-confirm": "附件 {{name}} 仍被 {{count}} 條對話引用，刪除後相關圖片將失效，確定繼續嗎？"
+      "delete-referenced-confirm": "附件 {{name}} 仍被 {{count}} 條對話引用，刪除後相關圖片將失效，確定繼續嗎？",
+      "file-name": "文件名",
+      "storage-mode": "儲存模式",
+      "file-size": "大小：",
+      "reference-status": "引用狀態",
+      "updated-at": "更新時間",
+      "action": "操作"
     },
     "exit": "退出後台",
     "billing": "收入",

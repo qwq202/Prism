@@ -1049,7 +1049,13 @@
       "orphan": "孤立ファイル",
       "referenced-count": "{{count}} 件の会話で参照中",
       "delete-confirm": "添付ファイル {{name}} を削除しますか？",
-      "delete-referenced-confirm": "添付ファイル {{name}} はまだ {{count}} 件の会話で参照されています。削除すると画像が無効になります。続行しますか？"
+      "delete-referenced-confirm": "添付ファイル {{name}} はまだ {{count}} 件の会話で参照されています。削除すると画像が無効になります。続行しますか？",
+      "file-name": "ファイル名",
+      "storage-mode": "保管モード",
+      "file-size": "サイズ",
+      "reference-status": "参照ステータス",
+      "updated-at": "アップデート時間",
+      "action": "操作"
     },
     "logger": {
       "title": "サービスログ",
