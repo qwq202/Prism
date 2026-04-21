@@ -965,7 +965,10 @@
         "prompt": "カスタムプロンプト",
         "promptPlaceholder": "{max_len}はプレースホルダーとして使用できます",
         "tip": "LLMを使用して、最初のラウンドの会話の後、セッションのタイトルを自動的に要約して設定します。カスタムプロンプトワードが空に設定されている場合、CoAIのデフォルト設定のデフォルトプロンプトワードが使用されます。"
-      }
+      },
+      "storageMode_r2": "R 2",
+      "storageR2AccountId": "アカウントID",
+      "storageR2Jurisdiction": "管轄"
     },
     "user": "ユーザー管理",
     "invitation-code": "招待コード",

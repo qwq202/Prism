@@ -857,7 +857,7 @@ function StorageSettings({
           onValueChange={(value: string) => {
             dispatch({
               type: "update:common.storage_mode",
-              value: value === "s3" ? "s3" : "local",
+              value: value === "s3" ? "s3" : value === "r2" ? "r2" : "local",
             });
           }}
         >
@@ -869,6 +869,7 @@ function StorageSettings({
           <SelectContent>
             <SelectItem value="local">{t("admin.system.storageMode_local")}</SelectItem>
             <SelectItem value="s3">{t("admin.system.storageMode_s3")}</SelectItem>
+            <SelectItem value="r2">{t("admin.system.storageMode_r2")}</SelectItem>
           </SelectContent>
         </Select>
       </ParagraphItem>
@@ -963,6 +964,86 @@ function StorageSettings({
                   value,
                 });
               }}
+            />
+          </ParagraphItem>
+        </>
+      )}
+      {data.storage_mode === "r2" && (
+        <>
+          <ParagraphItem>
+            <Label>{t("admin.system.storageR2AccountId")}</Label>
+            <Input
+              value={data.r2.account_id}
+              onChange={(e) =>
+                dispatch({
+                  type: "update:common.r2.account_id",
+                  value: e.target.value,
+                })
+              }
+              placeholder={`0123456789abcdef0123456789abcdef`}
+            />
+          </ParagraphItem>
+          <ParagraphItem>
+            <Label>{t("admin.system.storageR2Jurisdiction")}</Label>
+            <Input
+              value={data.r2.jurisdiction}
+              onChange={(e) =>
+                dispatch({
+                  type: "update:common.r2.jurisdiction",
+                  value: e.target.value,
+                })
+              }
+              placeholder={`eu`}
+            />
+          </ParagraphItem>
+          <ParagraphItem>
+            <Label>{t("admin.system.storageBucket")}</Label>
+            <Input
+              value={data.r2.bucket}
+              onChange={(e) =>
+                dispatch({
+                  type: "update:common.r2.bucket",
+                  value: e.target.value,
+                })
+              }
+              placeholder={`your-bucket`}
+            />
+          </ParagraphItem>
+          <ParagraphItem>
+            <Label>{t("admin.system.storageAccessKey")}</Label>
+            <Input
+              value={data.r2.access_key}
+              onChange={(e) =>
+                dispatch({
+                  type: "update:common.r2.access_key",
+                  value: e.target.value,
+                })
+              }
+            />
+          </ParagraphItem>
+          <ParagraphItem>
+            <Label>{t("admin.system.storageSecretKey")}</Label>
+            <Input
+              value={data.r2.secret_key}
+              onChange={(e) =>
+                dispatch({
+                  type: "update:common.r2.secret_key",
+                  value: e.target.value,
+                })
+              }
+            />
+          </ParagraphItem>
+          <ParagraphItem>
+            <Label>{t("admin.system.storagePublicBaseUrl")}</Label>
+            <Input
+              value={data.r2.public_base_url}
+              onChange={(e) =>
+                dispatch({
+                  type: "update:common.r2.public_base_url",
+                  value: e.target.value,
+                })
+              }
+              placeholder={`https://pub-xxxxxxxx.r2.dev`}
             />
           </ParagraphItem>
         </>

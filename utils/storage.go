@@ -34,9 +34,8 @@ func AttachmentLocalPath(name string) string {
 }
 
 func AttachmentPublicURL(name string) string {
-	if strings.EqualFold(strings.TrimSpace(globals.StorageMode), "s3") &&
-		strings.TrimSpace(globals.StorageS3PublicBaseURL) != "" {
-		return fmt.Sprintf("%s/%s", strings.TrimSuffix(globals.StorageS3PublicBaseURL, "/"), AttachmentObjectKey(name))
+	if publicBaseURL := getStoragePublicBaseURL(); publicBaseURL != "" {
+		return fmt.Sprintf("%s/%s", strings.TrimSuffix(publicBaseURL, "/"), AttachmentObjectKey(name))
 	}
 
 	if strings.TrimSpace(globals.NotifyUrl) != "" {
@@ -79,16 +78,78 @@ func s3StorageReady() bool {
 		strings.TrimSpace(globals.StorageS3SecretKey) != ""
 }
 
+func r2StorageReady() bool {
+	return strings.EqualFold(strings.TrimSpace(globals.StorageMode), "r2") &&
+		strings.TrimSpace(globals.StorageR2AccountID) != "" &&
+		strings.TrimSpace(globals.StorageR2Bucket) != "" &&
+		strings.TrimSpace(globals.StorageR2AccessKey) != "" &&
+		strings.TrimSpace(globals.StorageR2SecretKey) != ""
+}
+
+func getStoragePublicBaseURL() string {
+	switch strings.ToLower(strings.TrimSpace(globals.StorageMode)) {
+	case "s3":
+		return strings.TrimSpace(globals.StorageS3PublicBaseURL)
+	case "r2":
+		return strings.TrimSpace(globals.StorageR2PublicBaseURL)
+	default:
+		return ""
+	}
+}
+
+func getR2Endpoint() string {
+	accountID := strings.TrimSpace(globals.StorageR2AccountID)
+	if accountID == "" {
+		return ""
+	}
+
+	jurisdiction := strings.TrimSpace(globals.StorageR2Jurisdiction)
+	if jurisdiction == "" {
+		return fmt.Sprintf("https://%s.r2.cloudflarestorage.com", accountID)
+	}
+
+	return fmt.Sprintf("https://%s.%s.r2.cloudflarestorage.com", accountID, jurisdiction)
+}
+
 func newS3Client(ctx context.Context) (*s3.Client, error) {
-	if !s3StorageReady() {
+	var (
+		region         string
+		accessKey      string
+		secretKey      string
+		endpoint       string
+		forcePathStyle bool
+	)
+
+	switch strings.ToLower(strings.TrimSpace(globals.StorageMode)) {
+	case "s3":
+		if !s3StorageReady() {
+			return nil, fmt.Errorf("s3 storage is not configured")
+		}
+
+		region = globals.StorageS3Region
+		accessKey = globals.StorageS3AccessKey
+		secretKey = globals.StorageS3SecretKey
+		endpoint = strings.TrimSpace(globals.StorageS3Endpoint)
+		forcePathStyle = globals.StorageS3ForcePathStyle
+	case "r2":
+		if !r2StorageReady() {
+			return nil, fmt.Errorf("r2 storage is not configured")
+		}
+
+		region = "auto"
+		accessKey = globals.StorageR2AccessKey
+		secretKey = globals.StorageR2SecretKey
+		endpoint = getR2Endpoint()
+		forcePathStyle = true
+	default:
 		return nil, fmt.Errorf("s3 storage is not configured")
 	}
 
 	loadOptions := []func(*awsconfig.LoadOptions) error{
-		awsconfig.WithRegion(globals.StorageS3Region),
+		awsconfig.WithRegion(region),
 		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
-			globals.StorageS3AccessKey,
-			globals.StorageS3SecretKey,
+			accessKey,
+			secretKey,
 			"",
 		)),
 	}
@@ -99,11 +160,26 @@ func newS3Client(ctx context.Context) (*s3.Client, error) {
 	}
 
 	return s3.NewFromConfig(cfg, func(o *s3.Options) {
-		o.UsePathStyle = globals.StorageS3ForcePathStyle
-		if strings.TrimSpace(globals.StorageS3Endpoint) != "" {
-			o.BaseEndpoint = aws.String(globals.StorageS3Endpoint)
+		o.UsePathStyle = forcePathStyle
+		if endpoint != "" {
+			o.BaseEndpoint = aws.String(endpoint)
 		}
 	}), nil
+}
+
+func storageBucket() string {
+	switch strings.ToLower(strings.TrimSpace(globals.StorageMode)) {
+	case "s3":
+		return globals.StorageS3Bucket
+	case "r2":
+		return globals.StorageR2Bucket
+	default:
+		return ""
+	}
+}
+
+func storageModeReady() bool {
+	return s3StorageReady() || r2StorageReady()
 }
 
 func normalizeContentType(contentType string) string {
@@ -202,7 +278,7 @@ func writeAttachmentS3(ctx context.Context, name string, data []byte, contentTyp
 	}
 
 	_, err = client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket:      aws.String(globals.StorageS3Bucket),
+		Bucket:      aws.String(storageBucket()),
 		Key:         aws.String(AttachmentObjectKey(name)),
 		Body:        bytes.NewReader(data),
 		ContentType: aws.String(normalizeContentType(contentType)),
@@ -217,7 +293,7 @@ func readAttachmentS3(ctx context.Context, name string) ([]byte, string, error) 
 	}
 
 	object, err := client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(globals.StorageS3Bucket),
+		Bucket: aws.String(storageBucket()),
 		Key:    aws.String(AttachmentObjectKey(name)),
 	})
 	if err != nil {
@@ -240,7 +316,7 @@ func deleteAttachmentS3(ctx context.Context, name string) error {
 	}
 
 	_, err = client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(globals.StorageS3Bucket),
+		Bucket: aws.String(storageBucket()),
 		Key:    aws.String(AttachmentObjectKey(name)),
 	})
 	return err
@@ -258,7 +334,7 @@ func StoreImage(source string) string {
 	}
 
 	name := attachmentNameForSource(source, contentType)
-	if strings.EqualFold(strings.TrimSpace(globals.StorageMode), "s3") {
+	if storageModeReady() && !strings.EqualFold(strings.TrimSpace(globals.StorageMode), "local") {
 		if err := writeAttachmentS3(context.Background(), name, data, contentType); err != nil {
 			globals.Warn(fmt.Sprintf("[utils] upload image error: %s", err.Error()))
 			return source
@@ -278,13 +354,12 @@ func ServeStoredAttachment(c *gin.Context, name string) {
 		return
 	}
 
-	if strings.EqualFold(strings.TrimSpace(globals.StorageMode), "s3") &&
-		strings.TrimSpace(globals.StorageS3PublicBaseURL) != "" {
+	if publicBaseURL := getStoragePublicBaseURL(); publicBaseURL != "" {
 		c.Redirect(http.StatusTemporaryRedirect, AttachmentPublicURL(name))
 		return
 	}
 
-	if s3StorageReady() {
+	if storageModeReady() {
 		data, contentType, err := readAttachmentS3(c.Request.Context(), name)
 		if err != nil {
 			globals.Warn(fmt.Sprintf("[utils] read s3 attachment error: %s", err.Error()))
@@ -313,7 +388,7 @@ func DeleteStoredAttachment(name string) error {
 		}
 	}
 
-	if s3StorageReady() {
+	if storageModeReady() {
 		if err := deleteAttachmentS3(context.Background(), name); err != nil {
 			if result == nil {
 				result = err

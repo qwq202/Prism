@@ -153,6 +153,15 @@ export type S3StorageState = {
   force_path_style: boolean;
 };
 
+export type R2StorageState = {
+  account_id: string;
+  jurisdiction: string;
+  bucket: string;
+  access_key: string;
+  secret_key: string;
+  public_base_url: string;
+};
+
 export type CommonState = {
   cache: string[];
   expire: number;
@@ -163,8 +172,9 @@ export type CommonState = {
 
   prompt_store: boolean;
   image_store: boolean;
-  storage_mode: "local" | "s3";
+  storage_mode: "local" | "s3" | "r2";
   s3: S3StorageState;
+  r2: R2StorageState;
 };
 
 export type SystemProps = {
@@ -259,6 +269,14 @@ export const initialSystemState: SystemProps = {
       public_base_url: "",
       force_path_style: false,
     },
+    r2: {
+      account_id: "",
+      jurisdiction: "",
+      bucket: "",
+      access_key: "",
+      secret_key: "",
+      public_base_url: "",
+    },
   },
   payment: {
     stripe: {
@@ -339,7 +357,11 @@ export async function getConfig(): Promise<SystemResponse> {
 
       data.data.site.currency = data.data.site.currency || "cny";
       data.data.common.storage_mode =
-        data.data.common.storage_mode === "s3" ? "s3" : "local";
+        data.data.common.storage_mode === "s3"
+          ? "s3"
+          : data.data.common.storage_mode === "r2"
+            ? "r2"
+            : "local";
       const s3 = (data.data.common.s3 = data.data.common.s3 || {
         endpoint: "",
         region: "",
@@ -356,6 +378,20 @@ export async function getConfig(): Promise<SystemResponse> {
       s3.secret_key = s3.secret_key || "";
       s3.public_base_url = s3.public_base_url || "";
       s3.force_path_style = !!s3.force_path_style;
+      const r2 = (data.data.common.r2 = data.data.common.r2 || {
+        account_id: "",
+        jurisdiction: "",
+        bucket: "",
+        access_key: "",
+        secret_key: "",
+        public_base_url: "",
+      });
+      r2.account_id = r2.account_id || "";
+      r2.jurisdiction = r2.jurisdiction || "";
+      r2.bucket = r2.bucket || "";
+      r2.access_key = r2.access_key || "";
+      r2.secret_key = r2.secret_key || "";
+      r2.public_base_url = r2.public_base_url || "";
 
       if (
         !data.data.common.group ||

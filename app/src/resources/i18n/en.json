@@ -965,7 +965,10 @@
         "prompt": "Custom Prompt",
         "promptPlaceholder": "{max_len} can be used as a placeholder",
         "tip": "Use LLM to automatically summarize and set the session title after the first round of conversations. When the custom prompt word is set to empty, the default prompt word in the default configuration in CoAI is used."
-      }
+      },
+      "storageMode_r2": "R2",
+      "storageR2AccountId": "Account ID",
+      "storageR2Jurisdiction": "Jurisdiction"
     },
     "user": "Users",
     "invitation-code": "Invitation Code",

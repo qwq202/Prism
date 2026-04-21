@@ -32,6 +32,12 @@ var StorageS3AccessKey string
 var StorageS3SecretKey string
 var StorageS3PublicBaseURL string
 var StorageS3ForcePathStyle bool
+var StorageR2AccountID string
+var StorageR2Jurisdiction string
+var StorageR2Bucket string
+var StorageR2AccessKey string
+var StorageR2SecretKey string
+var StorageR2PublicBaseURL string
 var CloseRegistration bool
 var CloseRelay bool
 

@@ -88,6 +88,15 @@ type s3StorageState struct {
 	ForcePathStyle bool   `json:"force_path_style" mapstructure:"force_path_style"`
 }
 
+type r2StorageState struct {
+	AccountID     string `json:"account_id" mapstructure:"account_id"`
+	Jurisdiction  string `json:"jurisdiction" mapstructure:"jurisdiction"`
+	Bucket        string `json:"bucket" mapstructure:"bucket"`
+	AccessKey     string `json:"access_key" mapstructure:"access_key"`
+	SecretKey     string `json:"secret_key" mapstructure:"secret_key"`
+	PublicBaseURL string `json:"public_base_url" mapstructure:"public_base_url"`
+}
+
 type commonState struct {
 	Article     []string       `json:"article" mapstructure:"article"`
 	Generation  []string       `json:"generation" mapstructure:"generation"`
@@ -98,6 +107,7 @@ type commonState struct {
 	PromptStore bool           `json:"prompt_store" mapstructure:"promptstore"`
 	StorageMode string         `json:"storage_mode" mapstructure:"storage_mode"`
 	S3          s3StorageState `json:"s3" mapstructure:"s3"`
+	R2          r2StorageState `json:"r2" mapstructure:"r2"`
 }
 
 type SystemConfig struct {
@@ -140,6 +150,12 @@ func (c *SystemConfig) Load() {
 	globals.StorageS3SecretKey = c.GetStorageS3SecretKey()
 	globals.StorageS3PublicBaseURL = c.GetStorageS3PublicBaseURL()
 	globals.StorageS3ForcePathStyle = c.Common.S3.ForcePathStyle
+	globals.StorageR2AccountID = c.GetStorageR2AccountID()
+	globals.StorageR2Jurisdiction = c.GetStorageR2Jurisdiction()
+	globals.StorageR2Bucket = c.GetStorageR2Bucket()
+	globals.StorageR2AccessKey = c.GetStorageR2AccessKey()
+	globals.StorageR2SecretKey = c.GetStorageR2SecretKey()
+	globals.StorageR2PublicBaseURL = c.GetStorageR2PublicBaseURL()
 	globals.AcceptImageStore = c.AcceptImageStore()
 
 	globals.AcceptPromptStore = c.Common.PromptStore
@@ -347,11 +363,17 @@ func (c *SystemConfig) GetCacheAcceptedSize() int64 {
 }
 
 func (c *SystemConfig) GetStorageMode() string {
-	if strings.EqualFold(strings.TrimSpace(c.Common.StorageMode), "s3") {
-		return "s3"
-	}
+	return c.GetRawStorageMode()
+}
 
-	return "local"
+func (c *SystemConfig) GetRawStorageMode() string {
+	mode := strings.ToLower(strings.TrimSpace(c.Common.StorageMode))
+	switch mode {
+	case "s3", "r2":
+		return mode
+	default:
+		return "local"
+	}
 }
 
 func (c *SystemConfig) GetStorageS3Endpoint() string {
@@ -378,6 +400,30 @@ func (c *SystemConfig) GetStorageS3PublicBaseURL() string {
 	return strings.TrimSuffix(strings.TrimSpace(c.Common.S3.PublicBaseURL), "/")
 }
 
+func (c *SystemConfig) GetStorageR2AccountID() string {
+	return strings.TrimSpace(c.Common.R2.AccountID)
+}
+
+func (c *SystemConfig) GetStorageR2Jurisdiction() string {
+	return strings.ToLower(strings.TrimSpace(c.Common.R2.Jurisdiction))
+}
+
+func (c *SystemConfig) GetStorageR2Bucket() string {
+	return strings.TrimSpace(c.Common.R2.Bucket)
+}
+
+func (c *SystemConfig) GetStorageR2AccessKey() string {
+	return strings.TrimSpace(c.Common.R2.AccessKey)
+}
+
+func (c *SystemConfig) GetStorageR2SecretKey() string {
+	return strings.TrimSpace(c.Common.R2.SecretKey)
+}
+
+func (c *SystemConfig) GetStorageR2PublicBaseURL() string {
+	return strings.TrimSuffix(strings.TrimSpace(c.Common.R2.PublicBaseURL), "/")
+}
+
 func (c *SystemConfig) IsS3StorageConfigured() bool {
 	return c.GetStorageS3Bucket() != "" &&
 		c.GetStorageS3Region() != "" &&
@@ -385,17 +431,31 @@ func (c *SystemConfig) IsS3StorageConfigured() bool {
 		c.GetStorageS3SecretKey() != ""
 }
 
+func (c *SystemConfig) IsR2StorageConfigured() bool {
+	return c.GetStorageR2AccountID() != "" &&
+		c.GetStorageR2Bucket() != "" &&
+		c.GetStorageR2AccessKey() != "" &&
+		c.GetStorageR2SecretKey() != ""
+}
+
 func (c *SystemConfig) AcceptImageStore() bool {
 	if !c.Common.ImageStore {
 		return false
 	}
 
-	if c.GetStorageMode() == "s3" {
+	switch c.GetRawStorageMode() {
+	case "s3":
 		if !c.IsS3StorageConfigured() {
 			return false
 		}
 
 		return c.GetStorageS3PublicBaseURL() != "" || len(strings.TrimSpace(globals.NotifyUrl)) > 0
+	case "r2":
+		if !c.IsR2StorageConfigured() {
+			return false
+		}
+
+		return c.GetStorageR2PublicBaseURL() != "" || len(strings.TrimSpace(globals.NotifyUrl)) > 0
 	}
 
 	return len(strings.TrimSpace(globals.NotifyUrl)) > 0

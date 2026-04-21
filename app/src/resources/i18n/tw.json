@@ -1164,7 +1164,10 @@
         "prompt": "自訂提示詞",
         "promptPlaceholder": "可使用{max_len} 作為佔位符",
         "tip": "使用LLM 在首輪對話後自動總結並設定會話標題。設定自訂提示詞為空時，預設使用CoAI 內預設配置的提示詞"
-      }
+      },
+      "storageMode_r2": "R2",
+      "storageR2AccountId": "Account ID",
+      "storageR2Jurisdiction": "Jurisdiction"
     },
     "logger": {
       "title": "服務日誌",

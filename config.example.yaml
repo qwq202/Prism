@@ -47,3 +47,10 @@ system:
       secret_key: ""
       public_base_url: ""
       force_path_style: false
+    r2:
+      account_id: ""
+      jurisdiction: ""
+      bucket: ""
+      access_key: ""
+      secret_key: ""
+      public_base_url: ""
