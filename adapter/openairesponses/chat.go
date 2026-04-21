@@ -40,6 +40,7 @@ func getMessageText(message globals.Message) string {
 
 func formatInputMessage(props *adaptercommon.ChatProps, message globals.Message) *InputMessage {
 	text := getMessageText(message)
+	imageDetail := "high"
 
 	if normalizeRole(message.Role) == globals.User {
 		content, urls := utils.ExtractImages(text, true)
@@ -68,6 +69,7 @@ func formatInputMessage(props *adaptercommon.ChatProps, message globals.Message)
 			items = append(items, InputMessageContent{
 				Type:     "input_image",
 				ImageURL: &url,
+				Detail:   &imageDetail,
 			})
 		}
 
@@ -88,9 +90,10 @@ func formatInputMessage(props *adaptercommon.ChatProps, message globals.Message)
 	}
 }
 
-func formatMessages(props *adaptercommon.ChatProps) ([]InputMessage, *string) {
+func formatMessages(props *adaptercommon.ChatProps) ([]InputMessage, *string, bool) {
 	input := make([]InputMessage, 0, len(props.Message))
 	instructions := make([]string, 0)
+	hasImages := false
 
 	for _, message := range props.Message {
 		if message.Role == globals.System {
@@ -106,6 +109,13 @@ func formatMessages(props *adaptercommon.ChatProps) ([]InputMessage, *string) {
 			continue
 		}
 
+		for _, item := range formatted.Content {
+			if item.Type == "input_image" && item.ImageURL != nil && strings.TrimSpace(*item.ImageURL) != "" {
+				hasImages = true
+				break
+			}
+		}
+
 		input = append(input, *formatted)
 	}
 
@@ -115,7 +125,7 @@ func formatMessages(props *adaptercommon.ChatProps) ([]InputMessage, *string) {
 		instructionText = &joined
 	}
 
-	return input, instructionText
+	return input, instructionText, hasImages
 }
 
 func getResponseTools(props *adaptercommon.ChatProps) []ResponseTool {
@@ -151,7 +161,11 @@ func getResponseTools(props *adaptercommon.ChatProps) []ResponseTool {
 }
 
 func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps) ResponseRequest {
-	input, instructions := formatMessages(props)
+	input, instructions, hasImages := formatMessages(props)
+	var store *bool
+	if props != nil && props.ChannelType == globals.XAIChannelType && hasImages {
+		store = utils.ToPtr(false)
+	}
 
 	return ResponseRequest{
 		Model:           props.Model,
@@ -162,6 +176,7 @@ func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps) ResponseReque
 		TopP:            props.TopP,
 		Tools:           getResponseTools(props),
 		ToolChoice:      props.ToolChoice,
+		Store:           store,
 		Stream:          false,
 	}
 }

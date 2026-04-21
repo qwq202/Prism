@@ -4,6 +4,7 @@ type InputMessageContent struct {
 	Type     string  `json:"type"`
 	Text     *string `json:"text,omitempty"`
 	ImageURL *string `json:"image_url,omitempty"`
+	Detail   *string `json:"detail,omitempty"`
 }
 
 type InputMessage struct {
@@ -27,6 +28,7 @@ type ResponseRequest struct {
 	TopP            *float32       `json:"top_p,omitempty"`
 	Tools           []ResponseTool `json:"tools,omitempty"`
 	ToolChoice      *interface{}   `json:"tool_choice,omitempty"`
+	Store           *bool          `json:"store,omitempty"`
 	Stream          bool           `json:"stream,omitempty"`
 }
 
