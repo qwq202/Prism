@@ -11,6 +11,7 @@ import (
 	"chat/adapter/dify"
 	"chat/adapter/hunyuan"
 	"chat/adapter/midjourney"
+	"chat/adapter/minimaxtokenplan"
 	"chat/adapter/openai"
 	"chat/adapter/openairesponses"
 	"chat/adapter/palm2"
@@ -30,7 +31,7 @@ var channelFactories = map[string]adaptercommon.FactoryCreator{
 	globals.AzureOpenAIChannelType:        azure.NewChatInstanceFromConfig,
 	globals.ClaudeChannelType:             claude.NewChatInstanceFromConfig,
 	globals.GLMCodingPlanCNChannelType:    claude.NewChatInstanceFromConfig, // anthropic-compatible
-	globals.MiniMaxTokenPlanCNChannelType: claude.NewChatInstanceFromConfig, // anthropic-compatible
+	globals.MiniMaxTokenPlanCNChannelType: minimaxtokenplan.NewChatInstanceFromConfig,
 	globals.SlackChannelType:              slack.NewChatInstanceFromConfig,
 	globals.PalmChannelType:               palm2.NewChatInstanceFromConfig,
 	globals.SparkdeskChannelType:          sparkdesk.NewChatInstanceFromConfig,
