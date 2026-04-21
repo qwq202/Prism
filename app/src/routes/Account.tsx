@@ -64,6 +64,8 @@ import {
 } from "@/components/ui/alert-dialog.tsx";
 import { toast } from "sonner";
 import Emoji from "@/components/Emoji";
+import { motion } from "framer-motion";
+import { useInView } from "react-intersection-observer";
 
 type AccountCardProps = {
   title: string;
@@ -85,16 +87,48 @@ function AccountCard({
   classNameWrapper,
 }: AccountCardProps) {
   const { t } = useTranslation();
+  const [ref, inView] = useInView({
+    triggerOnce: true,
+    threshold: 0.12,
+  });
+
+  const containerVariants = {
+    hidden: { opacity: 0, y: 32 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.45,
+        ease: "easeOut",
+        when: "beforeChildren",
+        staggerChildren: 0.08,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 18 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.35, ease: "easeOut" },
+    },
+  };
 
   return (
-    <div
+    <motion.div
+      ref={ref}
       className={cn(
         `flex flex-col bg-background rounded-lg shadow border overflow-hidden`,
         classNameWrapper,
       )}
+      variants={containerVariants}
+      initial="hidden"
+      animate={inView ? "visible" : "hidden"}
     >
-      <div
+      <motion.div
         className={`select-none inline-flex flex-row items-center h-fit w-full border-b px-4 py-2.5 bg-muted/20`}
+        variants={itemVariants}
       >
         <div className="flex items-center mr-2.5">
           {icon && (
@@ -110,14 +144,19 @@ function AccountCard({
             <p className="text-xs text-secondary">{t(description)}</p>
           )}
         </div>
-      </div>
-      <div className={cn("p-4", className)}>{children}</div>
+      </motion.div>
+      <motion.div className={cn("p-4", className)} variants={itemVariants}>
+        {children}
+      </motion.div>
       {footer && (
-        <div className={`flex flex-row items-center px-4 pb-4 pt-2`}>
+        <motion.div
+          className={`flex flex-row items-center px-4 pb-4 pt-2`}
+          variants={itemVariants}
+        >
           {footer}
-        </div>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -140,10 +179,14 @@ function ShareContent({ data }: ShareContentProps) {
   return (
     <div className="space-y-3 pt-2 pb-6">
       {data.map((row) => (
-        <div
+        <motion.div
           key={row.conversation_id}
           onClick={() => openWindow(getSharedLink(row.hash), "_blank")}
           className="flex items-center justify-between w-full border border-input p-4 rounded-lg hover:bg-muted/20 duration-200 cursor-pointer transition-colors"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          whileHover={{ y: -2 }}
         >
           <div className="flex-grow mr-4">
             <div className="flex items-center mb-1">
@@ -184,7 +227,7 @@ function ShareContent({ data }: ShareContentProps) {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-        </div>
+        </motion.div>
       ))}
     </div>
   );
@@ -297,7 +340,12 @@ function Account() {
           }
         >
           <div className="flex flex-col space-y-4">
-            <div className="flex items-center space-x-4">
+            <motion.div
+              className="flex items-center space-x-4"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: 0.05 }}
+            >
               <Avatar
                 username={username}
                 className="w-16 h-16 shrink-0 shadow text-lg rounded-full"
@@ -313,9 +361,14 @@ function Account() {
                   <p className="text-sm text-muted-foreground">#{info.id}</p>
                 </div>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="flex flex-wrap gap-2">
+            <motion.div
+              className="flex flex-wrap gap-2"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: 0.12 }}
+            >
               <Badge className="px-3 py-1 text-sm font-medium">
                 {t(`admin.channels.groups.${group}`)}
               </Badge>
@@ -327,10 +380,16 @@ function Account() {
                   days: Math.ceil(info.register_days),
                 })}
               </Badge>
-            </div>
+            </motion.div>
           </div>
           <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-card shadow-sm rounded-lg p-4 transition-all border">
+            <motion.div
+              className="bg-card shadow-sm rounded-lg p-4 transition-all border"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: 0.18 }}
+              whileHover={{ y: -3 }}
+            >
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-muted-foreground">
                   {t("account.current-quota")}
@@ -338,8 +397,14 @@ function Account() {
                 <Cloud className="w-10 h-10 p-2 rounded-lg bg-muted/40 text-secondary stroke-[1]" />
               </div>
               <p className="text-md">{quota.toFixed(2)}</p>
-            </div>
-            <div className="bg-card shadow-sm rounded-lg p-4 transition-all border">
+            </motion.div>
+            <motion.div
+              className="bg-card shadow-sm rounded-lg p-4 transition-all border"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: 0.24 }}
+              whileHover={{ y: -3 }}
+            >
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-muted-foreground">
                   {t("account.used-quota")}
@@ -347,8 +412,14 @@ function Account() {
                 <CloudRain className="w-10 h-10 p-2 rounded-lg bg-muted/40 text-secondary stroke-[1]" />
               </div>
               <p className="text-md">{info.used_quota.toFixed(2)}</p>
-            </div>
-            <div className="bg-card shadow-sm rounded-lg p-4 transition-all border">
+            </motion.div>
+            <motion.div
+              className="bg-card shadow-sm rounded-lg p-4 transition-all border"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: 0.3 }}
+              whileHover={{ y: -3 }}
+            >
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-muted-foreground">
                   {t("account.plan-total-month")}
@@ -362,7 +433,7 @@ function Account() {
                   content={t("account.plan-total-month-tips")}
                 />
               </div>
-            </div>
+            </motion.div>
           </div>
         </AccountCard>
         <DeeptrainOnly>
