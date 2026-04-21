@@ -129,18 +129,24 @@ async function convertImageFileToPng(file: File): Promise<File> {
 }
 
 async function ensureGrokCompatibleImage(file: File, model: Model): Promise<File> {
-  if (!isXAIChannelModel(model) || isGrokCompatibleImage(file)) {
+  if (!isXAIChannelModel(model)) {
     return file;
   }
 
   try {
-    console.log(
-      `[parser] grok model received unsupported image type "${file.type || "unknown"}", converting to image/png`,
-    );
+    if (isGrokCompatibleImage(file)) {
+      console.log(
+        `[parser] xai image upload detected "${file.type || "unknown"}", normalizing to image/png for stable decoding`,
+      );
+    } else {
+      console.log(
+        `[parser] xai image upload received unsupported image type "${file.type || "unknown"}", converting to image/png`,
+      );
+    }
     return await convertImageFileToPng(file);
   } catch (error) {
     console.warn(
-      "[parser] failed to convert image for grok compatibility, fallback to original file:",
+      "[parser] failed to normalize image for xai compatibility, fallback to original file:",
       error,
     );
     return file;
