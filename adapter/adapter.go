@@ -24,24 +24,25 @@ import (
 )
 
 var channelFactories = map[string]adaptercommon.FactoryCreator{
-	globals.OpenAIChannelType:          openai.NewChatInstanceFromConfig,
-	globals.OpenAIResponsesChannelType: openairesponses.NewChatInstanceFromConfig,
-	globals.XAIChannelType:             openairesponses.NewChatInstanceFromConfig,
-	globals.AzureOpenAIChannelType:     azure.NewChatInstanceFromConfig,
-	globals.ClaudeChannelType:          claude.NewChatInstanceFromConfig,
-	globals.SlackChannelType:           slack.NewChatInstanceFromConfig,
-	globals.PalmChannelType:            palm2.NewChatInstanceFromConfig,
-	globals.SparkdeskChannelType:       sparkdesk.NewChatInstanceFromConfig,
-	globals.ChatGLMChannelType:         zhipuai.NewChatInstanceFromConfig,
-	globals.QwenChannelType:            dashscope.NewChatInstanceFromConfig,
-	globals.HunyuanChannelType:         hunyuan.NewChatInstanceFromConfig,
-	globals.BaichuanChannelType:        baichuan.NewChatInstanceFromConfig,
-	globals.SkylarkChannelType:         skylark.NewChatInstanceFromConfig,
-	globals.ZhinaoChannelType:          zhinao.NewChatInstanceFromConfig,
-	globals.MidjourneyChannelType:      midjourney.NewChatInstanceFromConfig,
-	globals.DeepseekChannelType:        deepseek.NewChatInstanceFromConfig,
-	globals.DifyChannelType:            dify.NewChatInstanceFromConfig,
-	globals.CozeChannelType:            coze.NewChatInstanceFromConfig,
+	globals.OpenAIChannelType:             openai.NewChatInstanceFromConfig,
+	globals.OpenAIResponsesChannelType:    openairesponses.NewChatInstanceFromConfig,
+	globals.XAIChannelType:                openairesponses.NewChatInstanceFromConfig,
+	globals.AzureOpenAIChannelType:        azure.NewChatInstanceFromConfig,
+	globals.ClaudeChannelType:             claude.NewChatInstanceFromConfig,
+	globals.MiniMaxTokenPlanCNChannelType: claude.NewChatInstanceFromConfig, // anthropic-compatible
+	globals.SlackChannelType:              slack.NewChatInstanceFromConfig,
+	globals.PalmChannelType:               palm2.NewChatInstanceFromConfig,
+	globals.SparkdeskChannelType:          sparkdesk.NewChatInstanceFromConfig,
+	globals.ChatGLMChannelType:            zhipuai.NewChatInstanceFromConfig,
+	globals.QwenChannelType:               dashscope.NewChatInstanceFromConfig,
+	globals.HunyuanChannelType:            hunyuan.NewChatInstanceFromConfig,
+	globals.BaichuanChannelType:           baichuan.NewChatInstanceFromConfig,
+	globals.SkylarkChannelType:            skylark.NewChatInstanceFromConfig,
+	globals.ZhinaoChannelType:             zhinao.NewChatInstanceFromConfig,
+	globals.MidjourneyChannelType:         midjourney.NewChatInstanceFromConfig,
+	globals.DeepseekChannelType:           deepseek.NewChatInstanceFromConfig,
+	globals.DifyChannelType:               dify.NewChatInstanceFromConfig,
+	globals.CozeChannelType:               coze.NewChatInstanceFromConfig,
 
 	globals.MoonshotChannelType: openai.NewChatInstanceFromConfig, // openai format
 	globals.GroqChannelType:     openai.NewChatInstanceFromConfig, // openai format

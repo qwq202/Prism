@@ -18,6 +18,7 @@ export const modelColorMapper: Record<string, string> = {
   "claude-3": "orange-500",
   claude: "orange-400",
   anthropic: "orange-400",
+  minimax: "emerald-500",
 
   // Spark Desk
   "spark-desk": "blue-400",

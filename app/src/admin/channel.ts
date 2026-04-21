@@ -57,6 +57,7 @@ export const ChannelTypes: Record<string, string> = {
   xai: "xAI Grok",
   azure: "Azure OpenAI",
   claude: "Anthropic Claude",
+  "minimax-token-plan-cn": "MiniMax Token Plan（CN）",
   palm: "Google Gemini",
   midjourney: "Midjourney Proxy",
   sparkdesk: "讯飞星火 SparkDesk",
@@ -80,6 +81,7 @@ export const ShortChannelTypes: Record<string, string> = {
   xai: "xAI",
   azure: "Azure",
   claude: "Claude",
+  "minimax-token-plan-cn": "MiniMax",
   palm: "Gemini",
   midjourney: "Midjourney",
   sparkdesk: "讯飞星火",
@@ -213,6 +215,15 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "claude-3-sonnet-20240229",
       "claude-3-haiku-20240307",
     ],
+  },
+  "minimax-token-plan-cn": {
+    endpoint: "https://api.minimaxi.com/anthropic",
+    format: "<x-api-key>",
+    description:
+      "> MiniMax Token Plan（CN）渠道基于 **Anthropic API** 兼容格式，接入点请填写 *https://api.minimaxi.com/anthropic* 或其反代地址。 \n" +
+      "> 密钥需使用 **Token Plan 专属 API Key**，与 MiniMax 按量计费 API Key **不可互通**。 \n" +
+      "> 当前常用文本模型可填写 **MiniMax-M2.7**，极速版套餐也可使用 **MiniMax-M2.7-highspeed**。 \n",
+    models: ["MiniMax-M2.7", "MiniMax-M2.7-highspeed"],
   },
   slack: {
     endpoint: "your-channel",
