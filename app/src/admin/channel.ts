@@ -68,7 +68,6 @@ export const ChannelTypes: Record<string, string> = {
   baichuan: "百川大模型 BaichuanAI",
   skylark: "云雀大模型 SkylarkLLM",
   groq: "Groq Cloud",
-  bing: "New Bing",
   slack: "Slack Claude",
   deepseek: "深度求索 DeepSeek",
   coze: "扣子 Coze",
@@ -92,7 +91,6 @@ export const ShortChannelTypes: Record<string, string> = {
   baichuan: "百川 AI",
   skylark: "火山方舟",
   groq: "Groq",
-  bing: "Bing",
   slack: "Slack",
   deepseek: "DeepSeek",
   coze: "Coze",
@@ -277,15 +275,6 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "> Skylark 格式密钥请填写获取到的 ak|sk 或 apikey \n" +
       "> 接入点填写生成的接入点，如 *https://ark.cn-beijing.volces.com/api/v3* \n" +
       "> Skylark API 的地域字段无需手动填写，系统会自动根据接入点获取 \n",
-  },
-  bing: {
-    endpoint: "wss://your.bing.service",
-    format: "<secret>",
-    models: ["bing-creative", "bing-balanced", "bing-precise"],
-    description:
-      "> New Bing 服务搭建详情请参考 [chatnio-bing-service](https://github.com/coaidev/chatnio-bing-service) \n " +
-      "> bing2api (如 [bingo](https://github.com/weaigc/bingo)) 可直接使用 **OpenAI** 格式而非 **New Bing** 格式 \n " +
-      "> 接入点填写你部署的站点即可，如 *http://localhost:8765* ",
   },
   palm: {
     endpoint: "https://generativelanguage.googleapis.com",

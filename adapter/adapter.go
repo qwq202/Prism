@@ -3,7 +3,6 @@ package adapter
 import (
 	"chat/adapter/azure"
 	"chat/adapter/baichuan"
-	"chat/adapter/bing"
 	"chat/adapter/claude"
 	adaptercommon "chat/adapter/common"
 	"chat/adapter/coze"
@@ -31,7 +30,6 @@ var channelFactories = map[string]adaptercommon.FactoryCreator{
 	globals.AzureOpenAIChannelType:     azure.NewChatInstanceFromConfig,
 	globals.ClaudeChannelType:          claude.NewChatInstanceFromConfig,
 	globals.SlackChannelType:           slack.NewChatInstanceFromConfig,
-	globals.BingChannelType:            bing.NewChatInstanceFromConfig,
 	globals.PalmChannelType:            palm2.NewChatInstanceFromConfig,
 	globals.SparkdeskChannelType:       sparkdesk.NewChatInstanceFromConfig,
 	globals.ChatGLMChannelType:         zhipuai.NewChatInstanceFromConfig,

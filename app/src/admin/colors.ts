@@ -52,9 +52,6 @@ export const modelColorMapper: Record<string, string> = {
   deepseek: "blue-700",
   grok: "gray-900",
 
-  // New Bing
-  bing: "blue-700",
-
   // ChatGLM
   zhipu: "lime-500",
   glm: "lime-500",

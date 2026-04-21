@@ -11,7 +11,6 @@ import {
   Baichuan,
   ByteDance,
   Meta,
-  Copilot,
   Hunyuan,
   Midjourney,
   Stability,
@@ -80,8 +79,6 @@ const builtinAvatars: Record<string, React.ExoticComponent<IconAvatarProps>> = {
 
   meta: Meta.Avatar,
   llama: Meta.Avatar,
-
-  bing: Copilot.Avatar,
 
   hunyuan: Hunyuan.Avatar,
 

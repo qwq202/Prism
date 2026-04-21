@@ -22,7 +22,6 @@ const (
 	ZhinaoChannelType          = "zhinao"
 	BaichuanChannelType        = "baichuan"
 	SkylarkChannelType         = "skylark"
-	BingChannelType            = "bing"
 	PalmChannelType            = "palm"
 	MidjourneyChannelType      = "midjourney"
 	MoonshotChannelType        = "moonshot"
