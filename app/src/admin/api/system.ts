@@ -172,6 +172,8 @@ export type CommonState = {
 
   prompt_store: boolean;
   image_store: boolean;
+  orphan_cleanup_enabled: boolean;
+  orphan_cleanup_interval: number;
   storage_mode: "local" | "s3" | "r2";
   s3: S3StorageState;
   r2: R2StorageState;
@@ -259,6 +261,8 @@ export const initialSystemState: SystemProps = {
     size: 1,
     prompt_store: false,
     image_store: false,
+    orphan_cleanup_enabled: false,
+    orphan_cleanup_interval: 60,
     storage_mode: "local",
     s3: {
       endpoint: "",
@@ -392,6 +396,12 @@ export async function getConfig(): Promise<SystemResponse> {
       r2.access_key = r2.access_key || "";
       r2.secret_key = r2.secret_key || "";
       r2.public_base_url = r2.public_base_url || "";
+      data.data.common.orphan_cleanup_enabled = !!data.data.common.orphan_cleanup_enabled;
+      data.data.common.orphan_cleanup_interval =
+        typeof data.data.common.orphan_cleanup_interval === "number" &&
+        data.data.common.orphan_cleanup_interval > 0
+          ? data.data.common.orphan_cleanup_interval
+          : 60;
 
       if (
         !data.data.common.group ||

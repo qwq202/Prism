@@ -851,6 +851,36 @@ function StorageSettings({
       )}
       <ParagraphItem>
         <Label className={`flex flex-row items-center`}>
+          {t("admin.system.orphanCleanupEnabled")}
+          <Tips content={t("admin.system.orphanCleanupEnabledTip")} />
+        </Label>
+        <Switch
+          checked={data.orphan_cleanup_enabled}
+          onCheckedChange={(value) => {
+            dispatch({ type: "update:common.orphan_cleanup_enabled", value });
+          }}
+        />
+      </ParagraphItem>
+      <ParagraphItem>
+        <Label className={`flex flex-row items-center`}>
+          {t("admin.system.orphanCleanupInterval")}
+          <Tips content={t("admin.system.orphanCleanupIntervalTip")} />
+        </Label>
+        <NumberInput
+          min={5}
+          max={10080}
+          value={data.orphan_cleanup_interval}
+          onValueChange={(value) => {
+            dispatch({
+              type: "update:common.orphan_cleanup_interval",
+              value: Number(value) || 60,
+            });
+          }}
+          placeholder={`60`}
+        />
+      </ParagraphItem>
+      <ParagraphItem>
+        <Label className={`flex flex-row items-center`}>
           {t("admin.system.storageMode")}
           <Tips content={t("admin.system.storageModeTip")} />
         </Label>

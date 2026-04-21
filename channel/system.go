@@ -98,16 +98,18 @@ type r2StorageState struct {
 }
 
 type commonState struct {
-	Article     []string       `json:"article" mapstructure:"article"`
-	Generation  []string       `json:"generation" mapstructure:"generation"`
-	Cache       []string       `json:"cache" mapstructure:"cache"`
-	Expire      int64          `json:"expire" mapstructure:"expire"`
-	Size        int64          `json:"size" mapstructure:"size"`
-	ImageStore  bool           `json:"image_store" mapstructure:"imagestore"`
-	PromptStore bool           `json:"prompt_store" mapstructure:"promptstore"`
-	StorageMode string         `json:"storage_mode" mapstructure:"storagemode"`
-	S3          s3StorageState `json:"s3" mapstructure:"s3"`
-	R2          r2StorageState `json:"r2" mapstructure:"r2"`
+	Article               []string       `json:"article" mapstructure:"article"`
+	Generation            []string       `json:"generation" mapstructure:"generation"`
+	Cache                 []string       `json:"cache" mapstructure:"cache"`
+	Expire                int64          `json:"expire" mapstructure:"expire"`
+	Size                  int64          `json:"size" mapstructure:"size"`
+	ImageStore            bool           `json:"image_store" mapstructure:"imagestore"`
+	PromptStore           bool           `json:"prompt_store" mapstructure:"promptstore"`
+	OrphanCleanupEnabled  bool           `json:"orphan_cleanup_enabled" mapstructure:"orphancleanupenabled"`
+	OrphanCleanupInterval int64          `json:"orphan_cleanup_interval" mapstructure:"orphancleanupinterval"`
+	StorageMode           string         `json:"storage_mode" mapstructure:"storagemode"`
+	S3                    s3StorageState `json:"s3" mapstructure:"s3"`
+	R2                    r2StorageState `json:"r2" mapstructure:"r2"`
 }
 
 type SystemConfig struct {
@@ -157,6 +159,8 @@ func (c *SystemConfig) Load() {
 	globals.StorageR2SecretKey = c.GetStorageR2SecretKey()
 	globals.StorageR2PublicBaseURL = c.GetStorageR2PublicBaseURL()
 	globals.AcceptImageStore = c.AcceptImageStore()
+	globals.OrphanCleanupEnabled = c.Common.OrphanCleanupEnabled
+	globals.OrphanCleanupInterval = c.GetOrphanCleanupInterval()
 
 	globals.AcceptPromptStore = c.Common.PromptStore
 
@@ -422,6 +426,18 @@ func (c *SystemConfig) GetStorageR2SecretKey() string {
 
 func (c *SystemConfig) GetStorageR2PublicBaseURL() string {
 	return strings.TrimSuffix(strings.TrimSpace(c.Common.R2.PublicBaseURL), "/")
+}
+
+func (c *SystemConfig) GetOrphanCleanupInterval() int64 {
+	if c.Common.OrphanCleanupInterval <= 0 {
+		return 60
+	}
+
+	if c.Common.OrphanCleanupInterval < 5 {
+		return 5
+	}
+
+	return c.Common.OrphanCleanupInterval
 }
 
 func (c *SystemConfig) IsS3StorageConfigured() bool {

@@ -6,24 +6,15 @@ import (
 	"chat/utils"
 	"database/sql"
 	"fmt"
+	"sync"
+	"time"
 )
 
-func cleanupStoredAttachments(db *sql.DB, names []string) {
-	for _, name := range names {
-		referenced, err := attachmentStillReferenced(db, name)
-		if err != nil {
-			globals.Warn(fmt.Sprintf("[conversation] check attachment reference error: %s (attachment: %s)", err.Error(), name))
-			continue
-		}
-
-		if referenced {
-			continue
-		}
-
-		if err := utils.DeleteStoredAttachment(name); err != nil {
-			globals.Warn(fmt.Sprintf("[conversation] delete attachment error: %s (attachment: %s)", err.Error(), name))
-		}
-	}
+var orphanCleanupState struct {
+	once    sync.Once
+	mu      sync.Mutex
+	lastRun time.Time
+	running bool
 }
 
 func loadGlobalConversationAttachmentNames(db *sql.DB) map[string]struct{} {
@@ -69,53 +60,68 @@ func cleanupOrphanStoredAttachments(db *sql.DB) {
 	}
 }
 
-func attachmentStillReferenced(db *sql.DB, name string) (bool, error) {
-	var count int64
-	err := globals.QueryRowDb(db, `
-		SELECT COUNT(1) FROM conversation WHERE data LIKE ?
-	`, "%attachments/"+name+"%").Scan(&count)
-	return count > 0, err
+func ResetOrphanAttachmentCleanupSchedule() {
+	orphanCleanupState.mu.Lock()
+	defer orphanCleanupState.mu.Unlock()
+	orphanCleanupState.lastRun = time.Time{}
 }
 
-func loadConversationAttachmentNames(db *sql.DB, userID int64, conversationID int64) []string {
-	var data string
-	if err := globals.QueryRowDb(db, `
-		SELECT data FROM conversation WHERE user_id = ? AND conversation_id = ?
-	`, userID, conversationID).Scan(&data); err != nil {
-		return nil
+func RunOrphanAttachmentCleanup(db *sql.DB) {
+	orphanCleanupState.mu.Lock()
+	if orphanCleanupState.running {
+		orphanCleanupState.mu.Unlock()
+		return
 	}
+	orphanCleanupState.running = true
+	orphanCleanupState.lastRun = time.Now()
+	orphanCleanupState.mu.Unlock()
 
-	return utils.ExtractAttachmentNames(data)
+	defer func() {
+		orphanCleanupState.mu.Lock()
+		orphanCleanupState.running = false
+		orphanCleanupState.mu.Unlock()
+	}()
+
+	cleanupOrphanStoredAttachments(db)
 }
 
-func loadAllConversationAttachmentNames(db *sql.DB, userID int64) []string {
-	rows, err := globals.QueryDb(db, `SELECT data FROM conversation WHERE user_id = ?`, userID)
-	if err != nil {
-		return nil
+func StartOrphanAttachmentCleanupWorker(db *sql.DB) {
+	if db == nil {
+		return
 	}
-	defer func(rows *sql.Rows) {
-		_ = rows.Close()
-	}(rows)
 
-	seen := map[string]struct{}{}
-	result := make([]string, 0)
-	for rows.Next() {
-		var data string
-		if err := rows.Scan(&data); err != nil {
-			continue
-		}
+	orphanCleanupState.once.Do(func() {
+		go func() {
+			ticker := time.NewTicker(time.Minute)
+			defer ticker.Stop()
 
-		for _, name := range utils.ExtractAttachmentNames(data) {
-			if _, ok := seen[name]; ok {
-				continue
+			for range ticker.C {
+				if !globals.OrphanCleanupEnabled {
+					continue
+				}
+
+				interval := globals.OrphanCleanupInterval
+				if interval <= 0 {
+					interval = 60
+				}
+
+				orphanCleanupState.mu.Lock()
+				lastRun := orphanCleanupState.lastRun
+				running := orphanCleanupState.running
+				orphanCleanupState.mu.Unlock()
+
+				if running {
+					continue
+				}
+
+				if !lastRun.IsZero() && time.Since(lastRun) < time.Duration(interval)*time.Minute {
+					continue
+				}
+
+				RunOrphanAttachmentCleanup(db)
 			}
-
-			seen[name] = struct{}{}
-			result = append(result, name)
-		}
-	}
-
-	return result
+		}()
+	})
 }
 
 func (c *Conversation) SaveConversation(db *sql.DB) bool {
@@ -228,16 +234,8 @@ func LoadConversationList(db *sql.DB, userId int64) []Conversation {
 }
 
 func (c *Conversation) DeleteConversation(db *sql.DB) bool {
-	attachments := loadConversationAttachmentNames(db, c.UserID, c.Id)
-
 	_, err := globals.ExecDb(db, "DELETE FROM conversation WHERE user_id = ? AND conversation_id = ?", c.UserID, c.Id)
-	if err != nil {
-		return false
-	}
-
-	cleanupStoredAttachments(db, attachments)
-	cleanupOrphanStoredAttachments(db)
-	return true
+	return err == nil
 }
 
 func (c *Conversation) RenameConversation(db *sql.DB, name string) bool {
@@ -250,11 +248,6 @@ func (c *Conversation) RenameConversation(db *sql.DB, name string) bool {
 
 func DeleteAllConversations(db *sql.DB, user auth.User) error {
 	userID := user.GetID(db)
-	attachments := loadAllConversationAttachmentNames(db, userID)
 	_, err := globals.ExecDb(db, "DELETE FROM conversation WHERE user_id = ?", userID)
-	if err == nil {
-		cleanupStoredAttachments(db, attachments)
-		cleanupOrphanStoredAttachments(db)
-	}
 	return err
 }

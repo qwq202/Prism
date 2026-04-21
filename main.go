@@ -8,6 +8,7 @@ import (
 	"chat/billing"
 	"chat/channel"
 	"chat/cli"
+	"chat/connection"
 	"chat/globals"
 	"chat/manager"
 	"chat/manager/conversation"
@@ -66,6 +67,7 @@ func main() {
 	app := utils.NewEngine()
 	worker := middleware.RegisterMiddleware(app)
 	defer worker()
+	conversation.StartOrphanAttachmentCleanupWorker(connection.DB)
 
 	utils.RegisterStaticRoute(app)
 	registerApiRouter(app)

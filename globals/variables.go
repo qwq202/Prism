@@ -38,6 +38,8 @@ var StorageR2Bucket string
 var StorageR2AccessKey string
 var StorageR2SecretKey string
 var StorageR2PublicBaseURL string
+var OrphanCleanupEnabled bool
+var OrphanCleanupInterval int64
 var CloseRegistration bool
 var CloseRelay bool
 
