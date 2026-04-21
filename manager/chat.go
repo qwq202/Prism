@@ -169,6 +169,7 @@ func createChatTask(
 			adaptercommon.CreateChatProps(&adaptercommon.ChatProps{
 				Model:                model,
 				Message:              segment,
+				CustomInstruction:    instance.GetCustomInstruction(),
 				EnableWeb:            instance.IsEnableWeb(),
 				EnableWebSearch:      instance.IsEnableWebSearch(),
 				EnableURLContext:     instance.IsEnableURLContext(),

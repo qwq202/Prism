@@ -522,7 +522,54 @@
     "hide-model": "隱藏模型選擇區",
     "hide-toolbar": "預設隱藏工具列",
     "hide-toolbar-text": "隱藏工具列文字",
-    "collapse-thinking": "預設折疊思考內容"
+    "collapse-thinking": "預設折疊思考內容",
+    "personalization": {
+      "title": "個性化",
+      "description": "設定回覆時預設偏好的風格、語調和對你的稱呼方式。它會影響回覆呈現，但不會覆蓋你目前訊息裡的明確要求。",
+      "base-style": "基本風格和語調",
+      "base-style-tip": "設定預設的表達基調，適合你平時和助手互動時的大方向。",
+      "traits": "特徵",
+      "traits-tip": "在基礎風格之上，進一步補充表達方式上的偏好。",
+      "warmth": "溫和體貼",
+      "enthusiasm": "熱情洋溢",
+      "headings-lists": "標題和列表",
+      "emoji": "表情符號",
+      "custom-instruction": "自訂指令",
+      "custom-instruction-placeholder": "補充其他行為、風格和語調偏好設置",
+      "about-you": "關於你",
+      "nickname": "暱稱",
+      "nickname-placeholder": "希望助手怎麼稱呼你",
+      "about-user": "更多背景資訊",
+      "about-user-tip": "例如你的角色、目標、寫作偏好，或是希望助手長期記住的協作方式。",
+      "about-user-placeholder": "告訴助手一些關於你的背景、偏好或常見場景",
+      "options": {
+        "style": {
+          "friendly": "親和友善",
+          "professional": "專業穩重",
+          "concise": "簡潔利落",
+          "direct": "直接明確",
+          "playful": "輕鬆活潑"
+        },
+        "level": {
+          "default": "預設",
+          "low": "較低",
+          "medium": "中等",
+          "high": "較高"
+        },
+        "list": {
+          "default": "預設",
+          "minimal": "盡量少用",
+          "balanced": "按需使用",
+          "structured": "更常使用"
+        },
+        "emoji": {
+          "default": "預設",
+          "none": "不使用",
+          "light": "偶爾使用",
+          "expressive": "適度活潑"
+        }
+      }
+    }
   },
   "article": {
     "title": "批次產生文章",

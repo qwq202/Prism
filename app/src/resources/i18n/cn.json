@@ -717,6 +717,53 @@
     "frequency-penalty-tip": "(FrequencyPenalty) 频率惩罚，控制模型生成字词的重复程度，提高此值可以降低重复字词出现频率的可能性",
     "repetition-penalty": "重复惩罚",
     "repetition-penalty-tip": "(RepetitionPenalty) 控制模型生成的重复程度，提高此值可以减少重复，但是可能会导致模型生成不连贯的文本（与 FrequencyPenalty 相似）",
+    "personalization": {
+      "title": "个性化",
+      "description": "设置回复时默认偏好的风格、语调和对你的称呼方式。它会影响回复呈现，但不会覆盖你当前消息里的明确要求。",
+      "base-style": "基本风格和语调",
+      "base-style-tip": "设置默认的表达基调，适合你平时和助手互动时的大方向。",
+      "traits": "特征",
+      "traits-tip": "在基础风格之上，进一步补充表达方式上的偏好。",
+      "warmth": "温和体贴",
+      "enthusiasm": "热情洋溢",
+      "headings-lists": "标题和列表",
+      "emoji": "表情符号",
+      "custom-instruction": "自定义指令",
+      "custom-instruction-placeholder": "补充其他行为、风格和语调偏好设置",
+      "about-you": "关于你",
+      "nickname": "昵称",
+      "nickname-placeholder": "希望助手怎么称呼你",
+      "about-user": "更多背景信息",
+      "about-user-tip": "例如你的角色、目标、写作偏好，或希望助手长期记住的协作方式。",
+      "about-user-placeholder": "告诉助手一些关于你的背景、偏好或常见场景",
+      "options": {
+        "style": {
+          "friendly": "亲和友善",
+          "professional": "专业稳重",
+          "concise": "简洁利落",
+          "direct": "直接明确",
+          "playful": "轻松活泼"
+        },
+        "level": {
+          "default": "默认",
+          "low": "较低",
+          "medium": "中等",
+          "high": "较高"
+        },
+        "list": {
+          "default": "默认",
+          "minimal": "尽量少用",
+          "balanced": "按需使用",
+          "structured": "更常使用"
+        },
+        "emoji": {
+          "default": "默认",
+          "none": "不使用",
+          "light": "偶尔使用",
+          "expressive": "适度活泼"
+        }
+      }
+    },
     "reset-settings": "重置全部设置",
     "reset-settings-description": "是否确定？此操作无法撤消。这将永久重置全部设置。"
   },

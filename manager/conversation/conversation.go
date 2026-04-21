@@ -27,6 +27,7 @@ type Conversation struct {
 	GeminiThinkingBudget int               `json:"gemini_thinking_budget"`
 	Shared               bool              `json:"shared"`
 	Context              int               `json:"context"`
+	CustomInstruction    string            `json:"custom_instruction,omitempty"`
 
 	MaxTokens         *int     `json:"max_tokens,omitempty"`
 	Temperature       *float32 `json:"temperature,omitempty"`
@@ -48,6 +49,7 @@ type FormMessage struct {
 	Model                string `json:"model"`
 	IgnoreContext        bool   `json:"ignore_context"`
 	Context              int    `json:"context"`
+	CustomInstruction    string `json:"custom_instruction,omitempty"`
 
 	// request params
 	MaxTokens         *int     `json:"max_tokens,omitempty"`
@@ -234,6 +236,14 @@ func (c *Conversation) SetContextLength(context int, ignore bool) {
 	c.Context = context
 }
 
+func (c *Conversation) GetCustomInstruction() string {
+	return strings.TrimSpace(c.CustomInstruction)
+}
+
+func (c *Conversation) SetCustomInstruction(customInstruction string) {
+	c.CustomInstruction = strings.TrimSpace(customInstruction)
+}
+
 func (c *Conversation) GetName() string {
 	return c.Name
 }
@@ -365,6 +375,7 @@ func (c *Conversation) ApplyParam(form *FormMessage) {
 	c.SetEnableXSearch(form.XSearch)
 	c.SetGeminiThinkingBudget(form.GeminiThinkingBudget)
 	c.SetContextLength(form.Context, form.IgnoreContext)
+	c.SetCustomInstruction(form.CustomInstruction)
 
 	c.SetMaxTokens(form.MaxTokens)
 	c.SetTemperature(form.Temperature)

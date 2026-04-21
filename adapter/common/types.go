@@ -36,6 +36,7 @@ type ChatProps struct {
 	OriginalModel string `json:"-"`
 
 	Message              []globals.Message      `json:"messages,omitempty"`
+	CustomInstruction    string                 `json:"custom_instruction,omitempty"`
 	MaxTokens            *int                   `json:"max_tokens,omitempty"`
 	PresencePenalty      *float32               `json:"presence_penalty,omitempty"`
 	FrequencyPenalty     *float32               `json:"frequency_penalty,omitempty"`
@@ -57,6 +58,7 @@ type ChatProps struct {
 
 const currentDateTimePromptPrefix = "Current date and time reference:"
 const clientContextPromptPrefix = "Current client device reference:"
+const personalizationPromptPrefix = "User personalization preferences:"
 
 func buildCurrentDateTimePrompt(clientContext string) string {
 	now := time.Now()
@@ -113,8 +115,44 @@ func injectCurrentDateTime(messages []globals.Message, clientContext string) []g
 	}, cloned...)
 }
 
+func injectPersonalization(messages []globals.Message, customInstruction string) []globals.Message {
+	customInstruction = strings.TrimSpace(customInstruction)
+	if customInstruction == "" {
+		return messages
+	}
+
+	cloned := utils.DeepCopy[[]globals.Message](messages)
+	prompt := fmt.Sprintf("%s\n%s", personalizationPromptPrefix, customInstruction)
+
+	for i := range cloned {
+		if cloned[i].Role != globals.System {
+			continue
+		}
+
+		content := strings.TrimSpace(cloned[i].Content)
+		if strings.Contains(content, personalizationPromptPrefix) {
+			return cloned
+		}
+
+		if content == "" {
+			cloned[i].Content = prompt
+		} else {
+			cloned[i].Content = fmt.Sprintf("%s\n\n%s", content, prompt)
+		}
+		return cloned
+	}
+
+	return append([]globals.Message{
+		{
+			Role:    globals.System,
+			Content: prompt,
+		},
+	}, cloned...)
+}
+
 func (c *ChatProps) SetupBuffer(buf *utils.Buffer) {
 	c.Message = injectCurrentDateTime(c.Message, c.ClientContext)
+	c.Message = injectPersonalization(c.Message, c.CustomInstruction)
 	if buf == nil {
 		return
 	}

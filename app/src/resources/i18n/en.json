@@ -450,7 +450,54 @@
     "collapse-thinking": "Collapse thinking content by default",
     "theme": "Themes",
     "light": "Light",
-    "dark": "Dark"
+    "dark": "Dark",
+    "personalization": {
+      "title": "Personalization",
+      "description": "Set your default preferred style, tone, and how the assistant should address you. These preferences shape presentation, but they do not override your current request.",
+      "base-style": "Base Style and Tone",
+      "base-style-tip": "Choose the overall default direction for how the assistant should sound in everyday conversations.",
+      "traits": "Traits",
+      "traits-tip": "Layer a few presentation preferences on top of the base style.",
+      "warmth": "Warmth",
+      "enthusiasm": "Enthusiasm",
+      "headings-lists": "Headings and Lists",
+      "emoji": "Emoji",
+      "custom-instruction": "Custom Instruction",
+      "custom-instruction-placeholder": "Add any extra behavior, style, or tone preferences",
+      "about-you": "About you",
+      "nickname": "Nickname",
+      "nickname-placeholder": "What would you like your assistant to call you?",
+      "about-user": "More context",
+      "about-user-tip": "For example, your role, goals, writing preferences, or ways of collaborating that you want your assistant to remember over time.",
+      "about-user-placeholder": "Tell the assistant something about your background, preferences, or common scenarios",
+      "options": {
+        "style": {
+          "friendly": "Friendly",
+          "professional": "Professional",
+          "concise": "Concise",
+          "direct": "Straightforward",
+          "playful": "Playful"
+        },
+        "level": {
+          "default": "Default",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High"
+        },
+        "list": {
+          "default": "Default",
+          "minimal": "Use Less Often",
+          "balanced": "Use When Helpful",
+          "structured": "Use More Often"
+        },
+        "emoji": {
+          "default": "Default",
+          "none": "Do Not Use",
+          "light": "Occasionally",
+          "expressive": "Expressive"
+        }
+      }
+    }
   },
   "article": {
     "title": "Batch Generate Articles",

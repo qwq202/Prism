@@ -36,10 +36,19 @@ import { useMemo } from "react";
 import { ConnectionStack, StreamMessage } from "@/api/connection.ts";
 import { useTranslation } from "react-i18next";
 import {
+  buildPersonalizationInstruction,
   contextSelector,
   frequencyPenaltySelector,
   historySelector,
   maxTokensSelector,
+  personaAboutUserSelector,
+  personaCustomInstructionSelector,
+  personaEmojiSelector,
+  personaEnthusiasmSelector,
+  personaListsSelector,
+  personaNicknameSelector,
+  personaStyleSelector,
+  personaWarmthSelector,
   presencePenaltySelector,
   repetitionPenaltySelector,
   temperatureSelector,
@@ -605,6 +614,27 @@ export function useMessageActions() {
   const presence_penalty = useSelector(presencePenaltySelector);
   const frequency_penalty = useSelector(frequencyPenaltySelector);
   const repetition_penalty = useSelector(repetitionPenaltySelector);
+  const persona_style = useSelector(personaStyleSelector);
+  const persona_warmth = useSelector(personaWarmthSelector);
+  const persona_enthusiasm = useSelector(personaEnthusiasmSelector);
+  const persona_lists = useSelector(personaListsSelector);
+  const persona_emoji = useSelector(personaEmojiSelector);
+  const persona_custom_instruction = useSelector(
+    personaCustomInstructionSelector,
+  );
+  const persona_nickname = useSelector(personaNicknameSelector);
+  const persona_about_user = useSelector(personaAboutUserSelector);
+
+  const personalizationInstruction = buildPersonalizationInstruction({
+    persona_style,
+    persona_warmth,
+    persona_enthusiasm,
+    persona_lists,
+    persona_emoji,
+    persona_custom_instruction,
+    persona_nickname,
+    persona_about_user,
+  });
 
   return {
     send: async (message: string, using_model?: string) => {
@@ -647,6 +677,7 @@ export function useMessageActions() {
         model: targetModel,
         context: history,
         ignore_context: !context,
+        custom_instruction: personalizationInstruction || undefined,
         max_tokens: max_tokens > 0 ? max_tokens : undefined,
         temperature,
         top_p,
@@ -700,6 +731,7 @@ export function useMessageActions() {
         model,
         context: history,
         ignore_context: !context,
+        custom_instruction: personalizationInstruction || undefined,
         max_tokens: max_tokens > 0 ? max_tokens : undefined,
         temperature,
         top_p,

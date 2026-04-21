@@ -1,8 +1,10 @@
 import { createSlice } from "@reduxjs/toolkit";
 import {
   getBooleanMemory,
+  getMemory,
   getNumberMemory,
   setBooleanMemory,
+  setMemory,
   setNumberMemory,
 } from "@/utils/memory.ts";
 import { RootState } from "@/store/index.ts";
@@ -25,7 +27,88 @@ export const initialSettings = {
   hide_toolbar: false,
   hide_toolbar_text: true,
   collapse_thinking: false,
+  persona_style: "friendly",
+  persona_warmth: "default",
+  persona_enthusiasm: "default",
+  persona_lists: "default",
+  persona_emoji: "default",
+  persona_custom_instruction: "",
+  persona_nickname: "",
+  persona_about_user: "",
 };
+
+export type PersonalizationSettings = {
+  persona_style: string;
+  persona_warmth: string;
+  persona_enthusiasm: string;
+  persona_lists: string;
+  persona_emoji: string;
+  persona_custom_instruction: string;
+  persona_nickname: string;
+  persona_about_user: string;
+};
+
+const stylePromptMap: Record<string, string> = {
+  friendly: "Keep the default response style warm, approachable, and collaborative.",
+  concise: "Keep the default response style concise, crisp, and efficient.",
+  professional: "Keep the default response style polished, calm, and professional.",
+  playful: "Keep the default response style lively, witty, and playful when appropriate.",
+  direct: "Keep the default response style straightforward, candid, and low-frills.",
+};
+
+const warmthPromptMap: Record<string, string> = {
+  low: "Use a restrained emotional tone.",
+  medium: "Use a moderately warm tone.",
+  high: "Use a very warm and caring tone without sounding overbearing.",
+};
+
+const enthusiasmPromptMap: Record<string, string> = {
+  low: "Keep excitement levels subdued.",
+  medium: "Show a moderate amount of enthusiasm.",
+  high: "Show noticeable enthusiasm and encouragement when appropriate.",
+};
+
+const listsPromptMap: Record<string, string> = {
+  minimal: "Prefer paragraphs over headings and lists unless structure clearly helps.",
+  balanced: "Use headings and lists when they improve clarity, but avoid over-structuring.",
+  structured: "Use clear headings and lists more proactively to organize answers.",
+};
+
+const emojiPromptMap: Record<string, string> = {
+  none: "Do not use emoji.",
+  light: "Use emoji sparingly and only when it feels natural.",
+  expressive: "Emoji are welcome in light amounts when they support the tone.",
+};
+
+export function buildPersonalizationInstruction(
+  personalization: PersonalizationSettings,
+): string {
+  const sections = [
+    stylePromptMap[personalization.persona_style],
+    warmthPromptMap[personalization.persona_warmth],
+    enthusiasmPromptMap[personalization.persona_enthusiasm],
+    listsPromptMap[personalization.persona_lists],
+    emojiPromptMap[personalization.persona_emoji],
+    personalization.persona_nickname
+      ? `When it feels natural, address the user as "${personalization.persona_nickname.trim()}".`
+      : "",
+    personalization.persona_about_user
+      ? `User profile and background to keep in mind: ${personalization.persona_about_user.trim()}`
+      : "",
+    personalization.persona_custom_instruction
+      ? `Additional user preference: ${personalization.persona_custom_instruction.trim()}`
+      : "",
+  ].filter(Boolean);
+
+  if (sections.length === 0) {
+    return "";
+  }
+
+  return [
+    "Follow these user personalization preferences when helpful. They should shape tone and presentation, but must not override the user's current request.",
+    ...sections,
+  ].join("\n");
+}
 
 export const settingsSlice = createSlice({
   name: "settings",
@@ -46,6 +129,29 @@ export const settingsSlice = createSlice({
     hide_toolbar: getBooleanMemory("hide_toolbar", false), // hide toolbar
     hide_toolbar_text: getBooleanMemory("hide_toolbar_text", true), // hide toolbar text
     collapse_thinking: getBooleanMemory("collapse_thinking", false), // collapse thinking content by default
+    persona_style: getMemory("persona_style", initialSettings.persona_style),
+    persona_warmth: getMemory(
+      "persona_warmth",
+      initialSettings.persona_warmth,
+    ),
+    persona_enthusiasm: getMemory(
+      "persona_enthusiasm",
+      initialSettings.persona_enthusiasm,
+    ),
+    persona_lists: getMemory("persona_lists", initialSettings.persona_lists),
+    persona_emoji: getMemory("persona_emoji", initialSettings.persona_emoji),
+    persona_custom_instruction: getMemory(
+      "persona_custom_instruction",
+      initialSettings.persona_custom_instruction,
+    ),
+    persona_nickname: getMemory(
+      "persona_nickname",
+      initialSettings.persona_nickname,
+    ),
+    persona_about_user: getMemory(
+      "persona_about_user",
+      initialSettings.persona_about_user,
+    ),
   },
   reducers: {
     toggleDialog: (state) => {
@@ -120,6 +226,38 @@ export const settingsSlice = createSlice({
       state.collapse_thinking = action.payload as boolean;
       setBooleanMemory("collapse_thinking", action.payload);
     },
+    setPersonaStyle: (state, action) => {
+      state.persona_style = action.payload as string;
+      setMemory("persona_style", action.payload);
+    },
+    setPersonaWarmth: (state, action) => {
+      state.persona_warmth = action.payload as string;
+      setMemory("persona_warmth", action.payload);
+    },
+    setPersonaEnthusiasm: (state, action) => {
+      state.persona_enthusiasm = action.payload as string;
+      setMemory("persona_enthusiasm", action.payload);
+    },
+    setPersonaLists: (state, action) => {
+      state.persona_lists = action.payload as string;
+      setMemory("persona_lists", action.payload);
+    },
+    setPersonaEmoji: (state, action) => {
+      state.persona_emoji = action.payload as string;
+      setMemory("persona_emoji", action.payload);
+    },
+    setPersonaCustomInstruction: (state, action) => {
+      state.persona_custom_instruction = action.payload as string;
+      setMemory("persona_custom_instruction", action.payload);
+    },
+    setPersonaNickname: (state, action) => {
+      state.persona_nickname = action.payload as string;
+      setMemory("persona_nickname", action.payload);
+    },
+    setPersonaAboutUser: (state, action) => {
+      state.persona_about_user = action.payload as string;
+      setMemory("persona_about_user", action.payload);
+    },
     resetSettings: (state) => {
       state.context = initialSettings.context;
       state.align = initialSettings.align;
@@ -136,6 +274,15 @@ export const settingsSlice = createSlice({
       state.hide_toolbar = initialSettings.hide_toolbar;
       state.hide_toolbar_text = initialSettings.hide_toolbar_text;
       state.collapse_thinking = initialSettings.collapse_thinking;
+      state.persona_style = initialSettings.persona_style;
+      state.persona_warmth = initialSettings.persona_warmth;
+      state.persona_enthusiasm = initialSettings.persona_enthusiasm;
+      state.persona_lists = initialSettings.persona_lists;
+      state.persona_emoji = initialSettings.persona_emoji;
+      state.persona_custom_instruction =
+        initialSettings.persona_custom_instruction;
+      state.persona_nickname = initialSettings.persona_nickname;
+      state.persona_about_user = initialSettings.persona_about_user;
 
       setBooleanMemory("context", initialSettings.context);
       setBooleanMemory("align", initialSettings.align);
@@ -152,6 +299,17 @@ export const settingsSlice = createSlice({
       setBooleanMemory("hide_toolbar", initialSettings.hide_toolbar);
       setBooleanMemory("hide_toolbar_text", initialSettings.hide_toolbar_text);
       setBooleanMemory("collapse_thinking", initialSettings.collapse_thinking);
+      setMemory("persona_style", initialSettings.persona_style);
+      setMemory("persona_warmth", initialSettings.persona_warmth);
+      setMemory("persona_enthusiasm", initialSettings.persona_enthusiasm);
+      setMemory("persona_lists", initialSettings.persona_lists);
+      setMemory("persona_emoji", initialSettings.persona_emoji);
+      setMemory(
+        "persona_custom_instruction",
+        initialSettings.persona_custom_instruction,
+      );
+      setMemory("persona_nickname", initialSettings.persona_nickname);
+      setMemory("persona_about_user", initialSettings.persona_about_user);
     },
   },
 });
@@ -177,6 +335,14 @@ export const {
   setHideToolbar,
   setHideToolbarText,
   setCollapseThinking,
+  setPersonaStyle,
+  setPersonaWarmth,
+  setPersonaEnthusiasm,
+  setPersonaLists,
+  setPersonaEmoji,
+  setPersonaCustomInstruction,
+  setPersonaNickname,
+  setPersonaAboutUser,
 } = settingsSlice.actions;
 export default settingsSlice.reducer;
 
@@ -210,3 +376,19 @@ export const hideToolbarTextSelector = (state: RootState): boolean =>
   state.settings.hide_toolbar_text;
 export const collapseThinkingSelector = (state: RootState): boolean =>
   state.settings.collapse_thinking;
+export const personaStyleSelector = (state: RootState): string =>
+  state.settings.persona_style;
+export const personaWarmthSelector = (state: RootState): string =>
+  state.settings.persona_warmth;
+export const personaEnthusiasmSelector = (state: RootState): string =>
+  state.settings.persona_enthusiasm;
+export const personaListsSelector = (state: RootState): string =>
+  state.settings.persona_lists;
+export const personaEmojiSelector = (state: RootState): string =>
+  state.settings.persona_emoji;
+export const personaCustomInstructionSelector = (state: RootState): string =>
+  state.settings.persona_custom_instruction;
+export const personaNicknameSelector = (state: RootState): string =>
+  state.settings.persona_nickname;
+export const personaAboutUserSelector = (state: RootState): string =>
+  state.settings.persona_about_user;

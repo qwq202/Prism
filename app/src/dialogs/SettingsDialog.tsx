@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import { getMemoryPerformance } from "@/utils/app.ts";
 import { version } from "@/conf/bootstrap.ts";
 import { NumberInput } from "@/components/ui/number-input.tsx";
+import { Input } from "@/components/ui/input.tsx";
 import {
   Select,
   SelectContent,
@@ -24,6 +25,7 @@ import {
 import { langsProps, setLanguage } from "@/i18n.ts";
 import { cn } from "@/components/ui/lib/utils.ts";
 import { Slider } from "@/components/ui/slider.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
 import Tips from "@/components/Tips.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import {
@@ -42,6 +44,48 @@ import Github from "@/components/ui/icons/Github.tsx";
 import { isTauri } from "@/utils/desktop.ts";
 import { useDeeptrain } from "@/conf/env.ts";
 import ThemeToggle from "@/components/ThemeProvider.tsx";
+
+type SelectOption = {
+  value: string;
+  label: string;
+};
+
+type PersonalizationSelectFieldProps = {
+  title: string;
+  helper?: string;
+  value: string;
+  options: SelectOption[];
+  onChange: (value: string) => void;
+};
+
+function PersonalizationSelectField({
+  title,
+  helper,
+  value,
+  options,
+  onChange,
+}: PersonalizationSelectFieldProps) {
+  return (
+    <div className={`persona-field`}>
+      <div className={`persona-copy`}>
+        <p className={`persona-label`}>{title}</p>
+        {helper && <p className={`persona-helper`}>{helper}</p>}
+      </div>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className={`select persona-select`}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
 
 function SettingsDialog() {
   const { t, i18n } = useTranslation();
@@ -64,10 +108,100 @@ function SettingsDialog() {
   const presencePenalty = useSelector(settings.presencePenaltySelector);
   const frequencyPenalty = useSelector(settings.frequencyPenaltySelector);
   const repetitionPenalty = useSelector(settings.repetitionPenaltySelector);
+  const personaStyle = useSelector(settings.personaStyleSelector);
+  const personaWarmth = useSelector(settings.personaWarmthSelector);
+  const personaEnthusiasm = useSelector(settings.personaEnthusiasmSelector);
+  const personaLists = useSelector(settings.personaListsSelector);
+  const personaEmoji = useSelector(settings.personaEmojiSelector);
+  const personaCustomInstruction = useSelector(
+    settings.personaCustomInstructionSelector,
+  );
+  const personaNickname = useSelector(settings.personaNicknameSelector);
+  const personaAboutUser = useSelector(settings.personaAboutUserSelector);
 
   const [memorySize, setMemorySize] = useState(getMemoryPerformance());
 
   const desktop = isTauri();
+
+  const baseStyleOptions: SelectOption[] = [
+    {
+      value: "friendly",
+      label: t("settings.personalization.options.style.friendly"),
+    },
+    {
+      value: "professional",
+      label: t("settings.personalization.options.style.professional"),
+    },
+    {
+      value: "concise",
+      label: t("settings.personalization.options.style.concise"),
+    },
+    {
+      value: "direct",
+      label: t("settings.personalization.options.style.direct"),
+    },
+    {
+      value: "playful",
+      label: t("settings.personalization.options.style.playful"),
+    },
+  ];
+
+  const warmthOptions: SelectOption[] = [
+    {
+      value: "default",
+      label: t("settings.personalization.options.level.default"),
+    },
+    {
+      value: "low",
+      label: t("settings.personalization.options.level.low"),
+    },
+    {
+      value: "medium",
+      label: t("settings.personalization.options.level.medium"),
+    },
+    {
+      value: "high",
+      label: t("settings.personalization.options.level.high"),
+    },
+  ];
+
+  const listOptions: SelectOption[] = [
+    {
+      value: "default",
+      label: t("settings.personalization.options.list.default"),
+    },
+    {
+      value: "minimal",
+      label: t("settings.personalization.options.list.minimal"),
+    },
+    {
+      value: "balanced",
+      label: t("settings.personalization.options.list.balanced"),
+    },
+    {
+      value: "structured",
+      label: t("settings.personalization.options.list.structured"),
+    },
+  ];
+
+  const emojiOptions: SelectOption[] = [
+    {
+      value: "default",
+      label: t("settings.personalization.options.emoji.default"),
+    },
+    {
+      value: "none",
+      label: t("settings.personalization.options.emoji.none"),
+    },
+    {
+      value: "light",
+      label: t("settings.personalization.options.emoji.light"),
+    },
+    {
+      value: "expressive",
+      label: t("settings.personalization.options.emoji.expressive"),
+    },
+  ];
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -129,6 +263,152 @@ function SettingsDialog() {
                           )}
                         </SelectContent>
                       </Select>
+                    </div>
+                  </div>
+                </div>
+                <div className={`settings-segment`}>
+                  <div className={`item persona-item`}>
+                    <div className={`persona-stack`}>
+                      <div className={`segment-copy`}>
+                        <h3 className={`segment-title`}>
+                          {t("settings.personalization.title")}
+                        </h3>
+                        <p className={`segment-note`}>
+                          {t("settings.personalization.description")}
+                        </p>
+                      </div>
+
+                      <PersonalizationSelectField
+                        title={t("settings.personalization.base-style")}
+                        helper={t("settings.personalization.base-style-tip")}
+                        value={personaStyle}
+                        options={baseStyleOptions}
+                        onChange={(value) =>
+                          dispatch(settings.setPersonaStyle(value))
+                        }
+                      />
+
+                      <div className={`persona-divider`} />
+
+                      <div className={`segment-copy`}>
+                        <h4 className={`segment-subtitle`}>
+                          {t("settings.personalization.traits")}
+                        </h4>
+                        <p className={`segment-note`}>
+                          {t("settings.personalization.traits-tip")}
+                        </p>
+                      </div>
+
+                      <div className={`persona-grid`}>
+                        <PersonalizationSelectField
+                          title={t("settings.personalization.warmth")}
+                          value={personaWarmth}
+                          options={warmthOptions}
+                          onChange={(value) =>
+                            dispatch(settings.setPersonaWarmth(value))
+                          }
+                        />
+                        <PersonalizationSelectField
+                          title={t("settings.personalization.enthusiasm")}
+                          value={personaEnthusiasm}
+                          options={warmthOptions}
+                          onChange={(value) =>
+                            dispatch(settings.setPersonaEnthusiasm(value))
+                          }
+                        />
+                        <PersonalizationSelectField
+                          title={t("settings.personalization.headings-lists")}
+                          value={personaLists}
+                          options={listOptions}
+                          onChange={(value) =>
+                            dispatch(settings.setPersonaLists(value))
+                          }
+                        />
+                        <PersonalizationSelectField
+                          title={t("settings.personalization.emoji")}
+                          value={personaEmoji}
+                          options={emojiOptions}
+                          onChange={(value) =>
+                            dispatch(settings.setPersonaEmoji(value))
+                          }
+                        />
+                      </div>
+
+                      <div className={`persona-field`}>
+                        <div className={`persona-copy`}>
+                          <p className={`persona-label`}>
+                            {t("settings.personalization.custom-instruction")}
+                          </p>
+                        </div>
+                        <Textarea
+                          rows={4}
+                          value={personaCustomInstruction}
+                          placeholder={t(
+                            "settings.personalization.custom-instruction-placeholder",
+                          )}
+                          className={`persona-textarea`}
+                          onChange={(event) =>
+                            dispatch(
+                              settings.setPersonaCustomInstruction(
+                                event.target.value,
+                              ),
+                            )
+                          }
+                        />
+                      </div>
+
+                      <div className={`persona-divider`} />
+
+                      <div className={`segment-copy`}>
+                        <h4 className={`segment-subtitle`}>
+                          {t("settings.personalization.about-you")}
+                        </h4>
+                      </div>
+
+                      <div className={`persona-grid persona-grid-wide`}>
+                        <div className={`persona-field`}>
+                          <div className={`persona-copy`}>
+                            <p className={`persona-label`}>
+                              {t("settings.personalization.nickname")}
+                            </p>
+                          </div>
+                          <Input
+                            value={personaNickname}
+                            placeholder={t(
+                              "settings.personalization.nickname-placeholder",
+                            )}
+                            className={`persona-input`}
+                            onChange={(event) =>
+                              dispatch(
+                                settings.setPersonaNickname(event.target.value),
+                              )
+                            }
+                          />
+                        </div>
+                        <div className={`persona-field persona-field-full`}>
+                          <div className={`persona-copy`}>
+                            <p className={`persona-label`}>
+                              {t("settings.personalization.about-user")}
+                            </p>
+                            <p className={`persona-helper`}>
+                              {t("settings.personalization.about-user-tip")}
+                            </p>
+                          </div>
+                          <Textarea
+                            rows={4}
+                            value={personaAboutUser}
+                            placeholder={t(
+                              "settings.personalization.about-user-placeholder",
+                            )}
+                            className={`persona-textarea`}
+                            onChange={(event) =>
+                              dispatch(
+                                settings.setPersonaAboutUser(event.target.value),
+                              )
+                            }
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

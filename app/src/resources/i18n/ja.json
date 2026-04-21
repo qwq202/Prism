@@ -450,7 +450,54 @@
     "collapse-thinking": "思考内容をデフォルトで折りたたむ",
     "theme": "テーマ",
     "light": "明るい色:",
-    "dark": "グレー表示にする色"
+    "dark": "グレー表示にする色",
+    "personalization": {
+      "title": "パーソナライズ",
+      "description": "返信する際のデフォルトのスタイル、トーン、通話方法を設定します。応答の表示には影響しますが、現在のメッセージの明示的な要求を上書きすることはありません。",
+      "base-style": "基本的なスタイルとイントネーション",
+      "base-style-tip": "アシスタントとやり取りするときの一般的な向きに合ったデフォルトのプレゼンテーショントーンを設定します。",
+      "traits": "特徴",
+      "traits-tip": "基本的なスタイルに加えて、表現の好みをさらに補完します。",
+      "warmth": "穏やかで思いやりがある",
+      "enthusiasm": "熱狂的",
+      "headings-lists": "タイトルとリスト",
+      "emoji": "顔文字",
+      "custom-instruction": "カスタム手順",
+      "custom-instruction-placeholder": "他の行動、スタイル、トーンの好みを補完する",
+      "about-you": "あなたについて",
+      "nickname": "ニックネーム",
+      "nickname-placeholder": "アシスタントに何と呼んでもらいたいですか？",
+      "about-user": "その他のコンテキスト",
+      "about-user-tip": "たとえば、アシスタントに時間をかけて覚えてもらいたい役割、目標、書き方の好み、コラボレーションの方法などです。",
+      "about-user-placeholder": "あなたの経歴、好み、または一般的なシナリオについてアシスタントに何かを伝えます",
+      "options": {
+        "style": {
+          "friendly": "フレンドリー",
+          "professional": "プロフェッショナルで安定している",
+          "concise": "シンプルで清潔",
+          "direct": "わかりやすい",
+          "playful": "リラックスして活気がある"
+        },
+        "level": {
+          "default": "デフォルト",
+          "low": "小さく",
+          "medium": "中距離",
+          "high": "かなり高い"
+        },
+        "list": {
+          "default": "デフォルト",
+          "minimal": "できるだけ使用量を減らす",
+          "balanced": "オンデマンド使用",
+          "structured": "より頻繁に使用される"
+        },
+        "emoji": {
+          "default": "デフォルト",
+          "none": "無効",
+          "light": "臨時使用",
+          "expressive": "ある程度アクティブ"
+        }
+      }
+    }
   },
   "article": {
     "title": "投稿の一括生成",
