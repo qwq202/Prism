@@ -12,6 +12,7 @@ import (
 	neturl "net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -548,6 +549,63 @@ func DeleteStoredAttachment(name string) error {
 	}
 
 	return result
+}
+
+func ListStoredAttachmentNames() ([]string, error) {
+	seen := map[string]struct{}{}
+	result := make([]string, 0)
+
+	appendName := func(name string) {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			return
+		}
+		if _, ok := seen[name]; ok {
+			return
+		}
+		seen[name] = struct{}{}
+		result = append(result, name)
+	}
+
+	localDir := filepath.Dir(AttachmentLocalPath("placeholder"))
+	if entries, err := os.ReadDir(localDir); err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			appendName(entry.Name())
+		}
+	}
+
+	if storageModeReady() {
+		ctx := context.Background()
+		client, err := newS3Client(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		paginator := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{
+			Bucket: aws.String(storageBucket()),
+			Prefix: aws.String(attachmentPrefix + "/"),
+		})
+
+		for paginator.HasMorePages() {
+			page, err := paginator.NextPage(ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			for _, object := range page.Contents {
+				key := strings.TrimSpace(aws.ToString(object.Key))
+				if key == "" || !strings.HasPrefix(key, attachmentPrefix+"/") {
+					continue
+				}
+				appendName(strings.TrimPrefix(key, attachmentPrefix+"/"))
+			}
+		}
+	}
+
+	return result, nil
 }
 
 func TestStorageConnection(config StorageTestConfig) error {

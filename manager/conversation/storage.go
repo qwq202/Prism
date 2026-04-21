@@ -26,6 +26,49 @@ func cleanupStoredAttachments(db *sql.DB, names []string) {
 	}
 }
 
+func loadGlobalConversationAttachmentNames(db *sql.DB) map[string]struct{} {
+	rows, err := globals.QueryDb(db, `SELECT data FROM conversation`)
+	if err != nil {
+		return map[string]struct{}{}
+	}
+	defer func(rows *sql.Rows) {
+		_ = rows.Close()
+	}(rows)
+
+	result := map[string]struct{}{}
+	for rows.Next() {
+		var data string
+		if err := rows.Scan(&data); err != nil {
+			continue
+		}
+
+		for _, name := range utils.ExtractAttachmentNames(data) {
+			result[name] = struct{}{}
+		}
+	}
+
+	return result
+}
+
+func cleanupOrphanStoredAttachments(db *sql.DB) {
+	storedNames, err := utils.ListStoredAttachmentNames()
+	if err != nil {
+		globals.Warn(fmt.Sprintf("[conversation] list stored attachments error: %s", err.Error()))
+		return
+	}
+
+	referenced := loadGlobalConversationAttachmentNames(db)
+	for _, name := range storedNames {
+		if _, ok := referenced[name]; ok {
+			continue
+		}
+
+		if err := utils.DeleteStoredAttachment(name); err != nil {
+			globals.Warn(fmt.Sprintf("[conversation] delete orphan attachment error: %s (attachment: %s)", err.Error(), name))
+		}
+	}
+}
+
 func attachmentStillReferenced(db *sql.DB, name string) (bool, error) {
 	var count int64
 	err := globals.QueryRowDb(db, `
@@ -193,6 +236,7 @@ func (c *Conversation) DeleteConversation(db *sql.DB) bool {
 	}
 
 	cleanupStoredAttachments(db, attachments)
+	cleanupOrphanStoredAttachments(db)
 	return true
 }
 
@@ -210,6 +254,7 @@ func DeleteAllConversations(db *sql.DB, user auth.User) error {
 	_, err := globals.ExecDb(db, "DELETE FROM conversation WHERE user_id = ?", userID)
 	if err == nil {
 		cleanupStoredAttachments(db, attachments)
+		cleanupOrphanStoredAttachments(db)
 	}
 	return err
 }
