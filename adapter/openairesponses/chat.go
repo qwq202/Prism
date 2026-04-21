@@ -52,6 +52,13 @@ func formatInputMessage(props *adaptercommon.ChatProps, message globals.Message)
 
 		for _, rawURL := range urls {
 			url := rawURL
+			if props != nil && props.ChannelType == globals.XAIChannelType && utils.IsInternalAttachmentURL(url) {
+				if normalized, err := utils.NormalizeImageToVisionDataURL(url); err == nil {
+					url = normalized
+				} else {
+					globals.Warn(fmt.Sprintf("[openai responses] cannot normalize xai attachment image: %s", err.Error()))
+				}
+			}
 			if props.Buffer != nil {
 				if obj, err := utils.NewImage(url); err == nil {
 					props.Buffer.AddImage(obj)

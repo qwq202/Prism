@@ -1,14 +1,18 @@
 package utils
 
 import (
+	"bytes"
 	"chat/globals"
 	"fmt"
 	"image"
+	imagedraw "image/draw"
 	"image/gif"
 	"image/jpeg"
+	"image/png"
 	"io"
 	"math"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"path"
 	"strings"
@@ -101,6 +105,65 @@ func ConvertToBase64(url string) (string, error) {
 	}
 
 	return Base64EncodeBytes(data), nil
+}
+
+func IsInternalAttachmentURL(source string) bool {
+	if source == "" || strings.HasPrefix(source, "data:image/") {
+		return false
+	}
+
+	instance, err := neturl.Parse(source)
+	if err != nil {
+		return false
+	}
+
+	return strings.Contains(instance.Path, "/attachments/")
+}
+
+func NormalizeImageToVisionDataURL(source string) (string, error) {
+	imageObject, err := NewImage(source)
+	if err != nil {
+		return "", err
+	}
+	if imageObject == nil || imageObject.Object == nil {
+		return "", fmt.Errorf("cannot decode image")
+	}
+
+	normalized := imageObject.Object
+	bounds := normalized.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+	if width <= 0 || height <= 0 {
+		return "", fmt.Errorf("invalid image dimensions")
+	}
+
+	if width < 8 || height < 8 {
+		targetWidth := width
+		targetHeight := height
+		if targetWidth < 8 {
+			targetWidth = 8
+		}
+		if targetHeight < 8 {
+			targetHeight = 8
+		}
+
+		canvas := image.NewRGBA(image.Rect(0, 0, targetWidth, targetHeight))
+		imagedraw.Draw(
+			canvas,
+			image.Rect(0, 0, width, height),
+			normalized,
+			bounds.Min,
+			imagedraw.Src,
+		)
+		normalized = canvas
+	}
+
+	var buffer bytes.Buffer
+	if err := png.Encode(&buffer, normalized); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("data:image/png;base64,%s", Base64EncodeBytes(buffer.Bytes())), nil
 }
 
 func (i *Image) GetWidth() int {
