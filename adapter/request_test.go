@@ -3,6 +3,7 @@ package adapter
 import (
 	adaptercommon "chat/adapter/common"
 	"chat/globals"
+	"strings"
 	"testing"
 )
 
@@ -146,5 +147,28 @@ func TestSanitizeChatMessagesForRequestStripsPalmNonGeminiModel(t *testing.T) {
 	restore()
 	if props.Message[0].GeminiHiddenMetadata == nil {
 		t.Fatalf("expected metadata to be restored after request")
+	}
+}
+
+func TestClearMessagesKeepsBase64ForConfiguredVisionModel(t *testing.T) {
+	originalResolver := globals.VisionModelResolver
+	globals.VisionModelResolver = func(model string) bool {
+		return model == "custom-vision-model"
+	}
+	defer func() {
+		globals.VisionModelResolver = originalResolver
+	}()
+
+	image := "data:image/png;base64," + strings.Repeat("A", 128)
+	messages := []globals.Message{
+		{
+			Role:    globals.User,
+			Content: "before " + image + " after",
+		},
+	}
+
+	cleared := ClearMessages("custom-vision-model", messages)
+	if cleared[0].Content != messages[0].Content {
+		t.Fatalf("expected configured vision model to preserve base64 image content")
 	}
 }

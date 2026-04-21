@@ -50,6 +50,15 @@ var SearchMaxResults int
 var SearchTopic string
 var SearchDepth string
 var TaskModel string
+var VisionModelResolver func(string) bool
+
+func IsConfiguredVisionModel(model string) bool {
+	if VisionModelResolver == nil {
+		return false
+	}
+
+	return VisionModelResolver(model)
+}
 
 func OriginIsAllowed(uri string) bool {
 	if len(AllowedOrigins) == 0 {

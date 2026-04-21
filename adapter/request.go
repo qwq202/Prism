@@ -132,7 +132,7 @@ func NewVideoRequest(conf globals.ChannelConfig, props *adaptercommon.VideoProps
 }
 
 func ClearMessages(model string, messages []globals.Message) []globals.Message {
-	if globals.IsVisionModel(model) || globals.IsXAIModel(model) {
+	if globals.IsVisionModel(model) || globals.IsConfiguredVisionModel(model) || globals.IsXAIModel(model) {
 		return messages
 	}
 
