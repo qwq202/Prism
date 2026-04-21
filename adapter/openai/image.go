@@ -34,14 +34,14 @@ func (c *ChatInstance) CreateImageRequest(props ImageProps) (string, string, err
 			N: 1,
 		}, props.Proxy)
 	if err != nil || res == nil {
-		return "", "", fmt.Errorf(err.Error())
+		return "", "", fmt.Errorf("%s", err.Error())
 	}
 
 	data := utils.MapToStruct[ImageResponse](res)
 	if data == nil {
 		return "", "", fmt.Errorf("openai error: cannot parse response")
 	} else if data.Error.Message != "" {
-		return "", "", fmt.Errorf(data.Error.Message)
+		return "", "", fmt.Errorf("%s", data.Error.Message)
 	}
 
 	// for gpt-image-1, return base64 data if available

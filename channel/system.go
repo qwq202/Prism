@@ -78,14 +78,26 @@ type taskState struct {
 	Model string `json:"model" mapstructure:"model"`
 }
 
+type s3StorageState struct {
+	Endpoint       string `json:"endpoint" mapstructure:"endpoint"`
+	Region         string `json:"region" mapstructure:"region"`
+	Bucket         string `json:"bucket" mapstructure:"bucket"`
+	AccessKey      string `json:"access_key" mapstructure:"access_key"`
+	SecretKey      string `json:"secret_key" mapstructure:"secret_key"`
+	PublicBaseURL  string `json:"public_base_url" mapstructure:"public_base_url"`
+	ForcePathStyle bool   `json:"force_path_style" mapstructure:"force_path_style"`
+}
+
 type commonState struct {
-	Article     []string `json:"article" mapstructure:"article"`
-	Generation  []string `json:"generation" mapstructure:"generation"`
-	Cache       []string `json:"cache" mapstructure:"cache"`
-	Expire      int64    `json:"expire" mapstructure:"expire"`
-	Size        int64    `json:"size" mapstructure:"size"`
-	ImageStore  bool     `json:"image_store" mapstructure:"imagestore"`
-	PromptStore bool     `json:"prompt_store" mapstructure:"promptstore"`
+	Article     []string       `json:"article" mapstructure:"article"`
+	Generation  []string       `json:"generation" mapstructure:"generation"`
+	Cache       []string       `json:"cache" mapstructure:"cache"`
+	Expire      int64          `json:"expire" mapstructure:"expire"`
+	Size        int64          `json:"size" mapstructure:"size"`
+	ImageStore  bool           `json:"image_store" mapstructure:"imagestore"`
+	PromptStore bool           `json:"prompt_store" mapstructure:"promptstore"`
+	StorageMode string         `json:"storage_mode" mapstructure:"storage_mode"`
+	S3          s3StorageState `json:"s3" mapstructure:"s3"`
 }
 
 type SystemConfig struct {
@@ -120,6 +132,14 @@ func (c *SystemConfig) Load() {
 
 	globals.CacheAcceptedExpire = c.GetCacheAcceptedExpire()
 	globals.CacheAcceptedSize = c.GetCacheAcceptedSize()
+	globals.StorageMode = c.GetStorageMode()
+	globals.StorageS3Endpoint = c.GetStorageS3Endpoint()
+	globals.StorageS3Region = c.GetStorageS3Region()
+	globals.StorageS3Bucket = c.GetStorageS3Bucket()
+	globals.StorageS3AccessKey = c.GetStorageS3AccessKey()
+	globals.StorageS3SecretKey = c.GetStorageS3SecretKey()
+	globals.StorageS3PublicBaseURL = c.GetStorageS3PublicBaseURL()
+	globals.StorageS3ForcePathStyle = c.Common.S3.ForcePathStyle
 	globals.AcceptImageStore = c.AcceptImageStore()
 
 	globals.AcceptPromptStore = c.Common.PromptStore
@@ -326,13 +346,59 @@ func (c *SystemConfig) GetCacheAcceptedSize() int64 {
 	return c.Common.Size
 }
 
+func (c *SystemConfig) GetStorageMode() string {
+	if strings.EqualFold(strings.TrimSpace(c.Common.StorageMode), "s3") {
+		return "s3"
+	}
+
+	return "local"
+}
+
+func (c *SystemConfig) GetStorageS3Endpoint() string {
+	return strings.TrimSuffix(strings.TrimSpace(c.Common.S3.Endpoint), "/")
+}
+
+func (c *SystemConfig) GetStorageS3Region() string {
+	return strings.TrimSpace(c.Common.S3.Region)
+}
+
+func (c *SystemConfig) GetStorageS3Bucket() string {
+	return strings.TrimSpace(c.Common.S3.Bucket)
+}
+
+func (c *SystemConfig) GetStorageS3AccessKey() string {
+	return strings.TrimSpace(c.Common.S3.AccessKey)
+}
+
+func (c *SystemConfig) GetStorageS3SecretKey() string {
+	return strings.TrimSpace(c.Common.S3.SecretKey)
+}
+
+func (c *SystemConfig) GetStorageS3PublicBaseURL() string {
+	return strings.TrimSuffix(strings.TrimSpace(c.Common.S3.PublicBaseURL), "/")
+}
+
+func (c *SystemConfig) IsS3StorageConfigured() bool {
+	return c.GetStorageS3Bucket() != "" &&
+		c.GetStorageS3Region() != "" &&
+		c.GetStorageS3AccessKey() != "" &&
+		c.GetStorageS3SecretKey() != ""
+}
+
 func (c *SystemConfig) AcceptImageStore() bool {
-	// if notify url is empty, then image store is not allowed
-	if len(strings.TrimSpace(globals.NotifyUrl)) == 0 {
+	if !c.Common.ImageStore {
 		return false
 	}
 
-	return c.Common.ImageStore
+	if c.GetStorageMode() == "s3" {
+		if !c.IsS3StorageConfigured() {
+			return false
+		}
+
+		return c.GetStorageS3PublicBaseURL() != "" || len(strings.TrimSpace(globals.NotifyUrl)) > 0
+	}
+
+	return len(strings.TrimSpace(globals.NotifyUrl)) > 0
 }
 
 func (c *SystemConfig) SupportRelayPlan() bool {

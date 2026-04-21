@@ -36,3 +36,14 @@ system:
     crop_len: 1000
   task:
     model: ""
+  common:
+    image_store: false
+    storage_mode: local
+    s3:
+      endpoint: ""
+      region: ""
+      bucket: ""
+      access_key: ""
+      secret_key: ""
+      public_base_url: ""
+      force_path_style: false

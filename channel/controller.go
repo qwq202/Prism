@@ -2,7 +2,6 @@ package channel
 
 import (
 	"chat/utils"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )
@@ -17,9 +16,8 @@ func GetInfo(c *gin.Context) {
 }
 
 func AttachmentService(c *gin.Context) {
-	// /attachments/:hash -> ~/storage/attachments/:hash
 	hash := c.Param("hash")
-	c.File(fmt.Sprintf("storage/attachments/%s", hash))
+	utils.ServeStoredAttachment(c, hash)
 }
 
 func DeleteChannel(c *gin.Context) {

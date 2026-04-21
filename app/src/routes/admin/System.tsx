@@ -664,7 +664,7 @@ function Site({ data, dispatch, onChange }: CompProps<SiteState>) {
   );
 }
 
-function Common({ form, data, dispatch, onChange }: CompProps<CommonState>) {
+function Common({ data, dispatch, onChange }: CompProps<CommonState>) {
   const { t } = useTranslation();
 
   const { channelModels } = useChannelModels();
@@ -676,24 +676,6 @@ function Common({ form, data, dispatch, onChange }: CompProps<CommonState>) {
       configParagraph={true}
       isCollapsed={true}
     >
-      <ParagraphItem>
-        <Label className={`flex flex-row items-center`}>
-          {t("admin.system.image_store")}
-          <Tips content={t("admin.system.image_storeTip")} />
-        </Label>
-        <Switch
-          checked={data.image_store}
-          onCheckedChange={(value) => {
-            dispatch({ type: "update:common.image_store", value });
-          }}
-        />
-      </ParagraphItem>
-      {data.image_store && form.general.backend.length === 0 && (
-        <ParagraphDescription border={true}>
-          {t("admin.system.image_storeNoBackend")}
-        </ParagraphDescription>
-      )}
-      <ParagraphSpace />
       <ParagraphItem>
         <Label className={`flex flex-row items-center`}>
           {t("admin.system.cache")}
@@ -817,6 +799,174 @@ function Common({ form, data, dispatch, onChange }: CompProps<CommonState>) {
           })}
         />
       </ParagraphItem>
+      <ParagraphFooter>
+        <div className={`grow`} />
+        <Button
+          size={`sm`}
+          loading={true}
+          onClick={async () => await onChange()}
+        >
+          {t("admin.system.save")}
+        </Button>
+      </ParagraphFooter>
+    </Paragraph>
+  );
+}
+
+function StorageSettings({
+  form,
+  data,
+  dispatch,
+  onChange,
+}: CompProps<CommonState>) {
+  const { t } = useTranslation();
+
+  return (
+    <Paragraph
+      title={t("admin.system.storage")}
+      configParagraph={true}
+      isCollapsed={true}
+    >
+      <ParagraphDescription border={true}>
+        {t("admin.system.storageTip")}
+      </ParagraphDescription>
+      <ParagraphItem>
+        <Label className={`flex flex-row items-center`}>
+          {t("admin.system.image_store")}
+          <Tips content={t("admin.system.image_storeTip")} />
+        </Label>
+        <Switch
+          checked={data.image_store}
+          onCheckedChange={(value) => {
+            dispatch({ type: "update:common.image_store", value });
+          }}
+        />
+      </ParagraphItem>
+      {data.image_store && form.general.backend.length === 0 && (
+        <ParagraphDescription border={true}>
+          {t("admin.system.image_storeNoBackend")}
+        </ParagraphDescription>
+      )}
+      <ParagraphItem>
+        <Label className={`flex flex-row items-center`}>
+          {t("admin.system.storageMode")}
+          <Tips content={t("admin.system.storageModeTip")} />
+        </Label>
+        <Select
+          value={data.storage_mode}
+          onValueChange={(value: string) => {
+            dispatch({
+              type: "update:common.storage_mode",
+              value: value === "s3" ? "s3" : "local",
+            });
+          }}
+        >
+          <SelectTrigger className={`select`}>
+            <SelectValue
+              placeholder={t(`admin.system.storageMode_${data.storage_mode}`)}
+            />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="local">{t("admin.system.storageMode_local")}</SelectItem>
+            <SelectItem value="s3">{t("admin.system.storageMode_s3")}</SelectItem>
+          </SelectContent>
+        </Select>
+      </ParagraphItem>
+      {data.storage_mode === "s3" && (
+        <>
+          <ParagraphItem>
+            <Label>{t("admin.system.storageEndpoint")}</Label>
+            <Input
+              value={data.s3.endpoint}
+              onChange={(e) =>
+                dispatch({
+                  type: "update:common.s3.endpoint",
+                  value: e.target.value,
+                })
+              }
+              placeholder={`https://s3.amazonaws.com`}
+            />
+          </ParagraphItem>
+          <ParagraphItem>
+            <Label>{t("admin.system.storageRegion")}</Label>
+            <Input
+              value={data.s3.region}
+              onChange={(e) =>
+                dispatch({
+                  type: "update:common.s3.region",
+                  value: e.target.value,
+                })
+              }
+              placeholder={`us-east-1`}
+            />
+          </ParagraphItem>
+          <ParagraphItem>
+            <Label>{t("admin.system.storageBucket")}</Label>
+            <Input
+              value={data.s3.bucket}
+              onChange={(e) =>
+                dispatch({
+                  type: "update:common.s3.bucket",
+                  value: e.target.value,
+                })
+              }
+              placeholder={`your-bucket`}
+            />
+          </ParagraphItem>
+          <ParagraphItem>
+            <Label>{t("admin.system.storageAccessKey")}</Label>
+            <Input
+              value={data.s3.access_key}
+              onChange={(e) =>
+                dispatch({
+                  type: "update:common.s3.access_key",
+                  value: e.target.value,
+                })
+              }
+            />
+          </ParagraphItem>
+          <ParagraphItem>
+            <Label>{t("admin.system.storageSecretKey")}</Label>
+            <Input
+              value={data.s3.secret_key}
+              onChange={(e) =>
+                dispatch({
+                  type: "update:common.s3.secret_key",
+                  value: e.target.value,
+                })
+              }
+            />
+          </ParagraphItem>
+          <ParagraphItem>
+            <Label>{t("admin.system.storagePublicBaseUrl")}</Label>
+            <Input
+              value={data.s3.public_base_url}
+              onChange={(e) =>
+                dispatch({
+                  type: "update:common.s3.public_base_url",
+                  value: e.target.value,
+                })
+              }
+              placeholder={`https://cdn.example.com`}
+            />
+          </ParagraphItem>
+          <ParagraphItem>
+            <Label className={`flex flex-row items-center`}>
+              {t("admin.system.storageForcePathStyle")}
+              <Tips content={t("admin.system.storageForcePathStyleTip")} />
+            </Label>
+            <Switch
+              checked={data.s3.force_path_style}
+              onCheckedChange={(value) => {
+                dispatch({
+                  type: "update:common.s3.force_path_style",
+                  value,
+                });
+              }}
+            />
+          </ParagraphItem>
+        </>
+      )}
       <ParagraphFooter>
         <div className={`grow`} />
         <Button
@@ -1121,6 +1271,12 @@ function System() {
           <Task
             form={data}
             data={data.task}
+            dispatch={setData}
+            onChange={doSaving}
+          />
+          <StorageSettings
+            form={data}
+            data={data.common}
             dispatch={setData}
             onChange={doSaving}
           />

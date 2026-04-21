@@ -224,18 +224,3 @@ func DownloadImage(url string, path string) error {
 	_, err = io.Copy(file, res.Body)
 	return err
 }
-
-func StoreImage(url string) string {
-	if globals.AcceptImageStore {
-		hash := Md5Encrypt(url) + path.Ext(url)
-
-		if err := DownloadImage(url, fmt.Sprintf("storage/attachments/%s", hash)); err != nil {
-			globals.Warn(fmt.Sprintf("[utils] save image error: %s", err.Error()))
-			return url
-		}
-
-		return fmt.Sprintf("%s/attachments/%s", globals.NotifyUrl, hash)
-	}
-
-	return url
-}

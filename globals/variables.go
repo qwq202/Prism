@@ -24,6 +24,14 @@ var CacheAcceptedExpire int64
 var CacheAcceptedSize int64
 var AcceptImageStore bool
 var AcceptPromptStore bool
+var StorageMode = "local"
+var StorageS3Endpoint string
+var StorageS3Region string
+var StorageS3Bucket string
+var StorageS3AccessKey string
+var StorageS3SecretKey string
+var StorageS3PublicBaseURL string
+var StorageS3ForcePathStyle bool
 var CloseRegistration bool
 var CloseRelay bool
 

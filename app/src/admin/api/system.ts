@@ -143,6 +143,16 @@ export type AutoTitleState = {
   prompt: string;
 };
 
+export type S3StorageState = {
+  endpoint: string;
+  region: string;
+  bucket: string;
+  access_key: string;
+  secret_key: string;
+  public_base_url: string;
+  force_path_style: boolean;
+};
+
 export type CommonState = {
   cache: string[];
   expire: number;
@@ -153,6 +163,8 @@ export type CommonState = {
 
   prompt_store: boolean;
   image_store: boolean;
+  storage_mode: "local" | "s3";
+  s3: S3StorageState;
 };
 
 export type SystemProps = {
@@ -237,6 +249,16 @@ export const initialSystemState: SystemProps = {
     size: 1,
     prompt_store: false,
     image_store: false,
+    storage_mode: "local",
+    s3: {
+      endpoint: "",
+      region: "",
+      bucket: "",
+      access_key: "",
+      secret_key: "",
+      public_base_url: "",
+      force_path_style: false,
+    },
   },
   payment: {
     stripe: {
@@ -316,6 +338,24 @@ export async function getConfig(): Promise<SystemResponse> {
           : "basic";
 
       data.data.site.currency = data.data.site.currency || "cny";
+      data.data.common.storage_mode =
+        data.data.common.storage_mode === "s3" ? "s3" : "local";
+      const s3 = (data.data.common.s3 = data.data.common.s3 || {
+        endpoint: "",
+        region: "",
+        bucket: "",
+        access_key: "",
+        secret_key: "",
+        public_base_url: "",
+        force_path_style: false,
+      });
+      s3.endpoint = s3.endpoint || "";
+      s3.region = s3.region || "";
+      s3.bucket = s3.bucket || "";
+      s3.access_key = s3.access_key || "";
+      s3.secret_key = s3.secret_key || "";
+      s3.public_base_url = s3.public_base_url || "";
+      s3.force_path_style = !!s3.force_path_style;
 
       if (
         !data.data.common.group ||
