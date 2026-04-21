@@ -467,7 +467,9 @@
       "about-you": "あなたについて",
       "nickname": "ニックネーム",
       "nickname-placeholder": "アシスタントに何と呼んでもらいたいですか？",
-      "about-user": "その他のコンテキスト",
+      "occupation": "職業",
+      "occupation-placeholder": "家庭保育士",
+      "about-user": "あなたの詳細",
       "about-user-tip": "たとえば、アシスタントに時間をかけて覚えてもらいたい役割、目標、書き方の好み、コラボレーションの方法などです。",
       "about-user-placeholder": "あなたの経歴、好み、または一般的なシナリオについてアシスタントに何かを伝えます",
       "options": {
@@ -1483,6 +1485,7 @@
   "anonymous": "ログインしていません",
   "bar": {
     "chat": "ダイアログ",
+    "personalization": "パーソナライズ",
     "model": "モデル",
     "wallet": "財布",
     "log": "ログ",

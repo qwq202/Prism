@@ -733,9 +733,11 @@
       "about-you": "关于你",
       "nickname": "昵称",
       "nickname-placeholder": "希望助手怎么称呼你",
-      "about-user": "更多背景信息",
+      "occupation": "职业",
+      "occupation-placeholder": "家庭日托管理人员",
+      "about-user": "你的详情",
       "about-user-tip": "例如你的角色、目标、写作偏好，或希望助手长期记住的协作方式。",
-      "about-user-placeholder": "告诉助手一些关于你的背景、偏好或常见场景",
+      "about-user-placeholder": "需要记住的兴趣、价值观或偏好",
       "options": {
         "style": {
           "friendly": "亲和友善",
@@ -1606,6 +1608,7 @@
   "bar": {
     "chat": "对话",
     "chat-full": "开始对话",
+    "personalization": "个性化",
     "model": "模型",
     "model-full": "探索模型",
     "preset": "预设",

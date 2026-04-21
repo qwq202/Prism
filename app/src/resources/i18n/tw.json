@@ -539,7 +539,9 @@
       "about-you": "關於你",
       "nickname": "暱稱",
       "nickname-placeholder": "希望助手怎麼稱呼你",
-      "about-user": "更多背景資訊",
+      "occupation": "職業",
+      "occupation-placeholder": "家庭托育管理人員",
+      "about-user": "你的詳情",
       "about-user-tip": "例如你的角色、目標、寫作偏好，或是希望助手長期記住的協作方式。",
       "about-user-placeholder": "告訴助手一些關於你的背景、偏好或常見場景",
       "options": {
@@ -1630,6 +1632,7 @@
   },
   "bar": {
     "chat": "對話",
+    "personalization": "個性化",
     "chat-full": "開始對話",
     "model": "模型",
     "model-full": "探索模型",

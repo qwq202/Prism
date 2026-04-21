@@ -34,6 +34,7 @@ export const initialSettings = {
   persona_emoji: "default",
   persona_custom_instruction: "",
   persona_nickname: "",
+  persona_occupation: "",
   persona_about_user: "",
 };
 
@@ -45,6 +46,7 @@ export type PersonalizationSettings = {
   persona_emoji: string;
   persona_custom_instruction: string;
   persona_nickname: string;
+  persona_occupation: string;
   persona_about_user: string;
 };
 
@@ -91,6 +93,9 @@ export function buildPersonalizationInstruction(
     emojiPromptMap[personalization.persona_emoji],
     personalization.persona_nickname
       ? `When it feels natural, address the user as "${personalization.persona_nickname.trim()}".`
+      : "",
+    personalization.persona_occupation
+      ? `The user's occupation is: ${personalization.persona_occupation.trim()}`
       : "",
     personalization.persona_about_user
       ? `User profile and background to keep in mind: ${personalization.persona_about_user.trim()}`
@@ -147,6 +152,10 @@ export const settingsSlice = createSlice({
     persona_nickname: getMemory(
       "persona_nickname",
       initialSettings.persona_nickname,
+    ),
+    persona_occupation: getMemory(
+      "persona_occupation",
+      initialSettings.persona_occupation,
     ),
     persona_about_user: getMemory(
       "persona_about_user",
@@ -254,6 +263,10 @@ export const settingsSlice = createSlice({
       state.persona_nickname = action.payload as string;
       setMemory("persona_nickname", action.payload);
     },
+    setPersonaOccupation: (state, action) => {
+      state.persona_occupation = action.payload as string;
+      setMemory("persona_occupation", action.payload);
+    },
     setPersonaAboutUser: (state, action) => {
       state.persona_about_user = action.payload as string;
       setMemory("persona_about_user", action.payload);
@@ -282,6 +295,7 @@ export const settingsSlice = createSlice({
       state.persona_custom_instruction =
         initialSettings.persona_custom_instruction;
       state.persona_nickname = initialSettings.persona_nickname;
+      state.persona_occupation = initialSettings.persona_occupation;
       state.persona_about_user = initialSettings.persona_about_user;
 
       setBooleanMemory("context", initialSettings.context);
@@ -309,6 +323,7 @@ export const settingsSlice = createSlice({
         initialSettings.persona_custom_instruction,
       );
       setMemory("persona_nickname", initialSettings.persona_nickname);
+      setMemory("persona_occupation", initialSettings.persona_occupation);
       setMemory("persona_about_user", initialSettings.persona_about_user);
     },
   },
@@ -342,6 +357,7 @@ export const {
   setPersonaEmoji,
   setPersonaCustomInstruction,
   setPersonaNickname,
+  setPersonaOccupation,
   setPersonaAboutUser,
 } = settingsSlice.actions;
 export default settingsSlice.reducer;
@@ -390,5 +406,7 @@ export const personaCustomInstructionSelector = (state: RootState): string =>
   state.settings.persona_custom_instruction;
 export const personaNicknameSelector = (state: RootState): string =>
   state.settings.persona_nickname;
+export const personaOccupationSelector = (state: RootState): string =>
+  state.settings.persona_occupation;
 export const personaAboutUserSelector = (state: RootState): string =>
   state.settings.persona_about_user;

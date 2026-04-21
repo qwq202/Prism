@@ -467,9 +467,11 @@
       "about-you": "About you",
       "nickname": "Nickname",
       "nickname-placeholder": "What would you like your assistant to call you?",
-      "about-user": "More context",
+      "occupation": "Occupation",
+      "occupation-placeholder": "Family daycare provider",
+      "about-user": "Your details",
       "about-user-tip": "For example, your role, goals, writing preferences, or ways of collaborating that you want your assistant to remember over time.",
-      "about-user-placeholder": "Tell the assistant something about your background, preferences, or common scenarios",
+      "about-user-placeholder": "Interests, values, or preferences to remember",
       "options": {
         "style": {
           "friendly": "Friendly",
@@ -1483,6 +1485,7 @@
   "anonymous": "please sign in here",
   "bar": {
     "chat": "Chat",
+    "personalization": "Personalization",
     "model": "Model",
     "wallet": "Wallet",
     "log": "Log",

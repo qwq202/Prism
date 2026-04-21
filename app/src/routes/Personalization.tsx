@@ -70,6 +70,7 @@ function Personalization() {
     settings.personaCustomInstructionSelector,
   );
   const personaNickname = useSelector(settings.personaNicknameSelector);
+  const personaOccupation = useSelector(settings.personaOccupationSelector);
   const personaAboutUser = useSelector(settings.personaAboutUserSelector);
 
   const styleOptions: SelectOption[] = [
@@ -235,6 +236,22 @@ function Personalization() {
               className="pz-input"
               onChange={(e) =>
                 dispatch(settings.setPersonaNickname(e.target.value))
+              }
+            />
+          </div>
+
+          <div className="pz-field">
+            <span className="pz-field-label">
+              {t("settings.personalization.occupation")}
+            </span>
+            <Input
+              value={personaOccupation}
+              placeholder={t(
+                "settings.personalization.occupation-placeholder",
+              )}
+              className="pz-input"
+              onChange={(e) =>
+                dispatch(settings.setPersonaOccupation(e.target.value))
               }
             />
           </div>

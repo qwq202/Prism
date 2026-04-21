@@ -47,6 +47,7 @@ import {
   personaEnthusiasmSelector,
   personaListsSelector,
   personaNicknameSelector,
+  personaOccupationSelector,
   personaStyleSelector,
   personaWarmthSelector,
   presencePenaltySelector,
@@ -623,6 +624,7 @@ export function useMessageActions() {
     personaCustomInstructionSelector,
   );
   const persona_nickname = useSelector(personaNicknameSelector);
+  const persona_occupation = useSelector(personaOccupationSelector);
   const persona_about_user = useSelector(personaAboutUserSelector);
 
   const personalizationInstruction = buildPersonalizationInstruction({
@@ -633,6 +635,7 @@ export function useMessageActions() {
     persona_emoji,
     persona_custom_instruction,
     persona_nickname,
+    persona_occupation,
     persona_about_user,
   });
 
