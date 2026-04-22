@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"runtime/debug"
@@ -52,6 +53,108 @@ func summarizeToolCalls(calls *globals.ToolCalls) string {
 	}
 
 	return "[" + strings.Join(items, ", ") + "]"
+}
+
+func buildToolCallEvent(call globals.ToolCall, status string) *globals.ChatSegmentToolCall {
+	name := strings.TrimSpace(call.Function.Name)
+	if name == "" {
+		return nil
+	}
+
+	return &globals.ChatSegmentToolCall{
+		Id:        strings.TrimSpace(call.Id),
+		Name:      name,
+		Arguments: strings.TrimSpace(call.Function.Arguments),
+		Status:    status,
+	}
+}
+
+func buildToolResultEvent(call globals.ToolCall, toolMessage globals.Message) *globals.ChatSegmentToolCall {
+	event := buildToolCallEvent(call, "success")
+	if event == nil {
+		return nil
+	}
+
+	raw := strings.TrimSpace(toolMessage.Content)
+	event.Result = raw
+
+	var result memory.ToolResult
+	if err := json.Unmarshal([]byte(raw), &result); err == nil {
+		if strings.TrimSpace(result.Error) != "" || strings.EqualFold(strings.TrimSpace(result.Status), "error") {
+			event.Status = "error"
+			event.Error = strings.TrimSpace(result.Error)
+			event.Result = ""
+		}
+	}
+
+	return event
+}
+
+func sendToolCallEvents(conn *Connection, calls *globals.ToolCalls, status string, quota float32, plan bool) error {
+	if calls == nil || len(*calls) == 0 {
+		return nil
+	}
+
+	for _, call := range *calls {
+		event := buildToolCallEvent(call, status)
+		if event == nil {
+			continue
+		}
+
+		if err := conn.SendClient(globals.ChatSegmentResponse{
+			Quota:    quota,
+			ToolCall: event,
+			End:      false,
+			Plan:     plan,
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func sendToolResultEvents(conn *Connection, calls *globals.ToolCalls, toolMessages []globals.Message, quota float32, plan bool) error {
+	if calls == nil || len(*calls) == 0 || len(toolMessages) == 0 {
+		return nil
+	}
+
+	callIndex := make(map[string]globals.ToolCall, len(*calls))
+	for _, call := range *calls {
+		callID := strings.TrimSpace(call.Id)
+		if callID == "" {
+			continue
+		}
+		callIndex[callID] = call
+	}
+
+	for _, toolMessage := range toolMessages {
+		callID := strings.TrimSpace(utils.ToString(toolMessage.ToolCallId))
+		if callID == "" {
+			continue
+		}
+
+		call, ok := callIndex[callID]
+		if !ok {
+			continue
+		}
+
+		event := buildToolResultEvent(call, toolMessage)
+		if event == nil {
+			continue
+		}
+
+		if err := conn.SendClient(globals.ChatSegmentResponse{
+			Quota:    quota,
+			ToolCall: event,
+			End:      false,
+			Plan:     plan,
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func CollectQuota(c *gin.Context, user *auth.User, buffer *utils.Buffer, uncountable bool, err error) {
@@ -448,6 +551,10 @@ func createMemoryToolChatTask(
 			summarizeToolCalls(assistant.ToolCalls),
 		))
 
+		if err := sendToolCallEvents(conn, assistant.ToolCalls, "executing", liveBuffer.GetQuota(), plan); err != nil {
+			return hit, err, true
+		}
+
 		toolMessages := memory.ExecuteToolCalls(db, user, assistant.ToolCalls)
 		for _, toolMessage := range toolMessages {
 			globals.Debug(fmt.Sprintf(
@@ -457,6 +564,9 @@ func createMemoryToolChatTask(
 				utils.ToString(toolMessage.ToolCallId),
 				toolMessage.Content,
 			))
+		}
+		if err := sendToolResultEvents(conn, assistant.ToolCalls, toolMessages, liveBuffer.GetQuota(), plan); err != nil {
+			return hit, err, true
 		}
 		workingSegment = append(workingSegment, assistant)
 		workingSegment = append(workingSegment, toolMessages...)
@@ -631,6 +741,14 @@ func createChatTask(
 
 			if data.End {
 				return
+			}
+
+			if data.Chunk != nil && data.Chunk.ToolCall != nil {
+				if err := sendToolCallEvents(conn, data.Chunk.ToolCall, "start", buffer.GetQuota(), plan); err != nil {
+					globals.Warn(fmt.Sprintf("failed to send tool call event to client: %s", err.Error()))
+					interruptSignal <- err
+					return hit, nil, true
+				}
 			}
 
 			if err := conn.SendClient(globals.ChatSegmentResponse{

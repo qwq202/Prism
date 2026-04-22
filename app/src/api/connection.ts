@@ -38,8 +38,9 @@ export type StreamMessage = {
     }>;
   };
   tool_call?: {
+    id?: string;
     name: string;
-    arguments?: unknown;
+    arguments?: string;
     result?: string;
     error?: string;
     status: "start" | "executing" | "success" | "error";

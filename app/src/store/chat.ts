@@ -3,6 +3,7 @@ import {
   AssistantRole,
   ConversationInstance,
   Model,
+  MessageToolCall,
   UserRole,
 } from "@/api/types.tsx";
 import { Message } from "@/api/types.tsx";
@@ -162,6 +163,82 @@ export function supportsGeminiThinkingBudgetControl(
   );
 }
 
+const toolStatusPriority: Record<string, number> = {
+  start: 0,
+  executing: 1,
+  success: 2,
+  error: 2,
+};
+
+function normalizeToolArguments(argumentsText?: string): string {
+  if (!argumentsText) return "";
+  return typeof argumentsText === "string"
+    ? argumentsText
+    : JSON.stringify(argumentsText);
+}
+
+function mergeToolArguments(existing: string, incoming: string): string {
+  if (!incoming) return existing;
+  if (!existing) return incoming;
+  if (existing === incoming) return existing;
+  if (incoming.startsWith(existing)) return incoming;
+  if (existing.startsWith(incoming)) return existing;
+  if (existing.includes(incoming)) return existing;
+  return `${existing}${incoming}`;
+}
+
+function upsertToolCall(
+  current: MessageToolCall[] | undefined,
+  incoming: NonNullable<StreamMessage["tool_call"]>,
+): MessageToolCall[] {
+  const next = current ? [...current] : [];
+  const id = incoming.id?.trim() || "";
+  const name = incoming.name.trim();
+  const hitIndex = next.findIndex(
+    (item) => (id && item.id === id) || (!id && item.function.name === name),
+  );
+
+  const base: MessageToolCall =
+    hitIndex >= 0
+      ? next[hitIndex]
+      : {
+          index: next.length,
+          type: "function",
+          id,
+          function: {
+            name,
+            arguments: "",
+          },
+        };
+
+  const merged: MessageToolCall = {
+    ...base,
+    id: id || base.id,
+    function: {
+      name: name || base.function.name,
+      arguments: mergeToolArguments(
+        base.function.arguments,
+        normalizeToolArguments(incoming.arguments),
+      ),
+    },
+    status:
+      (toolStatusPriority[incoming.status] ?? 0) >=
+      (toolStatusPriority[base.status ?? "start"] ?? 0)
+        ? incoming.status
+        : base.status,
+    result: incoming.result ?? base.result,
+    error: incoming.error ?? base.error,
+  };
+
+  if (hitIndex >= 0) {
+    next[hitIndex] = merged;
+  } else {
+    next.push(merged);
+  }
+
+  return next;
+}
+
 export const stack = new ConnectionStack();
 const offline = loadPreferenceModels(getOfflineModels());
 const chatSlice = createSlice({
@@ -246,6 +323,12 @@ const chatSlice = createSlice({
       if (!instance.model && model) instance.model = model;
       if (message.keyword) instance.keyword = message.keyword;
       if (message.quota) instance.quota = message.quota;
+      if (message.tool_call) {
+        instance.tool_calls = upsertToolCall(
+          instance.tool_calls,
+          message.tool_call,
+        );
+      }
       if (message.end) instance.end = message.end;
       instance.plan = message.plan;
     },
@@ -669,13 +752,13 @@ export function useMessageActions() {
         web: enableGeminiNativeWeb
           ? gemini_google_search || gemini_url_context
           : enableXAINativeWeb
-            ? xai_web_search || xai_x_search
+          ? xai_web_search || xai_x_search
           : web,
         web_search: enableGeminiNativeWeb
           ? gemini_google_search
           : enableXAINativeWeb
-            ? xai_web_search
-            : false,
+          ? xai_web_search
+          : false,
         url_context: enableGeminiNativeWeb ? gemini_url_context : false,
         x_search: enableXAINativeWeb ? xai_x_search : false,
         gemini_thinking_budget: supportsGeminiThinkingBudgetControl(targetModel)
@@ -725,13 +808,13 @@ export function useMessageActions() {
         web: enableGeminiNativeWeb
           ? gemini_google_search || gemini_url_context
           : enableXAINativeWeb
-            ? xai_web_search || xai_x_search
+          ? xai_web_search || xai_x_search
           : web,
         web_search: enableGeminiNativeWeb
           ? gemini_google_search
           : enableXAINativeWeb
-            ? xai_web_search
-            : false,
+          ? xai_web_search
+          : false,
         url_context: enableGeminiNativeWeb ? gemini_url_context : false,
         x_search: enableXAINativeWeb ? xai_x_search : false,
         gemini_thinking_budget: supportsGeminiThinkingBudgetControl(model)

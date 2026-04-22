@@ -15,11 +15,7 @@ import {
   Trash,
 } from "lucide-react";
 import { filterMessage } from "@/utils/processor.ts";
-import {
-  copyClipboard,
-  isContainDom,
-  saveAsFile,
-} from "@/utils/dom.ts";
+import { copyClipboard, isContainDom, saveAsFile } from "@/utils/dom.ts";
 import { useTranslation } from "react-i18next";
 import React, { Ref, useRef, useState } from "react";
 import {
@@ -37,6 +33,7 @@ import { motion } from "framer-motion";
 import { ThinkContent } from "@/components/ThinkContent";
 import ModelAvatar from "@/components/ModelAvatar.tsx";
 import { selectSupportModels } from "@/store/chat.ts";
+import { ToolCallStatus } from "@/components/ToolCallStatus";
 
 type MessageProps = {
   index: number;
@@ -257,6 +254,8 @@ function MessageContent({
   const hasContent = message.content.length > 0;
   const isAssistant = message.role === "assistant";
   const isOutput = message.end === false;
+  const hasToolCalls =
+    isAssistant && !!message.tool_calls && message.tool_calls.length > 0;
   const user = useSelector(selectUsername);
   const supportModels = useSelector(selectSupportModels);
 
@@ -264,12 +263,11 @@ function MessageContent({
   const [editedMessage, setEditedMessage] = useState<string | undefined>("");
 
   const modelId = model;
-  const messageModel =
-    supportModels.find((item) => item.id === modelId) || {
-      id: modelId || "assistant",
-      name: modelId || "assistant",
-      avatar: "",
-    };
+  const messageModel = supportModels.find((item) => item.id === modelId) || {
+    id: modelId || "assistant",
+    name: modelId || "assistant",
+    avatar: "",
+  };
   const useModelAvatar = !isUser && !selected;
 
   // parse think content
@@ -281,21 +279,23 @@ function MessageContent({
       const thinkContent = startMatch[1];
       // if there is an end tag, remove the whole matching part;
       // if not, keep the remaining content
-      const hasEndTag = content.includes('</think>');
-      const restContent = hasEndTag ? 
-        content.replace(startMatch[0], "").trim() :
-        content.substring(content.indexOf('<think>') + 7).trim();
-      
+      const hasEndTag = content.includes("</think>");
+      const restContent = hasEndTag
+        ? content.replace(startMatch[0], "").trim()
+        : content.substring(content.indexOf("<think>") + 7).trim();
+
       return {
         thinkContent,
-        restContent: hasEndTag ? restContent : '',
-        isComplete: hasEndTag
+        restContent: hasEndTag ? restContent : "",
+        isComplete: hasEndTag,
       };
     }
     return null;
   };
 
-  const parsedContent = message.content.length ? parseThinkContent(message.content) : null;
+  const parsedContent = message.content.length
+    ? parseThinkContent(message.content)
+    : null;
 
   return (
     <div className={"content-wrapper"}>
@@ -352,8 +352,8 @@ function MessageContent({
           <>
             {parsedContent ? (
               <>
-                <ThinkContent 
-                  content={parsedContent.thinkContent} 
+                <ThinkContent
+                  content={parsedContent.thinkContent}
                   isComplete={parsedContent.isComplete}
                 />
                 {parsedContent.restContent && (
@@ -374,9 +374,11 @@ function MessageContent({
           </>
         ) : message.end === true ? (
           <CircleSlash className={`h-5 w-5 m-1`} />
-        ) : (
+        ) : !hasToolCalls ? (
           <Loader2 className={`h-5 w-5 m-1 animate-spin`} />
-        )}
+        ) : null}
+
+        {hasToolCalls && <ToolCallStatus toolCalls={message.tool_calls!} />}
 
         {isAssistant && hasContent && isOutput && (
           <Loader2

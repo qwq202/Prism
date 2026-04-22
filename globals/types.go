@@ -71,14 +71,24 @@ type Chunk struct {
 	ClaudeHiddenMetadata *ClaudeHiddenMetadata `json:"claude_hidden_metadata,omitempty"` // hidden claude thinking metadata for replay
 }
 
+type ChatSegmentToolCall struct {
+	Id        string `json:"id,omitempty"`
+	Name      string `json:"name"`
+	Arguments string `json:"arguments,omitempty"`
+	Result    string `json:"result,omitempty"`
+	Error     string `json:"error,omitempty"`
+	Status    string `json:"status"`
+}
+
 type ChatSegmentResponse struct {
-	Conversation int64   `json:"conversation"`
-	Quota        float32 `json:"quota"`
-	Keyword      string  `json:"keyword"`
-	Message      string  `json:"message"`
-	Title        string  `json:"title,omitempty"`
-	End          bool    `json:"end"`
-	Plan         bool    `json:"plan"`
+	Conversation int64                `json:"conversation"`
+	Quota        float32              `json:"quota"`
+	Keyword      string               `json:"keyword"`
+	Message      string               `json:"message"`
+	Title        string               `json:"title,omitempty"`
+	ToolCall     *ChatSegmentToolCall `json:"tool_call,omitempty"`
+	End          bool                 `json:"end"`
+	Plan         bool                 `json:"plan"`
 }
 
 type GenerationSegmentResponse struct {

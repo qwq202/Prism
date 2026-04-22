@@ -10,6 +10,19 @@ export const VirtualWebSearchRole = "virtualRole::websearch";
 export type Role = typeof UserRole | typeof AssistantRole | typeof SystemRole;
 export const Roles = [UserRole, AssistantRole, SystemRole];
 
+export type MessageToolCall = {
+  index: number;
+  type: string;
+  id: string;
+  function: {
+    name: string;
+    arguments: string;
+  };
+  status?: "start" | "executing" | "success" | "error";
+  result?: string;
+  error?: string;
+};
+
 export const getRoleIcon = (role: string) => {
   return useMemo(() => {
     switch (role) {
@@ -55,18 +68,7 @@ export type Message = {
       cite_index: number;
     }>;
   };
-  tool_calls?: Array<{
-    index: number;
-    type: string;
-    id: string;
-    function: {
-      name: string;
-      arguments: string;
-    };
-    status?: "start" | "executing" | "success" | "error";
-    result?: string;
-    error?: string;
-  }>;
+  tool_calls?: MessageToolCall[];
   tool_call_id?: string;
   name?: string;
   response_type?: string;
