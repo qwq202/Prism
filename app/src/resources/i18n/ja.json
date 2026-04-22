@@ -517,6 +517,27 @@
           "expressive": "ある程度アクティブ",
           "expressive-desc": "表現力を加える"
         }
+      },
+      "memory": {
+        "title": "記憶",
+        "dialog-title": "保存された思い出",
+        "dialog-description": "アシスタントはチャット内の有用な情報を記憶し、自動的に管理して、回答のパーソナライゼーションと関連性を高めます。",
+        "search-placeholder": "メモリを検索",
+        "loading": "メモリを読み込んでいます...",
+        "empty": "保存されたメモリはまだありません。",
+        "more": "より多く",
+        "meta": "{{date}}から保存しました",
+        "just-now": "たった今",
+        "delete-failed": "削除失敗",
+        "delete-failed-tip": "このメモリは削除できません",
+        "saved-label": "保存されたメモリを参照",
+        "saved-desc": "AIにメモリを保存させ、返信時に使用させます。",
+        "history-label": "リファレンスチャット履歴",
+        "history-desc": "返信するときに、AIが以前のすべての会話を参照できるようにします。",
+        "footer": "AIは、プロバイダを検索することで、メモリを使用してクエリをパーソナライズすることができます。",
+        "source": {
+          "chat": "チャット"
+        }
       }
     }
   },

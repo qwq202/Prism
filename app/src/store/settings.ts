@@ -36,8 +36,8 @@ export const initialSettings = {
   persona_nickname: "",
   persona_occupation: "",
   persona_about_user: "",
-  memory_enabled: true,
-  memory_history_enabled: true,
+  memory_enabled: false,
+  memory_history_enabled: false,
 };
 
 export type PersonalizationSettings = {

@@ -589,6 +589,27 @@
           "expressive": "適度活潑",
           "expressive-desc": "增添表達色彩"
         }
+      },
+      "memory": {
+        "title": "記憶",
+        "dialog-title": "保存的記憶",
+        "dialog-description": "助理會記住並自動管理聊天中的有用訊息，以提升回覆的個人化程度和相關性。",
+        "search-placeholder": "搜尋記憶",
+        "loading": "正在載入記憶...",
+        "empty": "還沒有保存的記憶。",
+        "more": "更多",
+        "meta": "儲存日期：{{date}}；儲存來源：",
+        "just-now": "剛剛",
+        "delete-failed": "刪除失敗",
+        "delete-failed-tip": "無法刪除這記憶",
+        "saved-label": "參考保存的記憶",
+        "saved-desc": "讓AI 保存記憶並在回應時使用記憶。",
+        "history-label": "參考歷史聊天記錄",
+        "history-desc": "讓AI 在回覆時參考所有先前的對話。",
+        "footer": "AI 可使用記憶庫，透過搜尋提供者進行個人化查詢。",
+        "source": {
+          "chat": "聊天"
+        }
       }
     }
   },

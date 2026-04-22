@@ -722,6 +722,27 @@
       "description": "设置回复时默认偏好的风格、语调和对你的称呼方式。它会影响回复呈现，但不会覆盖你当前消息里的明确要求。",
       "base-style": "基本风格和语调",
       "base-style-tip": "设置默认的表达基调，适合你平时和助手互动时的大方向。",
+      "memory": {
+        "title": "记忆",
+        "dialog-title": "保存的记忆",
+        "dialog-description": "助手会记住并自动管理聊天中的有用信息，以提升回复的个性化程度和相关性。",
+        "search-placeholder": "搜索记忆",
+        "loading": "正在加载记忆...",
+        "empty": "还没有保存的记忆。",
+        "more": "更多",
+        "meta": "保存日期：{{date}}；保存来源：",
+        "just-now": "刚刚",
+        "delete-failed": "删除失败",
+        "delete-failed-tip": "无法删除这条记忆",
+        "saved-label": "参考保存的记忆",
+        "saved-desc": "让 AI 保存记忆并在回复时使用记忆。",
+        "history-label": "参考历史聊天记录",
+        "history-desc": "让 AI 在回复时参考所有以前的对话。",
+        "footer": "AI 可使用记忆库，通过搜索提供商进行个性化查询。",
+        "source": {
+          "chat": "聊天"
+        }
+      },
       "traits": "特征",
       "traits-tip": "在基础风格之上，进一步补充表达方式上的偏好。",
       "warmth": "温和体贴",

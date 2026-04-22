@@ -517,6 +517,27 @@
           "expressive": "Expressive",
           "expressive-desc": "Add expressive flair"
         }
+      },
+      "memory": {
+        "title": "Memory",
+        "dialog-title": "Saved Memories",
+        "dialog-description": "The assistant remembers and automatically manages useful information in the chat to increase the personalization and relevance of responses.",
+        "search-placeholder": "Search Memory",
+        "loading": "Loading memories...",
+        "empty": "No saved memories yet.",
+        "more": "更多/More info",
+        "meta": "Saved {{date}} from",
+        "just-now": "a few seconds",
+        "delete-failed": "Delete failed",
+        "delete-failed-tip": "This memory cannot be deleted",
+        "saved-label": "Reference saved memories",
+        "saved-desc": "Let the AI save the memory and use it when replying.",
+        "history-label": "Reference Chat History",
+        "history-desc": "Let the AI refer to all previous conversations when replying.",
+        "footer": "AI can use memories to personalize queries by searching providers.",
+        "source": {
+          "chat": "Obrolan"
+        }
       }
     }
   },

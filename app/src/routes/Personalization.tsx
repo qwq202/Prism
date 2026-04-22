@@ -56,15 +56,15 @@ type MemoryItem = {
   source: string;
 };
 
-function formatMemoryDate(value?: string) {
-  if (!value) return "刚刚";
+function formatMemoryDate(value: string | undefined, locale: string) {
+  if (!value) return "";
 
   const parsed = new Date(value.replace(" ", "T"));
   if (Number.isNaN(parsed.getTime())) {
     return value;
   }
 
-  return new Intl.DateTimeFormat("zh-CN", {
+  return new Intl.DateTimeFormat(locale || "zh-CN", {
     month: "short",
     day: "numeric",
   }).format(parsed);
@@ -83,6 +83,7 @@ function MemoryDialog({
   loading: boolean;
   onDelete: (id: number) => Promise<void>;
 }) {
+  const { t, i18n } = useTranslation();
   const [search, setSearch] = useState("");
   const filteredMemories: MemoryItem[] = useMemo(
     () =>
@@ -93,21 +94,25 @@ function MemoryDialog({
         .map((item) => ({
           id: item.id,
           content: item.content,
-          date: formatMemoryDate(item.updated_at || item.created_at),
-          source: item.source || "聊天",
+          date:
+            formatMemoryDate(item.updated_at || item.created_at, i18n.language) ||
+            t("settings.personalization.memory.just-now"),
+          source: item.source || t("settings.personalization.memory.source.chat"),
         })),
-    [memories, search],
+    [i18n.language, memories, search, t],
   );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl p-0 overflow-hidden gap-0">
         <DialogHeader className="p-6 pb-2">
-          <DialogTitle className="text-xl font-semibold">保存的记忆</DialogTitle>
+          <DialogTitle className="text-xl font-semibold">
+            {t("settings.personalization.memory.dialog-title")}
+          </DialogTitle>
           <DialogDescription className="text-sm mt-1">
-            ChatGPT 会记住并自动管理聊天中的有用信息，以提升回复的个性化程度和相关性。
+            {t("settings.personalization.memory.dialog-description")}
             <a href="#" className="text-primary hover:underline ml-1">
-              了解更多
+              {t("learn-more")}
             </a>
           </DialogDescription>
         </DialogHeader>
@@ -116,7 +121,7 @@ function MemoryDialog({
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="搜索记忆"
+              placeholder={t("settings.personalization.memory.search-placeholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 h-10 bg-muted/30 border-none rounded-full"
@@ -129,12 +134,12 @@ function MemoryDialog({
             <div className="flex flex-col">
               {loading && (
                 <div className="px-6 py-8 text-sm text-muted-foreground">
-                  正在加载记忆...
+                  {t("settings.personalization.memory.loading")}
                 </div>
               )}
               {!loading && filteredMemories.length === 0 && (
                 <div className="px-6 py-8 text-sm text-muted-foreground">
-                  还没有保存的记忆。
+                  {t("settings.personalization.memory.empty")}
                 </div>
               )}
               {filteredMemories.map((item) => (
@@ -151,7 +156,7 @@ function MemoryDialog({
                         <button
                           type="button"
                           className="p-1.5 rounded-md transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          aria-label="更多"
+                          aria-label={t("settings.personalization.memory.more")}
                         >
                           <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
                         </button>
@@ -162,15 +167,16 @@ function MemoryDialog({
                           className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4 mr-2" />
-                          删除
+                          {t("delete")}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <div className="px-2 py-1.5 text-[10px] text-muted-foreground leading-relaxed">
-                          保存日期：{item.date}；保存来源：
+                          {t("settings.personalization.memory.meta", {
+                            date: item.date,
+                          })}
                           <span className="underline cursor-pointer">
                             {item.source}
                           </span>
-                          。
                         </div>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -270,6 +276,7 @@ type PersonalizationCardProps = {
   children: React.ReactNode;
   className?: string;
   headerAction?: React.ReactNode;
+  showHelp?: boolean;
 };
 
 function PersonalizationCard({
@@ -279,6 +286,7 @@ function PersonalizationCard({
   children,
   className,
   headerAction,
+  showHelp,
 }: PersonalizationCardProps) {
   return (
     <div
@@ -300,7 +308,7 @@ function PersonalizationCard({
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
               <p className="text-sm font-medium">{title}</p>
-              {title === "记忆" && (
+              {showHelp && (
                 <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
               )}
             </div>
@@ -357,8 +365,9 @@ function Personalization() {
   const handleDeleteMemory = async (id: number) => {
     const resp = await deleteMemory(id);
     if (!resp.status) {
-      toast.error("删除失败", {
-        description: resp.message || "无法删除这条记忆",
+      toast.error(t("settings.personalization.memory.delete-failed"), {
+        description:
+          resp.message || t("settings.personalization.memory.delete-failed-tip"),
       });
       return;
     }
@@ -523,28 +532,29 @@ function Personalization() {
         <motion.div variants={cardVariants}>
           <PersonalizationCard
             icon={<Brain />}
-            title="记忆"
+            title={t("settings.personalization.memory.title")}
+            showHelp
             headerAction={
               <button
                 className="text-xs font-medium px-3 py-1 rounded-full border bg-background hover:bg-muted transition-colors"
                 onClick={() => setMemoryDialogOpen(true)}
               >
-                管理
+                {t("manage")}
               </button>
             }
           >
             <div className="flex flex-col divide-y divide-border/50">
               <InlineSwitchItem
-                label="参考保存的记忆"
-                description="让 AI 保存记忆并在回复时使用记忆。"
+                label={t("settings.personalization.memory.saved-label")}
+                description={t("settings.personalization.memory.saved-desc")}
                 checked={memoryEnabled}
                 onCheckedChange={(checked) =>
                   dispatch(settings.setMemoryEnabled(checked))
                 }
               />
               <InlineSwitchItem
-                label="参考历史聊天记录"
-                description="让 AI 在回复时参考所有以前的对话。"
+                label={t("settings.personalization.memory.history-label")}
+                description={t("settings.personalization.memory.history-desc")}
                 checked={historyEnabled}
                 onCheckedChange={(checked) =>
                   dispatch(settings.setMemoryHistoryEnabled(checked))
@@ -553,8 +563,10 @@ function Personalization() {
             </div>
             <div className="pt-2">
               <p className="text-xs text-muted-foreground leading-relaxed">
-                AI 可使用记忆库，通过搜索提供商进行个性化查询。
-                <a href="#" className="text-primary hover:underline ml-1">了解更多</a>
+                {t("settings.personalization.memory.footer")}
+                <a href="#" className="text-primary hover:underline ml-1">
+                  {t("learn-more")}
+                </a>
               </p>
             </div>
           </PersonalizationCard>
