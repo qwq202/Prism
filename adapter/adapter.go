@@ -9,6 +9,7 @@ import (
 	"chat/adapter/openai"
 	"chat/adapter/openairesponses"
 	"chat/adapter/palm2"
+	"chat/adapter/xai"
 	"chat/globals"
 	"fmt"
 )
@@ -16,7 +17,7 @@ import (
 var channelFactories = map[string]adaptercommon.FactoryCreator{
 	globals.OpenAIChannelType:             openai.NewChatInstanceFromConfig,
 	globals.OpenAIResponsesChannelType:    openairesponses.NewChatInstanceFromConfig,
-	globals.XAIChannelType:                openairesponses.NewChatInstanceFromConfig,
+	globals.XAIChannelType:                xai.NewChatInstanceFromConfig,
 	globals.AzureOpenAIChannelType:        azure.NewChatInstanceFromConfig,
 	globals.ClaudeChannelType:             claude.NewChatInstanceFromConfig,
 	globals.GLMCodingPlanCNChannelType:    claude.NewChatInstanceFromConfig, // anthropic-compatible

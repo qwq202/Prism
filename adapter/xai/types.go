@@ -1,10 +1,9 @@
-package openairesponses
+package xai
 
 type InputMessageContent struct {
 	Type     string  `json:"type"`
 	Text     *string `json:"text,omitempty"`
 	ImageURL *string `json:"image_url,omitempty"`
-	Detail   *string `json:"detail,omitempty"`
 }
 
 type InputMessage struct {
@@ -19,15 +18,21 @@ type FunctionCallOutputInput struct {
 }
 
 type ResponseTool struct {
-	Type        string      `json:"type"`
-	Name        string      `json:"name,omitempty"`
-	Description string      `json:"description,omitempty"`
-	Parameters  interface{} `json:"parameters,omitempty"`
+	Type                     string      `json:"type"`
+	Name                     string      `json:"name,omitempty"`
+	Description              string      `json:"description,omitempty"`
+	Parameters               interface{} `json:"parameters,omitempty"`
+	Filters                  interface{} `json:"filters,omitempty"`
+	AllowedXHandles          []string    `json:"allowed_x_handles,omitempty"`
+	ExcludedXHandles         []string    `json:"excluded_x_handles,omitempty"`
+	FromDate                 *string     `json:"from_date,omitempty"`
+	ToDate                   *string     `json:"to_date,omitempty"`
+	EnableImageUnderstanding *bool       `json:"enable_image_understanding,omitempty"`
+	EnableVideoUnderstanding *bool       `json:"enable_video_understanding,omitempty"`
 }
 
 type ResponseRequest struct {
 	Model              string         `json:"model"`
-	Instructions       *string        `json:"instructions,omitempty"`
 	Input              interface{}    `json:"input"`
 	MaxOutputTokens    *int           `json:"max_output_tokens,omitempty"`
 	Temperature        *float32       `json:"temperature,omitempty"`

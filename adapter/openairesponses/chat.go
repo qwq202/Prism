@@ -53,28 +53,17 @@ func formatInputMessage(props *adaptercommon.ChatProps, message globals.Message)
 
 		for _, rawURL := range urls {
 			url := rawURL
-			if props != nil && props.ChannelType == globals.XAIChannelType && utils.IsInternalAttachmentURL(url) {
-				if normalized, err := utils.NormalizeImageToVisionDataURL(url); err == nil {
-					url = normalized
-				} else {
-					globals.Warn(fmt.Sprintf("[openai responses] cannot normalize xai attachment image: %s", err.Error()))
-				}
-			}
 			if props.Buffer != nil {
 				if obj, err := utils.NewImage(url); err == nil {
 					props.Buffer.AddImage(obj)
 				}
 			}
 
-			item := InputMessageContent{
+			items = append(items, InputMessageContent{
 				Type:     "input_image",
 				ImageURL: &url,
-			}
-			if props == nil || props.ChannelType != globals.XAIChannelType {
-				item.Detail = &imageDetail
-			}
-
-			items = append(items, item)
+				Detail:   &imageDetail,
+			})
 		}
 
 		return &InputMessage{
@@ -94,44 +83,12 @@ func formatInputMessage(props *adaptercommon.ChatProps, message globals.Message)
 	}
 }
 
-func formatReplayFunctionCalls(message globals.Message) []interface{} {
-	if message.ToolCalls == nil || len(*message.ToolCalls) == 0 {
-		return nil
-	}
-
-	items := make([]interface{}, 0, len(*message.ToolCalls))
-	for _, toolCall := range *message.ToolCalls {
-		items = append(items, OutputItem{
-			Type:      "function_call",
-			Name:      toolCall.Function.Name,
-			Arguments: toolCall.Function.Arguments,
-			CallID:    toolCall.Id,
-		})
-	}
-
-	return items
-}
-
-func formatFunctionCallOutput(message globals.Message) *FunctionCallOutputInput {
-	if message.ToolCallId == nil || strings.TrimSpace(*message.ToolCallId) == "" {
-		return nil
-	}
-
-	return &FunctionCallOutputInput{
-		Type:   "function_call_output",
-		CallID: strings.TrimSpace(*message.ToolCallId),
-		Output: message.Content,
-	}
-}
-
-func formatMessages(props *adaptercommon.ChatProps) ([]interface{}, *string, bool) {
+func formatMessages(props *adaptercommon.ChatProps) ([]interface{}, *string) {
 	input := make([]interface{}, 0, len(props.Message))
 	instructions := make([]string, 0)
-	hasImages := false
-	useInstructions := props == nil || props.ChannelType != globals.XAIChannelType
 
 	for _, message := range props.Message {
-		if useInstructions && message.Role == globals.System {
+		if message.Role == globals.System {
 			text := strings.TrimSpace(getMessageText(message))
 			if text != "" {
 				instructions = append(instructions, text)
@@ -139,37 +96,9 @@ func formatMessages(props *adaptercommon.ChatProps) ([]interface{}, *string, boo
 			continue
 		}
 
-		if props != nil && props.ChannelType == globals.XAIChannelType {
-			if message.Role == globals.Tool {
-				if output := formatFunctionCallOutput(message); output != nil {
-					input = append(input, *output)
-				}
-				continue
-			}
-
-			if message.Role == globals.Assistant && message.ToolCalls != nil && len(*message.ToolCalls) > 0 {
-				if strings.TrimSpace(message.Content) != "" {
-					formatted := formatInputMessage(props, message)
-					if formatted != nil {
-						input = append(input, *formatted)
-					}
-				}
-
-				input = append(input, formatReplayFunctionCalls(message)...)
-				continue
-			}
-		}
-
 		formatted := formatInputMessage(props, message)
 		if formatted == nil {
 			continue
-		}
-
-		for _, item := range formatted.Content {
-			if item.Type == "input_image" && item.ImageURL != nil && strings.TrimSpace(*item.ImageURL) != "" {
-				hasImages = true
-				break
-			}
 		}
 
 		input = append(input, *formatted)
@@ -181,29 +110,11 @@ func formatMessages(props *adaptercommon.ChatProps) ([]interface{}, *string, boo
 		instructionText = &joined
 	}
 
-	return input, instructionText, hasImages
+	return input, instructionText
 }
 
 func getResponseTools(props *adaptercommon.ChatProps) []ResponseTool {
 	tools := make([]ResponseTool, 0)
-
-	if props != nil && props.ChannelType == globals.XAIChannelType {
-		enabled := utils.ToPtr(true)
-		if props.EnableWebSearch {
-			tools = append(tools, ResponseTool{
-				Type:                     "web_search",
-				EnableImageUnderstanding: enabled,
-			})
-		}
-		if props.EnableXSearch {
-			tools = append(tools, ResponseTool{
-				Type:                     "x_search",
-				EnableImageUnderstanding: enabled,
-				EnableVideoUnderstanding: enabled,
-			})
-		}
-	}
-
 	if props == nil || props.Tools == nil {
 		return tools
 	}
@@ -224,20 +135,8 @@ func getResponseTools(props *adaptercommon.ChatProps) []ResponseTool {
 	return tools
 }
 
-func getResponseInclude(props *adaptercommon.ChatProps, stream bool, tools []ResponseTool) []string {
-	if props == nil || props.ChannelType != globals.XAIChannelType || !stream || len(tools) == 0 {
-		return nil
-	}
-
-	return []string{"verbose_streaming"}
-}
-
 func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps, stream bool) ResponseRequest {
-	input, instructions, hasImages := formatMessages(props)
-	var store *bool
-	if props != nil && props.ChannelType == globals.XAIChannelType && hasImages {
-		store = utils.ToPtr(false)
-	}
+	input, instructions := formatMessages(props)
 	tools := getResponseTools(props)
 
 	return ResponseRequest{
@@ -250,8 +149,6 @@ func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps, stream bool) 
 		Tools:           tools,
 		ToolChoice:      props.ToolChoice,
 		ResponseFormat:  props.ResponseFormat,
-		Include:         getResponseInclude(props, stream, tools),
-		Store:           store,
 		Stream:          stream,
 	}
 }
@@ -332,149 +229,7 @@ func parseResponse(data string) (*ResponseResponse, error) {
 	return form, nil
 }
 
-func parseStreamEvent(data string) (*ResponseStreamEvent, error) {
-	form := utils.UnmarshalForm[ResponseStreamEvent](data)
-	if form == nil {
-		return nil, errors.New("cannot parse stream event")
-	}
-
-	if form.Error.Message != "" {
-		return nil, fmt.Errorf("%s", form.Error.Message)
-	}
-
-	return form, nil
-}
-
-func emitReasoningSummary(delta string, started *bool) *globals.Chunk {
-	if strings.TrimSpace(delta) == "" {
-		return nil
-	}
-
-	if !*started {
-		*started = true
-		return &globals.Chunk{
-			Content: fmt.Sprintf("<think>\n%s", delta),
-		}
-	}
-
-	return &globals.Chunk{
-		Content: delta,
-	}
-}
-
-func emitOutputText(delta string, reasoningStarted *bool, reasoningClosed *bool) *globals.Chunk {
-	content := delta
-
-	if *reasoningStarted && !*reasoningClosed {
-		*reasoningClosed = true
-		if content != "" {
-			content = fmt.Sprintf("\n</think>\n\n%s", content)
-		} else {
-			content = "\n</think>\n\n"
-		}
-	}
-
-	if content == "" {
-		return nil
-	}
-
-	return &globals.Chunk{
-		Content: content,
-	}
-}
-
-func emitFunctionCallEvent(item *OutputItem) *globals.Chunk {
-	if item == nil || item.Type != "function_call" || strings.TrimSpace(item.Name) == "" {
-		return nil
-	}
-
-	toolCalls := globals.ToolCalls{
-		{
-			Index: utils.ToPtr(0),
-			Type:  "function",
-			Id:    item.CallID,
-			Function: globals.ToolCallFunction{
-				Name:      item.Name,
-				Arguments: item.Arguments,
-			},
-		},
-	}
-
-	return &globals.Chunk{
-		ToolCall: &toolCalls,
-	}
-}
-
-func (c *ChatInstance) CreateXAIStreamChatRequest(props *adaptercommon.ChatProps, callback globals.Hook) error {
-	reasoningStarted := false
-	reasoningClosed := false
-	ticks := 0
-	body := c.GetChatBody(props, true)
-
-	err := utils.EventScanner(&utils.EventScannerProps{
-		Method:  "POST",
-		Uri:     c.GetChatEndpoint(),
-		Headers: c.GetHeader(),
-		Body:    body,
-		Callback: func(data string) error {
-			event, parseErr := parseStreamEvent(data)
-			if parseErr != nil {
-				return parseErr
-			}
-
-			var chunk *globals.Chunk
-			switch event.Type {
-			case "response.reasoning_summary_text.delta":
-				chunk = emitReasoningSummary(event.Delta, &reasoningStarted)
-			case "response.output_text.delta":
-				chunk = emitOutputText(event.Delta, &reasoningStarted, &reasoningClosed)
-			case "response.output_item.done":
-				chunk = emitFunctionCallEvent(event.Item)
-			default:
-				return nil
-			}
-
-			if chunk == nil {
-				return nil
-			}
-
-			ticks += 1
-			return callback(chunk)
-		},
-	}, props.Proxy)
-
-	if err != nil {
-		if err.Body != "" {
-			if form := utils.UnmarshalForm[ResponseResponse](err.Body); form != nil && form.Error.Message != "" {
-				return fmt.Errorf("openai responses error: %s", form.Error.Message)
-			}
-
-			return fmt.Errorf("openai responses error: %s", strings.TrimSpace(err.Body))
-		}
-
-		return fmt.Errorf("openai responses error: %s", err.Error)
-	}
-
-	if reasoningStarted && !reasoningClosed {
-		if closeErr := callback(&globals.Chunk{Content: "\n</think>\n\n"}); closeErr != nil {
-			return closeErr
-		}
-		reasoningClosed = true
-		ticks += 1
-	}
-
-	if ticks == 0 {
-		return errors.New("openai responses error: empty response")
-	}
-
-	return nil
-}
-
 func (c *ChatInstance) CreateStreamChatRequest(props *adaptercommon.ChatProps, callback globals.Hook) error {
-	if props != nil && props.ChannelType == globals.XAIChannelType {
-		return c.CreateXAIStreamChatRequest(props, callback)
-	}
-
 	body := c.GetChatBody(props, false)
 	raw, err := utils.PostRaw(
 		c.GetChatEndpoint(),
