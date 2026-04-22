@@ -63,7 +63,7 @@ export function ToolCallStatus({ toolCalls, className }: ToolCallStatusProps) {
   };
 
   return (
-    <div className={cn("mt-2 space-y-1.5", className)}>
+    <div className={cn("mt-1.5 space-y-1", className)}>
       {toolCalls.map((toolCall, index) => {
         const status = getStatusMeta(toolCall);
         const argumentsText = getPrettyJson(toolCall.function.arguments);
@@ -76,20 +76,20 @@ export function ToolCallStatus({ toolCalls, className }: ToolCallStatusProps) {
         return (
           <details
             key={toolCall.id || `${toolCall.function.name}-${index}`}
-            className="overflow-hidden rounded-lg border border-border/70 bg-muted/10"
+            className="overflow-hidden rounded-md border border-border/60 bg-muted/5"
           >
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-2.5 py-2">
-              <div className="flex min-w-0 items-center gap-2">
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border/60 bg-background/80">
-                  <Wrench className="h-3 w-3 text-muted-foreground" />
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-2 py-1.5">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border/60 bg-background/80">
+                  <Wrench className="h-2.5 w-2.5 text-muted-foreground" />
                 </div>
-                <div className="min-w-0">
-                  <div className="truncate text-[13px] font-medium leading-none">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <div className="truncate text-[12px] font-medium leading-none">
                     {toolCall.function.name}
                   </div>
                   <div
                     className={cn(
-                      "mt-1 flex items-center gap-1 text-[11px] leading-none",
+                      "flex items-center gap-1 text-[10px] leading-none",
                       status.tone,
                     )}
                   >
@@ -99,18 +99,18 @@ export function ToolCallStatus({ toolCalls, className }: ToolCallStatusProps) {
                 </div>
               </div>
               {hasDetails && (
-                <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform details-open:rotate-180" />
+                <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground transition-transform details-open:rotate-180" />
               )}
             </summary>
 
             {hasDetails && (
-              <div className="space-y-2.5 border-t border-border/60 px-2.5 py-2.5">
+              <div className="space-y-2 border-t border-border/60 px-2 py-2">
                 {argumentsText && (
                   <div className="space-y-1">
                     <div className="text-[11px] font-medium text-muted-foreground">
                       {t("plugin.mcp.tool-arguments")}
                     </div>
-                    <pre className="overflow-x-auto rounded-md bg-background/80 p-2 text-[11px] leading-relaxed text-foreground whitespace-pre-wrap break-words">
+                    <pre className="overflow-x-auto rounded-md bg-background/80 p-1.5 text-[10px] leading-relaxed text-foreground whitespace-pre-wrap break-words">
                       {argumentsText}
                     </pre>
                   </div>
@@ -120,7 +120,7 @@ export function ToolCallStatus({ toolCalls, className }: ToolCallStatusProps) {
                     <div className="text-[11px] font-medium text-muted-foreground">
                       {t("plugin.mcp.result")}
                     </div>
-                    <pre className="overflow-x-auto rounded-md bg-background/80 p-2 text-[11px] leading-relaxed text-foreground whitespace-pre-wrap break-words">
+                    <pre className="overflow-x-auto rounded-md bg-background/80 p-1.5 text-[10px] leading-relaxed text-foreground whitespace-pre-wrap break-words">
                       {resultText}
                     </pre>
                   </div>
@@ -130,7 +130,7 @@ export function ToolCallStatus({ toolCalls, className }: ToolCallStatusProps) {
                     <div className="text-[11px] font-medium text-red-500">
                       {t("plugin.mcp.error")}
                     </div>
-                    <pre className="overflow-x-auto rounded-md bg-red-500/10 p-2 text-[11px] leading-relaxed text-red-600 dark:text-red-400 whitespace-pre-wrap break-words">
+                    <pre className="overflow-x-auto rounded-md bg-red-500/10 p-1.5 text-[10px] leading-relaxed text-red-600 dark:text-red-400 whitespace-pre-wrap break-words">
                       {errorText}
                     </pre>
                   </div>
