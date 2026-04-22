@@ -2,6 +2,7 @@ package conversation
 
 import (
 	"chat/globals"
+	"strings"
 	"testing"
 )
 
@@ -105,5 +106,11 @@ func TestSaveResponsePersistsConversationModelOnAssistantReply(t *testing.T) {
 	last := instance.GetLastMessage()
 	if last.Model != "grok-4.20-reasoning" {
 		t.Fatalf("expected persisted model to be preserved, got %q", last.Model)
+	}
+}
+
+func TestSaveConversationQueryUpdatesModelColumn(t *testing.T) {
+	if !strings.Contains(saveConversationQuery, "model = VALUES(model)") {
+		t.Fatalf("expected save conversation query to update model column, got %q", saveConversationQuery)
 	}
 }

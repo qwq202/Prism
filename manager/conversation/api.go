@@ -24,6 +24,11 @@ type RetitleConversationForm struct {
 	Id int64 `json:"id"`
 }
 
+type UpdateConversationModelForm struct {
+	Id    int64  `json:"id"`
+	Model string `json:"model"`
+}
+
 type DeleteMaskForm struct {
 	Id int `json:"id" binding:"required"`
 }
@@ -207,6 +212,58 @@ func RetitleAPI(c *gin.Context) {
 		"data": gin.H{
 			"name": conversation.GetName(),
 		},
+	})
+}
+
+func UpdateModelAPI(c *gin.Context) {
+	user := auth.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": "user not found",
+		})
+		return
+	}
+
+	db := utils.GetDBFromContext(c)
+	var form UpdateConversationModelForm
+	if err := c.ShouldBindJSON(&form); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": "invalid form",
+		})
+		return
+	}
+
+	if strings.TrimSpace(form.Model) == "" {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": "model is required",
+		})
+		return
+	}
+
+	conversation := LoadConversation(db, user.GetID(db), form.Id)
+	if conversation == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": "conversation not found",
+		})
+		return
+	}
+
+	conversation.SetModel(form.Model)
+	if !conversation.SaveConversation(db) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": "failed to update conversation model",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  true,
+		"message": "",
 	})
 }
 

@@ -151,6 +151,19 @@ export async function renameConversation(
   }
 }
 
+export async function updateConversationModel(
+  id: number,
+  model: string,
+): Promise<CommonResponse> {
+  try {
+    const resp = await axios.post("/conversation/model", { id, model });
+    return resp.data as CommonResponse;
+  } catch (e) {
+    console.warn(e);
+    return { status: false, error: getErrorMessage(e) };
+  }
+}
+
 export async function retitleConversation(id: number): Promise<CommonResponse> {
   try {
     const resp = await axios.post("/conversation/retitle", { id });

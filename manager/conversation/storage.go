@@ -17,6 +17,11 @@ var orphanCleanupState struct {
 	running bool
 }
 
+const saveConversationQuery = `
+		INSERT INTO conversation (user_id, conversation_id, conversation_name, data, model, task_id) VALUES (?, ?, ?, ?, ?, ?)
+		ON DUPLICATE KEY UPDATE conversation_name = VALUES(conversation_name), data = VALUES(data), model = VALUES(model), task_id = VALUES(task_id)
+	`
+
 func loadGlobalConversationAttachmentNames(db *sql.DB) map[string]struct{} {
 	rows, err := globals.QueryDb(db, `SELECT data FROM conversation`)
 	if err != nil {
@@ -131,12 +136,8 @@ func (c *Conversation) SaveConversation(db *sql.DB) bool {
 	}
 
 	data := utils.ToJson(c.GetMessage())
-	query := `
-		INSERT INTO conversation (user_id, conversation_id, conversation_name, data, model, task_id) VALUES (?, ?, ?, ?, ?, ?)
-		ON DUPLICATE KEY UPDATE conversation_name = VALUES(conversation_name), data = VALUES(data), task_id = VALUES(task_id)
-	`
 
-	stmt, err := globals.PrepareDb(db, query)
+	stmt, err := globals.PrepareDb(db, saveConversationQuery)
 	if err != nil {
 		return false
 	}

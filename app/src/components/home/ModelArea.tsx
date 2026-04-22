@@ -3,6 +3,7 @@ import SelectGroup, {
   SelectItemProps,
 } from "@/components/SelectGroup.tsx";
 import {
+  selectCurrent,
   selectModel,
   selectModelList,
   selectSupportModels,
@@ -49,6 +50,7 @@ import {
 import Icon from "@/components/utils/Icon.tsx";
 import { toast } from "sonner";
 import { cn } from "@/components/ui/lib/utils.ts";
+import { updateConversationModel } from "@/api/history.ts";
 
 const tagIcons: { [key: string]: React.ReactNode } = {
   official: <Award />,
@@ -123,16 +125,30 @@ export default function ModelFinder(props: ModelSelectorProps) {
   const level = useSelector(levelSelector);
   const student = useSelector(teenagerSelector);
   const list = useSelector(selectModelList);
+  const currentConversationId = useSelector(selectCurrent);
 
   const supportModels = useSelector(selectSupportModels);
   const modelList = useSelector(selectModelList);
   const subscriptionData = useSelector(subscriptionDataSelector);
 
+  async function syncConversationModel(value: string) {
+    dispatch(setModel(value));
+
+    if (currentConversationId === -1) return;
+
+    const resp = await updateConversationModel(currentConversationId, value);
+    if (!resp.status) {
+      console.warn(
+        `[conversation] failed to persist model ${value} for conversation ${currentConversationId}: ${resp.error ?? resp.message ?? "unknown error"}`,
+      );
+    }
+  }
+
   modelEvent.bind((target: string) => {
     if (supportModels.find((m) => m.id === target)) {
       if (model === target) return;
       console.debug(`[chat] toggle model from event: ${target}`);
-      dispatch(setModel(target));
+      void syncConversationModel(target);
     }
   });
 
@@ -189,7 +205,7 @@ export default function ModelFinder(props: ModelSelectorProps) {
           });
           return;
         }
-        dispatch(setModel(value));
+        void syncConversationModel(value);
       }}
     />
   );
@@ -203,16 +219,30 @@ export function ModelArea() {
   const auth = useSelector(selectAuthenticated);
   const level = useSelector(levelSelector);
   const student = useSelector(teenagerSelector);
+  const currentConversationId = useSelector(selectCurrent);
 
   const supportModels = useSelector(selectSupportModels);
   const modelList = useSelector(selectModelList);
   const subscriptionData = useSelector(subscriptionDataSelector);
 
+  async function syncConversationModel(value: string) {
+    dispatch(setModel(value));
+
+    if (currentConversationId === -1) return;
+
+    const resp = await updateConversationModel(currentConversationId, value);
+    if (!resp.status) {
+      console.warn(
+        `[conversation] failed to persist model ${value} for conversation ${currentConversationId}: ${resp.error ?? resp.message ?? "unknown error"}`,
+      );
+    }
+  }
+
   modelEvent.bind((target: string) => {
     if (supportModels.find((m) => m.id === target)) {
       if (model === target) return;
       console.debug(`[chat] toggle model from event: ${target}`);
-      dispatch(setModel(target));
+      void syncConversationModel(target);
     }
   });
 
@@ -265,7 +295,7 @@ export function ModelArea() {
           });
           return;
         }
-        dispatch(setModel(value));
+        void syncConversationModel(value);
       }}
     >
       <NativeSelectTrigger

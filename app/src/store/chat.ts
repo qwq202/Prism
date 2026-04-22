@@ -469,6 +469,18 @@ const chatSlice = createSlice({
 
       setMemory("model", model as string);
       state.model = action.payload as string;
+
+      const conversation = state.conversations[state.current];
+      if (conversation) {
+        conversation.model = model;
+      }
+
+      const historyConversation = state.history.find(
+        (item) => item.id === state.current,
+      );
+      if (historyConversation) {
+        historyConversation.model = model;
+      }
     },
     setWeb: (state, action) => {
       setMemory("web", action.payload ? "true" : "false");
