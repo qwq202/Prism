@@ -563,11 +563,13 @@ func extractAssistantMessageFromBuffer(buffer *utils.Buffer, interrupted bool) g
 	}
 
 	// Interrupted streams may contain partial/incomplete tool payloads.
-	// Keep visible text, but avoid persisting broken function-calling state.
+	// Keep visible text, but avoid persisting broken function-calling state
+	// or incomplete hidden reasoning context.
 	if interrupted {
 		return message
 	}
 
+	message.ReasoningContent = buffer.GetReasoningContent()
 	message.ToolCalls = buffer.GetToolCalls()
 	message.FunctionCall = buffer.GetFunctionCall()
 	return message

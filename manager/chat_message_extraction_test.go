@@ -58,6 +58,24 @@ func TestExtractAssistantMessageFromBufferToolCallOnlyResponse(t *testing.T) {
 	}
 }
 
+func TestExtractAssistantMessageFromBufferPreservesReasoningContent(t *testing.T) {
+	buffer := &utils.Buffer{}
+	buffer.WriteChunk(&globals.Chunk{
+		Content:          "<think>\nplanning\n</think>\n\nfinal answer",
+		ReasoningContent: utils.ToPtr("planning"),
+	})
+
+	message := extractAssistantMessageFromBuffer(buffer, false)
+
+	if message.Content != "<think>\nplanning\n</think>\n\nfinal answer" {
+		t.Fatalf("expected visible content to be preserved, got %q", message.Content)
+	}
+
+	if message.ReasoningContent == nil || *message.ReasoningContent != "planning" {
+		t.Fatalf("expected reasoning content to be preserved, got %#v", message.ReasoningContent)
+	}
+}
+
 func TestExtractAssistantMessageFromBufferMetadataOnlyResponse(t *testing.T) {
 	buffer := &utils.Buffer{}
 	buffer.WriteChunk(&globals.Chunk{

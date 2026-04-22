@@ -11,9 +11,10 @@ type Message struct {
 	Content              interface{}                   `json:"content"`
 	Model                string                        `json:"model,omitempty"`
 	Name                 *string                       `json:"name,omitempty"`
-	FunctionCall         *globals.FunctionCall         `json:"function_call,omitempty"`          // only `function` role
-	ToolCallId           *string                       `json:"tool_call_id,omitempty"`           // only `tool` role
-	ToolCalls            *globals.ToolCalls            `json:"tool_calls,omitempty"`             // only `assistant` role
+	FunctionCall         *globals.FunctionCall         `json:"function_call,omitempty"` // only `function` role
+	ToolCallId           *string                       `json:"tool_call_id,omitempty"`  // only `tool` role
+	ToolCalls            *globals.ToolCalls            `json:"tool_calls,omitempty"`    // only `assistant` role
+	ReasoningContent     *string                       `json:"reasoning_content,omitempty"`
 	GeminiHiddenMetadata *globals.GeminiHiddenMetadata `json:"gemini_hidden_metadata,omitempty"` // hidden gemini metadata for replay
 }
 
@@ -31,16 +32,22 @@ type MessageContent struct {
 type MessageContents []MessageContent
 
 type RelayForm struct {
-	Model                string    `json:"model" binding:"required"`
-	Messages             []Message `json:"messages" binding:"required"`
-	Stream               bool      `json:"stream"`
-	MaxTokens            *int      `json:"max_tokens"`
-	PresencePenalty      *float32  `json:"presence_penalty"`
-	FrequencyPenalty     *float32  `json:"frequency_penalty"`
-	RepetitionPenalty    *float32  `json:"repetition_penalty"`
-	Temperature          *float32  `json:"temperature"`
-	TopP                 *float32  `json:"top_p"`
-	TopK                 *int      `json:"top_k"`
+	Model                string      `json:"model" binding:"required"`
+	Messages             []Message   `json:"messages" binding:"required"`
+	Stream               bool        `json:"stream"`
+	MaxTokens            *int        `json:"max_tokens"`
+	PresencePenalty      *float32    `json:"presence_penalty"`
+	FrequencyPenalty     *float32    `json:"frequency_penalty"`
+	RepetitionPenalty    *float32    `json:"repetition_penalty"`
+	Temperature          *float32    `json:"temperature"`
+	TopP                 *float32    `json:"top_p"`
+	TopK                 *int        `json:"top_k"`
+	Stop                 interface{} `json:"stop,omitempty"`
+	ResponseFormat       interface{} `json:"response_format,omitempty"`
+	StreamOptions        interface{} `json:"stream_options,omitempty"`
+	Thinking             interface{} `json:"thinking,omitempty"`
+	Logprobs             *bool       `json:"logprobs,omitempty"`
+	TopLogprobs          *int        `json:"top_logprobs,omitempty"`
 	Tools                *globals.FunctionTools
 	ToolChoice           *interface{}
 	WebSearch            bool `json:"web_search"`
@@ -60,9 +67,10 @@ type StreamMessage struct {
 	Role                 *string                       `json:"role"`
 	Content              string                        `json:"content"`
 	Name                 *string                       `json:"name,omitempty"`
-	FunctionCall         *globals.FunctionCall         `json:"function_call,omitempty"`          // only `function` role
-	ToolCallId           *string                       `json:"tool_call_id,omitempty"`           // only `tool` role
-	ToolCalls            *globals.ToolCalls            `json:"tool_calls,omitempty"`             // only `assistant` role
+	FunctionCall         *globals.FunctionCall         `json:"function_call,omitempty"` // only `function` role
+	ToolCallId           *string                       `json:"tool_call_id,omitempty"`  // only `tool` role
+	ToolCalls            *globals.ToolCalls            `json:"tool_calls,omitempty"`    // only `assistant` role
+	ReasoningContent     *string                       `json:"reasoning_content,omitempty"`
 	GeminiHiddenMetadata *globals.GeminiHiddenMetadata `json:"gemini_hidden_metadata,omitempty"` // hidden gemini metadata for replay
 }
 
@@ -192,6 +200,7 @@ func transform(m []Message) []globals.Message {
 			FunctionCall:         v.FunctionCall,
 			ToolCallId:           v.ToolCallId,
 			ToolCalls:            v.ToolCalls,
+			ReasoningContent:     v.ReasoningContent,
 			GeminiHiddenMetadata: sanitizeGeminiHiddenMetadata(v.GeminiHiddenMetadata),
 		})
 	}

@@ -244,6 +244,10 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
     endpoint: "https://api.deepseek.com",
     format: "<api-key>",
     models: ["deepseek-chat", "deepseek-reasoner"],
+    description:
+      "> DeepSeek 渠道使用官方 **Chat Completions API**，接入点填写 *https://api.deepseek.com* 或其反代地址，系统会请求 *`/chat/completions`*。 \n" +
+      "> 当前官方模型别名 **deepseek-chat** 与 **deepseek-reasoner** 均已升级到 **DeepSeek-V3.2** 系列。 \n" +
+      "> 系统现已适配官方最新的 **thinking**、**response_format**、**stream_options**、**logprobs / top_logprobs**、**tools / tool_choice** 等参数。 \n",
   },
 };
 

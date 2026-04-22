@@ -6,6 +6,7 @@ import (
 	"chat/utils"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 type ChatInstance struct {
@@ -51,12 +52,32 @@ func (c *ChatInstance) GetChatEndpoint() string {
 
 func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps, stream bool) interface{} {
 	messages := props.Message
-	// because of deepseek first message must be user role
-	// convert assistant message to user message
+	// Keep legacy compatibility for older deployments that reject an initial assistant role.
 	if len(messages) > 0 && messages[0].Role == globals.Assistant {
 		messages = make([]globals.Message, len(props.Message))
 		copy(messages, props.Message)
 		messages[0].Role = globals.User
+	}
+
+	temperature := props.Temperature
+	topP := props.TopP
+	presencePenalty := props.PresencePenalty
+	frequencyPenalty := props.FrequencyPenalty
+	logprobs := props.Logprobs
+	topLogprobs := props.TopLogprobs
+
+	if isReasoningModel(props.Model) {
+		temperature = nil
+		topP = nil
+		presencePenalty = nil
+		frequencyPenalty = nil
+		logprobs = nil
+		topLogprobs = nil
+	}
+
+	var streamOptions interface{}
+	if stream {
+		streamOptions = props.StreamOptions
 	}
 
 	return ChatRequest{
@@ -64,11 +85,23 @@ func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps, stream bool) 
 		Messages:         messages,
 		MaxTokens:        props.MaxTokens,
 		Stream:           stream,
-		Temperature:      props.Temperature,
-		TopP:             props.TopP,
-		PresencePenalty:  props.PresencePenalty,
-		FrequencyPenalty: props.FrequencyPenalty,
+		Temperature:      temperature,
+		TopP:             topP,
+		PresencePenalty:  presencePenalty,
+		FrequencyPenalty: frequencyPenalty,
+		Stop:             props.Stop,
+		ResponseFormat:   props.ResponseFormat,
+		Thinking:         props.Thinking,
+		StreamOptions:    streamOptions,
+		Logprobs:         logprobs,
+		TopLogprobs:      topLogprobs,
+		Tools:            props.Tools,
+		ToolChoice:       props.ToolChoice,
 	}
+}
+
+func isReasoningModel(model string) bool {
+	return strings.TrimSpace(model) == globals.DeepseekR1
 }
 
 func processChatResponse(data string) *ChatResponse {
@@ -92,41 +125,75 @@ func processChatErrorResponse(data string) *ChatStreamErrorResponse {
 	return nil
 }
 
-func (c *ChatInstance) ProcessLine(data string) (string, error) {
+func formatReasoning(reasoning *string, content string) string {
+	if reasoning == nil || *reasoning == "" {
+		return content
+	}
+
+	if content == "" {
+		return fmt.Sprintf("<think>\n%s\n</think>", *reasoning)
+	}
+
+	return fmt.Sprintf("<think>\n%s\n</think>\n\n%s", *reasoning, content)
+}
+
+func (c *ChatInstance) getChoices(form *ChatStreamResponse) *globals.Chunk {
+	if len(form.Choices) == 0 {
+		return &globals.Chunk{Content: ""}
+	}
+
+	choice := form.Choices[0].Delta
+	reasoning := choice.ReasoningContent
+
+	if c.isFirstReasoning == false && !c.isReasonOver && reasoning == nil {
+		c.isReasonOver = true
+		if choice.Content != "" {
+			return &globals.Chunk{
+				Content:          fmt.Sprintf("\n</think>\n\n%s", choice.Content),
+				ToolCall:         choice.ToolCalls,
+				FunctionCall:     choice.FunctionCall,
+				ReasoningContent: nil,
+			}
+		}
+
+		return &globals.Chunk{
+			Content:          "\n</think>\n\n",
+			ToolCall:         choice.ToolCalls,
+			FunctionCall:     choice.FunctionCall,
+			ReasoningContent: nil,
+		}
+	}
+
+	content := choice.Content
+	if reasoning != nil {
+		if c.isFirstReasoning {
+			c.isFirstReasoning = false
+			content = fmt.Sprintf("<think>\n%s", *reasoning)
+		} else {
+			content = *reasoning
+		}
+	}
+
+	return &globals.Chunk{
+		Content:          content,
+		ToolCall:         choice.ToolCalls,
+		FunctionCall:     choice.FunctionCall,
+		ReasoningContent: reasoning,
+	}
+}
+
+func (c *ChatInstance) ProcessLine(data string) (*globals.Chunk, error) {
 	if form := processChatStreamResponse(data); form != nil {
-		if len(form.Choices) == 0 {
-			return "", nil
-		}
-
-		delta := form.Choices[0].Delta
-
-		if c.isFirstReasoning == false && !c.isReasonOver && delta.ReasoningContent == nil {
-			c.isReasonOver = true
-			if delta.Content != "" {
-				return fmt.Sprintf("\n</think>\n\n%s", delta.Content), nil
-			}
-			return "\n</think>\n\n", nil
-		}
-
-		if delta.ReasoningContent != nil {
-			content := *delta.ReasoningContent
-			if c.isFirstReasoning {
-				c.isFirstReasoning = false
-				return fmt.Sprintf("<think>\n%s", content), nil
-			}
-			return content, nil
-		}
-
-		return delta.Content, nil
+		return c.getChoices(form), nil
 	}
 
 	if form := processChatErrorResponse(data); form != nil {
 		if form.Error.Message != "" {
-			return "", errors.New(fmt.Sprintf("deepseek error: %s", form.Error.Message))
+			return &globals.Chunk{Content: ""}, errors.New(fmt.Sprintf("deepseek error: %s", form.Error.Message))
 		}
 	}
 
-	return "", nil
+	return &globals.Chunk{Content: ""}, nil
 }
 
 func (c *ChatInstance) CreateChatRequest(props *adaptercommon.ChatProps) (string, error) {
@@ -151,12 +218,7 @@ func (c *ChatInstance) CreateChatRequest(props *adaptercommon.ChatProps) (string
 	}
 
 	message := data.Choices[0].Message
-	content := message.Content
-	if message.ReasoningContent != nil {
-		content = fmt.Sprintf("<think>\n%s\n</think>\n\n%s", *message.ReasoningContent, content)
-	}
-
-	return content, nil
+	return formatReasoning(message.ReasoningContent, message.Content), nil
 }
 
 func (c *ChatInstance) CreateStreamChatRequest(props *adaptercommon.ChatProps, callback globals.Hook) error {
@@ -172,7 +234,7 @@ func (c *ChatInstance) CreateStreamChatRequest(props *adaptercommon.ChatProps, c
 			if err != nil {
 				return err
 			}
-			return callback(&globals.Chunk{Content: partial})
+			return callback(partial)
 		},
 	}, props.Proxy)
 

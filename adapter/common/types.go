@@ -46,6 +46,12 @@ type ChatProps struct {
 	Temperature          *float32               `json:"temperature,omitempty"`
 	TopP                 *float32               `json:"top_p,omitempty"`
 	TopK                 *int                   `json:"top_k,omitempty"`
+	Stop                 interface{}            `json:"stop,omitempty"`
+	ResponseFormat       interface{}            `json:"response_format,omitempty"`
+	StreamOptions        interface{}            `json:"stream_options,omitempty"`
+	Thinking             interface{}            `json:"thinking,omitempty"`
+	Logprobs             *bool                  `json:"logprobs,omitempty"`
+	TopLogprobs          *int                   `json:"top_logprobs,omitempty"`
 	Tools                *globals.FunctionTools `json:"tools,omitempty"`
 	ToolChoice           *interface{}           `json:"tool_choice,omitempty"`
 	EnableWeb            bool                   `json:"-"`

@@ -30,6 +30,7 @@ type Buffer struct {
 	ToolCalls            *globals.ToolCalls            `json:"tool_calls"`
 	ToolCallsCursor      int                           `json:"tool_calls_cursor"`
 	FunctionCall         *globals.FunctionCall         `json:"function_call"`
+	ReasoningContent     string                        `json:"reasoning_content,omitempty"`
 	GeminiHiddenMetadata *globals.GeminiHiddenMetadata `json:"gemini_hidden_metadata,omitempty"`
 	StartTime            *time.Time                    `json:"-"`
 	Prompts              string                        `json:"prompts"`
@@ -113,6 +114,7 @@ func (b *Buffer) WriteChunk(data *globals.Chunk) string {
 	b.Write(data.Content)
 	b.AddToolCalls(data.ToolCall)
 	b.SetFunctionCall(data.FunctionCall)
+	b.AddReasoningContent(data.ReasoningContent)
 	b.SetGeminiHiddenMetadata(data.GeminiHiddenMetadata)
 
 	return data.Content
@@ -211,6 +213,22 @@ func (b *Buffer) SetFunctionCall(functionCall *globals.FunctionCall) {
 	}
 
 	b.FunctionCall = functionCall
+}
+
+func (b *Buffer) AddReasoningContent(reasoning *string) {
+	if reasoning == nil || len(*reasoning) == 0 {
+		return
+	}
+
+	b.ReasoningContent += *reasoning
+}
+
+func (b *Buffer) GetReasoningContent() *string {
+	if len(b.ReasoningContent) == 0 {
+		return nil
+	}
+
+	return ToPtr(b.ReasoningContent)
 }
 
 func cloneGeminiHiddenMetadata(metadata *globals.GeminiHiddenMetadata) *globals.GeminiHiddenMetadata {

@@ -67,5 +67,5 @@ func MergeGeminiHiddenMetadata(limit int, metadata ...*GeminiHiddenMetadata) *Ge
 // Chunk-level emptiness controls whether a stream delta should be emitted.
 // Hidden metadata is intentionally considered non-empty so metadata deltas can be forwarded.
 func (c *Chunk) IsEmpty() bool {
-	return len(c.Content) == 0 && c.ToolCall == nil && c.FunctionCall == nil && c.GeminiHiddenMetadata.IsEmpty()
+	return len(c.Content) == 0 && c.ToolCall == nil && c.FunctionCall == nil && c.ReasoningContent == nil && c.GeminiHiddenMetadata.IsEmpty()
 }

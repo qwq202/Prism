@@ -27,6 +27,7 @@ func TestBuildCacheChunkDoesNotPrewriteLiveBufferPayload(t *testing.T) {
 		Name:      "lookup_weather",
 		Arguments: `{"city":"Shanghai"}`,
 	})
+	cacheBuffer.AddReasoningContent(utils.ToPtr("Need cached reasoning."))
 	cacheBuffer.SetGeminiHiddenMetadata(&globals.GeminiHiddenMetadata{
 		ThoughtSignatures: []string{"sig-a"},
 	})
@@ -64,6 +65,11 @@ func TestBuildCacheChunkDoesNotPrewriteLiveBufferPayload(t *testing.T) {
 	functionCall := liveBuffer.GetFunctionCall()
 	if functionCall == nil || functionCall.Arguments != `{"city":"Shanghai"}` {
 		t.Fatalf("expected function call to be replayed once, got %#v", functionCall)
+	}
+
+	reasoning := liveBuffer.GetReasoningContent()
+	if reasoning == nil || *reasoning != "Need cached reasoning." {
+		t.Fatalf("expected reasoning content to be replayed once, got %#v", reasoning)
 	}
 
 	metadata := liveBuffer.GetGeminiHiddenMetadata()

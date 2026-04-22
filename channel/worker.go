@@ -81,6 +81,7 @@ func buildCacheChunk(cacheBuffer *utils.Buffer, liveBuffer *utils.Buffer) *globa
 		Content:              cacheBuffer.Read(),
 		FunctionCall:         cacheBuffer.GetFunctionCall(),
 		ToolCall:             cacheBuffer.GetToolCalls(),
+		ReasoningContent:     cacheBuffer.GetReasoningContent(),
 		GeminiHiddenMetadata: cacheBuffer.GetGeminiHiddenMetadata(),
 	}
 }
@@ -137,8 +138,9 @@ func PreflightCache(cache *redis.Client, model string, hash string, buffer *util
 	data := chunk.Content
 	toolCalls := chunk.ToolCall
 	functionCall := chunk.FunctionCall
+	reasoningContent := chunk.ReasoningContent
 	hiddenMetadata := chunk.GeminiHiddenMetadata
-	if data == "" && !hasToolCalls(toolCalls) && functionCall == nil && hiddenMetadata.IsEmpty() {
+	if data == "" && !hasToolCalls(toolCalls) && functionCall == nil && reasoningContent == nil && hiddenMetadata.IsEmpty() {
 		return idx, false, nil
 	}
 

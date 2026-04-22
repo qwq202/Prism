@@ -14,6 +14,7 @@ var writableToolChannelTypes = map[string]struct{}{
 	globals.OpenAIChannelType:      {},
 	globals.AzureOpenAIChannelType: {},
 	globals.PalmChannelType:        {},
+	globals.DeepseekChannelType:    {},
 }
 
 func BuildToolDefinition() *globals.FunctionTools {

@@ -53,6 +53,7 @@ type Chunk struct {
 	Content              string                `json:"content"`
 	ToolCall             *ToolCalls            `json:"tool_call,omitempty"`
 	FunctionCall         *FunctionCall         `json:"function_call,omitempty"`
+	ReasoningContent     *string               `json:"reasoning_content,omitempty"`
 	GeminiHiddenMetadata *GeminiHiddenMetadata `json:"gemini_hidden_metadata,omitempty"` // hidden gemini metadata for replay
 }
 
