@@ -38,6 +38,7 @@ import { includingModelFromPlan } from "@/conf/subscription.tsx";
 import { subscriptionDataSelector } from "@/store/globals.ts";
 import router from "@/router.tsx";
 import ModelAvatar from "@/components/ModelAvatar.tsx";
+import { getResolvedModelTags } from "@/conf/model.ts";
 import {
   NativeSelectTrigger,
   Select,
@@ -97,7 +98,7 @@ function formatModel(
     });
   }
 
-  const tags = model.tag || [];
+  const tags = getResolvedModelTags(model);
   tags.forEach((tag) => {
     if (tagIcons[tag] && !notDisplayTags.includes(tag)) {
       badge.push({

@@ -70,43 +70,66 @@ type MarketForm = Model[];
 
 const generateSeed = () => generateRandomChar(8);
 
+function normalizeMarketModel(model: Model): Model {
+  const next = { ...model };
+  const tags = Array.from(new Set(next.tag || []));
+  const isMultimodal = !!next.vision_model;
+
+  next.tag = isMultimodal
+    ? tags.includes("multi-modal")
+      ? tags
+      : [...tags, "multi-modal"]
+    : tags.filter((tag) => tag !== "multi-modal");
+
+  return next;
+}
+
 function reducer(state: MarketForm, action: any): MarketForm {
   switch (action.type) {
     case "set":
       return [
-        ...action.payload.map((model: RawModel) => ({
-          ...model,
-          seed: generateSeed(),
-        })),
+        ...action.payload.map((model: RawModel) =>
+          normalizeMarketModel({
+            ...model,
+            seed: generateSeed(),
+          }),
+        ),
       ];
     case "add":
       return [
         ...state,
-        {
+        normalizeMarketModel({
           ...action.payload,
           seed: generateSeed(),
-        },
+        }),
       ];
     case "add-multiple":
       return [
         ...state,
-        ...action.payload.map((model: RawModel) => ({
-          id: model.id || "",
-          name: model.name || "",
-          free: false,
-          auth: false,
-          description: model.description || "",
-          high_context: model.high_context || false,
-          default: model.default || false,
-          tag: model.tag || [],
-          avatar: model.avatar || "",
-          seed: generateSeed(),
-        })),
+        ...action.payload.map((model: RawModel) =>
+          normalizeMarketModel({
+            id: model.id || "",
+            name: model.name || "",
+            free: false,
+            auth: false,
+            description: model.description || "",
+            high_context: model.high_context || false,
+            default: model.default || false,
+            tag: model.tag || [],
+            avatar: model.avatar || "",
+            seed: generateSeed(),
+            function_calling: model.function_calling || false,
+            vision_model: model.vision_model || false,
+            thinking_model: model.thinking_model || false,
+            ocr_model: model.ocr_model || false,
+            reverse_model: model.reverse_model || false,
+          }),
+        ),
       ];
     case "new":
       return [
         ...state,
-        {
+        normalizeMarketModel({
           id: "",
           name: "",
           free: false,
@@ -117,11 +140,11 @@ function reducer(state: MarketForm, action: any): MarketForm {
           tag: [],
           avatar: "",
           seed: generateSeed(),
-        },
+        }),
       ];
     case "new-template":
       return [
-        {
+        normalizeMarketModel({
           id: action.payload.id,
           name: action.payload.name,
           free: false,
@@ -132,23 +155,25 @@ function reducer(state: MarketForm, action: any): MarketForm {
           tag: [],
           avatar: "",
           seed: generateSeed(),
-        },
+        }),
         ...state,
       ];
     case "batch-new-template":
       return [
-        ...action.payload.map((model: { id: string; name: string }) => ({
-          id: model.id,
-          name: model.name,
-          free: false,
-          auth: false,
-          description: "",
-          high_context: false,
-          default: true,
-          tag: [],
-          avatar: "",
-          seed: generateSeed(),
-        })),
+        ...action.payload.map((model: { id: string; name: string }) =>
+          normalizeMarketModel({
+            id: model.id,
+            name: model.name,
+            free: false,
+            auth: false,
+            description: "",
+            high_context: false,
+            default: true,
+            tag: [],
+            avatar: "",
+            seed: generateSeed(),
+          }),
+        ),
         ...state,
       ];
     case "remove":
@@ -215,7 +240,10 @@ function reducer(state: MarketForm, action: any): MarketForm {
       return [
         ...state.map((model, idx) => {
           if (idx === action.payload.idx) {
-            return { ...model, vision_model: action.payload.default };
+            return normalizeMarketModel({
+              ...model,
+              vision_model: action.payload.default,
+            });
           }
           return model;
         }),
@@ -233,7 +261,10 @@ function reducer(state: MarketForm, action: any): MarketForm {
       return [
         ...state.map((model, idx) => {
           if (idx === action.payload.idx) {
-            return { ...model, ocr_model: action.payload.default };
+            return normalizeMarketModel({
+              ...model,
+              ocr_model: action.payload.default,
+            });
           }
           return model;
         }),
@@ -242,7 +273,10 @@ function reducer(state: MarketForm, action: any): MarketForm {
       return [
         ...state.map((model, idx) => {
           if (idx === action.payload.idx) {
-            return { ...model, reverse_model: action.payload.default };
+            return normalizeMarketModel({
+              ...model,
+              reverse_model: action.payload.default,
+            });
           }
           return model;
         }),
@@ -251,7 +285,10 @@ function reducer(state: MarketForm, action: any): MarketForm {
       return [
         ...state.map((model, idx) => {
           if (idx === action.payload.idx) {
-            return { ...model, tag: action.payload.tags };
+            return normalizeMarketModel({
+              ...model,
+              tag: action.payload.tags,
+            });
           }
           return model;
         }),
@@ -261,11 +298,10 @@ function reducer(state: MarketForm, action: any): MarketForm {
         ...state.map((model, idx) => {
           if (idx === action.payload.idx) {
             const tag = model.tag || [];
-            tag.push(action.payload.tag);
-            return {
+            return normalizeMarketModel({
               ...model,
-              tag: [...tag],
-            };
+              tag: [...tag, action.payload.tag],
+            });
           }
           return model;
         }),
@@ -275,10 +311,10 @@ function reducer(state: MarketForm, action: any): MarketForm {
         ...state.map((model, idx) => {
           if (idx === action.payload.idx) {
             const tag = model.tag || [];
-            return {
+            return normalizeMarketModel({
               ...model,
               tag: tag.filter((t) => t !== action.payload.tag),
-            };
+            });
           }
           return model;
         }),
@@ -300,7 +336,7 @@ function reducer(state: MarketForm, action: any): MarketForm {
     case "add-below":
       return [
         ...state.slice(0, action.payload.idx + 1),
-        {
+        normalizeMarketModel({
           id: "",
           name: "",
           free: false,
@@ -311,7 +347,7 @@ function reducer(state: MarketForm, action: any): MarketForm {
           tag: [],
           avatar: "",
           seed: generateSeed(),
-        },
+        }),
         ...state.slice(action.payload.idx + 1),
       ];
     case "upward":

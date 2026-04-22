@@ -423,7 +423,8 @@
     "uploading": "文件上傳中...",
     "uploading-prompt": "正在上傳圖片中，請耐心等待",
     "image-only": "目前僅支援上傳圖片",
-    "vision-model-required": "當前模型不支援圖像識別"
+    "vision-model-required": "當前模型不支援圖像識別",
+    "files-cleared-on-model-switch": "模型切換後，待發送圖片已自動清空"
   },
   "generate": {
     "title": "AI 專案產生器",

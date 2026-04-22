@@ -24,13 +24,16 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "./ui/dialog";
 import { useTranslation } from "react-i18next";
 import { useDraggableInput } from "@/utils/dom.ts";
 import { FileObject, FileArray, quickBlobParser } from "@/api/file.ts";
 import { useSelector } from "react-redux";
-import { getModelFromId, isHighContextModel } from "@/conf/model.ts";
+import {
+  getModelFromId,
+  isHighContextModel,
+  supportsImageUpload,
+} from "@/conf/model.ts";
 import { selectModel, selectSupportModels } from "@/store/chat.ts";
 import { ChatAction } from "@/components/home/assemblies/ChatAction.tsx";
 import { blobEvent } from "@/events/blob.ts";
@@ -93,15 +96,50 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
   } as FileTaskState);
 
   const supportModels = useSelector(selectSupportModels);
+  const currentModelInfo = useMemo(
+    () =>
+      getModelFromId(supportModels, model) ?? {
+        id: model,
+        ocr_model: false,
+        vision_model: false,
+        reverse_model: false,
+      },
+    [supportModels, model],
+  );
+  const canUploadImage = supportsImageUpload(currentModelInfo);
 
   useEffect(() => {
     blobEvent.bind(async (file: File | File[]) => {
+      if (!canUploadImage) {
+        toast.info(t("file.vision-model-required"));
+        return;
+      }
       setOpen?.(true);
       await triggerFile(Array.isArray(file) ? file : [file]);
     });
-  }, []);
+  }, [canUploadImage, t]);
+
+  useEffect(() => {
+    if (canUploadImage) return;
+
+    if (open) {
+      setOpen(false);
+    }
+
+    if (files.length > 0) {
+      dispatch({ type: "clear" });
+      toast.info(t("file.files-cleared-on-model-switch"), {
+        description: t("file.vision-model-required"),
+      });
+    }
+  }, [canUploadImage, open, files.length, dispatch, t]);
 
   const triggerFile = async (files: (File | null)[]) => {
+    if (!canUploadImage) {
+      toast.info(t("file.vision-model-required"));
+      return;
+    }
+
     setLoading(true);
     for (const file of files) {
       if (!file) continue;
@@ -118,15 +156,9 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
           payload: { id, file, progress: 0 },
         });
 
-        const info = getModelFromId(supportModels, model);
         const task = quickBlobParser(
           file,
-          info ?? {
-            id: model,
-            ocr_model: false,
-            vision_model: false,
-            reverse_model: false,
-          },
+          currentModelInfo,
           (progress) => {
             console.debug(
               `[parser] task ${id} progress: ${progress.toFixed(2)}%`,
@@ -190,12 +222,31 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <ChatAction text={t("file.file")} active={files.length}>
-          <Paperclip className={`h-4 w-4`} />
-        </ChatAction>
-      </DialogTrigger>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!canUploadImage && next) {
+          toast.info(t("file.vision-model-required"));
+          return;
+        }
+        setOpen(next);
+      }}
+    >
+      <ChatAction
+        text={canUploadImage ? t("file.file") : t("file.vision-model-required")}
+        active={files.length}
+        className={!canUploadImage ? "opacity-50" : undefined}
+        disabled={!canUploadImage}
+        onClick={() => {
+          if (!canUploadImage) {
+            toast.info(t("file.vision-model-required"));
+            return;
+          }
+          setOpen(true);
+        }}
+      >
+        <Paperclip className={`h-4 w-4`} />
+      </ChatAction>
       <DialogContent className={`file-dialog flex-dialog`}>
         <DialogHeader>
           <DialogTitle className="flex flex-row items-center">

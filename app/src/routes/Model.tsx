@@ -43,6 +43,7 @@ import { goAuth } from "@/utils/app.ts";
 import { cn } from "@/components/ui/lib/utils.ts";
 import { includingModelFromPlan } from "@/conf/subscription.tsx";
 import { subscriptionDataSelector } from "@/store/globals.ts";
+import { getResolvedModelTags } from "@/conf/model.ts";
 import {
   ChargeBaseProps,
   nonBilling,
@@ -90,15 +91,7 @@ type SearchBarProps = {
 };
 
 function getTags(model: Model): string[] {
-  let raw = model.tag || [];
-
-  if (model.free && !raw.includes("free")) raw = ["free", ...raw];
-  if (!model.free && raw.includes("free"))
-    raw = raw.filter((tag) => tag !== "free");
-  if (model.high_context && !raw.includes("high-context"))
-    raw = ["high-context", ...raw];
-
-  return raw;
+  return getResolvedModelTags(model);
 }
 
 function SearchBar({
@@ -119,7 +112,7 @@ function SearchBar({
       marketTags.filter((tag) =>
         supportModels.some((model) => getTags(model).includes(tag)),
       ),
-    [],
+    [supportModels],
   );
 
   return (

@@ -351,7 +351,8 @@
     "uploading": "File upload on the way...",
     "uploading-prompt": "Uploading image, please be patient",
     "image-only": "Only image uploads are supported",
-    "vision-model-required": "The current model does not support image recognition"
+    "vision-model-required": "The current model does not support image recognition",
+    "files-cleared-on-model-switch": "After the model switch, the image to be sent has been automatically cleared"
   },
   "generate": {
     "title": "AI Project Generator",

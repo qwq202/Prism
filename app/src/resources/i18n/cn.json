@@ -571,7 +571,8 @@
     "empty-file": "无内容文件",
     "empty-file-prompt": "文件内容为空，已自动忽略",
     "image-only": "当前仅支持上传图片",
-    "vision-model-required": "当前模型不支持图像识别"
+    "vision-model-required": "当前模型不支持图像识别",
+    "files-cleared-on-model-switch": "模型切换后，待发送图片已自动清空"
   },
   "generate": {
     "title": "AI 项目生成器",
