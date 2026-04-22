@@ -5,9 +5,12 @@ import (
 	"chat/globals"
 	"chat/utils"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 )
+
+var visibleThinkBlockPattern = regexp.MustCompile(`(?s)<think>\s*.*?\s*</think>\s*`)
 
 func isGeminiAdapterRequest(channelType string, model string) bool {
 	return channelType == globals.PalmChannelType && globals.IsGeminiModel(model)
@@ -33,6 +36,43 @@ func stripHiddenMetadata(messages []globals.Message, stripGemini bool, stripClau
 
 		if stripClaude && message.ClaudeHiddenMetadata != nil {
 			sanitized[idx].ClaudeHiddenMetadata = nil
+			changed = true
+		}
+	}
+
+	if !changed {
+		return messages, false
+	}
+
+	return sanitized, true
+}
+
+func stripVisibleThinkingReplay(messages []globals.Message, allowReasoningReplay bool) ([]globals.Message, bool) {
+	if allowReasoningReplay {
+		return messages, false
+	}
+
+	sanitized := make([]globals.Message, len(messages))
+	changed := false
+
+	for idx, message := range messages {
+		sanitized[idx] = message
+
+		if message.Role != globals.Assistant {
+			continue
+		}
+
+		content := strings.TrimSpace(message.Content)
+		if strings.Contains(content, "<think>") || strings.Contains(content, "</think>") {
+			cleaned := strings.TrimSpace(visibleThinkBlockPattern.ReplaceAllString(message.Content, ""))
+			if cleaned != message.Content {
+				sanitized[idx].Content = cleaned
+				changed = true
+			}
+		}
+
+		if message.ReasoningContent != nil {
+			sanitized[idx].ReasoningContent = nil
 			changed = true
 		}
 	}
@@ -141,6 +181,7 @@ func sanitizeChatMessagesForRequest(conf globals.ChannelConfig, props *adapterco
 	reflectedModel := conf.GetModelReflect(originalModel)
 	stripGemini := !isGeminiAdapterRequest(conf.GetType(), reflectedModel)
 	stripClaude := !isAnthropicAdapterRequest(conf.GetType())
+	allowReasoningReplay := isAnthropicAdapterRequest(conf.GetType()) || strings.TrimSpace(reflectedModel) == globals.DeepseekR1
 
 	sanitized := props.Message
 	changed := false
@@ -150,6 +191,10 @@ func sanitizeChatMessagesForRequest(conf globals.ChannelConfig, props *adapterco
 		sanitized = next
 		changed = changed || metadataChanged
 	}
+
+	next, reasoningChanged := stripVisibleThinkingReplay(sanitized, allowReasoningReplay)
+	sanitized = next
+	changed = changed || reasoningChanged
 
 	next, toolChanged := stripOrphanedToolCalls(sanitized)
 	sanitized = next
