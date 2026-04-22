@@ -44,6 +44,90 @@ func stripHiddenMetadata(messages []globals.Message, stripGemini bool, stripClau
 	return sanitized, true
 }
 
+func stripOrphanedToolCalls(messages []globals.Message) ([]globals.Message, bool) {
+	sanitized := make([]globals.Message, 0, len(messages))
+	changed := false
+
+	for index := 0; index < len(messages); {
+		message := messages[index]
+
+		if message.Role == globals.Assistant && message.ToolCalls != nil && len(*message.ToolCalls) > 0 {
+			expected := make(map[string]struct{}, len(*message.ToolCalls))
+			for _, call := range *message.ToolCalls {
+				if id := strings.TrimSpace(call.Id); id != "" {
+					expected[id] = struct{}{}
+				}
+			}
+
+			next := index + 1
+			matched := make(map[string]struct{}, len(expected))
+			for next < len(messages) && messages[next].Role == globals.Tool {
+				if messages[next].ToolCallId != nil {
+					if id := strings.TrimSpace(*messages[next].ToolCallId); id != "" {
+						if _, ok := expected[id]; ok {
+							matched[id] = struct{}{}
+						}
+					}
+				}
+				next++
+			}
+
+			if len(expected) > 0 && len(matched) == len(expected) {
+				sanitized = append(sanitized, message)
+				sanitized = append(sanitized, messages[index+1:next]...)
+				index = next
+				continue
+			}
+
+			callSummary := make([]string, 0, len(*message.ToolCalls))
+			for _, call := range *message.ToolCalls {
+				callSummary = append(callSummary, fmt.Sprintf("%s:%s", call.Id, call.Function.Name))
+			}
+
+			globals.Debug(fmt.Sprintf(
+				"[adapter] stripping orphaned assistant tool calls at index=%d calls=%v content_len=%d matched=%d expected=%d",
+				index,
+				callSummary,
+				len(strings.TrimSpace(message.Content)),
+				len(matched),
+				len(expected),
+			))
+
+			if strings.TrimSpace(message.Content) != "" || message.FunctionCall != nil ||
+				message.ReasoningContent != nil || message.GeminiHiddenMetadata != nil ||
+				message.ClaudeHiddenMetadata != nil {
+				cleaned := message
+				cleaned.ToolCalls = nil
+				sanitized = append(sanitized, cleaned)
+			}
+
+			changed = true
+			index = next
+			continue
+		}
+
+		if message.Role == globals.Tool {
+			changed = true
+			globals.Debug(fmt.Sprintf(
+				"[adapter] dropping orphaned tool message at index=%d tool_call_id=%s",
+				index,
+				utils.ToString(message.ToolCallId),
+			))
+			index++
+			continue
+		}
+
+		sanitized = append(sanitized, message)
+		index++
+	}
+
+	if !changed {
+		return messages, false
+	}
+
+	return sanitized, true
+}
+
 func sanitizeChatMessagesForRequest(conf globals.ChannelConfig, props *adaptercommon.ChatProps) func() {
 	if props == nil || len(props.Message) == 0 {
 		return func() {}
@@ -57,11 +141,20 @@ func sanitizeChatMessagesForRequest(conf globals.ChannelConfig, props *adapterco
 	reflectedModel := conf.GetModelReflect(originalModel)
 	stripGemini := !isGeminiAdapterRequest(conf.GetType(), reflectedModel)
 	stripClaude := !isAnthropicAdapterRequest(conf.GetType())
-	if !stripGemini && !stripClaude {
-		return func() {}
+
+	sanitized := props.Message
+	changed := false
+
+	if stripGemini || stripClaude {
+		next, metadataChanged := stripHiddenMetadata(sanitized, stripGemini, stripClaude)
+		sanitized = next
+		changed = changed || metadataChanged
 	}
 
-	sanitized, changed := stripHiddenMetadata(props.Message, stripGemini, stripClaude)
+	next, toolChanged := stripOrphanedToolCalls(sanitized)
+	sanitized = next
+	changed = changed || toolChanged
+
 	if !changed {
 		return func() {}
 	}

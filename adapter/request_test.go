@@ -3,6 +3,7 @@ package adapter
 import (
 	adaptercommon "chat/adapter/common"
 	"chat/globals"
+	"chat/utils"
 	"strings"
 	"testing"
 )
@@ -232,5 +233,146 @@ func TestClearMessagesKeepsBase64ForConfiguredVisionModel(t *testing.T) {
 	cleared := ClearMessages("custom-vision-model", messages)
 	if cleared[0].Content != messages[0].Content {
 		t.Fatalf("expected configured vision model to preserve base64 image content")
+	}
+}
+
+func TestSanitizeChatMessagesForRequestStripsOrphanedToolCallsButKeepsAssistantText(t *testing.T) {
+	toolCalls := globals.ToolCalls{
+		{
+			Type: "function",
+			Id:   "call_memory_1",
+			Function: globals.ToolCallFunction{
+				Name:      "memory_tool",
+				Arguments: "{\"action\":\"create\"}",
+			},
+		},
+	}
+
+	props := &adaptercommon.ChatProps{
+		OriginalModel: "deepseek-chat",
+		Message: []globals.Message{
+			{Role: globals.User, Content: "你记一下"},
+			{
+				Role:      globals.Assistant,
+				Content:   "已经帮你记录好了。",
+				ToolCalls: &toolCalls,
+			},
+			{Role: globals.User, Content: "删除所有的"},
+		},
+	}
+
+	restore := sanitizeChatMessagesForRequest(requestTestChannelConfig{
+		channelType:    globals.DeepseekChannelType,
+		reflectedModel: "deepseek-chat",
+	}, props)
+
+	if got := len(props.Message); got != 3 {
+		t.Fatalf("expected orphaned tool call cleanup to preserve message count, got %d", got)
+	}
+
+	if props.Message[1].ToolCalls != nil {
+		t.Fatalf("expected orphaned tool_calls to be stripped, got %#v", props.Message[1].ToolCalls)
+	}
+
+	if props.Message[1].Content != "已经帮你记录好了。" {
+		t.Fatalf("expected visible assistant text to remain, got %q", props.Message[1].Content)
+	}
+
+	restore()
+	if props.Message[1].ToolCalls == nil || len(*props.Message[1].ToolCalls) != 1 {
+		t.Fatalf("expected original orphaned tool_calls to be restored after request")
+	}
+}
+
+func TestSanitizeChatMessagesForRequestKeepsMatchedToolCalls(t *testing.T) {
+	toolCalls := globals.ToolCalls{
+		{
+			Type: "function",
+			Id:   "call_memory_1",
+			Function: globals.ToolCallFunction{
+				Name:      "memory_tool",
+				Arguments: "{\"action\":\"create\"}",
+			},
+		},
+	}
+
+	props := &adaptercommon.ChatProps{
+		OriginalModel: "deepseek-chat",
+		Message: []globals.Message{
+			{Role: globals.User, Content: "你记一下"},
+			{
+				Role:      globals.Assistant,
+				Content:   "",
+				ToolCalls: &toolCalls,
+			},
+			{
+				Role:       globals.Tool,
+				Content:    "{\"status\":\"success\"}",
+				ToolCallId: utils.ToPtr("call_memory_1"),
+			},
+			{Role: globals.Assistant, Content: "已经帮你记录好了。"},
+		},
+	}
+
+	restore := sanitizeChatMessagesForRequest(requestTestChannelConfig{
+		channelType:    globals.DeepseekChannelType,
+		reflectedModel: "deepseek-chat",
+	}, props)
+
+	if props.Message[1].ToolCalls == nil || len(*props.Message[1].ToolCalls) != 1 {
+		t.Fatalf("expected matched tool_calls to be preserved, got %#v", props.Message[1].ToolCalls)
+	}
+
+	if props.Message[2].Role != globals.Tool || props.Message[2].ToolCallId == nil || *props.Message[2].ToolCallId != "call_memory_1" {
+		t.Fatalf("expected matching tool response to be preserved, got %#v", props.Message[2])
+	}
+
+	restore()
+	if props.Message[1].ToolCalls == nil || len(*props.Message[1].ToolCalls) != 1 {
+		t.Fatalf("expected matched tool_calls to remain after restore")
+	}
+}
+
+func TestSanitizeChatMessagesForRequestDropsToolOnlyAssistantWithoutToolReply(t *testing.T) {
+	toolCalls := globals.ToolCalls{
+		{
+			Type: "function",
+			Id:   "call_lookup_1",
+			Function: globals.ToolCallFunction{
+				Name:      "lookup_weather",
+				Arguments: "{\"city\":\"Shanghai\"}",
+			},
+		},
+	}
+
+	props := &adaptercommon.ChatProps{
+		OriginalModel: "gpt-4o",
+		Message: []globals.Message{
+			{Role: globals.User, Content: "查天气"},
+			{
+				Role:      globals.Assistant,
+				Content:   "",
+				ToolCalls: &toolCalls,
+			},
+			{Role: globals.User, Content: "继续"},
+		},
+	}
+
+	restore := sanitizeChatMessagesForRequest(requestTestChannelConfig{
+		channelType:    globals.OpenAIChannelType,
+		reflectedModel: "gpt-4o",
+	}, props)
+
+	if got := len(props.Message); got != 2 {
+		t.Fatalf("expected tool-only orphaned assistant message to be removed, got %d messages", got)
+	}
+
+	if props.Message[1].Role != globals.User || props.Message[1].Content != "继续" {
+		t.Fatalf("expected subsequent user message to remain after stripping orphaned tool call, got %#v", props.Message[1])
+	}
+
+	restore()
+	if got := len(props.Message); got != 3 {
+		t.Fatalf("expected original message history to be restored, got %d", got)
 	}
 }

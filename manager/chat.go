@@ -551,11 +551,6 @@ func createMemoryToolChatTask(
 			summarizeToolCalls(assistant.ToolCalls),
 		))
 
-		// Keep memory tool calls attached to the final visible assistant reply
-		// so the UI can continue showing what happened after the tool round
-		// completes and the model returns a follow-up answer.
-		liveBuffer.AddToolCalls(assistant.ToolCalls)
-
 		if err := sendToolCallEvents(conn, assistant.ToolCalls, "executing", liveBuffer.GetQuota(), plan); err != nil {
 			return hit, err, true
 		}
