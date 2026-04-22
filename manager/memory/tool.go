@@ -7,6 +7,7 @@ import (
 	"chat/utils"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -116,6 +117,15 @@ func containsSensitiveContent(content string) bool {
 	return false
 }
 
+func summarizeToolArguments(arguments string) string {
+	arguments = strings.TrimSpace(arguments)
+	if len(arguments) <= 240 {
+		return arguments
+	}
+
+	return arguments[:240] + "..."
+}
+
 func toolResultMessage(callID string, result ToolResult) globals.Message {
 	return globals.Message{
 		Role:       globals.Tool,
@@ -140,8 +150,20 @@ func executeToolCall(db *sql.DB, user *auth.User, call globals.ToolCall) globals
 		return toolResultMessage(call.Id, result)
 	}
 
+	globals.Debug(fmt.Sprintf(
+		"[memory] received tool call %s args=%s",
+		call.Id,
+		summarizeToolArguments(call.Function.Arguments),
+	))
+
 	var input ToolInput
 	if _, err := utils.UnmarshalString[ToolInput](call.Function.Arguments); err != nil {
+		globals.Warn(fmt.Sprintf(
+			"[memory] invalid tool arguments for call %s: %s (raw=%s)",
+			call.Id,
+			err.Error(),
+			summarizeToolArguments(call.Function.Arguments),
+		))
 		result.Error = "invalid tool arguments"
 		return toolResultMessage(call.Id, result)
 	}
@@ -152,7 +174,22 @@ func executeToolCall(db *sql.DB, user *auth.User, call globals.ToolCall) globals
 	input.Reason = strings.TrimSpace(input.Reason)
 	result.Action = input.Action
 
+	globals.Debug(fmt.Sprintf(
+		"[memory] parsed tool call %s action=%s memory_id=%v category=%s content_len=%d reason_len=%d",
+		call.Id,
+		input.Action,
+		input.MemoryID != nil,
+		input.Category,
+		len(input.Content),
+		len(input.Reason),
+	))
+
 	if input.Reason == "" {
+		globals.Warn(fmt.Sprintf(
+			"[memory] missing reason for call %s after parsing (raw=%s)",
+			call.Id,
+			summarizeToolArguments(call.Function.Arguments),
+		))
 		result.Error = "reason is required"
 		return toolResultMessage(call.Id, result)
 	}
@@ -170,6 +207,7 @@ func executeToolCall(db *sql.DB, user *auth.User, call globals.ToolCall) globals
 		}
 
 		if duplicate, err := FindDuplicate(db, userID, input.Content); err == nil && duplicate != nil {
+			globals.Debug(fmt.Sprintf("[memory] duplicate memory hit for call %s memory_id=%d", call.Id, duplicate.ID))
 			result.Status = "success"
 			result.MemoryID = &duplicate.ID
 			result.Message = "memory already exists"
@@ -178,10 +216,12 @@ func executeToolCall(db *sql.DB, user *auth.User, call globals.ToolCall) globals
 
 		record, err := Create(db, userID, input.Content, SourceToolAuto, input.Category)
 		if err != nil {
+			globals.Warn(fmt.Sprintf("[memory] create failed for call %s: %s", call.Id, err.Error()))
 			result.Error = err.Error()
 			return toolResultMessage(call.Id, result)
 		}
 
+		globals.Debug(fmt.Sprintf("[memory] created memory %d for call %s", record.ID, call.Id))
 		result.Status = "success"
 		result.MemoryID = &record.ID
 		result.Message = "memory created"
@@ -202,10 +242,12 @@ func executeToolCall(db *sql.DB, user *auth.User, call globals.ToolCall) globals
 
 		record, err := Update(db, userID, *input.MemoryID, input.Content, input.Category)
 		if err != nil {
+			globals.Warn(fmt.Sprintf("[memory] update failed for call %s memory_id=%d: %s", call.Id, *input.MemoryID, err.Error()))
 			result.Error = err.Error()
 			return toolResultMessage(call.Id, result)
 		}
 
+		globals.Debug(fmt.Sprintf("[memory] updated memory %d for call %s", record.ID, call.Id))
 		result.Status = "success"
 		result.MemoryID = &record.ID
 		result.Message = "memory updated"
@@ -219,22 +261,27 @@ func executeToolCall(db *sql.DB, user *auth.User, call globals.ToolCall) globals
 		record, err := FindByID(db, userID, *input.MemoryID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
+				globals.Warn(fmt.Sprintf("[memory] delete target missing for call %s memory_id=%d", call.Id, *input.MemoryID))
 				result.Error = "memory not found"
 				return toolResultMessage(call.Id, result)
 			}
+			globals.Warn(fmt.Sprintf("[memory] lookup before delete failed for call %s memory_id=%d: %s", call.Id, *input.MemoryID, err.Error()))
 			result.Error = err.Error()
 			return toolResultMessage(call.Id, result)
 		}
 		if record.Pinned {
+			globals.Warn(fmt.Sprintf("[memory] refused deleting pinned memory %d for call %s", record.ID, call.Id))
 			result.Error = "pinned memory cannot be deleted"
 			return toolResultMessage(call.Id, result)
 		}
 
 		if err := Delete(db, userID, *input.MemoryID); err != nil {
+			globals.Warn(fmt.Sprintf("[memory] delete failed for call %s memory_id=%d: %s", call.Id, *input.MemoryID, err.Error()))
 			result.Error = err.Error()
 			return toolResultMessage(call.Id, result)
 		}
 
+		globals.Debug(fmt.Sprintf("[memory] deleted memory %d for call %s", *input.MemoryID, call.Id))
 		result.Status = "success"
 		result.MemoryID = input.MemoryID
 		result.Message = "memory deleted"

@@ -27,6 +27,33 @@ import (
 const defaultMessage = "empty response"
 const interruptMessage = "interrupted"
 
+func summarizeToolCallArguments(arguments string) string {
+	arguments = strings.TrimSpace(arguments)
+	if len(arguments) <= 240 {
+		return arguments
+	}
+
+	return arguments[:240] + "..."
+}
+
+func summarizeToolCalls(calls *globals.ToolCalls) string {
+	if calls == nil || len(*calls) == 0 {
+		return "[]"
+	}
+
+	items := make([]string, 0, len(*calls))
+	for _, call := range *calls {
+		items = append(items, fmt.Sprintf(
+			"{id:%s name:%s args:%s}",
+			call.Id,
+			call.Function.Name,
+			summarizeToolCallArguments(call.Function.Arguments),
+		))
+	}
+
+	return "[" + strings.Join(items, ", ") + "]"
+}
+
 func CollectQuota(c *gin.Context, user *auth.User, buffer *utils.Buffer, uncountable bool, err error) {
 	db := utils.GetDBFromContext(c)
 	quota := buffer.GetQuota()
@@ -343,7 +370,23 @@ func createMemoryToolChatTask(
 			return hit, nil, false
 		}
 
+		globals.Debug(fmt.Sprintf(
+			"[memory] round %d received tool calls for model %s: %s",
+			round+1,
+			model,
+			summarizeToolCalls(assistant.ToolCalls),
+		))
+
 		toolMessages := memory.ExecuteToolCalls(db, user, assistant.ToolCalls)
+		for _, toolMessage := range toolMessages {
+			globals.Debug(fmt.Sprintf(
+				"[memory] round %d tool result for model %s tool_call_id=%s payload=%s",
+				round+1,
+				model,
+				utils.ToString(toolMessage.ToolCallId),
+				toolMessage.Content,
+			))
+		}
 		workingSegment = append(workingSegment, assistant)
 		workingSegment = append(workingSegment, toolMessages...)
 
@@ -356,6 +399,11 @@ func createMemoryToolChatTask(
 			}
 		}
 	}
+
+	globals.Warn(fmt.Sprintf(
+		"[memory] exceeded max tool rounds for model %s without final answer",
+		model,
+	))
 
 	return hit, nil, false
 }
@@ -620,10 +668,12 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 	var hit bool
 	var err error
 	var interrupted bool
+	writableMemory := false
 	if globals.IsVideoModel(model) {
 		hit, err, interrupted = createChatTask(conn, user, buffer, db, cache, model, instance, segment, plan)
 	} else {
 		memCtx := buildMemoryContext(db, user, instance, model, group)
+		writableMemory = memCtx.Writable
 		if memCtx.Writable {
 			hit, err, interrupted = createMemoryToolChatTask(conn, user, buffer, db, cache, model, group, instance, segment, plan, memCtx)
 		} else {
@@ -668,6 +718,12 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 	}
 
 	if buffer.IsEmpty() {
+		globals.Warn(fmt.Sprintf(
+			"[chat] empty response for model %s (interrupted=%v, writable_memory=%v)",
+			model,
+			interrupted,
+			writableMemory,
+		))
 		if buffer.HasHiddenMetadataOnly() {
 			conn.Send(globals.ChatSegmentResponse{
 				End: true,
