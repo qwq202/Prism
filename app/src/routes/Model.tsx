@@ -77,7 +77,7 @@ const tagIcons: { [key: string]: React.ReactNode } = {
   free: <Zap />,
 };
 
-const notDisplayTags = ["official", "fast", "unstable", "free"];
+const notDisplayTags = ["fast", "unstable", "free"];
 
 type SearchBarProps = {
   text: string;

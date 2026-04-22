@@ -67,7 +67,7 @@ const tagIcons: { [key: string]: React.ReactNode } = {
   free: <Zap />,
 };
 
-const notDisplayTags = ["official", "fast", "unstable", "free"];
+const notDisplayTags = ["fast", "unstable", "free"];
 
 function GetModel(models: Model[], name: string): Model {
   return models.find((model) => model.id === name) as Model;
