@@ -16,6 +16,7 @@ type Message struct {
 	ToolCalls            *globals.ToolCalls            `json:"tool_calls,omitempty"`    // only `assistant` role
 	ReasoningContent     *string                       `json:"reasoning_content,omitempty"`
 	GeminiHiddenMetadata *globals.GeminiHiddenMetadata `json:"gemini_hidden_metadata,omitempty"` // hidden gemini metadata for replay
+	ClaudeHiddenMetadata *globals.ClaudeHiddenMetadata `json:"claude_hidden_metadata,omitempty"` // hidden claude metadata for replay
 }
 
 type ImageUrl struct {
@@ -72,6 +73,7 @@ type StreamMessage struct {
 	ToolCalls            *globals.ToolCalls            `json:"tool_calls,omitempty"`    // only `assistant` role
 	ReasoningContent     *string                       `json:"reasoning_content,omitempty"`
 	GeminiHiddenMetadata *globals.GeminiHiddenMetadata `json:"gemini_hidden_metadata,omitempty"` // hidden gemini metadata for replay
+	ClaudeHiddenMetadata *globals.ClaudeHiddenMetadata `json:"claude_hidden_metadata,omitempty"` // hidden claude metadata for replay
 }
 
 type Usage struct {
@@ -189,6 +191,10 @@ func sanitizeGeminiHiddenMetadata(metadata *globals.GeminiHiddenMetadata) *globa
 	return metadata.Normalized(globals.GeminiThoughtSignatureLimit)
 }
 
+func sanitizeClaudeHiddenMetadata(metadata *globals.ClaudeHiddenMetadata) *globals.ClaudeHiddenMetadata {
+	return metadata.Normalized(globals.ClaudeThinkingBlockLimit)
+}
+
 func transform(m []Message) []globals.Message {
 	var messages []globals.Message
 	for _, v := range m {
@@ -202,6 +208,7 @@ func transform(m []Message) []globals.Message {
 			ToolCalls:            v.ToolCalls,
 			ReasoningContent:     v.ReasoningContent,
 			GeminiHiddenMetadata: sanitizeGeminiHiddenMetadata(v.GeminiHiddenMetadata),
+			ClaudeHiddenMetadata: sanitizeClaudeHiddenMetadata(v.ClaudeHiddenMetadata),
 		})
 	}
 	return messages

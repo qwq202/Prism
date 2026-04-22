@@ -178,14 +178,15 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
     endpoint: "https://api.anthropic.com",
     format: "<x-api-key>",
     description:
-      "> Anthropic Claude 密钥即为 **x-api-key**，Anthropic 对请求 IP 地域有限制，可能出现 **Request not allowed** 的错误，请尝试更换 IP 或者使用代理。\n",
+      "> Anthropic Claude 密钥即为 **x-api-key**，接入点填写 *https://api.anthropic.com* 或其反代地址，系统会请求官方 *`/v1/messages`* 接口。 \n" +
+      "> 系统现已适配新版 **Messages API** 的 **tools / tool_choice / thinking** 与完整 **SSE content block** 流式事件，可用于 Claude 原生工具调用与 extended thinking。 \n" +
+      "> 如果同时开启工具调用与 thinking，系统会按官方要求自动启用 **interleaved thinking** beta 头。Anthropic 对请求 IP 地域有限制，可能出现 **Request not allowed** 的错误，请尝试更换 IP 或者使用代理。\n",
     models: [
-      "claude-instant-1.2",
-      "claude-2",
-      "claude-2.1",
-      "claude-3-opus-20240229",
-      "claude-3-sonnet-20240229",
-      "claude-3-haiku-20240307",
+      "claude-opus-4-1-20250805",
+      "claude-opus-4-20250514",
+      "claude-sonnet-4-20250514",
+      "claude-3-7-sonnet-20250219",
+      "claude-3-5-haiku-20241022",
     ],
   },
   "glm-coding-plan-cn": {

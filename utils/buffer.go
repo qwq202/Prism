@@ -32,6 +32,7 @@ type Buffer struct {
 	FunctionCall         *globals.FunctionCall         `json:"function_call"`
 	ReasoningContent     string                        `json:"reasoning_content,omitempty"`
 	GeminiHiddenMetadata *globals.GeminiHiddenMetadata `json:"gemini_hidden_metadata,omitempty"`
+	ClaudeHiddenMetadata *globals.ClaudeHiddenMetadata `json:"claude_hidden_metadata,omitempty"`
 	StartTime            *time.Time                    `json:"-"`
 	Prompts              string                        `json:"prompts"`
 	TokenName            string                        `json:"-"`
@@ -116,6 +117,7 @@ func (b *Buffer) WriteChunk(data *globals.Chunk) string {
 	b.SetFunctionCall(data.FunctionCall)
 	b.AddReasoningContent(data.ReasoningContent)
 	b.SetGeminiHiddenMetadata(data.GeminiHiddenMetadata)
+	b.SetClaudeHiddenMetadata(data.ClaudeHiddenMetadata)
 
 	return data.Content
 }
@@ -235,6 +237,10 @@ func cloneGeminiHiddenMetadata(metadata *globals.GeminiHiddenMetadata) *globals.
 	return metadata.Normalized(globals.GeminiThoughtSignatureLimit)
 }
 
+func cloneClaudeHiddenMetadata(metadata *globals.ClaudeHiddenMetadata) *globals.ClaudeHiddenMetadata {
+	return metadata.Normalized(globals.ClaudeThinkingBlockLimit)
+}
+
 func (b *Buffer) SetGeminiHiddenMetadata(metadata *globals.GeminiHiddenMetadata) {
 	b.GeminiHiddenMetadata = globals.MergeGeminiHiddenMetadata(
 		globals.GeminiThoughtSignatureLimit,
@@ -249,6 +255,22 @@ func (b *Buffer) GetGeminiHiddenMetadata() *globals.GeminiHiddenMetadata {
 
 func (b *Buffer) HasGeminiHiddenMetadata() bool {
 	return !b.GeminiHiddenMetadata.IsEmpty()
+}
+
+func (b *Buffer) SetClaudeHiddenMetadata(metadata *globals.ClaudeHiddenMetadata) {
+	b.ClaudeHiddenMetadata = globals.MergeClaudeHiddenMetadata(
+		globals.ClaudeThinkingBlockLimit,
+		b.ClaudeHiddenMetadata,
+		metadata,
+	)
+}
+
+func (b *Buffer) GetClaudeHiddenMetadata() *globals.ClaudeHiddenMetadata {
+	return cloneClaudeHiddenMetadata(b.ClaudeHiddenMetadata)
+}
+
+func (b *Buffer) HasClaudeHiddenMetadata() bool {
+	return !b.ClaudeHiddenMetadata.IsEmpty()
 }
 
 func (b *Buffer) GetToolCalls() *globals.ToolCalls {
@@ -273,7 +295,7 @@ func (b *Buffer) HasVisiblePayload() bool {
 }
 
 func (b *Buffer) HasHiddenMetadataOnly() bool {
-	return !b.HasVisiblePayload() && b.HasGeminiHiddenMetadata()
+	return !b.HasVisiblePayload() && (b.HasGeminiHiddenMetadata() || b.HasClaudeHiddenMetadata())
 }
 
 func (b *Buffer) IsEmpty() bool {

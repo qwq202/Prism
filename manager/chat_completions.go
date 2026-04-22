@@ -165,7 +165,8 @@ func sendTranshipmentResponse(c *gin.Context, form RelayForm, messages []globals
 	}
 
 	tools := buffer.GetToolCalls()
-	hiddenMetadata := buffer.GetGeminiHiddenMetadata()
+	geminiHiddenMetadata := buffer.GetGeminiHiddenMetadata()
+	claudeHiddenMetadata := buffer.GetClaudeHiddenMetadata()
 
 	c.JSON(http.StatusOK, RelayResponse{
 		Id:      fmt.Sprintf("chatcmpl-%s", id),
@@ -181,7 +182,8 @@ func sendTranshipmentResponse(c *gin.Context, form RelayForm, messages []globals
 					ToolCalls:            tools,
 					FunctionCall:         buffer.GetFunctionCall(),
 					ReasoningContent:     buffer.GetReasoningContent(),
-					GeminiHiddenMetadata: hiddenMetadata,
+					GeminiHiddenMetadata: geminiHiddenMetadata,
+					ClaudeHiddenMetadata: claudeHiddenMetadata,
 				},
 				FinishReason: utils.Multi(tools != nil, ReasonToolCalls, ReasonStop),
 			},
@@ -214,7 +216,8 @@ func getRole(data *globals.Chunk) string {
 		return globals.Tool
 	} else if data.FunctionCall != nil {
 		return globals.Function
-	} else if data.GeminiHiddenMetadata != nil && !data.GeminiHiddenMetadata.IsEmpty() {
+	} else if (data.GeminiHiddenMetadata != nil && !data.GeminiHiddenMetadata.IsEmpty()) ||
+		(data.ClaudeHiddenMetadata != nil && !data.ClaudeHiddenMetadata.IsEmpty()) {
 		return globals.Assistant
 	}
 
@@ -237,6 +240,7 @@ func getStreamTranshipmentForm(id string, created int64, form RelayForm, data *g
 					FunctionCall:         data.FunctionCall,
 					ReasoningContent:     data.ReasoningContent,
 					GeminiHiddenMetadata: data.GeminiHiddenMetadata,
+					ClaudeHiddenMetadata: data.ClaudeHiddenMetadata,
 				},
 				FinishReason: getFinishReason(buffer, end),
 			},

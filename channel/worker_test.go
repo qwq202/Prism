@@ -137,3 +137,35 @@ func TestCacheHashForChatPropsKeepsHiddenMetadataOnGemini(t *testing.T) {
 		t.Fatalf("expected gemini cache hash to retain hidden metadata sensitivity")
 	}
 }
+
+func TestCacheHashForChatPropsKeepsClaudeMetadataOnAnthropic(t *testing.T) {
+	plain := &adaptercommon.ChatProps{
+		OriginalModel: "claude-sonnet-4-20250514",
+		ChannelType:   globals.ClaudeChannelType,
+		Message: []globals.Message{
+			{Role: globals.User, Content: "hello"},
+			{Role: globals.Assistant, Content: "world"},
+		},
+	}
+
+	withMetadata := &adaptercommon.ChatProps{
+		OriginalModel: "claude-sonnet-4-20250514",
+		ChannelType:   globals.ClaudeChannelType,
+		Message: []globals.Message{
+			{Role: globals.User, Content: "hello"},
+			{
+				Role:    globals.Assistant,
+				Content: "<think>\nplan\n</think>\n\nworld",
+				ClaudeHiddenMetadata: &globals.ClaudeHiddenMetadata{
+					ThinkingBlocks: []globals.ClaudeThinkingBlock{
+						{Thinking: "plan", Signature: "sig-a"},
+					},
+				},
+			},
+		},
+	}
+
+	if got, want := cacheHashForChatProps(withMetadata), cacheHashForChatProps(plain); got == want {
+		t.Fatalf("expected anthropic cache hash to retain claude hidden metadata sensitivity")
+	}
+}

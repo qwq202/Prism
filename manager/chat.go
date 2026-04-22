@@ -337,6 +337,7 @@ func createMemoryToolChatTask(
 				}
 			}
 			liveBuffer.SetGeminiHiddenMetadata(roundBuffer.GetGeminiHiddenMetadata())
+			liveBuffer.SetClaudeHiddenMetadata(roundBuffer.GetClaudeHiddenMetadata())
 			return hit, nil, false
 		}
 
@@ -541,12 +542,14 @@ func createChatTask(
 
 func extractAssistantMessageFromBuffer(buffer *utils.Buffer, interrupted bool) globals.Message {
 	if buffer.IsEmpty() {
-		hiddenMetadata := buffer.GetGeminiHiddenMetadata()
+		geminiHiddenMetadata := buffer.GetGeminiHiddenMetadata()
+		claudeHiddenMetadata := buffer.GetClaudeHiddenMetadata()
 		if buffer.HasHiddenMetadataOnly() {
 			return globals.Message{
 				Role:                 globals.Assistant,
 				Content:              "",
-				GeminiHiddenMetadata: hiddenMetadata,
+				GeminiHiddenMetadata: geminiHiddenMetadata,
+				ClaudeHiddenMetadata: claudeHiddenMetadata,
 			}
 		}
 
@@ -560,6 +563,7 @@ func extractAssistantMessageFromBuffer(buffer *utils.Buffer, interrupted bool) g
 		Role:                 globals.Assistant,
 		Content:              buffer.ReadWithDefault(defaultMessage),
 		GeminiHiddenMetadata: buffer.GetGeminiHiddenMetadata(),
+		ClaudeHiddenMetadata: buffer.GetClaudeHiddenMetadata(),
 	}
 
 	// Interrupted streams may contain partial/incomplete tool payloads.

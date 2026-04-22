@@ -150,6 +150,37 @@ func TestSanitizeChatMessagesForRequestStripsPalmNonGeminiModel(t *testing.T) {
 	}
 }
 
+func TestSanitizeChatMessagesForRequestKeepsClaudeMetadataOnAnthropic(t *testing.T) {
+	props := &adaptercommon.ChatProps{
+		OriginalModel: "claude-sonnet-4-20250514",
+		Message: []globals.Message{
+			{
+				Role:    globals.Assistant,
+				Content: "<think>\nplan\n</think>\n\nAnswer",
+				ClaudeHiddenMetadata: &globals.ClaudeHiddenMetadata{
+					ThinkingBlocks: []globals.ClaudeThinkingBlock{
+						{Thinking: "plan", Signature: "sig-a"},
+					},
+				},
+			},
+		},
+	}
+
+	restore := sanitizeChatMessagesForRequest(requestTestChannelConfig{
+		channelType:    globals.ClaudeChannelType,
+		reflectedModel: "claude-sonnet-4-20250514",
+	}, props)
+
+	if props.Message[0].ClaudeHiddenMetadata == nil {
+		t.Fatalf("expected claude metadata to be preserved for anthropic requests")
+	}
+
+	restore()
+	if props.Message[0].ClaudeHiddenMetadata == nil {
+		t.Fatalf("expected claude metadata to remain after no-op restore")
+	}
+}
+
 func TestClearMessagesKeepsBase64ForConfiguredVisionModel(t *testing.T) {
 	originalResolver := globals.VisionModelResolver
 	globals.VisionModelResolver = func(model string) bool {

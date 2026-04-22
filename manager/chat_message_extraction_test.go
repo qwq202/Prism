@@ -99,6 +99,27 @@ func TestExtractAssistantMessageFromBufferMetadataOnlyResponse(t *testing.T) {
 	}
 }
 
+func TestExtractAssistantMessageFromBufferPreservesClaudeMetadata(t *testing.T) {
+	buffer := &utils.Buffer{}
+	buffer.WriteChunk(&globals.Chunk{
+		ClaudeHiddenMetadata: &globals.ClaudeHiddenMetadata{
+			ThinkingBlocks: []globals.ClaudeThinkingBlock{
+				{Thinking: "plan", Signature: "sig-claude"},
+			},
+		},
+	})
+
+	message := extractAssistantMessageFromBuffer(buffer, false)
+
+	if message.Content != "" {
+		t.Fatalf("expected claude metadata-only response to keep empty content, got %q", message.Content)
+	}
+
+	if message.ClaudeHiddenMetadata == nil || len(message.ClaudeHiddenMetadata.ThinkingBlocks) != 1 {
+		t.Fatalf("expected claude hidden metadata to be preserved, got %#v", message.ClaudeHiddenMetadata)
+	}
+}
+
 func TestExtractAssistantMessageFromBufferInterruptedDropsFunctionPayloads(t *testing.T) {
 	buffer := &utils.Buffer{}
 	toolCalls := globals.ToolCalls{

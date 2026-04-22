@@ -13,19 +13,26 @@ func isGeminiAdapterRequest(channelType string, model string) bool {
 	return channelType == globals.PalmChannelType && globals.IsGeminiModel(model)
 }
 
-func stripGeminiHiddenMetadata(messages []globals.Message) ([]globals.Message, bool) {
+func isAnthropicAdapterRequest(channelType string) bool {
+	return channelType == globals.ClaudeChannelType || channelType == globals.GLMCodingPlanCNChannelType
+}
+
+func stripHiddenMetadata(messages []globals.Message, stripGemini bool, stripClaude bool) ([]globals.Message, bool) {
 	sanitized := make([]globals.Message, len(messages))
 	changed := false
 
 	for idx, message := range messages {
 		sanitized[idx] = message
 
-		if message.GeminiHiddenMetadata == nil {
-			continue
+		if stripGemini && message.GeminiHiddenMetadata != nil {
+			sanitized[idx].GeminiHiddenMetadata = nil
+			changed = true
 		}
 
-		sanitized[idx].GeminiHiddenMetadata = nil
-		changed = true
+		if stripClaude && message.ClaudeHiddenMetadata != nil {
+			sanitized[idx].ClaudeHiddenMetadata = nil
+			changed = true
+		}
 	}
 
 	if !changed {
@@ -46,11 +53,13 @@ func sanitizeChatMessagesForRequest(conf globals.ChannelConfig, props *adapterco
 	}
 
 	reflectedModel := conf.GetModelReflect(originalModel)
-	if isGeminiAdapterRequest(conf.GetType(), reflectedModel) {
+	stripGemini := !isGeminiAdapterRequest(conf.GetType(), reflectedModel)
+	stripClaude := !isAnthropicAdapterRequest(conf.GetType())
+	if !stripGemini && !stripClaude {
 		return func() {}
 	}
 
-	sanitized, changed := stripGeminiHiddenMetadata(props.Message)
+	sanitized, changed := stripHiddenMetadata(props.Message, stripGemini, stripClaude)
 	if !changed {
 		return func() {}
 	}

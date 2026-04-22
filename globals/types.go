@@ -5,12 +5,24 @@ import "encoding/json"
 type Hook func(data *Chunk) error
 
 const (
-	GeminiThoughtSignatureLimit    = 32
-	GeminiThoughtSignatureMaxBytes = 4096
+	GeminiThoughtSignatureLimit     = 32
+	GeminiThoughtSignatureMaxBytes  = 4096
+	ClaudeThinkingBlockLimit        = 32
+	ClaudeThinkingTextMaxBytes      = 32768
+	ClaudeThinkingSignatureMaxBytes = 4096
 )
 
 type GeminiHiddenMetadata struct {
 	ThoughtSignatures []string `json:"thought_signatures,omitempty"`
+}
+
+type ClaudeThinkingBlock struct {
+	Thinking  string `json:"thinking,omitempty"`
+	Signature string `json:"signature,omitempty"`
+}
+
+type ClaudeHiddenMetadata struct {
+	ThinkingBlocks []ClaudeThinkingBlock `json:"thinking_blocks,omitempty"`
 }
 
 func (m *GeminiHiddenMetadata) UnmarshalJSON(data []byte) error {
@@ -47,6 +59,7 @@ type Message struct {
 	ToolCalls            *ToolCalls            `json:"tool_calls,omitempty"`             // only `assistant` role
 	ReasoningContent     *string               `json:"reasoning_content,omitempty"`      // only for deepseek reasoner models
 	GeminiHiddenMetadata *GeminiHiddenMetadata `json:"gemini_hidden_metadata,omitempty"` // hidden gemini metadata for replay
+	ClaudeHiddenMetadata *ClaudeHiddenMetadata `json:"claude_hidden_metadata,omitempty"` // hidden claude thinking metadata for replay
 }
 
 type Chunk struct {
@@ -55,6 +68,7 @@ type Chunk struct {
 	FunctionCall         *FunctionCall         `json:"function_call,omitempty"`
 	ReasoningContent     *string               `json:"reasoning_content,omitempty"`
 	GeminiHiddenMetadata *GeminiHiddenMetadata `json:"gemini_hidden_metadata,omitempty"` // hidden gemini metadata for replay
+	ClaudeHiddenMetadata *ClaudeHiddenMetadata `json:"claude_hidden_metadata,omitempty"` // hidden claude thinking metadata for replay
 }
 
 type ChatSegmentResponse struct {

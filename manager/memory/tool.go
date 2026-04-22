@@ -11,10 +11,12 @@ import (
 )
 
 var writableToolChannelTypes = map[string]struct{}{
-	globals.OpenAIChannelType:      {},
-	globals.AzureOpenAIChannelType: {},
-	globals.PalmChannelType:        {},
-	globals.DeepseekChannelType:    {},
+	globals.OpenAIChannelType:          {},
+	globals.AzureOpenAIChannelType:     {},
+	globals.ClaudeChannelType:          {},
+	globals.GLMCodingPlanCNChannelType: {},
+	globals.PalmChannelType:            {},
+	globals.DeepseekChannelType:        {},
 }
 
 func BuildToolDefinition() *globals.FunctionTools {

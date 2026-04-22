@@ -23,7 +23,7 @@ func cacheModelForChatProps(props *adaptercommon.ChatProps) string {
 	return props.Model
 }
 
-func stripGeminiHiddenMetadataForCache(messages []globals.Message) []globals.Message {
+func stripHiddenMetadataForCache(messages []globals.Message, stripGemini bool, stripClaude bool) []globals.Message {
 	if len(messages) == 0 {
 		return messages
 	}
@@ -33,12 +33,15 @@ func stripGeminiHiddenMetadataForCache(messages []globals.Message) []globals.Mes
 
 	for idx, message := range messages {
 		sanitized[idx] = message
-		if message.GeminiHiddenMetadata == nil {
-			continue
+		if stripGemini && message.GeminiHiddenMetadata != nil {
+			sanitized[idx].GeminiHiddenMetadata = nil
+			changed = true
 		}
 
-		sanitized[idx].GeminiHiddenMetadata = nil
-		changed = true
+		if stripClaude && message.ClaudeHiddenMetadata != nil {
+			sanitized[idx].ClaudeHiddenMetadata = nil
+			changed = true
+		}
 	}
 
 	if !changed {
@@ -54,12 +57,12 @@ func cacheHashForChatProps(props *adaptercommon.ChatProps) string {
 	}
 
 	model := cacheModelForChatProps(props)
-	if globals.IsGeminiModel(model) {
+	if globals.IsGeminiModel(model) || props.ChannelType == globals.ClaudeChannelType || props.ChannelType == globals.GLMCodingPlanCNChannelType {
 		return utils.Md5Encrypt(utils.Marshal(props))
 	}
 
 	cloned := *props
-	cloned.Message = stripGeminiHiddenMetadataForCache(props.Message)
+	cloned.Message = stripHiddenMetadataForCache(props.Message, true, true)
 
 	return utils.Md5Encrypt(utils.Marshal(&cloned))
 }
@@ -83,6 +86,7 @@ func buildCacheChunk(cacheBuffer *utils.Buffer, liveBuffer *utils.Buffer) *globa
 		ToolCall:             cacheBuffer.GetToolCalls(),
 		ReasoningContent:     cacheBuffer.GetReasoningContent(),
 		GeminiHiddenMetadata: cacheBuffer.GetGeminiHiddenMetadata(),
+		ClaudeHiddenMetadata: cacheBuffer.GetClaudeHiddenMetadata(),
 	}
 }
 
@@ -140,7 +144,13 @@ func PreflightCache(cache *redis.Client, model string, hash string, buffer *util
 	functionCall := chunk.FunctionCall
 	reasoningContent := chunk.ReasoningContent
 	hiddenMetadata := chunk.GeminiHiddenMetadata
-	if data == "" && !hasToolCalls(toolCalls) && functionCall == nil && reasoningContent == nil && hiddenMetadata.IsEmpty() {
+	claudeHiddenMetadata := chunk.ClaudeHiddenMetadata
+	if data == "" &&
+		!hasToolCalls(toolCalls) &&
+		functionCall == nil &&
+		reasoningContent == nil &&
+		hiddenMetadata.IsEmpty() &&
+		claudeHiddenMetadata.IsEmpty() {
 		return idx, false, nil
 	}
 

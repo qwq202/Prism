@@ -64,8 +64,81 @@ func MergeGeminiHiddenMetadata(limit int, metadata ...*GeminiHiddenMetadata) *Ge
 	}).Normalized(limit)
 }
 
+func (m *ClaudeHiddenMetadata) IsEmpty() bool {
+	return m == nil || len(m.ThinkingBlocks) == 0
+}
+
+func NormalizeClaudeThinkingBlocks(blocks []ClaudeThinkingBlock, limit int) []ClaudeThinkingBlock {
+	if limit <= 0 || limit > ClaudeThinkingBlockLimit {
+		limit = ClaudeThinkingBlockLimit
+	}
+
+	result := make([]ClaudeThinkingBlock, 0, limit)
+	for _, block := range blocks {
+		thinking := strings.TrimSpace(block.Thinking)
+		signature := strings.TrimSpace(block.Signature)
+
+		if len(thinking) == 0 && len(signature) == 0 {
+			continue
+		}
+
+		if len(thinking) > ClaudeThinkingTextMaxBytes {
+			thinking = thinking[:ClaudeThinkingTextMaxBytes]
+		}
+
+		if len(signature) > ClaudeThinkingSignatureMaxBytes {
+			signature = signature[:ClaudeThinkingSignatureMaxBytes]
+		}
+
+		result = append(result, ClaudeThinkingBlock{
+			Thinking:  thinking,
+			Signature: signature,
+		})
+		if len(result) >= limit {
+			break
+		}
+	}
+
+	return result
+}
+
+func (m *ClaudeHiddenMetadata) Normalized(limit int) *ClaudeHiddenMetadata {
+	if m == nil {
+		return nil
+	}
+
+	blocks := NormalizeClaudeThinkingBlocks(m.ThinkingBlocks, limit)
+	if len(blocks) == 0 {
+		return nil
+	}
+
+	return &ClaudeHiddenMetadata{
+		ThinkingBlocks: blocks,
+	}
+}
+
+func MergeClaudeHiddenMetadata(limit int, metadata ...*ClaudeHiddenMetadata) *ClaudeHiddenMetadata {
+	merged := make([]ClaudeThinkingBlock, 0, ClaudeThinkingBlockLimit)
+	for _, item := range metadata {
+		if item == nil {
+			continue
+		}
+
+		merged = append(merged, item.ThinkingBlocks...)
+	}
+
+	return (&ClaudeHiddenMetadata{
+		ThinkingBlocks: merged,
+	}).Normalized(limit)
+}
+
 // Chunk-level emptiness controls whether a stream delta should be emitted.
 // Hidden metadata is intentionally considered non-empty so metadata deltas can be forwarded.
 func (c *Chunk) IsEmpty() bool {
-	return len(c.Content) == 0 && c.ToolCall == nil && c.FunctionCall == nil && c.ReasoningContent == nil && c.GeminiHiddenMetadata.IsEmpty()
+	return len(c.Content) == 0 &&
+		c.ToolCall == nil &&
+		c.FunctionCall == nil &&
+		c.ReasoningContent == nil &&
+		c.GeminiHiddenMetadata.IsEmpty() &&
+		c.ClaudeHiddenMetadata.IsEmpty()
 }
