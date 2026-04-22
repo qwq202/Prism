@@ -4,6 +4,7 @@ import (
 	"chat/channel"
 	"database/sql"
 	"fmt"
+	"math"
 
 	"chat/globals"
 	"chat/utils"
@@ -14,9 +15,24 @@ import (
 const (
 	ErrNotAuthenticated = "not authenticated error (model: %s)"
 	ErrNotSetPrice      = "the price of the model is not set (model: %s)"
-	ErrNotEnoughQuota   = "user quota is not enough error (model: %s, minimum quota: %0.2f, your quota: %0.2f)"
-	ErrEstimatedCost    = "estimated cost exceeds user quota (model: %s, estimated cost: %0.2f, your quota: %0.2f)"
+	ErrNotEnoughQuota   = "user quota is not enough error (model: %s, minimum quota: %s, your quota: %s)"
+	ErrEstimatedCost    = "estimated cost exceeds user quota (model: %s, estimated cost: %s, your quota: %s)"
 )
+
+func formatQuotaValue(value float32) string {
+	abs := math.Abs(float64(value))
+
+	switch {
+	case abs == 0:
+		return "0.0000"
+	case abs < 0.0001:
+		return "<0.0001"
+	case abs < 0.01:
+		return fmt.Sprintf("%.4f", value)
+	default:
+		return fmt.Sprintf("%.2f", value)
+	}
+}
 
 // CanEnableModel returns whether the model can be enabled (without subscription)
 func CanEnableModel(db *sql.DB, user *User, model string, messages []globals.Message) error {
@@ -49,7 +65,12 @@ func CanEnableModel(db *sql.DB, user *User, model string, messages []globals.Mes
 	// Get user's current quota
 	quota := user.GetQuota(db)
 	if quota < estimatedInputCost {
-		return fmt.Errorf(ErrEstimatedCost, model, estimatedInputCost, quota)
+		return fmt.Errorf(
+			ErrEstimatedCost,
+			model,
+			formatQuotaValue(estimatedInputCost),
+			formatQuotaValue(quota),
+		)
 	}
 
 	return nil
