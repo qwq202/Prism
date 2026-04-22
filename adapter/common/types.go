@@ -221,7 +221,7 @@ func appendPromptSection(content string, prefix string, prompt string) string {
 		return content
 	}
 
-	if strings.Contains(content, prefix) {
+	if hasPromptSection(content, prefix) {
 		return content
 	}
 
@@ -231,6 +231,16 @@ func appendPromptSection(content string, prefix string, prompt string) string {
 	}
 
 	return fmt.Sprintf("%s\n\n%s", content, section)
+}
+
+func hasPromptSection(content string, prefix string) bool {
+	for _, line := range strings.Split(content, "\n") {
+		if strings.TrimSpace(line) == prefix {
+			return true
+		}
+	}
+
+	return false
 }
 
 func injectReferencePrompts(messages []globals.Message, memoryPrompt string, recentChatsPrompt string) []globals.Message {

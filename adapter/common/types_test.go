@@ -185,3 +185,37 @@ func TestCreateChatPropsAvoidsDuplicateMemoryCapabilityInjection(t *testing.T) {
 		t.Fatalf("expected memory capability prompt prefix to appear once, got %q", props.Message[0].Content)
 	}
 }
+
+func TestCreateChatPropsInjectsReferenceSectionsAlongsideMemoryCapabilityState(t *testing.T) {
+	props := CreateChatProps(&ChatProps{
+		Model:                "deepseek-chat",
+		MemoryEnabled:        true,
+		MemoryHistoryEnabled: true,
+		MemoryPrompt:         "Remember that the user likes Genshin Impact.",
+		RecentChatsPrompt:    "Conversation 9 was about game preferences.",
+		Message: []globals.Message{
+			{Role: globals.User, Content: "What do I like?"},
+		},
+	}, nil)
+
+	if len(props.Message) != 2 {
+		t.Fatalf("expected injected system message, got %d messages", len(props.Message))
+	}
+
+	content := props.Message[0].Content
+	if !strings.Contains(content, memoryCapabilityPromptPrefix) {
+		t.Fatalf("expected memory capability prompt prefix, got %q", content)
+	}
+
+	if !strings.Contains(content, "- Saved user memories: enabled.") {
+		t.Fatalf("expected enabled saved memory state, got %q", content)
+	}
+
+	if !strings.Contains(content, memoryPromptPrefix+"\nRemember that the user likes Genshin Impact.") {
+		t.Fatalf("expected saved memory reference section to be injected, got %q", content)
+	}
+
+	if !strings.Contains(content, recentChatsPromptPrefix+"\nConversation 9 was about game preferences.") {
+		t.Fatalf("expected recent chats reference section to be injected, got %q", content)
+	}
+}
