@@ -169,3 +169,35 @@ func TestCacheHashForChatPropsKeepsClaudeMetadataOnAnthropic(t *testing.T) {
 		t.Fatalf("expected anthropic cache hash to retain claude hidden metadata sensitivity")
 	}
 }
+
+func TestCacheHashForChatPropsKeepsClaudeMetadataOnMiniMax(t *testing.T) {
+	plain := &adaptercommon.ChatProps{
+		OriginalModel: "MiniMax-M2.1",
+		ChannelType:   globals.MiniMaxTokenPlanCNChannelType,
+		Message: []globals.Message{
+			{Role: globals.User, Content: "hello"},
+			{Role: globals.Assistant, Content: "world"},
+		},
+	}
+
+	withMetadata := &adaptercommon.ChatProps{
+		OriginalModel: "MiniMax-M2.1",
+		ChannelType:   globals.MiniMaxTokenPlanCNChannelType,
+		Message: []globals.Message{
+			{Role: globals.User, Content: "hello"},
+			{
+				Role:    globals.Assistant,
+				Content: "<think>\nplan\n</think>\n\nworld",
+				ClaudeHiddenMetadata: &globals.ClaudeHiddenMetadata{
+					ThinkingBlocks: []globals.ClaudeThinkingBlock{
+						{Thinking: "plan", Signature: "sig-mini"},
+					},
+				},
+			},
+		},
+	}
+
+	if got, want := cacheHashForChatProps(withMetadata), cacheHashForChatProps(plain); got == want {
+		t.Fatalf("expected minimax cache hash to retain claude hidden metadata sensitivity")
+	}
+}

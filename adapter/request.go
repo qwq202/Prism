@@ -14,7 +14,9 @@ func isGeminiAdapterRequest(channelType string, model string) bool {
 }
 
 func isAnthropicAdapterRequest(channelType string) bool {
-	return channelType == globals.ClaudeChannelType || channelType == globals.GLMCodingPlanCNChannelType
+	return channelType == globals.ClaudeChannelType ||
+		channelType == globals.GLMCodingPlanCNChannelType ||
+		channelType == globals.MiniMaxTokenPlanCNChannelType
 }
 
 func stripHiddenMetadata(messages []globals.Message, stripGemini bool, stripClaude bool) ([]globals.Message, bool) {

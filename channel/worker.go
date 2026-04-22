@@ -57,7 +57,10 @@ func cacheHashForChatProps(props *adaptercommon.ChatProps) string {
 	}
 
 	model := cacheModelForChatProps(props)
-	if globals.IsGeminiModel(model) || props.ChannelType == globals.ClaudeChannelType || props.ChannelType == globals.GLMCodingPlanCNChannelType {
+	if globals.IsGeminiModel(model) ||
+		props.ChannelType == globals.ClaudeChannelType ||
+		props.ChannelType == globals.GLMCodingPlanCNChannelType ||
+		props.ChannelType == globals.MiniMaxTokenPlanCNChannelType {
 		return utils.Md5Encrypt(utils.Marshal(props))
 	}
 

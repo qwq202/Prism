@@ -181,6 +181,37 @@ func TestSanitizeChatMessagesForRequestKeepsClaudeMetadataOnAnthropic(t *testing
 	}
 }
 
+func TestSanitizeChatMessagesForRequestKeepsClaudeMetadataOnMiniMax(t *testing.T) {
+	props := &adaptercommon.ChatProps{
+		OriginalModel: "MiniMax-M2.1",
+		Message: []globals.Message{
+			{
+				Role:    globals.Assistant,
+				Content: "<think>\nplan\n</think>\n\nAnswer",
+				ClaudeHiddenMetadata: &globals.ClaudeHiddenMetadata{
+					ThinkingBlocks: []globals.ClaudeThinkingBlock{
+						{Thinking: "plan", Signature: "sig-mini"},
+					},
+				},
+			},
+		},
+	}
+
+	restore := sanitizeChatMessagesForRequest(requestTestChannelConfig{
+		channelType:    globals.MiniMaxTokenPlanCNChannelType,
+		reflectedModel: "MiniMax-M2.1",
+	}, props)
+
+	if props.Message[0].ClaudeHiddenMetadata == nil {
+		t.Fatalf("expected claude-style metadata to be preserved for minimax requests")
+	}
+
+	restore()
+	if props.Message[0].ClaudeHiddenMetadata == nil {
+		t.Fatalf("expected minimax metadata to remain after no-op restore")
+	}
+}
+
 func TestClearMessagesKeepsBase64ForConfiguredVisionModel(t *testing.T) {
 	originalResolver := globals.VisionModelResolver
 	globals.VisionModelResolver = func(model string) bool {

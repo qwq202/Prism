@@ -204,8 +204,15 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
     description:
       "> MiniMax Token Plan（CN）渠道基于 **Anthropic API** 兼容格式，接入点请填写 *https://api.minimaxi.com/anthropic* 或其反代地址。 \n" +
       "> 密钥需使用 **Token Plan 专属 API Key**，与 MiniMax 按量计费 API Key **不可互通**。 \n" +
-      "> 当前常用文本模型可填写 **MiniMax-M2.7**，极速版套餐也可使用 **MiniMax-M2.7-highspeed**。 \n",
-    models: ["MiniMax-M2.7", "MiniMax-M2.7-highspeed"],
+      "> 系统现已适配 MiniMax 当前 Anthropic 兼容链路里的 **tools / tool_choice / thinking** 与完整 **SSE content block** 流式事件，可用于 Tool Use 与交错思维链。 \n" +
+      "> 官方文档当前同时出现 **MiniMax-M2.1 / MiniMax-M2.1-highspeed / MiniMax-M2** 与快速接入页里的 **MiniMax-M2.7 / MiniMax-M2.7-highspeed**，这里一并保留，方便兼容不同套餐文档口径。 \n",
+    models: [
+      "MiniMax-M2.1",
+      "MiniMax-M2.1-highspeed",
+      "MiniMax-M2",
+      "MiniMax-M2.7",
+      "MiniMax-M2.7-highspeed",
+    ],
   },
   palm: {
     endpoint: "https://generativelanguage.googleapis.com",
