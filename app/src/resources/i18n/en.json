@@ -1865,5 +1865,6 @@
     "withdraw-failed": "Withdraw failed.",
     "withdraw-failed-prompt": "Withdrawal failed! Reason: {{reason}}",
     "invalid-amount": "Invalid amount"
-  }
+  },
+  "estimated-cost": "Estimated Spend"
 }

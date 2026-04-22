@@ -19,16 +19,18 @@ import { selectSupportModels } from "@/store/chat";
 
 type QuotaExceededFormProps = {
   model: string;
-  minimum: string;
+  required: string;
   quota: string;
   plan: boolean;
+  requiredLabel: string;
 };
 
 function QuotaExceededForm({
   model,
-  minimum,
+  required,
   quota,
   plan,
+  requiredLabel,
 }: QuotaExceededFormProps) {
   const { t } = useTranslation();
   const supportModels = useSelector(selectSupportModels);
@@ -78,10 +80,10 @@ function QuotaExceededForm({
           className={`flex flex-row w-full items-center justify-center px-4`}
         >
           <CloudCog className={`h-4 w-4 mr-1`} />
-          {t("min-quota")}
+          {requiredLabel}
           <div className={`grow`} />
           <p className={`flex flex-row items-center font-medium !mb-0`}>
-            {minimum}
+            {required}
             <Cloud className={`h-4 w-4 ml-1`} />
           </p>
         </div>
@@ -122,6 +124,7 @@ type LabelProps = {
 };
 
 export default function ({ children }: LabelProps) {
+  const { t } = useTranslation();
   const subscription = useSelector(subscriptionDataSelector);
   const content = (children ?? "").toString();
 
@@ -140,9 +143,33 @@ export default function ({ children }: LabelProps) {
       return (
         <QuotaExceededForm
           model={model}
-          minimum={minimum}
+          required={minimum}
           quota={quota}
           plan={plan}
+          requiredLabel={t("min-quota")}
+        />
+      );
+    }
+  }
+
+  if (content.startsWith("estimated cost exceeds user quota")) {
+    const match = content.match(
+      /estimated cost exceeds user quota \(model: (.*), estimated cost: (.*), your quota: (.*)\)/,
+    );
+
+    if (match) {
+      const [, model, estimatedCost, quota] = match;
+      const plan = subscription
+        .flatMap((p) => p.items.map((i) => i.models.includes(model)))
+        .includes(true);
+
+      return (
+        <QuotaExceededForm
+          model={model}
+          required={estimatedCost}
+          quota={quota}
+          plan={plan}
+          requiredLabel={t("estimated-cost")}
         />
       );
     }

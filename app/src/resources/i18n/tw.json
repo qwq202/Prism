@@ -1867,5 +1867,6 @@
       "pending": "待結算",
       "rate": "返傭率"
     }
-  }
+  },
+  "estimated-cost": "預計消費"
 }
