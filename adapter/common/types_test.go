@@ -166,6 +166,55 @@ func TestCreateChatPropsInjectsMemoryCapabilityState(t *testing.T) {
 	}
 }
 
+func TestCreateChatPropsInjectsCurrentModelReference(t *testing.T) {
+	props := CreateChatProps(&ChatProps{
+		Model: "grok-4-1-fast-reasoning",
+		Message: []globals.Message{
+			{Role: globals.User, Content: "Which model am I using?"},
+		},
+	}, nil)
+
+	if len(props.Message) != 2 {
+		t.Fatalf("expected injected system message, got %d messages", len(props.Message))
+	}
+
+	content := props.Message[0].Content
+	if !strings.Contains(content, currentModelPromptPrefix) {
+		t.Fatalf("expected current model prompt prefix, got %q", content)
+	}
+
+	if !strings.Contains(content, "The user is currently chatting with model: grok-4-1-fast-reasoning.") {
+		t.Fatalf("expected current model name to be injected, got %q", content)
+	}
+}
+
+func TestCreateChatPropsUpdatesExistingCurrentModelReference(t *testing.T) {
+	props := CreateChatProps(&ChatProps{
+		Model: "deepseek-chat",
+		Message: []globals.Message{
+			{
+				Role: globals.System,
+				Content: currentDateTimePromptPrefix + " 2026-04-20 23:30:00 (Asia/Shanghai).\n\n" +
+					currentModelPromptPrefix + "\n- The user is currently chatting with model: grok-4-1-fast-reasoning.",
+			},
+			{Role: globals.User, Content: "Which model am I using now?"},
+		},
+	}, nil)
+
+	content := props.Message[0].Content
+	if strings.Count(content, currentModelPromptPrefix) != 1 {
+		t.Fatalf("expected current model prompt prefix to appear once, got %q", content)
+	}
+
+	if strings.Contains(content, "grok-4-1-fast-reasoning") {
+		t.Fatalf("expected previous model reference to be replaced, got %q", content)
+	}
+
+	if !strings.Contains(content, "The user is currently chatting with model: deepseek-chat.") {
+		t.Fatalf("expected updated current model reference, got %q", content)
+	}
+}
+
 func TestCreateChatPropsAvoidsDuplicateMemoryCapabilityInjection(t *testing.T) {
 	props := CreateChatProps(&ChatProps{
 		Model:                "grok-4-1-fast-reasoning",

@@ -71,6 +71,7 @@ const currentDateTimePromptPrefix = "Current date and time reference:"
 const clientContextPromptPrefix = "Current client device reference:"
 const personalizationPromptPrefix = "User personalization preferences:"
 const memoryCapabilityPromptPrefix = "Memory capability state:"
+const currentModelPromptPrefix = "Current conversation model reference:"
 const memoryPromptPrefix = "Saved user memories:"
 const recentChatsPromptPrefix = "Recent conversation references:"
 
@@ -213,6 +214,80 @@ func injectMemoryCapabilities(messages []globals.Message, memoryEnabled bool, me
 	}, cloned...)
 }
 
+func buildCurrentModelPrompt(model string) string {
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return ""
+	}
+
+	return fmt.Sprintf(
+		"%s\n- The user is currently chatting with model: %s.\n- If the user asks which model is being used right now, rely on this value for the current turn.\n- If the model changes in a later turn, use the updated model reference from that turn instead of any prior assumption.",
+		currentModelPromptPrefix,
+		model,
+	)
+}
+
+func upsertPromptSection(content string, prefix string, prompt string) string {
+	content = strings.TrimSpace(content)
+	prompt = strings.TrimSpace(prompt)
+
+	if prompt == "" {
+		return content
+	}
+
+	if content == "" {
+		return fmt.Sprintf("%s\n%s", prefix, prompt)
+	}
+
+	sections := strings.Split(content, "\n\n")
+	replaced := false
+
+	for i, section := range sections {
+		lines := strings.Split(strings.TrimSpace(section), "\n")
+		if len(lines) == 0 {
+			continue
+		}
+
+		if strings.TrimSpace(lines[0]) == prefix {
+			sections[i] = fmt.Sprintf("%s\n%s", prefix, prompt)
+			replaced = true
+			break
+		}
+	}
+
+	if !replaced {
+		sections = append(sections, fmt.Sprintf("%s\n%s", prefix, prompt))
+	}
+
+	return strings.Join(sections, "\n\n")
+}
+
+func injectCurrentModel(messages []globals.Message, model string) []globals.Message {
+	prompt := buildCurrentModelPrompt(model)
+	if prompt == "" {
+		return messages
+	}
+
+	cloned := utils.DeepCopy[[]globals.Message](messages)
+	body := strings.TrimPrefix(prompt, currentModelPromptPrefix+"\n")
+
+	for i := range cloned {
+		if cloned[i].Role != globals.System {
+			continue
+		}
+
+		cloned[i].Content = upsertPromptSection(cloned[i].Content, currentModelPromptPrefix, body)
+		return cloned
+	}
+
+	return append([]globals.Message{
+		{
+			Role:    globals.System,
+			Content: prompt,
+		},
+	}, cloned...)
+}
+
 func appendPromptSection(content string, prefix string, prompt string) string {
 	content = strings.TrimSpace(content)
 	prompt = strings.TrimSpace(prompt)
@@ -275,6 +350,11 @@ func (c *ChatProps) SetupBuffer(buf *utils.Buffer) {
 	c.Message = injectCurrentDateTime(c.Message, c.ClientContext)
 	c.Message = injectPersonalization(c.Message, c.CustomInstruction)
 	c.Message = injectMemoryCapabilities(c.Message, c.MemoryEnabled, c.MemoryHistoryEnabled)
+	currentModel := strings.TrimSpace(c.OriginalModel)
+	if currentModel == "" {
+		currentModel = strings.TrimSpace(c.Model)
+	}
+	c.Message = injectCurrentModel(c.Message, currentModel)
 	c.Message = injectReferencePrompts(c.Message, c.MemoryPrompt, c.RecentChatsPrompt)
 	if buf == nil {
 		return
