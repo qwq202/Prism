@@ -73,6 +73,10 @@ export async function loadConversation(
           }
 
           if (currentMsg.role === "assistant" && currentMsg.tool_calls) {
+            currentMsg.tool_calls = currentMsg.tool_calls.map((toolCall) => ({
+              ...toolCall,
+              status: toolCall.status ?? "success",
+            }));
             processedMessages.push(currentMsg);
           } else if (currentMsg.role === "tool" && currentMsg.tool_call_id) {
             const toolCallId = currentMsg.tool_call_id;
