@@ -271,6 +271,38 @@ type memoryContext struct {
 	Writable          bool
 }
 
+func summarizeMemoryRecords(memories []memory.Record) string {
+	if len(memories) == 0 {
+		return "[]"
+	}
+
+	limit := len(memories)
+	if limit > 5 {
+		limit = 5
+	}
+
+	items := make([]string, 0, limit)
+	for _, item := range memories[:limit] {
+		content := strings.TrimSpace(item.Content)
+		if len(content) > 36 {
+			content = content[:36] + "..."
+		}
+
+		items = append(items, fmt.Sprintf(
+			"{id:%d category:%s content:%q}",
+			item.ID,
+			item.Category,
+			content,
+		))
+	}
+
+	summary := "[" + strings.Join(items, ", ") + "]"
+	if len(memories) > limit {
+		summary += fmt.Sprintf(" (+%d more)", len(memories)-limit)
+	}
+	return summary
+}
+
 func buildMemoryContext(db *sql.DB, user *auth.User, instance *conversation.Conversation, model string, group string) memoryContext {
 	ctx := memoryContext{}
 	if user == nil {
@@ -278,12 +310,29 @@ func buildMemoryContext(db *sql.DB, user *auth.User, instance *conversation.Conv
 	}
 
 	userID := user.GetID(db)
+	globals.Debug(fmt.Sprintf(
+		"[memory] building context user_id=%d conversation_id=%d model=%s group=%s memory_enabled=%v history_enabled=%v",
+		userID,
+		instance.GetId(),
+		model,
+		group,
+		instance.IsMemoryEnabled(),
+		instance.IsMemoryHistoryEnabled(),
+	))
+
 	if instance.IsMemoryEnabled() {
 		memories, err := memory.ListByUser(db, userID, "", memory.DefaultMemoryLimit)
 		if err != nil {
 			globals.Warn(fmt.Sprintf("[memory] failed to load memories: %s", err.Error()))
 		} else {
 			ctx.MemoryPrompt = memory.BuildMemoryPrompt(memories)
+			globals.Debug(fmt.Sprintf(
+				"[memory] loaded memories user_id=%d count=%d prompt_len=%d sample=%s",
+				userID,
+				len(memories),
+				len(ctx.MemoryPrompt),
+				summarizeMemoryRecords(memories),
+			))
 			ids := make([]int64, 0, len(memories))
 			for _, item := range memories {
 				ids = append(ids, item.ID)
@@ -294,6 +343,13 @@ func buildMemoryContext(db *sql.DB, user *auth.User, instance *conversation.Conv
 		}
 
 		ctx.Writable = memory.CanUseWritableTools(model, group)
+		globals.Debug(fmt.Sprintf(
+			"[memory] writable tools state user_id=%d model=%s group=%s writable=%v",
+			userID,
+			model,
+			group,
+			ctx.Writable,
+		))
 	}
 
 	if instance.IsMemoryHistoryEnabled() {
@@ -302,6 +358,12 @@ func buildMemoryContext(db *sql.DB, user *auth.User, instance *conversation.Conv
 			globals.Warn(fmt.Sprintf("[memory] failed to load recent chats: %s", err.Error()))
 		} else {
 			ctx.RecentChatsPrompt = memory.BuildRecentChatsPrompt(chats)
+			globals.Debug(fmt.Sprintf(
+				"[memory] loaded recent chats user_id=%d count=%d prompt_len=%d",
+				userID,
+				len(chats),
+				len(ctx.RecentChatsPrompt),
+			))
 		}
 	}
 
@@ -333,6 +395,15 @@ func createMemoryToolChatTask(
 			liveBuffer.InputTokens += roundBuffer.CountInputToken()
 			liveBuffer.Quota += utils.CountInputQuota(liveBuffer.GetCharge(), roundBuffer.CountInputToken())
 		}
+
+		globals.Debug(fmt.Sprintf(
+			"[memory] starting tool round %d model=%s memory_prompt_len=%d recent_chats_prompt_len=%d segment_messages=%d",
+			round+1,
+			model,
+			len(memoryPrompt),
+			len(recentChatsPrompt),
+			len(workingSegment),
+		))
 
 		props := buildChatProps(
 			conn,
