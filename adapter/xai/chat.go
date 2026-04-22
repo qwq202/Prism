@@ -206,6 +206,15 @@ func getResponseInclude(stream bool, tools []ResponseTool) []string {
 	return []string{"verbose_streaming"}
 }
 
+func supportsVerboseStreaming(model string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(model))
+	if normalized == "" {
+		return false
+	}
+
+	return !strings.Contains(normalized, "non-reasoning")
+}
+
 func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps, stream bool) ResponseRequest {
 	input, hasImages := formatMessages(props)
 	var store *bool
@@ -213,6 +222,10 @@ func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps, stream bool) 
 		store = utils.ToPtr(false)
 	}
 	tools := getResponseTools(props)
+	var include []string
+	if supportsVerboseStreaming(props.Model) {
+		include = getResponseInclude(stream, tools)
+	}
 
 	return ResponseRequest{
 		Model:           props.Model,
@@ -223,7 +236,7 @@ func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps, stream bool) 
 		Tools:           tools,
 		ToolChoice:      props.ToolChoice,
 		ResponseFormat:  props.ResponseFormat,
-		Include:         getResponseInclude(stream, tools),
+		Include:         include,
 		Store:           store,
 		Stream:          stream,
 	}

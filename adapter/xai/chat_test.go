@@ -176,6 +176,28 @@ func TestGetChatBodyAddsImageAndVideoUnderstandingTools(t *testing.T) {
 	}
 }
 
+func TestGetChatBodyOmitsVerboseStreamingForNonReasoningModel(t *testing.T) {
+	instance := &ChatInstance{}
+	props := &adaptercommon.ChatProps{
+		Model:           "grok-4-1-fast-non-reasoning",
+		EnableWebSearch: true,
+		Message: []globals.Message{
+			{
+				Role:    globals.User,
+				Content: "帮我搜一下",
+			},
+		},
+	}
+
+	body := instance.GetChatBody(props, true)
+	if len(body.Tools) != 1 || body.Tools[0].Type != "web_search" {
+		t.Fatalf("expected builtin web_search tool, got %#v", body.Tools)
+	}
+	if body.Include != nil {
+		t.Fatalf("expected non-reasoning xai model to omit include, got %#v", body.Include)
+	}
+}
+
 func TestGetChatBodyReplaysFunctionCallAndOutput(t *testing.T) {
 	instance := &ChatInstance{}
 	toolCalls := globals.ToolCalls{
