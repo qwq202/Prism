@@ -54,7 +54,7 @@ export function SingleGroupSelectItemBadge(props: SingleSelectItemBadgeProps) {
           "text-primary bg-primary/5 hover:bg-primary/10":
             props.variant === "default",
           "text-amber-600 bg-amber-500/20 hover:bg-amber-500/30":
-            props.variant === "gold",
+            props.variant === "official" || props.variant === "gold",
           "text-blue-600 bg-blue-500/20 hover:bg-blue-500/30":
             props.variant === "multi-modal",
           "text-green-600 bg-green-500/20 hover:bg-green-500/30":
