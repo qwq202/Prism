@@ -5,6 +5,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog.tsx";
@@ -28,7 +29,12 @@ import {
 } from "@/components/ui/dropdown-menu.tsx";
 import { cn } from "@/components/ui/lib/utils.ts";
 import Icon from "@/components/utils/Icon.tsx";
-import { deleteMemory, listMemories, type MemoryRecord } from "@/api/memory.ts";
+import {
+  deleteMemory,
+  listMemories,
+  updateMemory,
+  type MemoryRecord,
+} from "@/api/memory.ts";
 import { motion } from "framer-motion";
 import {
   Bot,
@@ -38,6 +44,7 @@ import {
   HelpCircle,
   Search,
   MoreHorizontal,
+  Pencil,
   Trash2,
 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
@@ -54,6 +61,7 @@ type MemoryItem = {
   content: string;
   date: string;
   source: string;
+  category?: string;
 };
 
 function formatMemoryDate(value: string | undefined, locale: string) {
@@ -76,15 +84,24 @@ function MemoryDialog({
   memories,
   loading,
   onDelete,
+  onUpdate,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   memories: MemoryRecord[];
   loading: boolean;
   onDelete: (id: number) => Promise<void>;
+  onUpdate: (
+    id: number,
+    content: string,
+    category?: string,
+  ) => Promise<boolean>;
 }) {
   const { t, i18n } = useTranslation();
   const [search, setSearch] = useState("");
+  const [editingMemory, setEditingMemory] = useState<MemoryItem | null>(null);
+  const [editingContent, setEditingContent] = useState("");
+  const [saving, setSaving] = useState(false);
   const filteredMemories: MemoryItem[] = useMemo(
     () =>
       memories
@@ -98,96 +115,171 @@ function MemoryDialog({
             formatMemoryDate(item.updated_at || item.created_at, i18n.language) ||
             t("settings.personalization.memory.just-now"),
           source: item.source || t("settings.personalization.memory.source.chat"),
+          category: item.category,
         })),
     [i18n.language, memories, search, t],
   );
 
+  const closeEditor = () => {
+    setEditingMemory(null);
+    setEditingContent("");
+    setSaving(false);
+  };
+
+  const handleStartEdit = (item: MemoryItem) => {
+    setEditingMemory(item);
+    setEditingContent(item.content);
+  };
+
+  const handleSubmitEdit = async () => {
+    if (!editingMemory) return;
+
+    const nextContent = editingContent.trim();
+    if (!nextContent) return;
+
+    setSaving(true);
+    try {
+      const ok = await onUpdate(editingMemory.id, nextContent, editingMemory.category);
+      if (ok) {
+        closeEditor();
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl p-0 overflow-hidden gap-0">
-        <DialogHeader className="p-6 pb-2">
-          <DialogTitle className="text-xl font-semibold">
-            {t("settings.personalization.memory.dialog-title")}
-          </DialogTitle>
-          <DialogDescription className="text-sm mt-1">
-            {t("settings.personalization.memory.dialog-description")}
-            <a href="#" className="text-primary hover:underline ml-1">
-              {t("learn-more")}
-            </a>
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl p-0 overflow-hidden gap-0">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle className="text-xl font-semibold">
+              {t("settings.personalization.memory.dialog-title")}
+            </DialogTitle>
+            <DialogDescription className="text-sm mt-1">
+              {t("settings.personalization.memory.dialog-description")}
+              <a href="#" className="text-primary hover:underline ml-1">
+                {t("learn-more")}
+              </a>
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="px-6 py-4 flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder={t("settings.personalization.memory.search-placeholder")}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-10 bg-muted/30 border-none rounded-full"
-            />
-          </div>
-        </div>
-
-        <div className="border-t">
-          <ScrollArea className="h-[400px]">
-            <div className="flex flex-col">
-              {loading && (
-                <div className="px-6 py-8 text-sm text-muted-foreground">
-                  {t("settings.personalization.memory.loading")}
-                </div>
-              )}
-              {!loading && filteredMemories.length === 0 && (
-                <div className="px-6 py-8 text-sm text-muted-foreground">
-                  {t("settings.personalization.memory.empty")}
-                </div>
-              )}
-              {filteredMemories.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-start justify-between p-6 hover:bg-muted/30 transition-colors border-b last:border-0"
-                >
-                  <p className="text-sm leading-relaxed flex-1 pr-4 min-w-0">
-                    {item.content}
-                  </p>
-                  <div className="flex shrink-0">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          type="button"
-                          className="p-1.5 rounded-md transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          aria-label={t("settings.personalization.memory.more")}
-                        >
-                          <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-52 p-1.5">
-                        <DropdownMenuItem
-                          onClick={() => void onDelete(item.id)}
-                          className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          {t("delete")}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <div className="px-2 py-1.5 text-[10px] text-muted-foreground leading-relaxed">
-                          {t("settings.personalization.memory.meta", {
-                            date: item.date,
-                          })}
-                          <span className="underline cursor-pointer">
-                            {item.source}
-                          </span>
-                        </div>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              ))}
+          <div className="px-6 py-4 flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder={t("settings.personalization.memory.search-placeholder")}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 h-10 bg-muted/30 border-none rounded-full"
+              />
             </div>
-          </ScrollArea>
-        </div>
-      </DialogContent>
-    </Dialog>
+          </div>
+
+          <div className="border-t">
+            <ScrollArea className="h-[400px]">
+              <div className="flex flex-col">
+                {loading && (
+                  <div className="px-6 py-8 text-sm text-muted-foreground">
+                    {t("settings.personalization.memory.loading")}
+                  </div>
+                )}
+                {!loading && filteredMemories.length === 0 && (
+                  <div className="px-6 py-8 text-sm text-muted-foreground">
+                    {t("settings.personalization.memory.empty")}
+                  </div>
+                )}
+                {filteredMemories.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-start justify-between p-6 hover:bg-muted/30 transition-colors border-b last:border-0"
+                  >
+                    <p className="text-sm leading-relaxed flex-1 pr-4 min-w-0">
+                      {item.content}
+                    </p>
+                    <div className="flex shrink-0">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            className="p-1.5 rounded-md transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            aria-label={t("settings.personalization.memory.more")}
+                          >
+                            <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-52 p-1.5">
+                          <DropdownMenuItem
+                            onClick={() => handleStartEdit(item)}
+                            className="cursor-pointer"
+                          >
+                            <Pencil className="w-4 h-4 mr-2" />
+                            {t("edit")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => void onDelete(item.id)}
+                            className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            {t("delete")}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <div className="px-2 py-1.5 text-[10px] text-muted-foreground leading-relaxed">
+                            {t("settings.personalization.memory.meta", {
+                              date: item.date,
+                            })}
+                            <span className="underline cursor-pointer">
+                              {item.source}
+                            </span>
+                          </div>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingMemory} onOpenChange={(nextOpen) => !nextOpen && closeEditor()}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {t("settings.personalization.memory.edit-title")}
+            </DialogTitle>
+            <DialogDescription>
+              {t("settings.personalization.memory.edit-description")}
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={editingContent}
+            onChange={(e) => setEditingContent(e.target.value)}
+            placeholder={t("settings.personalization.memory.edit-placeholder")}
+            className="min-h-[140px] resize-y"
+          />
+          <DialogFooter>
+            <button
+              type="button"
+              className="inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted"
+              onClick={closeEditor}
+              disabled={saving}
+            >
+              {t("close")}
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={() => void handleSubmitEdit()}
+              disabled={saving || !editingContent.trim()}
+            >
+              {t("save")}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -375,6 +467,26 @@ function Personalization() {
     setMemories((current) => current.filter((item) => item.id !== id));
   };
 
+  const handleUpdateMemory = async (
+    id: number,
+    content: string,
+    category?: string,
+  ) => {
+    const resp = await updateMemory(id, content, category);
+    if (!resp.status || !resp.data) {
+      toast.error(t("settings.personalization.memory.edit-failed"), {
+        description:
+          resp.message || t("settings.personalization.memory.edit-failed-tip"),
+      });
+      return false;
+    }
+
+    setMemories((current) =>
+      current.map((item) => (item.id === id ? resp.data! : item)),
+    );
+    return true;
+  };
+
   const styleOptions: SelectOption[] = [
     {
       value: "default",
@@ -522,6 +634,7 @@ function Personalization() {
         memories={memories}
         loading={memoryLoading}
         onDelete={handleDeleteMemory}
+        onUpdate={handleUpdateMemory}
       />
       <motion.div
         className="px-4 py-6 md:py-12 lg:py-16 h-full flex flex-col w-full max-w-3xl mx-auto space-y-6"

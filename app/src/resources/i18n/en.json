@@ -537,7 +537,12 @@
         "footer": "AI can use memories to personalize queries by searching providers.",
         "source": {
           "chat": "Obrolan"
-        }
+        },
+        "edit-title": "Edit Memory",
+        "edit-description": "You can adjust the contents of this memory to allow the assistant to use the updated version later.",
+        "edit-placeholder": "Please enter the updated memory content",
+        "edit-failed": "Editing Failed",
+        "edit-failed-tip": "Unable to update this memory"
       }
     }
   },

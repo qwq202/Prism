@@ -609,7 +609,12 @@
         "footer": "AI 可使用記憶庫，透過搜尋提供者進行個人化查詢。",
         "source": {
           "chat": "聊天"
-        }
+        },
+        "edit-title": "編輯記憶",
+        "edit-description": "你可以調整這記憶的內容，讓助手之後再使用更新後的版本。",
+        "edit-placeholder": "請輸入更新後的記憶內容",
+        "edit-failed": "編輯失敗",
+        "edit-failed-tip": "無法更新這條記憶"
       }
     }
   },

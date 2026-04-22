@@ -50,6 +50,19 @@ export async function createMemory(
   }
 }
 
+export async function updateMemory(
+  id: number,
+  content: string,
+  category?: string,
+): Promise<MemoryMutationResponse> {
+  try {
+    const resp = await axios.post("/memory/update", { id, content, category });
+    return resp.data as MemoryMutationResponse;
+  } catch (e) {
+    return { status: false, message: getErrorMessage(e) };
+  }
+}
+
 export async function deleteMemory(id: number): Promise<MemoryMutationResponse> {
   try {
     const resp = await axios.get(`/memory/delete?id=${id}`);
