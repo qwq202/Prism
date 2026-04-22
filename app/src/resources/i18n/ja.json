@@ -1265,7 +1265,16 @@
     "cdn": {
       "warmup": "リソースのウォームアップ",
       "warm-tip": "> CDNサービスを使用している場合は、この機能を使用してリソースをウォームアップできます。\n**各アップデートの後、リソースのリフレッシュを実行して、リソースの安定性を確保し、読み込み速度を向上させることができます。**\nCDN （コンテンツ配信ネットワーク）リソースは予熱され、予熱後、リソースはCDNノードにキャッシュされてアクセスを高速化します。\nウォームアップ機能を使用すると、ビジネスのピーク前に人気のあるリソースをCDNノードにキャッシュすることができ、ソースステーションへの圧力を軽減し、ユーザーエクスペリエンスを向上させることができます。\nヒント：**ウォームアップ実行は、CDNから送信元ステーションに大量のデータをプルします。送信元ステーションのブロードバンド負荷に注意してください。**",
-      "copy-data": "事前に加熱されたURLリソースリストをコピー"
+      "copy-data": "事前に加熱されたURLリソースリストをコピー",
+      "invalid-urls": "有効なHTTP/HTTPS URLを入力してください。",
+      "warmup-placeholder": "https://example.com/resource1.js\nhttps://example.com/resource2.css",
+      "detected-count": "{{count}}個のURLが検出されました",
+      "warming": "予熱中...",
+      "warmup-complete": "ウォームアップ完了：{{ success }}/{{ total}}成功",
+      "results": "結果",
+      "status-error": "エラー",
+      "status-ok": "{{status}}成功",
+      "status-redirect": "{{status}}リダイレクト"
     },
     "license": {
       "title": "授権管理",

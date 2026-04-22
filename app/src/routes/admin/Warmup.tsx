@@ -15,6 +15,7 @@ import { cn } from "@/components/ui/lib/utils.ts";
 import axios from "axios";
 import { copyClipboard } from "@/utils/dom.ts";
 import { toast } from "sonner";
+import Markdown from "@/components/Markdown.tsx";
 
 type WarmupResult = {
   url: string;
@@ -32,14 +33,24 @@ async function warmupUrls(urls: string[]): Promise<WarmupResult[]> {
 }
 
 function ResultBadge({ status, error }: { status: number; error?: string }) {
+  const { t } = useTranslation();
+
   if (error) {
-    return <Badge variant="destructive">Error</Badge>;
+    return <Badge variant="destructive">{t("admin.cdn.status-error")}</Badge>;
   }
   if (status >= 200 && status < 300) {
-    return <Badge variant="default">{status} OK</Badge>;
+    return (
+      <Badge variant="default">
+        {t("admin.cdn.status-ok", { status })}
+      </Badge>
+    );
   }
   if (status >= 300 && status < 400) {
-    return <Badge variant="secondary">{status} Redirect</Badge>;
+    return (
+      <Badge variant="secondary">
+        {t("admin.cdn.status-redirect", { status })}
+      </Badge>
+    );
   }
   return <Badge variant="destructive">{status || "—"}</Badge>;
 }
@@ -59,7 +70,7 @@ function AdminWarmup() {
   const handleWarmup = async () => {
     const urls = getUrls();
     if (urls.length === 0) {
-      toast.error("Please enter valid HTTP/HTTPS URLs.");
+      toast.error(t("admin.cdn.invalid-urls"));
       return;
     }
     setLoading(true);
@@ -69,7 +80,12 @@ function AdminWarmup() {
     setLoading(false);
 
     const success = res.filter((r) => !r.error && r.status >= 200 && r.status < 300).length;
-    toast.success(`Warmup complete: ${success}/${res.length} succeeded`);
+    toast.success(
+      t("admin.cdn.warmup-complete", {
+        success,
+        total: res.length,
+      }),
+    );
   };
 
   const handleCopyUrls = () => {
@@ -84,20 +100,22 @@ function AdminWarmup() {
           <CardTitle>{t("admin.cdn.warmup")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="prose prose-sm max-w-none text-muted-foreground whitespace-pre-wrap text-sm leading-relaxed bg-muted/20 rounded-md p-4">
-            {t("admin.cdn.warm-tip")}
+          <div className="rounded-md bg-muted/20 p-4">
+            <Markdown className="prose prose-sm max-w-none text-sm leading-relaxed text-muted-foreground">
+              {t("admin.cdn.warm-tip")}
+            </Markdown>
           </div>
 
           <div className="space-y-2">
             <Textarea
-              placeholder="https://example.com/resource1.js&#10;https://example.com/resource2.css"
+              placeholder={t("admin.cdn.warmup-placeholder")}
               value={urlText}
               onChange={(e) => setUrlText(e.target.value)}
               rows={8}
               className="font-mono text-sm"
             />
             <p className="text-xs text-muted-foreground">
-              {getUrls().length} URL(s) detected
+              {t("admin.cdn.detected-count", { count: getUrls().length })}
             </p>
           </div>
 
@@ -108,7 +126,7 @@ function AdminWarmup() {
               ) : (
                 <Flame className="w-4 h-4 mr-2" />
               )}
-              {loading ? "Warming up..." : t("admin.cdn.warmup")}
+              {loading ? t("admin.cdn.warming") : t("admin.cdn.warmup")}
             </Button>
             <Button variant="outline" onClick={handleCopyUrls}>
               <Copy className="w-4 h-4 mr-2" />
@@ -118,7 +136,7 @@ function AdminWarmup() {
 
           {results.length > 0 && (
             <div className="space-y-1">
-              <p className="text-sm font-medium">Results</p>
+              <p className="text-sm font-medium">{t("admin.cdn.results")}</p>
               <div className="rounded-md border divide-y">
                 {results.map((r, i) => (
                   <div

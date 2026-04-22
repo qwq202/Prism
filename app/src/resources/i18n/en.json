@@ -1265,7 +1265,16 @@
     "cdn": {
       "warmup": "CDN Warm",
       "warm-tip": "> If you are using a CDN service, you can warm up resources with this feature.\n* * After each update, you can perform a resource refresh to ensure the stability of the resource and increase the loading speed. * *\nCDN (Content Delivery Network) resources are preheated, and after preheating, the resources will be cached to the CDN node to speed up access.\nWith the warm-up function, you can cache popular resources to the CDN node before the peak of business, reducing the pressure on the source station and improving the user experience.\nTip: * * Warm-up execution will pull a lot of data from the CDN to the source station, please pay attention to the source station's broadband load. * *",
-      "copy-data": "Copy Preheated URL Resource List"
+      "copy-data": "Copy Preheated URL Resource List",
+      "invalid-urls": "Please enter a valid HTTP/HTTPS URL.",
+      "warmup-placeholder": "https://example.com/resource1.js\nhttps://example.com/resource2.css",
+      "detected-count": "{{count}} URLs detected",
+      "warming": "Warming up...",
+      "warmup-complete": "Warm-up completed: {{success}}/{{total}} successes",
+      "results": "Results",
+      "status-error": "Error",
+      "status-ok": "{{status}} Success",
+      "status-redirect": "{{status}} Redirect"
     },
     "license": {
       "title": "License",

@@ -1347,7 +1347,16 @@
     "cdn": {
       "warmup": "資源預熱",
       "copy-data": "複製預熱URL 資源列表",
-      "warm-tip": "&gt; 如果您正在使用CDN 服務，可以透過此功能預熱CSS / JS 等資源。&#10; **每次更新後，您可以進行一次資源刷新以確保資源穩定性並提升載入速度。 **&#10; CDN (內容傳遞網路) 資源預熱，預熱後資源將會被快取到CDN 節點，加速存取。&#10;透過預熱功能，您可以在業務高峰前預先將熱門資源快取到CDN節點，並降低源站壓力提升使用者體驗。&#10;提示：**預熱執行會從CDN到源站拉取大量的數據，請注意源站寬頻負載情況。 **"
+      "warm-tip": "&gt; 如果您正在使用CDN 服務，可以透過此功能預熱CSS / JS 等資源。&#10; **每次更新後，您可以進行一次資源刷新以確保資源穩定性並提升載入速度。 **&#10; CDN (內容傳遞網路) 資源預熱，預熱後資源將會被快取到CDN 節點，加速存取。&#10;透過預熱功能，您可以在業務高峰前預先將熱門資源快取到CDN節點，並降低源站壓力提升使用者體驗。&#10;提示：**預熱執行會從CDN到源站拉取大量的數據，請注意源站寬頻負載情況。 **",
+      "invalid-urls": "請輸入有效的HTTP/HTTPS URL。",
+      "warmup-placeholder": "https://example.com/resource1.js\nhttps://example.com/resource2.css",
+      "detected-count": "已偵測到{{count}} 個URL",
+      "warming": "預熱中...",
+      "warmup-complete": "預熱完成：{{success}}/{{total}} 成功",
+      "results": "結果",
+      "status-error": "錯誤",
+      "status-ok": "{{status}} 成功",
+      "status-redirect": "{{status}} 重定向"
     },
     "license": {
       "title": "授權管理",

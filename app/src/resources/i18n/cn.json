@@ -1519,7 +1519,16 @@
     "cdn": {
       "warmup": "资源预热",
       "copy-data": "复制预热 URL 资源列表",
-      "warm-tip": "> 如果您在使用 CDN 服务，可以通过此功能预热 CSS / JS 等资源。\n**每次更新后，您可以进行一次资源刷新以保证资源稳定性并提升加载速度。**\nCDN (内容分发网络) 资源预热，预热后资源将会被缓存到 CDN 节点，加速访问。\n通过预热功能，您可以在业务高峰前预先将热门资源缓存到CDN节点，降低源站压力提升用户体验。\n提示：**预热执行会从CDN到源站拉取大量的数据，请关注源站宽带负载情况。**"
+      "warm-tip": "> 如果您在使用 CDN 服务，可以通过此功能预热 CSS / JS 等资源。\n**每次更新后，您可以进行一次资源刷新以保证资源稳定性并提升加载速度。**\nCDN (内容分发网络) 资源预热，预热后资源将会被缓存到 CDN 节点，加速访问。\n通过预热功能，您可以在业务高峰前预先将热门资源缓存到CDN节点，降低源站压力提升用户体验。\n提示：**预热执行会从CDN到源站拉取大量的数据，请关注源站宽带负载情况。**",
+      "invalid-urls": "请输入有效的 HTTP/HTTPS URL。",
+      "warmup-placeholder": "https://example.com/resource1.js\nhttps://example.com/resource2.css",
+      "detected-count": "已检测到 {{count}} 个 URL",
+      "warming": "预热中...",
+      "warmup-complete": "预热完成：{{success}}/{{total}} 成功",
+      "results": "结果",
+      "status-error": "错误",
+      "status-ok": "{{status}} 成功",
+      "status-redirect": "{{status}} 重定向"
     },
     "license": {
       "title": "授权管理",
