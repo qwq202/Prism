@@ -53,7 +53,36 @@ func (c *PlanManager) SaveConfig() error {
 	return utils.SaveConfig("subscription", c)
 }
 
+func validatePlanConfigModels(data *PlanManager) error {
+	if ConduitInstance == nil {
+		return nil
+	}
+
+	availableModels := make(map[string]struct{}, len(ConduitInstance.GetModels()))
+	for _, model := range ConduitInstance.GetModels() {
+		availableModels[model] = struct{}{}
+	}
+
+	for _, plan := range data.Plans {
+		for _, item := range plan.Items {
+			for _, model := range item.Models {
+				if _, ok := availableModels[model]; ok {
+					continue
+				}
+
+				return fmt.Errorf("subscription item %q contains unavailable model %q", item.Id, model)
+			}
+		}
+	}
+
+	return nil
+}
+
 func (c *PlanManager) UpdateConfig(data *PlanManager) error {
+	if err := validatePlanConfigModels(data); err != nil {
+		return err
+	}
+
 	c.Enabled = data.Enabled
 	c.Plans = data.Plans
 	return c.SaveConfig()

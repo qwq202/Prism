@@ -5,7 +5,7 @@ import {
   CardTitle,
 } from "@/components/ui/card.tsx";
 import { useTranslation } from "react-i18next";
-import { useMemo, useReducer, useState } from "react";
+import { useEffect, useMemo, useReducer, useState } from "react";
 import {
   getExternalPlanConfig,
   getPlanConfig,
@@ -43,7 +43,7 @@ import { withNotify } from "@/api/common.ts";
 import { dispatchSubscriptionData } from "@/store/globals.ts";
 import { useDispatch } from "react-redux";
 import { cn } from "@/components/ui/lib/utils.ts";
-import { useChannelModels } from "@/admin/hook.tsx";
+import { useAllModels } from "@/admin/hook.tsx";
 import PopupDialog, {
   PopupAlertDialog,
   popupTypes,
@@ -55,6 +55,55 @@ const planInitialConfig: PlanConfig = {
   enabled: false,
   plans: [],
 };
+
+function sanitizePlanConfigModels(
+  config: PlanConfig,
+  availableModels: string[],
+): PlanConfig {
+  if (availableModels.length === 0) return config;
+
+  const availableSet = new Set(availableModels);
+  let changed = false;
+
+  const plans = config.plans.map((plan: Plan) => {
+    let planChanged = false;
+
+    const items = plan.items.map((item: PlanItem) => {
+      const rawModels = item.models ?? [];
+      const filteredModels = getUniqueList(
+        rawModels.filter((model) => availableSet.has(model)),
+      );
+
+      const sameModels =
+        filteredModels.length === rawModels.length &&
+        filteredModels.every((model, index) => model === rawModels[index]);
+
+      if (sameModels) return item;
+
+      changed = true;
+      planChanged = true;
+
+      return {
+        ...item,
+        models: filteredModels,
+      };
+    });
+
+    if (!planChanged) return plan;
+
+    return {
+      ...plan,
+      items,
+    };
+  });
+
+  if (!changed) return config;
+
+  return {
+    ...config,
+    plans,
+  };
+}
 
 function reducer(state: PlanConfig, action: Record<string, any>): PlanConfig {
   switch (action.type) {
@@ -372,7 +421,8 @@ function PlanConfig() {
   const [loading, setLoading] = useState<boolean>(false);
   const dispatch = useDispatch();
 
-  const { channelModels, update } = useChannelModels();
+  const { allModels, update } = useAllModels();
+  const availableModels = useMemo(() => getUniqueList(allModels), [allModels]);
 
   const [stacked, setStacked] = useState<boolean>(false);
 
@@ -398,13 +448,28 @@ function PlanConfig() {
   };
 
   const save = async (data?: PlanConfig) => {
-    const res = await setPlanConfig(data ?? form);
+    const payload = sanitizePlanConfigModels(data ?? form, availableModels);
+    if (payload !== (data ?? form)) {
+      formDispatch({ type: "set", payload });
+    }
+
+    const res = await setPlanConfig(payload);
     withNotify(t, res, true);
     if (res.status)
-      dispatchSubscriptionData(dispatch, form.enabled ? form.plans : []);
+      dispatchSubscriptionData(
+        dispatch,
+        payload.enabled ? payload.plans : [],
+      );
   };
 
   useEffectAsync(async () => await refresh(true), []);
+
+  useEffect(() => {
+    const sanitized = sanitizePlanConfigModels(form, availableModels);
+    if (sanitized !== form) {
+      formDispatch({ type: "set", payload: sanitized });
+    }
+  }, [availableModels, form]);
 
   return (
     <div className={`plan-config`}>
@@ -607,7 +672,7 @@ function PlanConfig() {
                           searchPlaceholder={t(
                             `admin.plan.item-models-search-placeholder`,
                           )}
-                          list={channelModels}
+                          list={availableModels}
                           className={`w-full max-w-full`}
                         />
                       </div>
