@@ -6,15 +6,9 @@ import {
   Gemini,
   Gemma,
   OpenAI,
-  Spark,
-  Qwen,
-  Baichuan,
-  ByteDance,
   Meta,
-  Hunyuan,
   Midjourney,
   Stability,
-  Moonshot,
   LLaVA,
   DeepSeek,
   Grok,
@@ -25,7 +19,6 @@ import {
   Cloudflare,
   Cohere,
   Fireworks,
-  Groq,
   OpenRouter,
   Perplexity,
   GithubCopilot,
@@ -33,8 +26,6 @@ import {
   Qingyan,
   IconAvatarProps,
   Azure,
-  Coze,
-  Dify
 } from "@lobehub/icons";
 import React from "react";
 import { cn } from "@/components/ui/lib/utils.ts";
@@ -66,21 +57,8 @@ const builtinAvatars: Record<string, React.ExoticComponent<IconAvatarProps>> = {
   glm: Qingyan.Avatar,
   zhipu: Qingyan.Avatar,
 
-  spark: Spark.Avatar,
-
-  tongyi: Qwen.Avatar,
-  qwen: Qwen.Avatar,
-
-  baichuan: Baichuan.Avatar,
-
-  byte: ByteDance.Avatar,
-  bytedance: ByteDance.Avatar,
-  skylark: ByteDance.Avatar,
-
   meta: Meta.Avatar,
   llama: Meta.Avatar,
-
-  hunyuan: Hunyuan.Avatar,
 
   midjourney: Midjourney.Avatar,
 
@@ -89,17 +67,10 @@ const builtinAvatars: Record<string, React.ExoticComponent<IconAvatarProps>> = {
   stablediffusion: Stability.Avatar,
   sd: Stability.Avatar,
 
-  moonshot: Moonshot.Avatar,
-  kimi: Moonshot.Avatar,
-
   llava: LLaVA.Avatar,
 
   deepseek: DeepSeek.Avatar,
   "deep-seek": DeepSeek.Avatar,
-
-  coze: Coze.Avatar,
-
-  dify: Dify.Avatar,
 
   grok: Grok.Avatar,
   minimax: Minimax.Avatar,
@@ -115,8 +86,6 @@ const builtinAvatars: Record<string, React.ExoticComponent<IconAvatarProps>> = {
   cohere: Cohere.Avatar,
 
   firework: Fireworks.Avatar,
-
-  groq: Groq.Avatar,
 
   router: OpenRouter.Avatar,
 
@@ -134,21 +103,21 @@ function getAvatarType(id: string): string | undefined {
 
 function ModelAvatar({ model, className, size }: ModelAvatarProps) {
   const avatarSize = size ?? 42;
-  
+
   if (isUrl(model.avatar ?? "")) {
     return (
-      <div 
+      <div
         style={{
           width: avatarSize,
           height: avatarSize,
           minWidth: avatarSize,
-          minHeight: avatarSize
+          minHeight: avatarSize,
         }}
         className={cn(
           "relative flex items-center justify-center overflow-hidden",
           // using scale to make the avatar smaller
           className?.includes("h-4") && "scale-[0.85]",
-          className
+          className,
         )}
       >
         <img
@@ -156,7 +125,7 @@ function ModelAvatar({ model, className, size }: ModelAvatarProps) {
           alt={model.name}
           className="rounded-full object-cover w-full h-full"
           style={{
-            transform: className?.includes("h-4") ? "scale(1.15)" : "none"
+            transform: className?.includes("h-4") ? "scale(1.15)" : "none",
           }}
         />
       </div>

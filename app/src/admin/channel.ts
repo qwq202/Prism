@@ -61,19 +61,7 @@ export const ChannelTypes: Record<string, string> = {
   "minimax-token-plan-cn": "MiniMax Token Plan（CN）",
   palm: "Google Gemini",
   midjourney: "Midjourney Proxy",
-  sparkdesk: "讯飞星火 SparkDesk",
-  chatglm: "智谱清言 ChatGLM",
-  moonshot: "月之暗面 Moonshot",
-  qwen: "通义千问 TongYi",
-  hunyuan: "腾讯混元 Hunyuan",
-  zhinao: "360智脑 360GLM",
-  baichuan: "百川大模型 BaichuanAI",
-  skylark: "云雀大模型 SkylarkLLM",
-  groq: "Groq Cloud",
-  slack: "Slack Claude",
   deepseek: "深度求索 DeepSeek",
-  coze: "扣子 Coze",
-  dify: "Dify",
 };
 
 export const ShortChannelTypes: Record<string, string> = {
@@ -86,19 +74,7 @@ export const ShortChannelTypes: Record<string, string> = {
   "minimax-token-plan-cn": "MiniMax",
   palm: "Gemini",
   midjourney: "Midjourney",
-  sparkdesk: "讯飞星火",
-  chatglm: "ChatGLM",
-  moonshot: "Moonshot",
-  qwen: "通义千问",
-  hunyuan: "腾讯混元",
-  zhinao: "360 智脑",
-  baichuan: "百川 AI",
-  skylark: "火山方舟",
-  groq: "Groq",
-  slack: "Slack",
   deepseek: "DeepSeek",
-  coze: "Coze",
-  dify: "Dify",
 };
 
 export const ChannelInfos: Record<string, ChannelInfo> = {
@@ -159,11 +135,7 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
   xai: {
     endpoint: "https://api.x.ai",
     format: "<api-key>",
-    models: [
-      "grok-4.20-reasoning",
-      "grok-4.20-mini",
-      "grok-4-1-fast",
-    ],
+    models: ["grok-4.20-reasoning", "grok-4.20-mini", "grok-4-1-fast"],
     description:
       "> xAI 渠道基于 **OpenAI Responses API** 兼容格式，请将接入点填写为 *https://api.x.ai* 或其反代地址，系统会自动请求 */v1/responses*。 \n" +
       "> 已内置适配 xAI 原生 **Web Search** 与 **X Search** 两个独立开关，用户可在聊天界面分别控制是否开启。 \n" +
@@ -236,68 +208,6 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "> 当前常用文本模型可填写 **MiniMax-M2.7**，极速版套餐也可使用 **MiniMax-M2.7-highspeed**。 \n",
     models: ["MiniMax-M2.7", "MiniMax-M2.7-highspeed"],
   },
-  slack: {
-    endpoint: "your-channel",
-    format: "<bot-id>|<xoxp-token>",
-    models: ["claude-slack"],
-    description:
-      "> **注意！当前个人免费版 Slack 已不支持 Claude 调用。** \n" +
-      "> 密钥请填写 bot-id|xoxp-token，其中 bot-id 为 Slack Bot 的 ID，xoxp-token 为 Slack Bot 的 xoxp-token \n" +
-      "> 接入点填写你的 Slack Channel 名称，如 *chatnio* \n" +
-      "> 详情参考 [claude-api](https://github.com/bincooo/claude-api) \n",
-  },
-  sparkdesk: {
-    endpoint: "wss://spark-api.xf-yun.com",
-    format: "<app-id>|<api-secret>|<api-key>",
-    models: [
-      "spark-desk-v1.5",
-      "spark-desk-v2",
-      "spark-desk-v3",
-      "spark-desk-v3.5",
-    ],
-  },
-  chatglm: {
-    endpoint: "https://open.bigmodel.cn",
-    format: "<api-key>",
-    models: ["glm-4", "glm-4v", "glm-3-turbo"],
-    description:
-      "> 智谱 ChatGLM 密钥格式为 **api-key**，接入点填写 *https://open.bigmodel.cn* \n",
-  },
-  qwen: {
-    endpoint: "https://dashscope.aliyuncs.com",
-    format: "<api-key>",
-    models: ["qwen-turbo", "qwen-plus", "qwen-turbo-net", "qwen-plus-net"],
-  },
-  hunyuan: {
-    endpoint: "https://hunyuan.cloud.tencent.com",
-    format: "<app-id>|<secret-id>|<secret-key>",
-    models: ["hunyuan"],
-    // endpoint
-  },
-  zhinao: {
-    endpoint: "https://api.360.cn",
-    format: "<api-key>",
-    models: ["360-gpt-v9"],
-  },
-  baichuan: {
-    endpoint: "https://api.baichuan-ai.com",
-    format: "<api-key>",
-    models: ["baichuan-53b"],
-  },
-  skylark: {
-    endpoint: "https://ark.cn-beijing.volces.com/api/v3",
-    format: "<access-key>|<secret-key>",
-    models: [
-      "skylark-lite-public",
-      "skylark-plus-public",
-      "skylark-pro-public",
-      "skylark-chat",
-    ],
-    description:
-      "> Skylark 格式密钥请填写获取到的 ak|sk 或 apikey \n" +
-      "> 接入点填写生成的接入点，如 *https://ark.cn-beijing.volces.com/api/v3* \n" +
-      "> Skylark API 的地域字段无需手动填写，系统会自动根据接入点获取 \n",
-  },
   palm: {
     endpoint: "https://generativelanguage.googleapis.com",
     format: "<api-key>",
@@ -344,40 +254,10 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "> 接入点填写你的 Midjourney Proxy 的部署地址，如 *http://localhost:8080*, *https://example.com* \n" +
       "> 注意：**请在系统设置中设置后端的公网 IP / 域名，否则无法接收回调报错 please provide available notify url** \n",
   },
-  moonshot: {
-    endpoint: "https://api.moonshot.cn",
-    format: "<api-key>",
-    models: ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"],
-  },
-  groq: {
-    endpoint: "https://api.groq.com/openai",
-    format: "<api-key>",
-    models: ["llama2-70b-4096", "mixtral-8x7b-32768", "gemma-7b-it"],
-  },
   deepseek: {
     endpoint: "https://api.deepseek.com",
     format: "<api-key>",
     models: ["deepseek-chat", "deepseek-reasoner"],
-  },
-  coze: {
-    endpoint: "https://api.coze.cn",
-    format: "<api-key>",
-    models: [""],
-    description:
-      "> 扣子 Coze 的模型名称即为 Coze 平台的 **bot_id** \n" +
-      "> 进入智能体的开发页面，开发页面 URL 中 bot 参数后的数字就是智能体 ID \n" +
-      "> 例如 [https://www.coze.cn/space/341****/bot/73428668*****](https://www.coze.cn/space/341****/bot/73428668*****)，智能体 ID 为 73428668***** \n" +
-      "> 确保当前使用的访问密钥已被授予智能体所属空间的 chat 权限 \n" +
-      "> 如果需要让系统自动适配扣子 Coze 平台的图标，请在 **模型映射** 中将 **bot_id** 映射为 **coze** 开头的模型，如 coze-chat>73428668***** \n",
-  },
-  dify: {
-    endpoint: "https://api.dify.ai/v1",
-    format: "<api-key>",
-    models: [""],
-    description:
-      "> 由于 Dify 平台一个 Key 对应一个 CHATFLOW （模型），所以模型名称仅在用户调用本系统时用于标识用户调用的对象，不代表调用 Dify 平台 CHATFLOW 时被调用 CHATFLOW 的名称 \n" +
-      "> 因此，您需要为每一个 Dify 平台的 CHATFLOW 分别创建渠道 \n" +
-      "> 如果需要让系统自动适配 Dify 平台的图标，请将模型名称填写为 **dify** 开头的模型，如 **dify-chat** \n",
   },
 };
 

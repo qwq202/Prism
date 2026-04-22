@@ -25,13 +25,6 @@ export const deprecatedModelImages = [
   "midjourney.jpg",
   "palm2.webp",
   "gemini.jpeg",
-  "chatglm.png",
-  "tongyi.png",
-  "sparkdesk.jpg",
-  "hunyuan.png",
-  "360gpt.png",
-  "baichuan.png",
-  "skylark.jpg",
 ];
 
 export const marketTags = ["high-context", ...marketEditableTags, "free"];

@@ -125,13 +125,6 @@ const (
 	Claude2100k                  = "claude-2"
 	Claude2200k                  = "claude-2.1"
 	Claude3                      = "claude-3"
-	ClaudeSlack                  = "claude-slack"
-	SparkDeskLite                = "spark-desk-lite"
-	SparkDeskPro                 = "spark-desk-pro"
-	SparkDeskPro128K             = "spark-desk-pro-128k"
-	SparkDeskMax                 = "spark-desk-max"
-	SparkDeskMax32K              = "spark-desk-max-32k"
-	SparkDeskV4Ultra             = "spark-desk-4.0-ultra"
 	ChatBison001                 = "chat-bison-001"
 	GeminiPro                    = "gemini-pro"
 	GeminiProVision              = "gemini-pro-vision"
@@ -155,27 +148,9 @@ const (
 	Gemini3ProImagePreview       = "gemini-3-pro-image-preview"
 	GeminiExp1206                = "gemini-exp-1206"
 	GoogleImagen002              = "imagen-3.0-generate-002"
-	ZhiPuChatGLM4                = "glm-4"
-	ZhiPuChatGLM4Vision          = "glm-4v"
-	ZhiPuChatGLM3Turbo           = "glm-3-turbo"
-	ZhiPuChatGLMTurbo            = "zhipu-chatglm-turbo"
-	ZhiPuChatGLMPro              = "zhipu-chatglm-pro"
-	ZhiPuChatGLMStd              = "zhipu-chatglm-std"
-	ZhiPuChatGLMLite             = "zhipu-chatglm-lite"
-	QwenTurbo                    = "qwen-turbo"
-	QwenPlus                     = "qwen-plus"
-	QwenTurboNet                 = "qwen-turbo-net"
-	QwenPlusNet                  = "qwen-plus-net"
 	Midjourney                   = "midjourney"
 	MidjourneyFast               = "midjourney-fast"
 	MidjourneyTurbo              = "midjourney-turbo"
-	Hunyuan                      = "hunyuan"
-	GPT360V9                     = "360-gpt-v9"
-	Baichuan53B                  = "baichuan-53b"
-	SkylarkLite                  = "skylark-lite-public"
-	SkylarkPlus                  = "skylark-plus-public"
-	SkylarkPro                   = "skylark-pro-public"
-	SkylarkChat                  = "skylark-chat"
 	DeepseekV3                   = "deepseek-chat"
 	DeepseekR1                   = "deepseek-reasoner"
 )
@@ -194,8 +169,7 @@ var VisionModels = []string{
 	Gemini20Flash, Gemini20Flash001, Gemini20FlashLite,
 	Gemini25Flash, Gemini25Pro, Gemini25FlashLitePreview, "gemini-2.5-flash-lite", "gemini-2.5-flash-preview-09-2025",
 	Gemini3Flash, Gemini3ProPreview, Gemini3ProImagePreview, "gemini-3-flash-preview", "gemini-3.1-pro-preview", "gemini-3.1-pro-preview-customtools", "gemini-3.1-flash-lite-preview", "gemini-3.1-flash-image-preview", // gemini
-	Claude3,             // anthropic
-	ZhiPuChatGLM4Vision, // chatglm
+	Claude3, // anthropic
 }
 
 var VisionSkipModels = []string{

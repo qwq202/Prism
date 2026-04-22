@@ -232,5 +232,22 @@ func validateChannelType(channel *Channel) error {
 }
 
 func isRemovedChannelType(channelType string) bool {
-	return channelType == "bing"
+	switch channelType {
+	case "bing",
+		"slack",
+		"sparkdesk",
+		"chatglm",
+		"qwen",
+		"hunyuan",
+		"baichuan",
+		"skylark",
+		"zhinao",
+		"moonshot",
+		"groq",
+		"coze",
+		"dify":
+		return true
+	default:
+		return false
+	}
 }

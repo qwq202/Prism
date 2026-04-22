@@ -106,7 +106,6 @@ export const pricing: PricingDataset = [
       "claude-1.3",
       "claude-instant",
       "claude-instant-1.2",
-      "claude-slack",
     ],
     input: 0.0008,
     output: 0.0024,
@@ -154,71 +153,6 @@ export const pricing: PricingDataset = [
     billing_type: timesBilling,
   },
   {
-    models: ["spark-desk-v1.5"],
-    input: 0.015,
-    output: 0.015,
-    currency: Currency.CNY,
-  },
-  {
-    models: ["spark-desk-v2", "spark-desk-v3", "spark-desk-v3.5"],
-    input: 0.03,
-    output: 0.03,
-    currency: Currency.CNY,
-  },
-  {
-    models: ["moonshot-v1-8k"],
-    input: 0.012,
-    output: 0.012,
-    currency: Currency.CNY,
-  },
-  {
-    models: ["moonshot-v1-32k"],
-    input: 0.024,
-    output: 0.024,
-    currency: Currency.CNY,
-  },
-  {
-    models: ["moonshot-v1-128k"],
-    input: 0.06,
-    output: 0.06,
-    currency: Currency.CNY,
-  },
-  {
-    models: ["glm-4", "glm-4v"],
-    input: 0.1,
-    output: 0.1,
-    currency: Currency.CNY,
-  },
-  {
-    models: [
-      "zhipu-chatglm-lite",
-      "zhipu-chatglm-std",
-      "zhipu-chatglm-turbo",
-      "glm-3-turbo",
-    ],
-    input: 0.005,
-    output: 0.005,
-    currency: Currency.CNY,
-  },
-  {
-    models: ["zhipu-chatglm-pro"],
-    input: 0.01,
-    output: 0.01,
-    currency: Currency.CNY,
-  },
-  {
-    models: ["qwen-plus", "qwen-plus-net"],
-    input: 0.02,
-    output: 0.02,
-    currency: Currency.CNY,
-  },
-  {
-    models: ["qwen-turbo", "qwen-turbo-net"],
-    input: 0.008,
-    output: 0.008,
-    currency: Currency.CNY,
-  },
-  {
     models: ["chat-bison-001"], // free marked as $0.001
     output: 0.001,
   },
@@ -233,51 +167,10 @@ export const pricing: PricingDataset = [
     output: 0.000375,
   },
   {
-    models: ["hunyuan"],
-    input: 0.1,
-    output: 0.1,
-    currency: Currency.CNY,
-  },
-  {
     models: ["deepseek-chat", "deepseek-coder"],
     input: 0.001,
     output: 0.002,
     currency: Currency.CNY,
-  },
-  {
-    models: ["360-gpt-v9"],
-    input: 0.12,
-    output: 0.12,
-    currency: Currency.CNY,
-  },
-  {
-    models: ["baichuan-53b"],
-    input: 0.02,
-    output: 0.02,
-    currency: Currency.CNY,
-  },
-  {
-    models: ["skylark-lite-public"],
-    input: 0.004,
-    output: 0.004,
-    currency: Currency.CNY,
-  },
-  {
-    models: ["skylark-plus-public"],
-    input: 0.008,
-    output: 0.008,
-    currency: Currency.CNY,
-  },
-  {
-    models: ["skylark-pro-public", "skylark-chat"],
-    input: 0.011,
-    output: 0.011,
-    currency: Currency.CNY,
-  },
-  {
-    models: ["llama2-70b-4096", "mixtral-8x7b-32768", "gemma-7b-it"],
-    output: 0.001, // free marked as $0.001
-    currency: Currency.USD,
   },
 ];
 

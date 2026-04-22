@@ -20,14 +20,6 @@ export const modelColorMapper: Record<string, string> = {
   anthropic: "orange-400",
   minimax: "emerald-500",
 
-  // Spark Desk
-  "spark-desk": "blue-400",
-  sparkdesk: "blue-400",
-
-  // Moonshot
-  moonshot: "black-500",
-  kimi: "black-500",
-
   // Midjourney
   midjourney: "indigo-600",
   "mid-journey": "indigo-600",
@@ -37,11 +29,6 @@ export const modelColorMapper: Record<string, string> = {
   "stable-diffusion": "gray-400",
   stablediffusion: "gray-400",
   stability: "gray-400",
-
-  // Groq Cloud
-  "llama2-70b-4096": "red-500",
-  "mixtral-8x7b-32768": "red-500",
-  "gemma-7b-it": "red-500",
 
   // Google Gemini & Gemma
   "chat-bison-001": "red-500",
@@ -57,29 +44,8 @@ export const modelColorMapper: Record<string, string> = {
   zhipu: "lime-500",
   glm: "lime-500",
 
-  // Tongyi Qwen
-  qwen: "indigo-600",
-  tongyi: "indigo-600",
-
   // Meta LLaMA
   llama: "sky-400",
-
-  // Tencent Hunyuan
-  hunyuan: "blue-500",
-
-  // 360 GPT
-  "360": "stone-500",
-
-  // Baichuan AI
-  baichuan: "orange-700",
-
-  // ByteDance Skylark / Doubao / Coze
-  skylark: "sky-300",
-  doubao: "sky-300",
-  coze: "sky-300",
-
-  // Dify
-  dify: "gray-300",
 
   // OpenRouter
   openrouter: "purple-600",
@@ -98,9 +64,6 @@ const unknownColors = [
   "blue-700",
   "lime-500",
   "sky-400",
-  "stone-500",
-  "orange-700",
-  "sky-300",
 ];
 
 export function getUnknownModelColor(model: string): string {

@@ -61,18 +61,8 @@
 2. Anthropic Claude *(✅ Vision ✅ Function Calling)*
 3. Google Gemini & PaLM2 *(✅ Vision)*
 4. Midjourney *(✅ Mode Toggling ✅ U/V/R Actions)*
-5. 讯飞星火 SparkDesk *(✅ Vision ✅ Function Calling)*
-6. 智谱清言 ChatGLM *(✅ Vision)*
-7. 通义千问 Tongyi Qwen
-8. 腾讯混元 Tencent Hunyuan
-9. 百川大模型 Baichuan AI
-10. 月之暗面 Moonshot AI (👉 OpenAI)
-11. 深度求索 DeepSeek AI (👉 OpenAI)
-12. 字节云雀 ByteDance Skylark *(✅ Function Calling)*
-13. Groq Cloud AI
-14. OpenRouter (👉 OpenAI)
-15. 360 GPT
-16. LocalAI / Ollama (👉 OpenAI)
+5. 深度求索 DeepSeek AI (👉 OpenAI)
+6. LocalAI / Ollama (👉 OpenAI)
 
 ## 👻 中转 OpenAI 兼容 API
    - [x] Chat Completions _(/v1/chat/completions)_

@@ -16,21 +16,9 @@ const (
 	ClaudeChannelType             = "claude"
 	GLMCodingPlanCNChannelType    = "glm-coding-plan-cn"
 	MiniMaxTokenPlanCNChannelType = "minimax-token-plan-cn"
-	SlackChannelType              = "slack"
-	SparkdeskChannelType          = "sparkdesk"
-	ChatGLMChannelType            = "chatglm"
-	HunyuanChannelType            = "hunyuan"
-	QwenChannelType               = "qwen"
-	ZhinaoChannelType             = "zhinao"
-	BaichuanChannelType           = "baichuan"
-	SkylarkChannelType            = "skylark"
 	PalmChannelType               = "palm"
 	MidjourneyChannelType         = "midjourney"
-	MoonshotChannelType           = "moonshot"
-	GroqChannelType               = "groq"
 	DeepseekChannelType           = "deepseek"
-	DifyChannelType               = "dify"
-	CozeChannelType               = "coze"
 )
 
 const (

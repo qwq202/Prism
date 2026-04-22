@@ -13,9 +13,7 @@ import (
 var writableToolChannelTypes = map[string]struct{}{
 	globals.OpenAIChannelType:      {},
 	globals.AzureOpenAIChannelType: {},
-	globals.ChatGLMChannelType:     {},
 	globals.PalmChannelType:        {},
-	globals.SkylarkChannelType:     {},
 }
 
 func BuildToolDefinition() *globals.FunctionTools {
