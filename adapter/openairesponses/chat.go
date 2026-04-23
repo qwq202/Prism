@@ -83,6 +83,36 @@ func formatInputMessage(props *adaptercommon.ChatProps, message globals.Message)
 	}
 }
 
+func formatReplayFunctionCalls(message globals.Message) []interface{} {
+	if message.ToolCalls == nil || len(*message.ToolCalls) == 0 {
+		return nil
+	}
+
+	items := make([]interface{}, 0, len(*message.ToolCalls))
+	for _, toolCall := range *message.ToolCalls {
+		items = append(items, OutputItem{
+			Type:      "function_call",
+			Name:      toolCall.Function.Name,
+			Arguments: toolCall.Function.Arguments,
+			CallID:    toolCall.Id,
+		})
+	}
+
+	return items
+}
+
+func formatFunctionCallOutput(message globals.Message) *FunctionCallOutputInput {
+	if message.ToolCallId == nil || strings.TrimSpace(*message.ToolCallId) == "" {
+		return nil
+	}
+
+	return &FunctionCallOutputInput{
+		Type:   "function_call_output",
+		CallID: strings.TrimSpace(*message.ToolCallId),
+		Output: message.Content,
+	}
+}
+
 func formatMessages(props *adaptercommon.ChatProps) ([]interface{}, *string) {
 	input := make([]interface{}, 0, len(props.Message))
 	instructions := make([]string, 0)
@@ -93,6 +123,25 @@ func formatMessages(props *adaptercommon.ChatProps) ([]interface{}, *string) {
 			if text != "" {
 				instructions = append(instructions, text)
 			}
+			continue
+		}
+
+		if message.Role == globals.Tool {
+			if output := formatFunctionCallOutput(message); output != nil {
+				input = append(input, *output)
+			}
+			continue
+		}
+
+		if message.Role == globals.Assistant && message.ToolCalls != nil && len(*message.ToolCalls) > 0 {
+			if strings.TrimSpace(message.Content) != "" {
+				formatted := formatInputMessage(props, message)
+				if formatted != nil {
+					input = append(input, *formatted)
+				}
+			}
+
+			input = append(input, formatReplayFunctionCalls(message)...)
 			continue
 		}
 
@@ -135,21 +184,36 @@ func getResponseTools(props *adaptercommon.ChatProps) []ResponseTool {
 	return tools
 }
 
+func getResponseTextConfig(props *adaptercommon.ChatProps) interface{} {
+	if props == nil || props.ResponseFormat == nil {
+		return nil
+	}
+
+	return map[string]interface{}{
+		"format": props.ResponseFormat,
+	}
+}
+
 func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps, stream bool) ResponseRequest {
 	input, instructions := formatMessages(props)
 	tools := getResponseTools(props)
 
 	return ResponseRequest{
-		Model:           props.Model,
-		Instructions:    instructions,
-		Input:           input,
-		MaxOutputTokens: props.MaxTokens,
-		Temperature:     props.Temperature,
-		TopP:            props.TopP,
-		Tools:           tools,
-		ToolChoice:      props.ToolChoice,
-		ResponseFormat:  props.ResponseFormat,
-		Stream:          stream,
+		Model:              props.Model,
+		Instructions:       instructions,
+		Input:              input,
+		MaxOutputTokens:    props.MaxTokens,
+		Temperature:        props.Temperature,
+		TopP:               props.TopP,
+		Tools:              tools,
+		ToolChoice:         props.ToolChoice,
+		ParallelToolCalls:  props.ParallelToolCalls,
+		Text:               getResponseTextConfig(props),
+		Reasoning:          props.Thinking,
+		Include:            props.ResponseInclude,
+		PreviousResponseID: props.PreviousResponseID,
+		Store:              props.ResponseStore,
+		Stream:             stream,
 	}
 }
 
@@ -229,27 +293,100 @@ func parseResponse(data string) (*ResponseResponse, error) {
 	return form, nil
 }
 
+func parseStreamEvent(data string) (*ResponseStreamEvent, error) {
+	form := utils.UnmarshalForm[ResponseStreamEvent](data)
+	if form == nil {
+		return nil, errors.New("cannot parse stream event")
+	}
+
+	if form.Error.Message != "" {
+		return nil, fmt.Errorf("%s", form.Error.Message)
+	}
+
+	return form, nil
+}
+
+func emitOutputText(delta string) *globals.Chunk {
+	if delta == "" {
+		return nil
+	}
+
+	return &globals.Chunk{
+		Content: delta,
+	}
+}
+
+func emitFunctionCallEvent(item *OutputItem) *globals.Chunk {
+	if item == nil || item.Type != "function_call" || strings.TrimSpace(item.Name) == "" {
+		return nil
+	}
+
+	toolCalls := globals.ToolCalls{
+		{
+			Index: utils.ToPtr(0),
+			Type:  "function",
+			Id:    item.CallID,
+			Function: globals.ToolCallFunction{
+				Name:      item.Name,
+				Arguments: item.Arguments,
+			},
+		},
+	}
+
+	return &globals.Chunk{
+		ToolCall: &toolCalls,
+	}
+}
+
 func (c *ChatInstance) CreateStreamChatRequest(props *adaptercommon.ChatProps, callback globals.Hook) error {
-	body := c.GetChatBody(props, false)
-	raw, err := utils.PostRaw(
-		c.GetChatEndpoint(),
-		c.GetHeader(),
-		body,
-		props.Proxy,
-	)
+	ticks := 0
+	body := c.GetChatBody(props, true)
+
+	err := utils.EventScanner(&utils.EventScannerProps{
+		Method:  "POST",
+		Uri:     c.GetChatEndpoint(),
+		Headers: c.GetHeader(),
+		Body:    body,
+		Callback: func(data string) error {
+			event, parseErr := parseStreamEvent(data)
+			if parseErr != nil {
+				return parseErr
+			}
+
+			var chunk *globals.Chunk
+			switch event.Type {
+			case "response.output_text.delta":
+				chunk = emitOutputText(event.Delta)
+			case "response.output_item.done", "response.function_call_arguments.done":
+				chunk = emitFunctionCallEvent(event.Item)
+			default:
+				return nil
+			}
+
+			if chunk == nil {
+				return nil
+			}
+
+			ticks += 1
+			return callback(chunk)
+		},
+	}, props.Proxy)
+
 	if err != nil {
-		return fmt.Errorf("openai responses error: %s", err.Error())
+		if err.Body != "" {
+			if form := utils.UnmarshalForm[ResponseResponse](err.Body); form != nil && form.Error.Message != "" {
+				return fmt.Errorf("openai responses error: %s", form.Error.Message)
+			}
+
+			return fmt.Errorf("openai responses error: %s", strings.TrimSpace(err.Body))
+		}
+
+		return fmt.Errorf("openai responses error: %s", err.Error)
 	}
 
-	form, parseErr := parseResponse(raw)
-	if parseErr != nil {
-		return fmt.Errorf("openai responses error: %s", parseErr.Error())
-	}
-
-	chunk := buildResponseChunk(form)
-	if chunk.IsEmpty() {
+	if ticks == 0 {
 		return errors.New("openai responses error: empty response")
 	}
 
-	return callback(chunk)
+	return nil
 }

@@ -35,7 +35,8 @@ type ResponseRequest struct {
 	Tools              []ResponseTool `json:"tools,omitempty"`
 	ToolChoice         *interface{}   `json:"tool_choice,omitempty"`
 	ParallelToolCalls  *bool          `json:"parallel_tool_calls,omitempty"`
-	ResponseFormat     interface{}    `json:"response_format,omitempty"`
+	Text               interface{}    `json:"text,omitempty"`
+	Reasoning          interface{}    `json:"reasoning,omitempty"`
 	Include            []string       `json:"include,omitempty"`
 	PreviousResponseID *string        `json:"previous_response_id,omitempty"`
 	Store              *bool          `json:"store,omitempty"`
@@ -48,6 +49,7 @@ type OutputContent struct {
 }
 
 type OutputItem struct {
+	ID        string          `json:"id,omitempty"`
 	Type      string          `json:"type"`
 	Role      string          `json:"role,omitempty"`
 	Content   []OutputContent `json:"content,omitempty"`
@@ -68,10 +70,11 @@ type ResponseResponse struct {
 }
 
 type ResponseStreamEvent struct {
-	Type  string      `json:"type"`
-	Delta string      `json:"delta,omitempty"`
-	Item  *OutputItem `json:"item,omitempty"`
-	Error struct {
+	Type   string      `json:"type"`
+	Delta  string      `json:"delta,omitempty"`
+	Item   *OutputItem `json:"item,omitempty"`
+	ItemID string      `json:"item_id,omitempty"`
+	Error  struct {
 		Message string `json:"message"`
 		Type    string `json:"type"`
 	} `json:"error,omitempty"`
