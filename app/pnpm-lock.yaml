@@ -7,6 +7,11 @@ settings:
 overrides:
   '@lobehub/icons': 1.97.2
 
+patchedDependencies:
+  needle@3.3.1:
+    hash: 76690b6c0e436c6f8b4135b5d3bf4a5cd7c777db12fe3dd45b55e2664362b81c
+    path: patches/needle@3.3.1.patch
+
 importers:
 
   .:
@@ -257,7 +262,7 @@ importers:
         version: 6.9.0(eslint@8.52.0)(typescript@5.2.2)
       '@vitejs/plugin-react-swc':
         specifier: ^3.3.2
-        version: 3.4.0(@swc/helpers@0.5.5)(vite@4.5.0(@types/node@20.8.9)(less@4.2.0)(terser@5.46.1))
+        version: 3.4.0(@swc/helpers@0.5.5)(vite@4.5.0(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1))
       autoprefixer:
         specifier: ^10.5.0
         version: 10.5.0(postcss@8.4.31)
@@ -275,10 +280,10 @@ importers:
         version: 0.4.3(eslint@8.52.0)
       less:
         specifier: ^4.2.0
-        version: 4.2.0
+        version: 4.6.4
       less-loader:
         specifier: ^11.1.3
-        version: 11.1.3(less@4.2.0)(webpack@5.95.0)
+        version: 11.1.3(less@4.6.4)(webpack@5.95.0)
       postcss:
         specifier: ^8.4.29
         version: 8.4.31
@@ -293,10 +298,10 @@ importers:
         version: 5.2.2
       vite:
         specifier: ^4.4.5
-        version: 4.5.0(@types/node@20.8.9)(less@4.2.0)(terser@5.46.1)
+        version: 4.5.0(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1)
       vite-plugin-html:
         specifier: ^3.2.0
-        version: 3.2.0(vite@4.5.0(@types/node@20.8.9)(less@4.2.0)(terser@5.46.1))
+        version: 3.2.0(vite@4.5.0(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1))
 
 packages:
 
@@ -886,24 +891,28 @@ packages:
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
+    libc: [glibc]
 
   '@next/swc-linux-arm64-musl@14.2.15':
     resolution: {integrity: sha512-k5xf/tg1FBv/M4CMd8S+JL3uV9BnnRmoe7F+GWC3DxkTCD9aewFRH1s5rJ1zkzDa+Do4zyN8qD0N8c84Hu96FQ==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
+    libc: [musl]
 
   '@next/swc-linux-x64-gnu@14.2.15':
     resolution: {integrity: sha512-kE6q38hbrRbKEkkVn62reLXhThLRh6/TvgSP56GkFNhU22TbIrQDEMrO7j0IcQHcew2wfykq8lZyHFabz0oBrA==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
+    libc: [glibc]
 
   '@next/swc-linux-x64-musl@14.2.15':
     resolution: {integrity: sha512-PZ5YE9ouy/IdO7QVJeIcyLn/Rc4ml9M2G4y3kCM9MNf1YKvFY4heg3pVa/jQbMro+tP6yc4G2o9LjAz1zxD7tQ==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
+    libc: [musl]
 
   '@next/swc-win32-arm64-msvc@14.2.15':
     resolution: {integrity: sha512-2raR16703kBvYEQD9HNLyb0/394yfqzmIeyp2nDzcPV4yPjqNUG3ohX6jX00WryXz6s1FXpVhsCo3i+g4RUX+g==}
@@ -1934,24 +1943,28 @@ packages:
     engines: {node: '>=10'}
     cpu: [arm64]
     os: [linux]
+    libc: [glibc]
 
   '@swc/core-linux-arm64-musl@1.3.95':
     resolution: {integrity: sha512-ZpbTr+QZDT4OPJfjPAmScqdKKaT+wGurvMU5AhxLaf85DuL8HwUwwlL0n1oLieLc47DwIJEMuKQkYhXMqmJHlg==}
     engines: {node: '>=10'}
     cpu: [arm64]
     os: [linux]
+    libc: [musl]
 
   '@swc/core-linux-x64-gnu@1.3.95':
     resolution: {integrity: sha512-n9SuHEFtdfSJ+sHdNXNRuIOVprB8nbsz+08apKfdo4lEKq6IIPBBAk5kVhPhkjmg2dFVHVo4Tr/OHXM1tzWCCw==}
     engines: {node: '>=10'}
     cpu: [x64]
     os: [linux]
+    libc: [glibc]
 
   '@swc/core-linux-x64-musl@1.3.95':
     resolution: {integrity: sha512-L1JrVlsXU3LC0WwmVnMK9HrOT2uhHahAoPNMJnZQpc18a0paO9fqifPG8M/HjNRffMUXR199G/phJsf326UvVg==}
     engines: {node: '>=10'}
     cpu: [x64]
     os: [linux]
+    libc: [musl]
 
   '@swc/core-win32-arm64-msvc@1.3.95':
     resolution: {integrity: sha512-YaP4x/aZbUyNdqCBpC2zL8b8n58MEpOUpmOIZK6G1SxGi+2ENht7gs7+iXpWPc0sy7X3YPKmSWMAuui0h8lgAA==}
@@ -2035,24 +2048,28 @@ packages:
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
+    libc: [glibc]
 
   '@tauri-apps/cli-linux-arm64-musl@1.5.6':
     resolution: {integrity: sha512-8j5dH3odweFeom7bRGlfzDApWVOT4jIq8/214Wl+JeiNVehouIBo9lZGeghZBH3XKFRwEvU23i7sRVjuh2s8mg==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
+    libc: [musl]
 
   '@tauri-apps/cli-linux-x64-gnu@1.5.6':
     resolution: {integrity: sha512-gbFHYHfdEGW0ffk8SigDsoXks6USpilF6wR0nqB/JbWzbzFR/sBuLVNQlJl1RKNakyJHu+lsFxGy0fcTdoX8xA==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
+    libc: [glibc]
 
   '@tauri-apps/cli-linux-x64-musl@1.5.6':
     resolution: {integrity: sha512-9v688ogoLkeFYQNgqiSErfhTreLUd8B3prIBSYUt+x4+5Kcw91zWvIh+VSxL1n3KCGGsM7cuXhkGPaxwlEh1ug==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
+    libc: [musl]
 
   '@tauri-apps/cli-win32-arm64-msvc@1.5.6':
     resolution: {integrity: sha512-DRNDXFNZb6y5IZrw+lhTTA9l4wbzO4TNRBAlHAiXUrH+pRFZ/ZJtv5WEuAj9ocVSahVw2NaK5Yaold4NPAxHog==}
@@ -2784,8 +2801,9 @@ packages:
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
 
-  copy-anything@2.0.6:
-    resolution: {integrity: sha512-1j20GZTsvKNkc4BY3NpMOM8tt///wY3FpIzozTOFO2ffuZcV61nojHXVKIy3WM+7ADCy5FVhdZYHYDdgTU0yJw==}
+  copy-anything@3.0.5:
+    resolution: {integrity: sha512-yCEafptTtb4bk7GLEQoM8KVJpxAfdBJYaXyzQEgQQQgYrZiDp8SJmGKlYza6CYjEDNstAdNdKA3UuoULlEbS6w==}
+    engines: {node: '>=12.13'}
 
   copy-to-clipboard@3.3.3:
     resolution: {integrity: sha512-2KV8NhB5JqC3ky0r9PMCAZKbUHSwtEo4CwCs0KXgruG43gX5PMqDEBbVU4OUzw2MuAWUfsuFmWvEKG5QRfSnJA==}
@@ -3721,8 +3739,9 @@ packages:
     resolution: {integrity: sha512-h5PpgXkWitc38BBMYawTYMWJHFZJVnBquFE57xFpjB8pJFiF6gZ+bU+WyI/yqXiFR5mdLsgYNaPe8uao6Uv9Og==}
     engines: {node: '>=0.10.0'}
 
-  is-what@3.14.1:
-    resolution: {integrity: sha512-sNxgpk9793nzSs7bA6JQJGeIuRBQhAaNGG77kzYQgMkrID+lS6SlK07K5LaptscDlSaIgH+GPFzf+d75FVxozA==}
+  is-what@4.1.16:
+    resolution: {integrity: sha512-ZhMwEosbFJkA0YhFnNDgTM4ZxDRsS6HqTo7qsZM08fehyRYIYa0yHu5R6mgo1n/8MgaPBXiPimPD77baVFYg+A==}
+    engines: {node: '>=12.13'}
 
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
@@ -3821,9 +3840,9 @@ packages:
       less: ^3.5.0 || ^4.0.0
       webpack: ^5.0.0
 
-  less@4.2.0:
-    resolution: {integrity: sha512-P3b3HJDBtSzsXUl0im2L7gTO5Ubg8mEN6G8qoTS77iXxXX4Hvu4Qj540PZDvQ8V6DmX6iXo98k7Md0Cm1PrLaA==}
-    engines: {node: '>=6'}
+  less@4.6.4:
+    resolution: {integrity: sha512-OJmO5+HxZLLw0RLzkqaNHzcgEAQG7C0y3aMbwtCzIUFZsLMNNq/1IdAdHEycQ58CwUO3jPTHmoN+tE5I7FQxNg==}
+    engines: {node: '>=18'}
     hasBin: true
 
   leva@0.10.1:
@@ -8209,10 +8228,10 @@ snapshots:
       '@use-gesture/core': 10.3.1
       react: 18.2.0
 
-  '@vitejs/plugin-react-swc@3.4.0(@swc/helpers@0.5.5)(vite@4.5.0(@types/node@20.8.9)(less@4.2.0)(terser@5.46.1))':
+  '@vitejs/plugin-react-swc@3.4.0(@swc/helpers@0.5.5)(vite@4.5.0(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1))':
     dependencies:
       '@swc/core': 1.3.95(@swc/helpers@0.5.5)
-      vite: 4.5.0(@types/node@20.8.9)(less@4.2.0)(terser@5.46.1)
+      vite: 4.5.0(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1)
     transitivePeerDependencies:
       - '@swc/helpers'
 
@@ -8687,9 +8706,9 @@ snapshots:
 
   convert-source-map@2.0.0: {}
 
-  copy-anything@2.0.6:
+  copy-anything@3.0.5:
     dependencies:
-      is-what: 3.14.1
+      is-what: 4.1.16
 
   copy-to-clipboard@3.3.3:
     dependencies:
@@ -9802,7 +9821,7 @@ snapshots:
     dependencies:
       isobject: 3.0.1
 
-  is-what@3.14.1: {}
+  is-what@4.1.16: {}
 
   isexe@2.0.0: {}
 
@@ -9884,23 +9903,22 @@ snapshots:
 
   layout-base@2.0.1: {}
 
-  less-loader@11.1.3(less@4.2.0)(webpack@5.95.0):
+  less-loader@11.1.3(less@4.6.4)(webpack@5.95.0):
     dependencies:
-      less: 4.2.0
+      less: 4.6.4
       webpack: 5.95.0
 
-  less@4.2.0:
+  less@4.6.4:
     dependencies:
-      copy-anything: 2.0.6
+      copy-anything: 3.0.5
       parse-node-version: 1.0.1
-      tslib: 2.6.2
     optionalDependencies:
       errno: 0.1.8
       graceful-fs: 4.2.11
       image-size: 0.5.5
       make-dir: 2.1.0
       mime: 1.6.0
-      needle: 3.3.1
+      needle: 3.3.1(patch_hash=76690b6c0e436c6f8b4135b5d3bf4a5cd7c777db12fe3dd45b55e2664362b81c)
       source-map: 0.6.1
 
   leva@0.10.1(@types/react-dom@18.2.14)(@types/react@18.2.33)(react-dom@18.2.0(react@18.2.0))(react@18.2.0):
@@ -10949,7 +10967,7 @@ snapshots:
 
   natural-compare@1.4.0: {}
 
-  needle@3.3.1:
+  needle@3.3.1(patch_hash=76690b6c0e436c6f8b4135b5d3bf4a5cd7c777db12fe3dd45b55e2664362b81c):
     dependencies:
       iconv-lite: 0.6.3
       sax: 1.3.0
@@ -12633,7 +12651,7 @@ snapshots:
       d3-time: 3.1.0
       d3-timer: 3.0.1
 
-  vite-plugin-html@3.2.0(vite@4.5.0(@types/node@20.8.9)(less@4.2.0)(terser@5.46.1)):
+  vite-plugin-html@3.2.0(vite@4.5.0(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1)):
     dependencies:
       '@rollup/pluginutils': 4.2.1
       colorette: 2.0.20
@@ -12647,9 +12665,9 @@ snapshots:
       html-minifier-terser: 6.1.0
       node-html-parser: 5.4.2
       pathe: 0.2.0
-      vite: 4.5.0(@types/node@20.8.9)(less@4.2.0)(terser@5.46.1)
+      vite: 4.5.0(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1)
 
-  vite@4.5.0(@types/node@20.8.9)(less@4.2.0)(terser@5.46.1):
+  vite@4.5.0(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1):
     dependencies:
       esbuild: 0.18.20
       postcss: 8.4.31
@@ -12657,7 +12675,7 @@ snapshots:
     optionalDependencies:
       '@types/node': 20.8.9
       fsevents: 2.3.3
-      less: 4.2.0
+      less: 4.6.4
       terser: 5.46.1
 
   void-elements@3.1.0: {}
