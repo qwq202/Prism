@@ -41,8 +41,9 @@ func getMessageText(message globals.Message) string {
 func formatInputMessage(props *adaptercommon.ChatProps, message globals.Message) *InputMessage {
 	text := getMessageText(message)
 	imageDetail := "high"
+	role := normalizeRole(message.Role)
 
-	if normalizeRole(message.Role) == globals.User {
+	if role == globals.User {
 		content, urls := utils.ExtractImages(text, true)
 		items := []InputMessageContent{
 			{
@@ -72,11 +73,16 @@ func formatInputMessage(props *adaptercommon.ChatProps, message globals.Message)
 		}
 	}
 
+	contentType := "input_text"
+	if role == globals.Assistant {
+		contentType = "output_text"
+	}
+
 	return &InputMessage{
-		Role: normalizeRole(message.Role),
+		Role: role,
 		Content: []InputMessageContent{
 			{
-				Type: "input_text",
+				Type: contentType,
 				Text: &text,
 			},
 		},

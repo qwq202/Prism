@@ -153,6 +153,34 @@ func TestGetChatBodyReplaysFunctionCallAndOutput(t *testing.T) {
 	}
 }
 
+func TestGetChatBodyEncodesAssistantHistoryAsOutputText(t *testing.T) {
+	instance := &ChatInstance{}
+	props := &adaptercommon.ChatProps{
+		Model: "gpt-5.4",
+		Message: []globals.Message{
+			{Role: globals.User, Content: "你好"},
+			{Role: globals.Assistant, Content: "你好，我是 GPT-5.4"},
+		},
+	}
+
+	body := instance.GetChatBody(props, false)
+	items := requireInputItems(t, body.Input)
+	if len(items) != 2 {
+		t.Fatalf("expected user + assistant history items, got %#v", items)
+	}
+
+	assistantMessage, ok := items[1].(InputMessage)
+	if !ok {
+		t.Fatalf("expected second item to be assistant input message, got %#v", items[1])
+	}
+	if assistantMessage.Role != globals.Assistant {
+		t.Fatalf("expected assistant role, got %#v", assistantMessage.Role)
+	}
+	if len(assistantMessage.Content) != 1 || assistantMessage.Content[0].Type != "output_text" {
+		t.Fatalf("expected assistant history to use output_text, got %#v", assistantMessage.Content)
+	}
+}
+
 func TestBuildResponseChunkExtractsFunctionCalls(t *testing.T) {
 	form := &ResponseResponse{
 		Output: []OutputItem{
