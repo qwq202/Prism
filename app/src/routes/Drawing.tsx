@@ -82,15 +82,15 @@ function Drawing() {
       <main className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-muted/30">
         {/* Top Controls - Floating */}
         <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20">
-          <div className="relative grid grid-cols-2 items-center rounded-[20px] border border-border/80 bg-background/90 p-1 shadow-sm backdrop-blur-xl">
+          <div className="relative grid grid-cols-2 items-center rounded-full border border-border/80 bg-background/90 p-1.5 shadow-sm backdrop-blur-xl">
             <div
-              className={`pointer-events-none absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-[16px] bg-foreground shadow-sm transition-transform duration-300 ease-out ${
+              className={`pointer-events-none absolute inset-y-1.5 left-1.5 w-[calc(50%-0.375rem)] rounded-full bg-foreground shadow-sm transition-transform duration-300 ease-out ${
                 mode === "edit" ? "translate-x-full" : "translate-x-0"
               }`}
             />
             <button
               onClick={() => setMode("generate")}
-              className={`relative z-10 min-w-[64px] px-6 py-2.5 rounded-[16px] text-sm font-medium transition-colors duration-300 ${
+              className={`relative z-10 min-w-[72px] px-7 py-2.5 rounded-full text-sm font-medium transition-colors duration-300 ${
                 mode === "generate"
                   ? "text-background"
                   : "text-muted-foreground hover:text-foreground"
@@ -101,7 +101,7 @@ function Drawing() {
             </button>
             <button
               onClick={() => setMode("edit")}
-              className={`relative z-10 min-w-[64px] px-6 py-2.5 rounded-[16px] text-sm font-medium transition-colors duration-300 ${
+              className={`relative z-10 min-w-[72px] px-7 py-2.5 rounded-full text-sm font-medium transition-colors duration-300 ${
                 mode === "edit"
                   ? "text-background"
                   : "text-muted-foreground hover:text-foreground"
