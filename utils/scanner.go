@@ -11,6 +11,8 @@ import (
 	"strings"
 )
 
+const scannerMaxTokenSize = 1024 * 1024 * 10
+
 type EventScannerProps struct {
 	Method   string
 	Uri      string
@@ -95,21 +97,23 @@ func EventScanner(props *EventScannerProps, config ...globals.ProxyConfig) *Even
 
 func processFullSSE(body io.ReadCloser, callback func(string) error) *EventScannerError {
 	scanner := bufio.NewScanner(body)
-	var eventType, eventData string
+	scanner.Buffer(make([]byte, 64*1024), scannerMaxTokenSize)
+	var eventType string
+	var eventData []string
 	var buffer strings.Builder
 
 	for scanner.Scan() {
 		line := scanner.Text()
 
 		if len(strings.TrimSpace(line)) == 0 {
-			if eventData != "" {
+			if len(eventData) > 0 {
 				if eventType != "" {
 					buffer.WriteString("event: ")
 					buffer.WriteString(eventType)
 					buffer.WriteString("\n")
 				}
 				buffer.WriteString("data: ")
-				buffer.WriteString(eventData)
+				buffer.WriteString(strings.Join(eventData, "\ndata: "))
 
 				eventStr := buffer.String()
 				if globals.DebugMode {
@@ -117,15 +121,14 @@ func processFullSSE(body io.ReadCloser, callback func(string) error) *EventScann
 				}
 
 				if err := callback(eventStr); err != nil {
-					err := body.Close()
-					if err != nil {
-						globals.Debug(fmt.Sprintf("[sse] event source close error: %s", err.Error()))
+					if closeErr := body.Close(); closeErr != nil && globals.DebugMode {
+						globals.Debug(fmt.Sprintf("[sse] event source close error: %s", closeErr.Error()))
 					}
 					return &EventScannerError{Error: err}
 				}
 
 				eventType = ""
-				eventData = ""
+				eventData = nil
 				buffer.Reset()
 			}
 			continue
@@ -137,22 +140,27 @@ func processFullSSE(body io.ReadCloser, callback func(string) error) *EventScann
 		}
 
 		if strings.HasPrefix(line, "data:") {
-			eventData = strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+			data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
 
-			if eventData == "[DONE]" || strings.HasPrefix(eventData, "[DONE]") {
+			if data == "[DONE]" || strings.HasPrefix(data, "[DONE]") {
 				continue
 			}
+			eventData = append(eventData, data)
 		}
 	}
 
-	if eventData != "" {
+	if err := scanner.Err(); err != nil {
+		return &EventScannerError{Error: err}
+	}
+
+	if len(eventData) > 0 {
 		if eventType != "" {
 			buffer.WriteString("event: ")
 			buffer.WriteString(eventType)
 			buffer.WriteString("\n")
 		}
 		buffer.WriteString("data: ")
-		buffer.WriteString(eventData)
+		buffer.WriteString(strings.Join(eventData, "\ndata: "))
 
 		eventStr := buffer.String()
 		if globals.DebugMode {
@@ -169,6 +177,7 @@ func processFullSSE(body io.ReadCloser, callback func(string) error) *EventScann
 
 func processLegacySSE(body io.ReadCloser, callback func(string) error) *EventScannerError {
 	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 64*1024), scannerMaxTokenSize)
 	scanner.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
 		if atEOF && len(data) == 0 {
 			// when EOF and empty data
@@ -210,13 +219,16 @@ func processLegacySSE(body io.ReadCloser, callback func(string) error) *EventSca
 		// callback chunk
 		if err := callback(chunk); err != nil {
 			// break connection on callback error
-			err := body.Close()
-			if err != nil {
-				globals.Debug(fmt.Sprintf("[sse] event source close error: %s", err.Error()))
+			if closeErr := body.Close(); closeErr != nil && globals.DebugMode {
+				globals.Debug(fmt.Sprintf("[sse] event source close error: %s", closeErr.Error()))
 			}
 
 			return &EventScannerError{Error: err}
 		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return &EventScannerError{Error: err}
 	}
 
 	return nil

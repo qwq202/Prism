@@ -376,18 +376,18 @@ func processStreamEvent(data string) *StreamEvent {
 func parseEvent(raw string) (string, string) {
 	lines := strings.Split(raw, "\n")
 	var eventType string
-	var payload string
+	dataLines := make([]string, 0)
 
 	for _, line := range lines {
 		if strings.HasPrefix(line, "event:") {
 			eventType = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
 		}
 		if strings.HasPrefix(line, "data:") {
-			payload = strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+			dataLines = append(dataLines, strings.TrimSpace(strings.TrimPrefix(line, "data:")))
 		}
 	}
 
-	return eventType, payload
+	return eventType, strings.Join(dataLines, "\n")
 }
 
 func appendJSONString(builder *strings.Builder, data string) {
@@ -639,10 +639,9 @@ func (c *ChatInstance) ProcessLine(data string) (*globals.Chunk, error) {
 			delete(c.signatures, index)
 			return chunk, nil
 		case "tool_use":
-			chunk := c.toolChunk(index, "")
 			delete(c.toolInputs, index)
 			delete(c.toolMeta, index)
-			return chunk, nil
+			return &globals.Chunk{Content: ""}, nil
 		}
 	case "message_stop":
 		if c.thinkingOpen {

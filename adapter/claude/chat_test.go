@@ -157,10 +157,51 @@ data: {"type":"content_block_stop","index":1}`)
 	if err != nil {
 		t.Fatalf("unexpected tool stop error: %v", err)
 	}
-	if toolStop.ToolCall == nil || len(*toolStop.ToolCall) != 1 {
-		t.Fatalf("expected final tool call on stop, got %#v", toolStop.ToolCall)
+	if toolStop.ToolCall != nil {
+		t.Fatalf("expected no duplicate tool snapshot on stop, got %#v", toolStop.ToolCall)
 	}
-	if (*toolStop.ToolCall)[0].Function.Arguments != `{"city":"Shanghai"}` {
-		t.Fatalf("expected accumulated tool arguments, got %q", (*toolStop.ToolCall)[0].Function.Arguments)
+}
+
+func TestProcessLineToolUseDoesNotDuplicateArgumentsInBuffer(t *testing.T) {
+	instance := NewChatInstance("https://api.anthropic.com", "test")
+	instance.resetStreamState()
+	buffer := &utils.Buffer{}
+
+	lines := []string{
+		`event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_1","name":"lookup_weather"}}`,
+		`event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"city\":\"Sha"}}`,
+		`event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"nghai\"}"}}`,
+		`event: content_block_stop
+data: {"type":"content_block_stop","index":0}`,
+	}
+
+	for _, line := range lines {
+		chunk, err := instance.ProcessLine(line)
+		if err != nil {
+			t.Fatalf("unexpected process error: %v", err)
+		}
+		buffer.WriteChunk(chunk)
+	}
+
+	if buffer.ToolCalls == nil || len(*buffer.ToolCalls) != 1 {
+		t.Fatalf("expected one accumulated tool call, got %#v", buffer.ToolCalls)
+	}
+	got := (*buffer.ToolCalls)[0].Function.Arguments
+	if got != `{"city":"Shanghai"}` {
+		t.Fatalf("expected non-duplicated tool arguments, got %q", got)
+	}
+}
+
+func TestParseEventJoinsMultilineData(t *testing.T) {
+	eventType, payload := parseEvent("event: message\ndata: {\"a\":\ndata: 1}")
+
+	if eventType != "message" {
+		t.Fatalf("expected message event, got %q", eventType)
+	}
+	if payload != "{\"a\":\n1}" {
+		t.Fatalf("expected joined payload, got %q", payload)
 	}
 }
