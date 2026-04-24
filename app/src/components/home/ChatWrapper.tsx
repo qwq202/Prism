@@ -1,6 +1,15 @@
 import { useTranslation } from "react-i18next";
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import FileAction from "@/components/FileProvider.tsx";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
+import FileAction, {
+  type FileProviderAction,
+} from "@/components/FileProvider.tsx";
 import { useSelector } from "react-redux";
 import { selectAuthenticated, selectInit } from "@/store/auth.ts";
 import {
@@ -48,12 +57,7 @@ function Interface(props: InterfaceProps) {
   return messages.length > 0 ? <ChatInterface {...props} /> : <ChatSpace />;
 }
 
-type FileAction =
-  | { type: "add"; payload: FileArray[number] }
-  | { type: "remove"; payload: number }
-  | { type: "clear" };
-
-function fileReducer(state: FileArray, action: FileAction): FileArray {
+function fileReducer(state: FileArray, action: FileProviderAction): FileArray {
   switch (action.type) {
     case "add":
       return [...state, action.payload];
@@ -94,33 +98,36 @@ function ChatWrapper() {
     fileDispatch({ type: "clear" });
   }
 
-  const processSend = useCallback(async function processSend(
-    data: string,
-    passAuth?: boolean,
-  ): Promise<boolean> {
-    if (requireAuth && !auth && !passAuth) {
-      toast(t("login-require"), {
-        description: t("login-require-prompt"),
-        action: {
-          label: t("login"),
-          onClick: goAuth,
-        },
-      });
-      return false;
-    }
-
-    if (working) return false;
-
-    const message: string = formatMessage(files, data);
-    if (message.length > 0 && data.trim().length > 0) {
-      if (await sendAction(message)) {
-        forgetMemory("history");
-        clearFile();
-        return true;
+  const processSend = useCallback(
+    async function processSend(
+      data: string,
+      passAuth?: boolean,
+    ): Promise<boolean> {
+      if (requireAuth && !auth && !passAuth) {
+        toast(t("login-require"), {
+          description: t("login-require-prompt"),
+          action: {
+            label: t("login"),
+            onClick: goAuth,
+          },
+        });
+        return false;
       }
-    }
-    return false;
-  }, [auth, files, requireAuth, sendAction, t, working]);
+
+      if (working) return false;
+
+      const message: string = formatMessage(files, data);
+      if (message.length > 0 && data.trim().length > 0) {
+        if (await sendAction(message)) {
+          forgetMemory("history");
+          clearFile();
+          return true;
+        }
+      }
+      return false;
+    },
+    [auth, files, requireAuth, sendAction, t, working],
+  );
 
   async function handleSend() {
     // because of the function wrapper, we need to update the selector state using props.

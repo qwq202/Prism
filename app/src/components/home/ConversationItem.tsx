@@ -38,6 +38,14 @@ type ConversationItemProps = {
     type: string;
   }) => void;
 };
+
+function getRetitleName(data: unknown): string | undefined {
+  if (!data || typeof data !== "object" || !("name" in data)) return undefined;
+
+  const { name } = data as { name?: unknown };
+  return typeof name === "string" ? name : undefined;
+}
+
 function ConversationItem({
   conversation,
   current,
@@ -217,11 +225,7 @@ function ConversationItem({
                   return;
                 }
 
-                setTypingTarget(
-                  typeof resp.data?.name === "string"
-                    ? resp.data.name
-                    : conversation.name,
-                );
+                setTypingTarget(getRetitleName(resp.data) ?? conversation.name);
                 setRetitleStage("typing");
               }}
             >

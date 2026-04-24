@@ -13,6 +13,12 @@ import Code, { CodeProps } from "@/components/markdown/Code.tsx";
 import Image from "@/components/markdown/Image.tsx";
 import Video from "@/components/markdown/Video.tsx";
 
+type RehypePlugin = NonNullable<
+  React.ComponentProps<typeof ReactMarkdown>["rehypePlugins"]
+>[number];
+
+const rehypeRawPlugin = rehypeRaw as unknown as RehypePlugin;
+
 type MarkdownProps = {
   children: string;
   className?: string;
@@ -40,7 +46,7 @@ function MarkdownContent({
     const plugins: NonNullable<
       React.ComponentProps<typeof ReactMarkdown>["rehypePlugins"]
     > = [rehypeKatex];
-    return acceptHtml ? [...plugins, rehypeRaw] : plugins;
+    return acceptHtml ? [...plugins, rehypeRawPlugin] : plugins;
   }, [acceptHtml]);
 
   const components = useMemo(() => {

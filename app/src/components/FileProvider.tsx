@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import {
+  type Dispatch,
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import {
   Loader2,
   Paperclip,
@@ -62,6 +70,11 @@ type FileTaskAction =
   | { type: "remove"; payload: number }
   | { type: "update-progress"; payload: { id: number; progress: number } };
 
+export type FileProviderAction =
+  | { type: "add"; payload: FileObject }
+  | { type: "remove"; payload: number }
+  | { type: "clear" };
+
 function fileTaskReducer(
   state: FileTaskState,
   action: FileTaskAction,
@@ -90,7 +103,7 @@ function fileTaskReducer(
 
 type FileProviderProps = {
   files: FileArray;
-  dispatch: (action: { type: string; payload?: unknown }) => void;
+  dispatch: Dispatch<FileProviderAction>;
 };
 
 function FileProvider({ files, dispatch }: FileProviderProps) {
@@ -116,50 +129,51 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
   );
   const canUploadImage = supportsImageUpload(currentModelInfo);
 
-  const addFile = useCallback((file: FileObject) => {
-    console.debug(
-      `[file] new file was added (filename: ${file.name}, size: ${file.size}, prompt: ${file.content.length})`,
-    );
-    if (
-      file.content.length > MaxPromptSize &&
-      !isHighContextModel(supportModels, model) &&
-      !isB64Image(file.content)
-    ) {
-      file.content = file.content.slice(0, MaxPromptSize);
-      toast(t("file.max-length"), {
-        description: t("file.max-length-prompt"),
-      });
-    }
-
-    dispatch({ type: "add", payload: file });
-  }, [dispatch, model, supportModels, t]);
-
-  const triggerFile = useCallback(async (files: (File | null)[]) => {
-    if (!canUploadImage) {
-      toast.info(t("file.vision-model-required"));
-      return;
-    }
-
-    setLoading(true);
-    for (const file of files) {
-      if (!file) continue;
-      if (file.size > MaxFileSize) {
-        toast.error(t("file.over-size"), {
-          description: t("file.over-size-prompt", {
-            size: (MaxFileSize / 1024 / 1024).toFixed(),
-          }),
+  const addFile = useCallback(
+    (file: FileObject) => {
+      console.debug(
+        `[file] new file was added (filename: ${file.name}, size: ${file.size}, prompt: ${file.content.length})`,
+      );
+      if (
+        file.content.length > MaxPromptSize &&
+        !isHighContextModel(supportModels, model) &&
+        !isB64Image(file.content)
+      ) {
+        file.content = file.content.slice(0, MaxPromptSize);
+        toast(t("file.max-length"), {
+          description: t("file.max-length-prompt"),
         });
-      } else {
-        const id = Date.now();
-        taskDispatch({
-          type: "add",
-          payload: { id, file, progress: 0 },
-        });
+      }
 
-        const task = quickBlobParser(
-          file,
-          currentModelInfo,
-          (progress) => {
+      dispatch({ type: "add", payload: file });
+    },
+    [dispatch, model, supportModels, t],
+  );
+
+  const triggerFile = useCallback(
+    async (files: (File | null)[]) => {
+      if (!canUploadImage) {
+        toast.info(t("file.vision-model-required"));
+        return;
+      }
+
+      setLoading(true);
+      for (const file of files) {
+        if (!file) continue;
+        if (file.size > MaxFileSize) {
+          toast.error(t("file.over-size"), {
+            description: t("file.over-size-prompt", {
+              size: (MaxFileSize / 1024 / 1024).toFixed(),
+            }),
+          });
+        } else {
+          const id = Date.now();
+          taskDispatch({
+            type: "add",
+            payload: { id, file, progress: 0 },
+          });
+
+          const task = quickBlobParser(file, currentModelInfo, (progress) => {
             console.debug(
               `[parser] task ${id} progress: ${progress.toFixed(2)}%`,
             );
@@ -167,37 +181,39 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
               type: "update-progress",
               payload: { id, progress },
             });
-          },
-        );
+          });
 
-        toast.promise(task, {
-          loading: t("file.uploading-prompt"),
-          success: (content: string) => {
-            addFile({ name: file.name, content, size: file.size });
-            taskDispatch({
-              type: "remove",
-              payload: id,
-            });
-            return t("file.parse-success-prompt", { file: file.name });
-          },
-          error: (error: Error) => {
-            taskDispatch({
-              type: "remove",
-              payload: id,
-            });
-            const reason =
-              error.message === "The current model does not support image recognition"
-                ? t("file.vision-model-required")
-                : error.message === "Only image uploads are supported"
+          toast.promise(task, {
+            loading: t("file.uploading-prompt"),
+            success: (content: string) => {
+              addFile({ name: file.name, content, size: file.size });
+              taskDispatch({
+                type: "remove",
+                payload: id,
+              });
+              return t("file.parse-success-prompt", { file: file.name });
+            },
+            error: (error: Error) => {
+              taskDispatch({
+                type: "remove",
+                payload: id,
+              });
+              const reason =
+                error.message ===
+                "The current model does not support image recognition"
+                  ? t("file.vision-model-required")
+                  : error.message === "Only image uploads are supported"
                   ? t("file.image-only")
                   : error.message;
-            return t("file.parse-error-prompt", { reason });
-          },
-        });
+              return t("file.parse-error-prompt", { reason });
+            },
+          });
+        }
       }
-    }
-    setLoading(false);
-  }, [addFile, canUploadImage, currentModelInfo, t]);
+      setLoading(false);
+    },
+    [addFile, canUploadImage, currentModelInfo, t],
+  );
 
   useEffect(() => {
     blobEvent.bind(async (file: File | File[]) => {
@@ -570,9 +586,7 @@ function FileInput({ id, loading, className, handleEvent }: FileInputProps) {
         <p>{t("file.drop")}</p>
 
         <div className="mt-6 flex flex-wrap justify-center gap-2">
-          {[
-            { icon: FileImageIcon, text: "Image" },
-          ].map((item, index) => (
+          {[{ icon: FileImageIcon, text: "Image" }].map((item, index) => (
             <motion.div
               key={index}
               className="flex flex-col items-center"

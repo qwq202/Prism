@@ -59,14 +59,12 @@ function Avatar({ username, ...props }: AvatarProps) {
 
   useEffect(() => {
     getConfig().then((config) => {
-      if (
-        config.data.general.gravatar === undefined ||
-        config.data.general.gravatar === ""
-      ) {
+      const gravatarEndpoint = config.data?.general.gravatar;
+      if (!gravatarEndpoint) {
         setGravatarEndpoint("");
         return;
       }
-      setGravatarEndpoint(config.data.general.gravatar);
+      setGravatarEndpoint(gravatarEndpoint);
     });
   }, []);
 
@@ -88,13 +86,16 @@ function Avatar({ username, ...props }: AvatarProps) {
     const index = code.charCodeAt(0) % colors.length;
     return colors[index];
   }, [code]);
-  const getGravatarUrl = useCallback((email: string | undefined) => {
-    if (!email) return "";
-    const trimmedEmail = email.trim().toLowerCase();
-    const hash = md5(trimmedEmail).toString();
-    if (!gravatar_endpoint) return "";
-    return `${gravatar_endpoint}/avatar/${hash}?d=identicon`;
-  }, [gravatar_endpoint]);
+  const getGravatarUrl = useCallback(
+    (email: string | undefined) => {
+      if (!email) return "";
+      const trimmedEmail = email.trim().toLowerCase();
+      const hash = md5(trimmedEmail).toString();
+      if (!gravatar_endpoint) return "";
+      return `${gravatar_endpoint}/avatar/${hash}?d=identicon`;
+    },
+    [gravatar_endpoint],
+  );
 
   useEffect(() => {
     if (cachedAvatarBlob !== null) {

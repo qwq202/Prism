@@ -3,7 +3,7 @@ import { format } from "date-fns";
 
 import { cn } from "@/components/ui/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Calendar, CalendarProps } from "@/components/ui/calendar";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
   PopoverContent,
@@ -11,8 +11,12 @@ import {
 } from "@/components/ui/popover";
 import { CalendarIcon, Eraser, Minus, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import type { DayPickerSingleProps } from "react-day-picker";
 
-type DatePickerProps = CalendarProps & {
+type DatePickerProps = Omit<
+  DayPickerSingleProps,
+  "mode" | "selected" | "onSelect"
+> & {
   classNameTrigger?: string;
   value?: string;
   onValueChange?: (value: string) => void;

@@ -35,7 +35,10 @@ type ModelAvatarProps = {
   size?: number;
 };
 
-type AvatarComponent = React.ComponentType<IconAvatarProps & { type?: string }>;
+type AvatarComponent = React.ComponentType<
+  Pick<IconAvatarProps, "size" | "className">
+>;
+type OpenAIAvatarType = React.ComponentProps<typeof OpenAI.Avatar>["type"];
 
 const builtinAvatars: Record<string, AvatarComponent> = {
   openai: OpenAI.Avatar,
@@ -95,7 +98,7 @@ const builtinAvatars: Record<string, AvatarComponent> = {
   suno: Suno.Avatar,
 };
 
-function getAvatarType(id: string): string | undefined {
+function getAvatarType(id: string): OpenAIAvatarType {
   if (id.includes("gpt-3.5")) return "gpt3";
   if (id.includes("gpt-4") || id.includes("o1")) return "gpt4";
 }
@@ -136,13 +139,17 @@ function ModelAvatar({ model, className, size }: ModelAvatarProps) {
   const key = Object.keys(builtinAvatars).find((key) => id.includes(key));
   const Avatar = key ? builtinAvatars[key] : OpenAI.Avatar;
 
-  return (
-    <Avatar
-      size={avatarSize}
-      className={className}
-      type={getAvatarType(id)}
-    />
-  );
+  if (!key || Avatar === OpenAI.Avatar) {
+    return (
+      <OpenAI.Avatar
+        size={avatarSize}
+        className={className}
+        type={getAvatarType(id)}
+      />
+    );
+  }
+
+  return <Avatar size={avatarSize} className={className} />;
 }
 
 export default ModelAvatar;
