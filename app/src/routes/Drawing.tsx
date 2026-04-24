@@ -31,16 +31,6 @@ function Drawing() {
     <div className="flex h-full min-h-0 w-full bg-background text-foreground font-sans overflow-hidden">
       {/* Left Sidebar - Configuration */}
       <aside className="w-72 min-h-0 bg-card border-r border-border flex flex-col z-10 shrink-0">
-        {/* Header */}
-        <div className="h-16 flex items-center px-6 border-b border-border">
-          <div className="flex items-center gap-2.5 text-primary">
-            <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Wand2 className="w-4 h-4" />
-            </div>
-            <span className="font-semibold text-foreground text-lg tracking-tight">图片</span>
-          </div>
-        </div>
-
         {/* Config Content */}
         <div className="p-6 flex-1 flex flex-col gap-6 overflow-y-auto">
           {/* Provider Selection */}
