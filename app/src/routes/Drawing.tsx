@@ -1,12 +1,16 @@
 import { useState } from "react";
 import {
-  ArrowUp,
   Wand2,
   Settings,
   Sparkles,
   Plus,
   Image as ImageIcon,
+  Languages,
+  SlidersHorizontal,
   History,
+  Palette,
+  Ratio,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,13 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupText,
-  InputGroupTextarea,
-} from "@/components/ui/input-group";
+import { Textarea } from "@/components/ui/textarea";
 
 type Mode = "generate" | "edit";
 
@@ -135,42 +133,78 @@ function Drawing() {
         </div>
 
         {/* Input Area - Floating Bottom */}
-        <div className="absolute bottom-8 left-0 right-0 px-8 flex justify-center z-20 pointer-events-none">
-          <InputGroup className="pointer-events-auto h-auto w-full max-w-3xl flex-col items-stretch overflow-hidden rounded-[24px] border border-border/80 bg-background shadow-lg transition-all duration-300 has-[[data-slot=input-group-control]:focus-visible]:border-primary/40 has-[[data-slot=input-group-control]:focus-visible]:shadow-xl">
-            <InputGroupTextarea
-              className="min-h-[84px] w-full px-5 pt-4 pb-3 text-[15px] leading-6 placeholder:text-muted-foreground/75"
-              placeholder="Ask, Search or Chat..."
+        <div className="absolute bottom-5 left-0 right-0 px-4 sm:bottom-8 sm:px-8 flex justify-center z-20 pointer-events-none">
+          <div className="pointer-events-auto w-full max-w-3xl overflow-hidden rounded-[26px] border border-white/80 bg-white/[0.88] shadow-[0_24px_80px_rgba(15,23,42,0.16),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl transition-all duration-300 focus-within:border-sky-300/80 focus-within:shadow-[0_28px_90px_rgba(14,165,233,0.20),inset_0_1px_0_rgba(255,255,255,0.95)] dark:border-border/80 dark:bg-background/[0.92] dark:focus-within:border-primary/50">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200/70 px-5 py-3 dark:border-border/50">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-[0_10px_24px_rgba(15,23,42,0.18)] dark:bg-foreground dark:text-background">
+                  <Wand2 className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-foreground">
+                    图像提示词
+                  </div>
+                  <div className="truncate text-xs text-muted-foreground">
+                    支持中文描述，文本内容用双引号包裹
+                  </div>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-11 w-11 shrink-0 rounded-2xl text-muted-foreground hover:bg-sky-50 hover:text-sky-700 dark:hover:bg-primary/10 dark:hover:text-primary"
+                aria-label="上传参考图"
+                title="上传参考图"
+              >
+                <Upload className="h-[18px] w-[18px]" />
+              </Button>
+            </div>
+            <Textarea
+              className="min-h-[104px] w-full resize-none border-0 bg-transparent px-5 py-4 text-[15px] leading-relaxed text-foreground shadow-none outline-none placeholder:text-muted-foreground/60 focus-visible:ring-0 focus-visible:ring-offset-0"
+              placeholder='输入你的图片描述，文本绘制用 "双引号" 包裹'
             />
-            <InputGroupAddon
-              align="block-end"
-              className="order-last w-full min-w-0 justify-between border-t border-border/60 px-4 py-3"
-            >
-              <div className="flex min-w-0 items-center gap-2">
-                <InputGroupButton
-                  size="icon-xs"
-                  className="shrink-0 rounded-full border border-border/80 bg-background text-muted-foreground hover:bg-muted"
-                  aria-label="Add"
+            <div className="flex flex-col gap-3 border-t border-slate-200/70 bg-slate-50/75 px-4 py-3 dark:border-border/50 dark:bg-muted/15 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-10 rounded-full border border-slate-200/80 bg-white/80 px-3 text-muted-foreground shadow-sm hover:bg-sky-50 hover:text-sky-700 dark:border-border/70 dark:bg-background/70 dark:hover:bg-primary/10 dark:hover:text-primary"
                 >
-                  <Plus />
-                </InputGroupButton>
-                <InputGroupText className="min-w-0 text-sm font-medium text-foreground/80">
-                  Auto
-                </InputGroupText>
-              </div>
-              <div className="flex shrink-0 items-center gap-3">
-                <InputGroupText className="text-sm font-medium text-muted-foreground">
-                  52% used
-                </InputGroupText>
-                <InputGroupButton
-                  size="icon-xs"
-                  className="shrink-0 rounded-full bg-foreground text-background hover:bg-foreground/90"
-                  aria-label="Send"
+                  <Languages className="mr-2 h-4 w-4" />
+                  翻译
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-10 rounded-full border border-slate-200/80 bg-white/80 px-3 text-muted-foreground shadow-sm hover:bg-rose-50 hover:text-rose-700 dark:border-border/70 dark:bg-background/70 dark:hover:bg-primary/10 dark:hover:text-primary"
                 >
-                  <ArrowUp />
-                </InputGroupButton>
+                  <Palette className="mr-2 h-4 w-4" />
+                  风格
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-10 rounded-full border border-slate-200/80 bg-white/80 px-3 text-muted-foreground shadow-sm hover:bg-amber-50 hover:text-amber-700 dark:border-border/70 dark:bg-background/70 dark:hover:bg-primary/10 dark:hover:text-primary"
+                >
+                  <Ratio className="mr-2 h-4 w-4" />
+                  比例
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 rounded-full border border-slate-200/80 bg-white/80 text-muted-foreground shadow-sm hover:bg-slate-100 hover:text-foreground dark:border-border/70 dark:bg-background/70"
+                  aria-label="高级参数"
+                  title="高级参数"
+                >
+                  <SlidersHorizontal className="h-4 w-4" />
+                </Button>
               </div>
-            </InputGroupAddon>
-          </InputGroup>
+              <Button className="h-11 shrink-0 rounded-2xl bg-slate-950 px-5 font-semibold text-white shadow-[0_12px_28px_rgba(15,23,42,0.22)] transition-all hover:-translate-y-0.5 hover:bg-slate-900 hover:shadow-[0_16px_34px_rgba(15,23,42,0.26)] dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90">
+                <Sparkles className="mr-2 h-4 w-4" />
+                生成图片
+              </Button>
+            </div>
+          </div>
         </div>
       </main>
 
