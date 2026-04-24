@@ -202,98 +202,29 @@ func IsXAIModel(model string) bool {
 }
 
 func IsOpenAIResponsesNativeWebModel(model string) bool {
-	normalized := strings.TrimSpace(strings.ToLower(model))
-	if normalized == "" {
-		return false
-	}
-
-	switch {
-	case strings.HasPrefix(normalized, "gpt-5.4"):
-		return true
-	case normalized == "gpt-5.3-chat-latest":
-		return true
-	case strings.HasPrefix(normalized, "gpt-5.2"):
-		return true
-	case strings.HasPrefix(normalized, "gpt-5.1"):
-		return true
-	case normalized == "gpt-5" || strings.HasPrefix(normalized, "gpt-5-"):
-		return true
-	case normalized == "o3" || strings.HasPrefix(normalized, "o3-"):
-		return true
-	default:
-		return false
-	}
+	return CapabilitiesFor(OpenAIResponsesChannelType, model).NativeWebSearch
 }
 
 func IsOpenAIGPT54Model(model string) bool {
-	normalized := strings.TrimSpace(strings.ToLower(model))
-	if normalized == "" {
-		return false
-	}
-
-	return strings.HasPrefix(normalized, "gpt-5.4") && !strings.Contains(normalized, "pro")
+	return isOpenAIGPT54Model(normalizeModelName(model))
 }
 
 func GetOpenAIResponsesReasoningEfforts(model string) []string {
-	normalized := strings.TrimSpace(strings.ToLower(model))
-	switch {
-	case strings.HasPrefix(normalized, "gpt-5.4-pro"):
-		return []string{"medium", "high", "xhigh"}
-	case strings.HasPrefix(normalized, "gpt-5.4-mini"):
-		return nil
-	case strings.HasPrefix(normalized, "gpt-5.4-nano"):
-		return nil
-	case strings.HasPrefix(normalized, "gpt-5.4"):
-		return []string{"none", "low", "medium", "high", "xhigh"}
-	case normalized == "gpt-5.2-pro" || strings.HasPrefix(normalized, "gpt-5.2-pro-"):
-		return []string{"medium", "high", "xhigh"}
-	case normalized == "gpt-5.2-chat-latest":
-		return nil
-	case strings.HasPrefix(normalized, "gpt-5.2"):
-		return []string{"none", "low", "medium", "high", "xhigh"}
-	case strings.HasPrefix(normalized, "gpt-5.1"):
-		return []string{"none", "low", "medium", "high"}
-	case normalized == "gpt-5-pro" || strings.HasPrefix(normalized, "gpt-5-pro-"):
-		return []string{"high"}
-	case normalized == "gpt-5-mini" || strings.HasPrefix(normalized, "gpt-5-mini-"):
-		return nil
-	case normalized == "gpt-5-nano" || strings.HasPrefix(normalized, "gpt-5-nano-"):
-		return nil
-	case normalized == "gpt-5":
-		return []string{"minimal", "low", "medium", "high"}
-	case normalized == "o3" || strings.HasPrefix(normalized, "o3-"):
-		return []string{"low", "medium", "high"}
-	case normalized == "o1" || strings.HasPrefix(normalized, "o1-"):
-		return []string{"low", "medium", "high"}
-	default:
-		return nil
-	}
+	return CapabilitiesFor(OpenAIResponsesChannelType, model).ReasoningEfforts
 }
 
 func SupportOpenAIResponsesReasoningControl(model string) bool {
-	return len(GetOpenAIResponsesReasoningEfforts(model)) > 0
+	return CapabilitiesFor(OpenAIResponsesChannelType, model).ReasoningControl
 }
 
 func NormalizeOpenAIResponsesReasoningEffort(model string, effort string, nativeWebEnabled bool) string {
-	normalized := strings.TrimSpace(strings.ToLower(effort))
-	if normalized == "" {
-		return ""
+	capabilities := CapabilitiesFor(OpenAIResponsesChannelType, model)
+	normalized := NormalizeReasoningEffort(capabilities, effort)
+	if nativeWebEnabled && normalizeModelName(model) == "gpt-5" && normalized == "minimal" {
+		return "low"
 	}
 
-	supported := GetOpenAIResponsesReasoningEfforts(model)
-	for _, item := range supported {
-		if item != normalized {
-			continue
-		}
-
-		if nativeWebEnabled && strings.TrimSpace(strings.ToLower(model)) == "gpt-5" && normalized == "minimal" {
-			return "low"
-		}
-
-		return normalized
-	}
-
-	return ""
+	return normalized
 }
 
 func IsGeminiNoThinkingModel(model string) bool {
