@@ -114,3 +114,19 @@ func TestSaveConversationQueryUpdatesModelColumn(t *testing.T) {
 		t.Fatalf("expected save conversation query to update model column, got %q", saveConversationQuery)
 	}
 }
+
+func TestSaveConversationQuerySqlitePreflightUpdatesModelColumn(t *testing.T) {
+	previous := globals.SqliteEngine
+	globals.SqliteEngine = true
+	t.Cleanup(func() {
+		globals.SqliteEngine = previous
+	})
+
+	query := globals.PreflightSql(saveConversationQuery)
+	if !strings.Contains(query, "model = excluded.model") {
+		t.Fatalf("expected sqlite save conversation query to update model column, got %q", query)
+	}
+	if strings.Contains(query, "DUPLICATE KEY") {
+		t.Fatalf("expected sqlite save conversation query to remove mysql upsert syntax, got %q", query)
+	}
+}

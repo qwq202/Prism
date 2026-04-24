@@ -704,13 +704,13 @@ func createChatTask(
 								videoUrl := fmt.Sprintf("%s/v1/videos/%s/content", backendUrl, job.Id)
 								videoMarkdown := utils.GetVideoMarkdown(videoUrl, "video")
 
-								sendPartialChunk(chunkChan, partialChunk{Chunk: &globals.Chunk{Content: videoMarkdown}, End: false, Hit: false, Error: nil})
+								chunkChan <- partialChunk{Chunk: &globals.Chunk{Content: videoMarkdown}, End: false, Hit: false, Error: nil}
 								return nil
 							}
 						}
 					}
 					// Send original content for progress updates and other messages
-					sendPartialChunk(chunkChan, partialChunk{Chunk: data, End: false, Hit: false, Error: nil})
+					chunkChan <- partialChunk{Chunk: data, End: false, Hit: false, Error: nil}
 					return nil
 				},
 			)
@@ -772,12 +772,12 @@ func createChatTask(
 				}
 
 				// send the chunk data to the channel
-				sendPartialChunk(chunkChan, partialChunk{
+				chunkChan <- partialChunk{
 					Chunk: data,
 					End:   false,
 					Hit:   false,
 					Error: nil,
-				})
+				}
 				return nil
 			},
 		)
@@ -794,17 +794,8 @@ func createChatTask(
 	for {
 		select {
 		case data := <-chunkChan:
-			acknowledged := false
-			acknowledge := func() {
-				if !acknowledged {
-					acknowledgePartialChunk(data)
-					acknowledged = true
-				}
-			}
-
 			if data.Error != nil && data.Error.Error() == interruptMessage {
 				interrupted = true
-				acknowledge()
 				if data.End {
 					return hit, nil, true
 				}
@@ -824,13 +815,11 @@ func createChatTask(
 				if err := sendToolCallEvents(conn, data.Chunk.ToolCall, "start", buffer.GetQuota(), plan); err != nil {
 					globals.Warn(fmt.Sprintf("failed to send tool call event to client: %s", err.Error()))
 					interruptSignal <- err
-					acknowledge()
 					return hit, nil, true
 				}
 			}
 
 			message := buffer.WriteChunk(data.Chunk)
-			acknowledge()
 			if err := conn.SendClient(globals.ChatSegmentResponse{
 				Message: message,
 				Quota:   buffer.GetQuota(),
