@@ -2,6 +2,7 @@ package xai
 
 import (
 	adaptercommon "chat/adapter/common"
+	compat "chat/adapter/responsescompat"
 	"chat/globals"
 	"chat/utils"
 	"errors"
@@ -13,35 +14,10 @@ func (c *ChatInstance) GetChatEndpoint() string {
 	return fmt.Sprintf("%s/v1/responses", c.GetEndpoint())
 }
 
-func normalizeRole(role string) string {
-	switch role {
-	case globals.System, globals.User, globals.Assistant:
-		return role
-	default:
-		return globals.User
-	}
-}
-
-func getMessageText(message globals.Message) string {
-	if message.Content != "" {
-		return message.Content
-	}
-
-	if message.FunctionCall != nil {
-		return utils.Marshal(*message.FunctionCall)
-	}
-
-	if message.ToolCalls != nil {
-		return utils.Marshal(*message.ToolCalls)
-	}
-
-	return ""
-}
-
 func formatInputMessage(props *adaptercommon.ChatProps, message globals.Message) *InputMessage {
-	text := getMessageText(message)
+	text := compat.MessageText(message)
 
-	if normalizeRole(message.Role) == globals.User {
+	if compat.NormalizeRole(message.Role) == globals.User {
 		content, urls := utils.ExtractImages(text, true)
 		items := []InputMessageContent{
 			{
@@ -78,7 +54,7 @@ func formatInputMessage(props *adaptercommon.ChatProps, message globals.Message)
 	}
 
 	return &InputMessage{
-		Role: normalizeRole(message.Role),
+		Role: compat.NormalizeRole(message.Role),
 		Content: []InputMessageContent{
 			{
 				Type: "input_text",
@@ -88,43 +64,13 @@ func formatInputMessage(props *adaptercommon.ChatProps, message globals.Message)
 	}
 }
 
-func formatReplayFunctionCalls(message globals.Message) []interface{} {
-	if message.ToolCalls == nil || len(*message.ToolCalls) == 0 {
-		return nil
-	}
-
-	items := make([]interface{}, 0, len(*message.ToolCalls))
-	for _, toolCall := range *message.ToolCalls {
-		items = append(items, OutputItem{
-			Type:      "function_call",
-			Name:      toolCall.Function.Name,
-			Arguments: toolCall.Function.Arguments,
-			CallID:    toolCall.Id,
-		})
-	}
-
-	return items
-}
-
-func formatFunctionCallOutput(message globals.Message) *FunctionCallOutputInput {
-	if message.ToolCallId == nil || strings.TrimSpace(*message.ToolCallId) == "" {
-		return nil
-	}
-
-	return &FunctionCallOutputInput{
-		Type:   "function_call_output",
-		CallID: strings.TrimSpace(*message.ToolCallId),
-		Output: message.Content,
-	}
-}
-
 func formatMessages(props *adaptercommon.ChatProps) ([]interface{}, bool) {
 	input := make([]interface{}, 0, len(props.Message))
 	hasImages := false
 
 	for _, message := range props.Message {
 		if message.Role == globals.Tool {
-			if output := formatFunctionCallOutput(message); output != nil {
+			if output := compat.FunctionCallOutput(message); output != nil {
 				input = append(input, *output)
 			}
 			continue
@@ -138,7 +84,7 @@ func formatMessages(props *adaptercommon.ChatProps) ([]interface{}, bool) {
 				}
 			}
 
-			input = append(input, formatReplayFunctionCalls(message)...)
+			input = append(input, compat.ReplayFunctionCalls(message)...)
 			continue
 		}
 
@@ -220,67 +166,12 @@ func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps, stream bool) 
 	}
 }
 
-func extractOutputText(form *ResponseResponse) string {
-	if form == nil {
-		return ""
-	}
-
-	chunks := make([]string, 0)
-	for _, item := range form.Output {
-		if item.Type != "message" || item.Role != globals.Assistant {
-			continue
-		}
-
-		for _, content := range item.Content {
-			if content.Type == "output_text" && content.Text != "" {
-				chunks = append(chunks, content.Text)
-			}
-		}
-	}
-
-	return strings.Join(chunks, "")
-}
-
-func extractToolCalls(items []OutputItem) *globals.ToolCalls {
-	toolCalls := make(globals.ToolCalls, 0)
-	for idx, item := range items {
-		if item.Type != "function_call" || strings.TrimSpace(item.Name) == "" {
-			continue
-		}
-
-		toolCalls = append(toolCalls, globals.ToolCall{
-			Index: utils.ToPtr(idx),
-			Type:  "function",
-			Id:    item.CallID,
-			Function: globals.ToolCallFunction{
-				Name:      item.Name,
-				Arguments: item.Arguments,
-			},
-		})
-	}
-
-	if len(toolCalls) == 0 {
-		return nil
-	}
-
-	return &toolCalls
-}
-
 func buildResponseChunk(form *ResponseResponse) *globals.Chunk {
 	if form == nil {
 		return &globals.Chunk{}
 	}
 
-	content := extractOutputText(form)
-	toolCalls := extractToolCalls(form.Output)
-	if content == "" && toolCalls == nil {
-		return &globals.Chunk{}
-	}
-
-	return &globals.Chunk{
-		Content:  content,
-		ToolCall: toolCalls,
-	}
+	return compat.BuildResponseChunk(form.Output)
 }
 
 func parseResponse(data string) (*ResponseResponse, error) {
@@ -348,25 +239,7 @@ func emitOutputText(delta string, reasoningStarted *bool, reasoningClosed *bool)
 }
 
 func emitFunctionCallEvent(item *OutputItem) *globals.Chunk {
-	if item == nil || item.Type != "function_call" || strings.TrimSpace(item.Name) == "" {
-		return nil
-	}
-
-	toolCalls := globals.ToolCalls{
-		{
-			Index: utils.ToPtr(0),
-			Type:  "function",
-			Id:    item.CallID,
-			Function: globals.ToolCallFunction{
-				Name:      item.Name,
-				Arguments: item.Arguments,
-			},
-		},
-	}
-
-	return &globals.Chunk{
-		ToolCall: &toolCalls,
-	}
+	return compat.EmitFunctionCallEvent(item)
 }
 
 func (c *ChatInstance) CreateStreamChatRequest(props *adaptercommon.ChatProps, callback globals.Hook) error {
