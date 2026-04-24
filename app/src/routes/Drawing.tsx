@@ -111,9 +111,6 @@ function Drawing() {
         {/* Canvas (No square box) */}
         <div className="flex-1 flex flex-col items-center justify-center pb-32 relative z-10">
           <div className="flex flex-col items-center justify-center gap-5">
-            <div className="w-20 h-20 bg-muted/30 rounded-[2rem] flex items-center justify-center border border-border/50 shadow-sm backdrop-blur-md">
-              <Sparkles className="w-8 h-8 text-muted-foreground/50" />
-            </div>
             <div className="flex flex-col items-center gap-1.5">
               <span className="text-foreground/80 font-medium tracking-wide text-base">开始你的创作</span>
               <span className="text-muted-foreground/60 text-sm">在下方输入描述，AI 将为你生成精美图片</span>
