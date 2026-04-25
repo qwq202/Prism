@@ -71,8 +71,16 @@ func TestGetChatBodyKeepsSamplingForDeepseekV4NonThinking(t *testing.T) {
 func TestSanitizeDSMLToolMarkup(t *testing.T) {
 	input := "Let me fetch it. </ | DSML | tool_calls>\n< | DSML | invoke name=\"fetch_webpage\">"
 	got := sanitizeDSMLToolMarkup(input)
-	if got != "Let me fetch it." {
+	if got != "Let me fetch it. " {
 		t.Fatalf("expected DSML markup to be stripped, got %q", got)
+	}
+}
+
+func TestSanitizeDSMLToolMarkupPreservesWhitespaceWithoutMarker(t *testing.T) {
+	input := "\n\n## 标题\n\n- 第一项\n"
+	got := sanitizeDSMLToolMarkup(input)
+	if got != input {
+		t.Fatalf("expected whitespace to be preserved, got %q", got)
 	}
 }
 
@@ -111,7 +119,7 @@ func TestGetChoicesStripsDSMLFromContentWithToolCalls(t *testing.T) {
 	if chunk.ToolCall == nil || len(*chunk.ToolCall) != 1 {
 		t.Fatalf("expected tool call to be preserved, got %#v", chunk.ToolCall)
 	}
-	if chunk.Content != "\n</think>\n\nI found a likely source." {
+	if chunk.Content != "\n</think>\n\nI found a likely source. " {
 		t.Fatalf("expected visible DSML markup to be stripped, got %q", chunk.Content)
 	}
 }

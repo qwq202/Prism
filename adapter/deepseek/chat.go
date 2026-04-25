@@ -173,9 +173,7 @@ func sanitizeDSMLToolMarkup(content string) string {
 		}
 	}
 
-	cleaned = strings.TrimSpace(cleaned)
 	cleaned = strings.TrimSuffix(cleaned, "<")
-	cleaned = strings.TrimSpace(cleaned)
 	return cleaned
 }
 
