@@ -10,13 +10,18 @@ import {
 } from "@/components/ui/dialog.tsx";
 import {
   CheckCircle2,
-  ChevronDown,
   Loader2,
   Wrench,
   XCircle,
 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip.tsx";
 
 type ToolCallStatusProps = {
   toolCalls: MessageToolCall[];
@@ -83,40 +88,32 @@ function ToolCallRow({ toolCall }: ToolCallRowProps) {
 
   return (
     <>
-      <button
-        type="button"
-        disabled={!hasDetails}
-        onClick={() => hasDetails && setOpen(true)}
-        className={cn(
-          "flex w-full items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/5 px-2 py-1.5 text-left transition-colors",
-          hasDetails
-            ? "hover:bg-muted/10 cursor-pointer"
-            : "cursor-default opacity-95",
-        )}
-      >
-        <div className="flex min-w-0 items-center gap-1.5">
-          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border/60 bg-background/80">
-            <Wrench className="h-2.5 w-2.5 text-muted-foreground" />
-          </div>
-          <div className="flex min-w-0 items-center gap-1.5">
-            <div className="truncate text-[12px] font-medium leading-none">
-              {toolCall.function.name}
-            </div>
-            <div
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              aria-label={`${toolCall.function.name} ${status.label}`}
+              aria-disabled={!hasDetails}
+              onClick={() => hasDetails && setOpen(true)}
               className={cn(
-                "flex items-center gap-1 text-[10px] leading-none",
-                status.tone,
+                "relative inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/5 text-muted-foreground transition-colors",
+                hasDetails
+                  ? "cursor-pointer hover:bg-muted/10 hover:text-foreground"
+                  : "cursor-default opacity-95",
               )}
             >
-              {status.icon}
-              <span>{status.label}</span>
-            </div>
-          </div>
-        </div>
-        {hasDetails && (
-          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
-        )}
-      </button>
+              <Wrench className="h-3.5 w-3.5" />
+              <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-background">
+                {status.icon}
+              </span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {toolCall.function.name} · {status.label}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
 
       {hasDetails && (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -182,7 +179,7 @@ export function ToolCallStatus({ toolCalls, className }: ToolCallStatusProps) {
   if (toolCalls.length === 0) return null;
 
   return (
-    <div className={cn("mt-1.5 space-y-1", className)}>
+    <div className={cn("mt-1.5 flex flex-wrap gap-1", className)}>
       {toolCalls.map((toolCall, index) => (
         <ToolCallRow
           key={toolCall.id || `${toolCall.function.name}-${index}`}
