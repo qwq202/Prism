@@ -80,6 +80,13 @@ function formatModelLabel(model: string): string {
   return model.trim().toUpperCase();
 }
 
+function formatDeepSeekModelLabel(model: string): string {
+  const normalized = model.trim().toLowerCase();
+  if (normalized === "deepseek-v4-flash") return "Deepseek-V4 Flash";
+  if (normalized === "deepseek-v4-pro") return "Deepseek-V4 Pro";
+  return model.trim();
+}
+
 function getStepPosition(index: number, total: number): string {
   if (total <= 1) return "0%";
   return `${(index / (total - 1)) * 100}%`;
@@ -479,7 +486,7 @@ export function DeepSeekThinkingAction() {
     return null;
   }
 
-  const modelLabel = formatModelLabel(model);
+  const modelLabel = formatDeepSeekModelLabel(model);
   const currentEffort = deepSeekReasoningEfforts.includes(
     deepSeekReasoningEffort,
   )
