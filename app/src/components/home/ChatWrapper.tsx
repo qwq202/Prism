@@ -100,6 +100,23 @@ function ChatWrapper() {
     fileDispatch({ type: "clear" });
   }
 
+  const handleLongTextPaste = useCallback(
+    (text: string) => {
+      const index = files.length + 1;
+      const filename = `pasted-text-${index}.txt`;
+      fileDispatch({
+        type: "add",
+        payload: {
+          name: filename,
+          content: text,
+          size: new Blob([text]).size,
+        },
+      });
+      toast.success(t("file.parse-success-prompt", { file: filename }));
+    },
+    [files.length, t],
+  );
+
   const processSend = useCallback(
     async function processSend(
       data: string,
@@ -299,6 +316,7 @@ function ChatWrapper() {
                 value={input}
                 onValueChange={setInput}
                 onEnterPressed={handleSend}
+                onLongTextPaste={handleLongTextPaste}
               />
             </div>
             <div className="flex items-center justify-end gap-2">

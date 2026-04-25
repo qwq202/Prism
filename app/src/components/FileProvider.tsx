@@ -128,6 +128,7 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
     [supportModels, model],
   );
   const canUploadImage = supportsImageUpload(currentModelInfo);
+  const canOpenFilePanel = canUploadImage || files.length > 0;
 
   const addFile = useCallback(
     (file: FileObject) => {
@@ -227,19 +228,12 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
   }, [canUploadImage, t, triggerFile]);
 
   useEffect(() => {
-    if (canUploadImage) return;
+    if (canUploadImage || canOpenFilePanel) return;
 
     if (open) {
       setOpen(false);
     }
-
-    if (files.length > 0) {
-      dispatch({ type: "clear" });
-      toast.info(t("file.files-cleared-on-model-switch"), {
-        description: t("file.vision-model-required"),
-      });
-    }
-  }, [canUploadImage, open, files.length, dispatch, t]);
+  }, [canOpenFilePanel, canUploadImage, open]);
 
   function removeFile(index: number) {
     dispatch({ type: "remove", payload: index });
@@ -249,7 +243,7 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!canUploadImage && next) {
+        if (!canOpenFilePanel && next) {
           toast.info(t("file.vision-model-required"));
           return;
         }
@@ -257,12 +251,12 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
       }}
     >
       <ChatAction
-        text={canUploadImage ? t("file.file") : t("file.vision-model-required")}
+        text={canOpenFilePanel ? t("file.file") : t("file.vision-model-required")}
         active={files.length}
-        className={!canUploadImage ? "opacity-50" : undefined}
-        disabled={!canUploadImage}
+        className={!canOpenFilePanel ? "opacity-50" : undefined}
+        disabled={!canOpenFilePanel}
         onClick={() => {
-          if (!canUploadImage) {
+          if (!canOpenFilePanel) {
             toast.info(t("file.vision-model-required"));
             return;
           }
@@ -307,12 +301,14 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.2, duration: 0.3 }}
               >
-                <FileInput
-                  loading={loading}
-                  id={"file"}
-                  className={"file"}
-                  handleEvent={triggerFile}
-                />
+                {canUploadImage && (
+                  <FileInput
+                    loading={loading}
+                    id={"file"}
+                    className={"file"}
+                    handleEvent={triggerFile}
+                  />
+                )}
               </motion.div>
             </motion.div>
           </DialogDescription>

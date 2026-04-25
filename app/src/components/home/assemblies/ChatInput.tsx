@@ -15,6 +15,7 @@ type ChatInputProps = {
   value: string;
   onValueChange: (value: string) => void;
   onEnterPressed: () => void;
+  onLongTextPaste?: (text: string) => void;
 };
 
 function ChatInput({
@@ -23,6 +24,7 @@ function ChatInput({
   value,
   onValueChange,
   onEnterPressed,
+  onLongTextPaste,
 }: ChatInputProps) {
   const { t } = useTranslation();
   const sender = useSelector(senderSelector);
@@ -83,6 +85,14 @@ function ChatInput({
       // on transfer file
       onPaste={(e) => {
         const items = e.clipboardData.items;
+        const hasFile = Array.from(items).some((item) => item.kind === "file");
+        const text = e.clipboardData.getData("text/plain");
+        if (!hasFile && text.trim().length >= 2000) {
+          e.preventDefault();
+          onLongTextPaste?.(text);
+          return;
+        }
+
         for (let i = 0; i < items.length; i++) {
           const item = items[i];
           if (item.kind === "file") {
