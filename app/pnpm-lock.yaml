@@ -11,6 +11,9 @@ patchedDependencies:
   needle@3.3.1:
     hash: 76690b6c0e436c6f8b4135b5d3bf4a5cd7c777db12fe3dd45b55e2664362b81c
     path: patches/needle@3.3.1.patch
+  vite@4.5.0:
+    hash: 19f407762c7bdd663d2fd2f106e1090c31408073c72e5c7ea3de679b2ca89a1e
+    path: patches/vite@4.5.0.patch
 
 importers:
 
@@ -262,7 +265,7 @@ importers:
         version: 6.9.0(eslint@8.52.0)(typescript@5.2.2)
       '@vitejs/plugin-react-swc':
         specifier: ^3.3.2
-        version: 3.4.0(@swc/helpers@0.5.5)(vite@4.5.0(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1))
+        version: 3.4.0(@swc/helpers@0.5.5)(vite@4.5.0(patch_hash=19f407762c7bdd663d2fd2f106e1090c31408073c72e5c7ea3de679b2ca89a1e)(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1))
       autoprefixer:
         specifier: ^10.5.0
         version: 10.5.0(postcss@8.4.31)
@@ -298,10 +301,10 @@ importers:
         version: 5.2.2
       vite:
         specifier: ^4.4.5
-        version: 4.5.0(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1)
+        version: 4.5.0(patch_hash=19f407762c7bdd663d2fd2f106e1090c31408073c72e5c7ea3de679b2ca89a1e)(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1)
       vite-plugin-html:
         specifier: ^3.2.0
-        version: 3.2.0(vite@4.5.0(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1))
+        version: 3.2.0(vite@4.5.0(patch_hash=19f407762c7bdd663d2fd2f106e1090c31408073c72e5c7ea3de679b2ca89a1e)(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1))
 
 packages:
 
@@ -8228,10 +8231,10 @@ snapshots:
       '@use-gesture/core': 10.3.1
       react: 18.2.0
 
-  '@vitejs/plugin-react-swc@3.4.0(@swc/helpers@0.5.5)(vite@4.5.0(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1))':
+  '@vitejs/plugin-react-swc@3.4.0(@swc/helpers@0.5.5)(vite@4.5.0(patch_hash=19f407762c7bdd663d2fd2f106e1090c31408073c72e5c7ea3de679b2ca89a1e)(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1))':
     dependencies:
       '@swc/core': 1.3.95(@swc/helpers@0.5.5)
-      vite: 4.5.0(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1)
+      vite: 4.5.0(patch_hash=19f407762c7bdd663d2fd2f106e1090c31408073c72e5c7ea3de679b2ca89a1e)(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1)
     transitivePeerDependencies:
       - '@swc/helpers'
 
@@ -12651,7 +12654,7 @@ snapshots:
       d3-time: 3.1.0
       d3-timer: 3.0.1
 
-  vite-plugin-html@3.2.0(vite@4.5.0(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1)):
+  vite-plugin-html@3.2.0(vite@4.5.0(patch_hash=19f407762c7bdd663d2fd2f106e1090c31408073c72e5c7ea3de679b2ca89a1e)(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1)):
     dependencies:
       '@rollup/pluginutils': 4.2.1
       colorette: 2.0.20
@@ -12665,9 +12668,9 @@ snapshots:
       html-minifier-terser: 6.1.0
       node-html-parser: 5.4.2
       pathe: 0.2.0
-      vite: 4.5.0(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1)
+      vite: 4.5.0(patch_hash=19f407762c7bdd663d2fd2f106e1090c31408073c72e5c7ea3de679b2ca89a1e)(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1)
 
-  vite@4.5.0(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1):
+  vite@4.5.0(patch_hash=19f407762c7bdd663d2fd2f106e1090c31408073c72e5c7ea3de679b2ca89a1e)(@types/node@20.8.9)(less@4.6.4)(terser@5.46.1):
     dependencies:
       esbuild: 0.18.20
       postcss: 8.4.31

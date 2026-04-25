@@ -115,7 +115,8 @@
       "@lobehub/icons": "1.97.2"
     },
     "patchedDependencies": {
-      "needle@3.3.1": "patches/needle@3.3.1.patch"
+      "needle@3.3.1": "patches/needle@3.3.1.patch",
+      "vite@4.5.0": "patches/vite@4.5.0.patch"
     }
   }
 }
