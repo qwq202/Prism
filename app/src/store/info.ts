@@ -33,8 +33,6 @@ export const infoSlice = createSlice({
     mail: getBooleanMemory("mail", false),
     currency: getMemory("currency"),
     contact: getMemory("contact"),
-    article: getArrayMemory("article"),
-    generation: getArrayMemory("generation"),
     footer: getMemory("footer"),
     auth_footer: getBooleanMemory("auth_footer", false),
     relay_plan: getBooleanMemory("relay_plan", false),
@@ -67,8 +65,6 @@ export const infoSlice = createSlice({
       state.mail = form.mail ?? false;
       state.currency = form.currency ?? "cny";
       state.contact = form.contact ?? "";
-      state.article = form.article ?? [];
-      state.generation = form.generation ?? [];
       state.footer = form.footer ?? "";
       state.auth_footer = form.auth_footer ?? false;
       state.relay_plan = form.relay_plan ?? false;
@@ -97,8 +93,6 @@ export const infoSlice = createSlice({
       setMemory("currency", state.currency);
       setBooleanMemory("mail", state.mail);
       setMemory("contact", state.contact);
-      setArrayMemory("article", state.article);
-      setArrayMemory("generation", state.generation);
       setMemory("footer", state.footer);
       setBooleanMemory("auth_footer", state.auth_footer);
       setBooleanMemory("relay_plan", state.relay_plan);
@@ -118,10 +112,6 @@ export default infoSlice.reducer;
 export const infoMailSelector = (state: RootState): boolean => state.info.mail;
 export const infoContactSelector = (state: RootState): string =>
   state.info.contact;
-export const infoArticleSelector = (state: RootState): string[] =>
-  state.info.article;
-export const infoGenerationSelector = (state: RootState): string[] =>
-  state.info.generation;
 export const infoFooterSelector = (state: RootState): string =>
   state.info.footer;
 export const infoAuthFooterSelector = (state: RootState): boolean =>

@@ -173,9 +173,6 @@ export type CommonState = {
   expire: number;
   size: number;
 
-  article: string[];
-  generation: string[];
-
   prompt_store: boolean;
   image_store: boolean;
   orphan_cleanup_enabled: boolean;
@@ -261,8 +258,6 @@ export const initialSystemState: SystemProps = {
     model: "",
   },
   common: {
-    article: [],
-    generation: [],
     cache: [],
     expire: 3600,
     size: 1,

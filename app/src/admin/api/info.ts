@@ -22,8 +22,6 @@ export type SiteInfo = {
   footer: string;
   auth_footer: boolean;
   hide_key_docs?: boolean;
-  article: string[];
-  generation: string[];
   relay_plan: boolean;
   web_search?: boolean;
   has_task_model?: boolean;
@@ -52,8 +50,6 @@ export async function getSiteInfo(): Promise<SiteInfo> {
       auth_footer: false,
       hide_key_docs: false,
       mail: false,
-      article: [],
-      generation: [],
       relay_plan: false,
       web_search: false,
       has_task_model: false,

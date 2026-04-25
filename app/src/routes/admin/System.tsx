@@ -59,7 +59,6 @@ import Tips from "@/components/Tips.tsx";
 import { cn } from "@/components/ui/lib/utils.ts";
 import { Switch } from "@/components/ui/switch.tsx";
 import { MultiCombobox } from "@/components/ui/multi-combobox.tsx";
-import { allGroups } from "@/utils/groups.ts";
 import { useAllModels, useChannelModels } from "@/admin/hook.tsx";
 import { useSelector } from "react-redux";
 import { selectSupportModels } from "@/store/chat.ts";
@@ -756,40 +755,6 @@ function Common({ data, dispatch, onChange }: CompProps<CommonState>) {
         </div>
       </ParagraphItem>
       <ParagraphSpace />
-      <ParagraphItem>
-        <Label className={`flex flex-row items-center`}>
-          {t("admin.system.article")}
-          <Tips content={t("admin.system.articleTip")} />
-        </Label>
-        <MultiCombobox
-          value={data.article}
-          onChange={(value) => {
-            dispatch({ type: "update:common.article", value });
-          }}
-          list={allGroups}
-          listTranslate={`admin.channels.groups`}
-          placeholder={t("admin.system.groupPlaceholder", {
-            length: (data.article ?? []).length,
-          })}
-        />
-      </ParagraphItem>
-      <ParagraphItem>
-        <Label className={`flex flex-row items-center`}>
-          {t("admin.system.generate")}
-          <Tips content={t("admin.system.generateTip")} />
-        </Label>
-        <MultiCombobox
-          value={data.generation}
-          onChange={(value) => {
-            dispatch({ type: "update:common.generation", value });
-          }}
-          list={allGroups}
-          listTranslate={`admin.channels.groups`}
-          placeholder={t("admin.system.groupPlaceholder", {
-            length: (data.generation ?? []).length,
-          })}
-        />
-      </ParagraphItem>
       <ParagraphFooter>
         <div className={`grow`} />
         <Button
