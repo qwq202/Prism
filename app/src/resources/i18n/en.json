@@ -189,7 +189,7 @@
     "gemini-thinking-level-high": "In Depth",
     "gemini-thinking-tip": "The current model supports Gemini native thinking budget control. When turned off, thinking is disabled; when turned on, it returns to Gemini's thinking summary and consumes more tokens according to the depth of thinking you choose.",
     "openai-web-enable-tip": "Using OpenAI native Web Search may incur extra built-in tool costs or token usage.",
-    "openai-reasoning-tip": "{{model}} supports reasoning.effort and reasoning.summary. When summary is off, the model can still reason without showing a summary; auto uses the most detailed summary available for the model.",
+    "openai-reasoning-tip": "{{model}} supports thinking effort and reasoning summaries. When summaries are off, the model can still think without showing a summary; auto uses the most suitable summary available for the model.",
     "deepseek-thinking-tip": "DeepSeek thinking mode is supported. Turning it off uses non-thinking mode; turning it on uses the selected thinking effort.",
     "deepseek-pro-max-warning-title": "DeepSeek-V4 Pro Max thinking uses many tokens",
     "deepseek-pro-max-warning-desc": "Max thinking enables Pro hard reasoning. It is useful for complex tasks, but can significantly increase token usage, latency, and cost. Please confirm before enabling it.",

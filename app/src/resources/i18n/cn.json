@@ -278,7 +278,7 @@
     "xai-web-enable-tip": "使用 xAI 原生搜索能力时，可分别开启 Web Search 与 X Search，这些能力会额外消耗 Token 或工具调用费用。",
     "gemini-thinking-tip": "支持 Gemini 原生思考。开启后会按思考深度消耗更多 Token。",
     "openai-web-enable-tip": "使用 OpenAI 原生 Web Search，会消耗额外的工具调用费用或 Token。",
-    "openai-reasoning-tip": "{{model}} 支持 reasoning.effort 与 reasoning.summary。summary 关闭时只思考不展示摘要；auto 会使用当前模型可用的最详细摘要。",
+    "openai-reasoning-tip": "{{model}} 支持设置思考强度和思考摘要。关闭摘要时只思考不展示摘要；自动会使用当前模型可用的最合适摘要。",
     "deepseek-thinking-tip": "支持 DeepSeek 思考模式。关闭时使用非思考模式；开启后会按所选强度进行思考。",
     "deepseek-pro-max-warning-title": "DeepSeek-V4 Pro 最大思考会消耗大量 Token",
     "deepseek-pro-max-warning-desc": "最大思考会启用 Pro 的硬推理模式，适合复杂任务，但可能显著增加 Token 消耗、响应时间和费用。请确认后再开启。",

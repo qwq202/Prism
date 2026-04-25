@@ -178,7 +178,7 @@
     "openai-reasoning-level-high": "高い",
     "openai-reasoning-level-xhigh": "非常に高い",
     "openai-web-enable-tip": "OpenAIネイティブWeb検索を使用すると、追加のツールコール料金またはトークンが消費されます。",
-    "openai-reasoning-tip": "{{model}}は reasoning.effort と reasoning.summary をサポートしています。summary をオフにすると、推論しても要約は表示されません。auto は現在のモデルで利用可能な最も詳細な要約を使用します。",
+    "openai-reasoning-tip": "{{model}}は思考強度と思考の要約設定に対応しています。要約をオフにすると、思考しても要約は表示されません。自動は現在のモデルで利用可能な最適な要約を使用します。",
     "openai-reasoning-summary-enable": "思考の要約を表示",
     "openai-reasoning-summary-detail": "概要の詳細",
     "openai-reasoning-summary-level-concise": "簡潔",

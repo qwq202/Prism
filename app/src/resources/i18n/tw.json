@@ -251,7 +251,7 @@
     "openai-reasoning-level-high": "高",
     "openai-reasoning-level-xhigh": "極高",
     "openai-web-enable-tip": "使用OpenAI 原生Web Search，會消耗額外的工具呼叫費用或Token。",
-    "openai-reasoning-tip": "{{model}} 支援 reasoning.effort 與 reasoning.summary。summary 關閉時只思考不顯示摘要；auto 會使用目前模型可用的最詳細摘要。",
+    "openai-reasoning-tip": "{{model}} 支援設定思考強度和思考摘要。關閉摘要時只思考不顯示摘要；自動會使用目前模型可用的最合適摘要。",
     "openai-reasoning-summary-enable": "顯示思考摘要",
     "openai-reasoning-summary-detail": "摘要詳細度",
     "openai-reasoning-summary-level-concise": "簡潔",

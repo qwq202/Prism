@@ -178,7 +178,7 @@
     "openai-reasoning-level-high": "Высокое",
     "openai-reasoning-level-xhigh": "Чрезвычайно высокий",
     "openai-web-enable-tip": "Использование OpenAI Native Web Search требует дополнительных сборов за вызов инструментов или токенов.",
-    "openai-reasoning-tip": "{{model}} поддерживает reasoning.effort и reasoning.summary. Если summary выключен, модель может рассуждать без показа сводки; auto использует самую подробную сводку, доступную для текущей модели.",
+    "openai-reasoning-tip": "{{model}} поддерживает настройку интенсивности мышления и сводки рассуждений. Если сводка выключена, модель может думать без ее показа; автоматически выбирается наиболее подходящая сводка для текущей модели.",
     "openai-reasoning-summary-enable": "Показать краткое описание мыслей",
     "openai-reasoning-summary-detail": "Краткая информация",
     "openai-reasoning-summary-level-concise": "Лаконичный",
