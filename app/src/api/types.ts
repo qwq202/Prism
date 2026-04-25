@@ -83,11 +83,9 @@ export type Model = {
   auth: boolean;
   default: boolean;
   high_context: boolean;
-  function_calling?: boolean;
   vision_model?: boolean;
   ocr_model?: boolean;
   reverse_model?: boolean;
-  thinking_model?: boolean;
   avatar: string;
   tag?: string[];
 

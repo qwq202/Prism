@@ -11,34 +11,30 @@ import (
 
 type ModelTag []string
 type MarketModel struct {
-	Id              string   `json:"id" mapstructure:"id" required:"true"`
-	Name            string   `json:"name" mapstructure:"name" required:"true"`
-	Description     string   `json:"description" mapstructure:"description"`
-	Default         bool     `json:"default" mapstructure:"default"`
-	HighContext     bool     `json:"high_context" mapstructure:"highcontext"`
-	FunctionCalling bool     `json:"function_calling" mapstructure:"functioncalling"`
-	VisionModel     bool     `json:"vision_model" mapstructure:"visionmodel"`
-	OCRModel        bool     `json:"ocr_model" mapstructure:"ocrmodel"`
-	ReverseModel    bool     `json:"reverse_model" mapstructure:"reversemodel"`
-	ThinkingModel   bool     `json:"thinking_model" mapstructure:"thinkingmodel"`
-	Avatar          string   `json:"avatar" mapstructure:"avatar"`
-	Tag             ModelTag `json:"tag" mapstructure:"tag"`
+	Id           string   `json:"id" mapstructure:"id" required:"true"`
+	Name         string   `json:"name" mapstructure:"name" required:"true"`
+	Description  string   `json:"description" mapstructure:"description"`
+	Default      bool     `json:"default" mapstructure:"default"`
+	HighContext  bool     `json:"high_context" mapstructure:"highcontext"`
+	VisionModel  bool     `json:"vision_model" mapstructure:"visionmodel"`
+	OCRModel     bool     `json:"ocr_model" mapstructure:"ocrmodel"`
+	ReverseModel bool     `json:"reverse_model" mapstructure:"reversemodel"`
+	Avatar       string   `json:"avatar" mapstructure:"avatar"`
+	Tag          ModelTag `json:"tag" mapstructure:"tag"`
 }
 
 type MarketModelView struct {
-	Id              string   `json:"id"`
-	Name            string   `json:"name"`
-	Description     string   `json:"description"`
-	Default         bool     `json:"default"`
-	HighContext     bool     `json:"high_context"`
-	FunctionCalling bool     `json:"function_calling"`
-	VisionModel     bool     `json:"vision_model"`
-	OCRModel        bool     `json:"ocr_model"`
-	ReverseModel    bool     `json:"reverse_model"`
-	ThinkingModel   bool     `json:"thinking_model"`
-	Avatar          string   `json:"avatar"`
-	Tag             ModelTag `json:"tag"`
-	ChannelType     string   `json:"channel_type,omitempty"`
+	Id           string   `json:"id"`
+	Name         string   `json:"name"`
+	Description  string   `json:"description"`
+	Default      bool     `json:"default"`
+	HighContext  bool     `json:"high_context"`
+	VisionModel  bool     `json:"vision_model"`
+	OCRModel     bool     `json:"ocr_model"`
+	ReverseModel bool     `json:"reverse_model"`
+	Avatar       string   `json:"avatar"`
+	Tag          ModelTag `json:"tag"`
+	ChannelType  string   `json:"channel_type,omitempty"`
 }
 type MarketModelList []MarketModel
 
@@ -74,19 +70,17 @@ func (m *Market) GetViewModels() []MarketModelView {
 		}
 
 		items = append(items, MarketModelView{
-			Id:              model.Id,
-			Name:            model.Name,
-			Description:     model.Description,
-			Default:         model.Default,
-			HighContext:     model.HighContext,
-			FunctionCalling: model.FunctionCalling,
-			VisionModel:     model.VisionModel,
-			OCRModel:        model.OCRModel,
-			ReverseModel:    model.ReverseModel,
-			ThinkingModel:   model.ThinkingModel,
-			Avatar:          model.Avatar,
-			Tag:             model.Tag,
-			ChannelType:     channelType,
+			Id:           model.Id,
+			Name:         model.Name,
+			Description:  model.Description,
+			Default:      model.Default,
+			HighContext:  model.HighContext,
+			VisionModel:  model.VisionModel,
+			OCRModel:     model.OCRModel,
+			ReverseModel: model.ReverseModel,
+			Avatar:       model.Avatar,
+			Tag:          model.Tag,
+			ChannelType:  channelType,
 		})
 	}
 

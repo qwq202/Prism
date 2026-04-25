@@ -88,10 +88,7 @@ type MarketAction =
     }
   | { type: "update-context"; payload: MarketIndexedPayload & { context: boolean } }
   | { type: "update-default"; payload: MarketFlagPayload }
-  | { type: "update-function-calling"; payload: MarketFlagPayload }
   | { type: "update-vision-model"; payload: MarketFlagPayload }
-  | { type: "update-thinking-model"; payload: MarketFlagPayload }
-  | { type: "update-ocr-model"; payload: MarketFlagPayload }
   | { type: "update-reverse-model"; payload: MarketFlagPayload }
   | { type: "update-tags"; payload: MarketIndexedPayload & { tags: string[] } }
   | { type: "add-tag"; payload: MarketIndexedPayload & { tag: string } }
@@ -155,9 +152,7 @@ function reducer(state: MarketForm, action: MarketAction): MarketForm {
             tag: model.tag || [],
             avatar: model.avatar || "",
             seed: generateSeed(),
-            function_calling: model.function_calling || false,
             vision_model: model.vision_model || false,
-            thinking_model: model.thinking_model || false,
             ocr_model: model.ocr_model || false,
             reverse_model: model.reverse_model || false,
           }),
@@ -266,15 +261,6 @@ function reducer(state: MarketForm, action: MarketAction): MarketForm {
           return model;
         }),
       ];
-    case "update-function-calling":
-      return [
-        ...state.map((model, idx) => {
-          if (idx === action.payload.idx) {
-            return { ...model, function_calling: action.payload.default };
-          }
-          return model;
-        }),
-      ];
     case "update-vision-model":
       return [
         ...state.map((model, idx) => {
@@ -282,27 +268,6 @@ function reducer(state: MarketForm, action: MarketAction): MarketForm {
             return normalizeMarketModel({
               ...model,
               vision_model: action.payload.default,
-            });
-          }
-          return model;
-        }),
-      ];
-    case "update-thinking-model":
-      return [
-        ...state.map((model, idx) => {
-          if (idx === action.payload.idx) {
-            return { ...model, thinking_model: action.payload.default };
-          }
-          return model;
-        }),
-      ];
-    case "update-ocr-model":
-      return [
-        ...state.map((model, idx) => {
-          if (idx === action.payload.idx) {
-            return normalizeMarketModel({
-              ...model,
-              ocr_model: action.payload.default,
             });
           }
           return model;
@@ -721,26 +686,6 @@ function MarketItem({
               }}
             />
           </div>
-          {/*function-calling*/}
-          <div className={`market-row`}>
-            <span>
-              {t("admin.market.function-calling")}
-              <Tips content={t("admin.market.function-calling-tip")} />
-            </span>
-            <Switch
-              className={`ml-auto`}
-              checked={model.function_calling || false}
-              onCheckedChange={(state) => {
-                dispatch({
-                  type: "update-function-calling",
-                  payload: {
-                    idx: index,
-                    default: state,
-                  },
-                });
-              }}
-            />
-          </div>
           <div className={`market-row`}>
             <span>
               {t("admin.market.vision-model")}
@@ -752,25 +697,6 @@ function MarketItem({
               onCheckedChange={(state) => {
                 dispatch({
                   type: "update-vision-model",
-                  payload: {
-                    idx: index,
-                    default: state,
-                  },
-                });
-              }}
-            />
-          </div>
-          <div className={`market-row`}>
-            <span>
-              {t("admin.market.thinking-model")}
-              <Tips content={t("admin.market.thinking-model-tip")} />
-            </span>
-            <Switch
-              className={`ml-auto`}
-              checked={model.thinking_model || false}
-              onCheckedChange={(state) => {
-                dispatch({
-                  type: "update-thinking-model",
                   payload: {
                     idx: index,
                     default: state,
@@ -793,25 +719,6 @@ function MarketItem({
               onCheckedChange={(state) => {
                 dispatch({
                   type: "update-reverse-model",
-                  payload: {
-                    idx: index,
-                    default: state,
-                  },
-                });
-              }}
-            />
-          </div>
-          <div className={`market-row`}>
-            <span>
-              {t("admin.market.ocr-model")}
-              <Tips content={t("admin.market.ocr-model-tip")} />
-            </span>
-            <Switch
-              className={`ml-auto`}
-              checked={model.ocr_model || false}
-              onCheckedChange={(state) => {
-                dispatch({
-                  type: "update-ocr-model",
                   payload: {
                     idx: index,
                     default: state,
