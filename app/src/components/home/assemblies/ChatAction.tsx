@@ -76,7 +76,6 @@ import { Switch } from "@/components/ui/switch.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
 import { ButtonProps } from "@/components/ui/button.tsx";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { getBooleanMemory, setMemory } from "@/utils/memory.ts";
 
 const geminiThinkingPresets = [
@@ -713,6 +712,10 @@ export function OpenAIReasoningAction() {
   const enabled = openAIReasoningEffort !== "none";
   const summaryEnabled = openAIReasoningSummary !== "none";
   const currentSummary = summaryEnabled ? openAIReasoningSummary : "auto";
+  const currentSummaryIndex = Math.max(
+    0,
+    openAIReasoningSummaryLevels.indexOf(currentSummary),
+  );
   const modelLabel = formatModelLabel(model);
   const fallbackEffort = availableEfforts.includes("medium")
     ? "medium"
@@ -823,27 +826,36 @@ export function OpenAIReasoningAction() {
                 </span>
               </div>
 
-              <ToggleGroup
-                type="single"
-                value={currentSummary}
-                disabled={!enabled || !summaryEnabled}
-                onValueChange={(value) => {
-                  value && dispatch(setOpenAIReasoningSummary(value));
-                }}
-                className="grid grid-cols-3 gap-1"
-              >
+              <div className="relative grid grid-cols-3 gap-1 overflow-hidden rounded-md border border-black/10 bg-white p-1 dark:border-white/15 dark:bg-black">
+                <span
+                  className="absolute inset-y-1 left-1 rounded-sm bg-black transition-transform duration-300 ease-out dark:bg-white"
+                  style={{
+                    width: "calc((100% - 1rem) / 3)",
+                    transform:
+                      currentSummaryIndex === 0
+                        ? "translateX(0)"
+                        : `translateX(calc(${currentSummaryIndex * 100}% + ${
+                            currentSummaryIndex * 0.25
+                          }rem))`,
+                  }}
+                />
                 {openAIReasoningSummaryLevels.map((summary) => (
-                  <ToggleGroupItem
+                  <button
                     key={summary}
-                    value={summary}
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
+                    type="button"
+                    disabled={!enabled || !summaryEnabled}
+                    onClick={() => dispatch(setOpenAIReasoningSummary(summary))}
+                    className={cn(
+                      "relative z-10 h-8 rounded-sm text-xs font-medium transition-colors duration-200 disabled:cursor-not-allowed",
+                      currentSummary === summary
+                        ? "text-white dark:text-black"
+                        : "text-black/70 hover:text-black dark:text-white/70 dark:hover:text-white",
+                    )}
                   >
                     {t(`chat.openai-reasoning-summary-level-${summary}`)}
-                  </ToggleGroupItem>
+                  </button>
                 ))}
-              </ToggleGroup>
+              </div>
             </div>
           </div>
 
