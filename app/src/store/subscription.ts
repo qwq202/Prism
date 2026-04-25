@@ -2,6 +2,14 @@ import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { getSubscription } from "@/api/addition.ts";
 import { RootState } from "@/store/index.ts";
 
+export type SubscriptionUsageValue = {
+  used: number;
+  total: number;
+  unit?: "times" | "points";
+  reset_interval?: number;
+  reset_at?: string;
+};
+
 export const subscriptionSlice = createSlice({
   name: "subscription",
   initialState: {
@@ -48,8 +56,9 @@ export const refreshSelector = (state: RootState): number =>
   state.subscription.refresh;
 export const refreshAtSelector = (state: RootState): string =>
   state.subscription.refresh_at;
-export const usageSelector = (state: RootState): Record<string, number> =>
-  state.subscription.usage;
+export const usageSelector = (
+  state: RootState,
+): Record<string, number | SubscriptionUsageValue> => state.subscription.usage;
 
 export const refreshSubscription = createAsyncThunk(
   "subscription/refreshSubscription",

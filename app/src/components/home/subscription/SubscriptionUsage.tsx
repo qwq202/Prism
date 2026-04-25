@@ -5,6 +5,7 @@ type UsageProps = {
   usage: {
     used: number;
     total: number;
+    unit?: "times" | "points";
   };
 };
 
@@ -15,6 +16,7 @@ function SubscriptionUsage({ name, usage }: UsageProps) {
 
   const used = usage.used;
   const total = isInfinity ? "∞" : usage.total;
+  const suffix = usage.unit === "points" ? "pts" : "";
 
   return (
     <div className={`sub-column-wrapper inline-flex flex-col`}>
@@ -27,7 +29,10 @@ function SubscriptionUsage({ name, usage }: UsageProps) {
           ) : (
             <>
               <p>{used}</p>
-              <p className="text-secondary !font-normal text-sm">/{total}</p>
+              <p className="text-secondary !font-normal text-sm">
+                /{total}
+                {suffix}
+              </p>
             </>
           )}
         </div>

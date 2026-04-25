@@ -26,8 +26,7 @@ func (u *User) GetSubscriptionRefreshAt(db *sql.DB, cache *redis.Client) time.Ti
 
 	var next time.Time
 	for i, item := range plan.Items {
-		_, offset := channel.GetSubscriptionUsage(cache, u, item.Id)
-		n := offset.AddDate(0, 1, 0)
+		n := item.GetResetAt(u, cache)
 		if i == 0 || n.Before(next) {
 			next = n
 		}

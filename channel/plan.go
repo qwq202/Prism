@@ -25,20 +25,30 @@ type Plan struct {
 }
 
 type PlanItem struct {
-	Id     string   `json:"id" mapstructure:"id"`
-	Name   string   `json:"name" mapstructure:"name"`
-	Icon   string   `json:"icon" mapstructure:"icon"`
-	Value  int64    `json:"value" mapstructure:"value"`
-	Models []string `json:"models" mapstructure:"models"`
+	Id            string   `json:"id" mapstructure:"id"`
+	Name          string   `json:"name" mapstructure:"name"`
+	Icon          string   `json:"icon" mapstructure:"icon"`
+	Value         int64    `json:"value" mapstructure:"value"`
+	Unit          string   `json:"unit,omitempty" mapstructure:"unit"`
+	ResetInterval int64    `json:"reset_interval,omitempty" mapstructure:"reset_interval"`
+	Models        []string `json:"models" mapstructure:"models"`
 }
 
 type Usage struct {
-	Used  int64 `json:"used" mapstructure:"used"`
-	Total int64 `json:"total" mapstructure:"total"`
+	Used          int64  `json:"used" mapstructure:"used"`
+	Total         int64  `json:"total" mapstructure:"total"`
+	Unit          string `json:"unit,omitempty" mapstructure:"unit"`
+	ResetInterval int64  `json:"reset_interval,omitempty" mapstructure:"reset_interval"`
+	ResetAt       string `json:"reset_at,omitempty" mapstructure:"reset_at"`
 }
 type UsageMap map[string]Usage
 
 var planExp int64 = 0
+
+const (
+	PlanItemUnitTimes  = "times"
+	PlanItemUnitPoints = "points"
+)
 
 func NewPlanManager() *PlanManager {
 	manager := &PlanManager{}
@@ -117,9 +127,45 @@ func getOffsetFormat(offset time.Time, usage int64) string {
 	return fmt.Sprintf("%s/%d", offset.Format("2006-01-02:15:04:05"), usage)
 }
 
-func GetSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string) (usage int64, offset time.Time) {
+func normalizePlanItemUnit(unit string) string {
+	switch strings.ToLower(strings.TrimSpace(unit)) {
+	case PlanItemUnitPoints:
+		return PlanItemUnitPoints
+	default:
+		return PlanItemUnitTimes
+	}
+}
+
+func advanceUsageOffset(offset time.Time, now time.Time, resetInterval int64) (time.Time, bool) {
+	if resetInterval > 0 {
+		interval := time.Duration(resetInterval) * time.Second
+		next := offset.Add(interval)
+		if next.After(now) {
+			return offset, false
+		}
+
+		elapsed := now.Sub(offset)
+		steps := int64(elapsed / interval)
+		if steps < 1 {
+			steps = 1
+		}
+		return offset.Add(time.Duration(steps) * interval), true
+	}
+
+	next := offset.AddDate(0, 1, 0)
+	if next.Before(now) {
+		for offset.AddDate(0, 1, 0).Before(now) {
+			offset = offset.AddDate(0, 1, 0)
+		}
+		return offset, true
+	}
+
+	return offset, false
+}
+
+func getSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string, resetInterval int64) (usage int64, offset time.Time) {
 	// example cache value: 2021-09-01:19:00:00/100
-	// if date is longer than 1 month, reset usage
+	// if date is longer than the configured reset interval, reset usage
 
 	offset = time.Now()
 
@@ -133,37 +179,18 @@ func GetSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string) 
 	if len(seg) != 2 {
 		usage = 0
 	} else {
-		date, err := time.Parse("2006-01-02:15:04:05", seg[0])
+		date, err := time.ParseInLocation("2006-01-02:15:04:05", seg[0], time.Local)
 		usage = utils.ParseInt64(seg[1])
 		if err != nil {
 			usage = 0
-		}
-
-		// check if date is longer than current date after 1 month, if true, reset usage
-
-		if date.AddDate(0, 1, 0).Before(time.Now()) {
-			// date is longer than 1 month, reset usage
-			usage = 0
-
-			// get current date offset (1 month step)
-			// example: 2021-09-01:19:00:0/100 -> 2021-10-01:19:00:00/100
-
-			// copy date to offset
-			offset = date
-
-			// example:
-			// current time: 2021-09-08:14:00:00
-			// offset: 2021-07-01:19:00:00
-			// expected offset: 2021-09-01:19:00:00
-			// offset is not longer than current date, stop adding 1 month
-
-			for offset.AddDate(0, 1, 0).Before(time.Now()) {
-				offset = offset.AddDate(0, 1, 0)
-			}
 		} else {
-			// date is not longer than 1 month, use current date value
-
 			offset = date
+			if nextOffset, reset := advanceUsageOffset(date, time.Now(), resetInterval); reset {
+				usage = 0
+				offset = nextOffset
+			} else {
+				offset = nextOffset
+			}
 		}
 	}
 
@@ -173,11 +200,32 @@ func GetSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string) 
 	return
 }
 
-func IncreaseSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string, limit int64) bool {
-	key := globals.GetSubscriptionLimitFormat(t, user.HitID())
-	usage, offset := GetSubscriptionUsage(cache, user, t)
+func GetSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string) (usage int64, offset time.Time) {
+	return getSubscriptionUsage(cache, user, t, 0)
+}
 
-	usage += 1
+func getNextResetAt(offset time.Time, resetInterval int64) time.Time {
+	if resetInterval > 0 {
+		return offset.Add(time.Duration(resetInterval) * time.Second)
+	}
+
+	return offset.AddDate(0, 1, 0)
+}
+
+func (p *PlanItem) GetResetAt(user globals.AuthLike, cache *redis.Client) time.Time {
+	_, offset := getSubscriptionUsage(cache, user, p.Id, p.ResetInterval)
+	return getNextResetAt(offset, p.ResetInterval)
+}
+
+func increaseSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string, limit int64, resetInterval int64, amount int64) bool {
+	key := globals.GetSubscriptionLimitFormat(t, user.HitID())
+	usage, offset := getSubscriptionUsage(cache, user, t, resetInterval)
+
+	if amount <= 0 {
+		amount = 1
+	}
+
+	usage += amount
 	if usage > limit {
 		return false
 	}
@@ -187,11 +235,19 @@ func IncreaseSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t str
 	return err == nil
 }
 
-func DecreaseSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string) bool {
-	key := globals.GetSubscriptionLimitFormat(t, user.HitID())
-	usage, offset := GetSubscriptionUsage(cache, user, t)
+func IncreaseSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string, limit int64) bool {
+	return increaseSubscriptionUsage(cache, user, t, limit, 0, 1)
+}
 
-	usage -= 1
+func decreaseSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string, resetInterval int64, amount int64) bool {
+	key := globals.GetSubscriptionLimitFormat(t, user.HitID())
+	usage, offset := getSubscriptionUsage(cache, user, t, resetInterval)
+
+	if amount <= 0 {
+		amount = 1
+	}
+
+	usage -= amount
 	if usage < 0 {
 		return true
 	}
@@ -201,13 +257,21 @@ func DecreaseSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t str
 	return err == nil
 }
 
-func ReleaseSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string) bool {
+func DecreaseSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string) bool {
+	return decreaseSubscriptionUsage(cache, user, t, 0, 1)
+}
+
+func releaseSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string, resetInterval int64) bool {
 	key := globals.GetSubscriptionLimitFormat(t, user.HitID())
-	_, offset := GetSubscriptionUsage(cache, user, t)
+	_, offset := getSubscriptionUsage(cache, user, t, resetInterval)
 
 	// set new cache value
 	err := utils.SetCache(cache, key, getOffsetFormat(offset, 0), planExp)
 	return err == nil
+}
+
+func ReleaseSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string) bool {
+	return releaseSubscriptionUsage(cache, user, t, 0)
 }
 
 func (p *Plan) GetUsage(user globals.AuthLike, db *sql.DB, cache *redis.Client) UsageMap {
@@ -219,13 +283,13 @@ func (p *Plan) GetUsage(user globals.AuthLike, db *sql.DB, cache *redis.Client) 
 func (p *PlanItem) GetUsage(user globals.AuthLike, db *sql.DB, cache *redis.Client) int64 {
 	// preflight check
 	user.GetID(db)
-	usage, _ := GetSubscriptionUsage(cache, user, p.Id)
+	usage, _ := getSubscriptionUsage(cache, user, p.Id, p.ResetInterval)
 	return usage
 }
 
 func (p *PlanItem) ResetUsage(user globals.AuthLike, cache *redis.Client) bool {
 	key := globals.GetSubscriptionLimitFormat(p.Id, user.HitID())
-	_, offset := GetSubscriptionUsage(cache, user, p.Id)
+	_, offset := getSubscriptionUsage(cache, user, p.Id, p.ResetInterval)
 
 	err := utils.SetCache(cache, key, getOffsetFormat(offset, 0), planExp)
 	return err == nil
@@ -239,10 +303,18 @@ func (p *PlanItem) CreateUsage(user globals.AuthLike, cache *redis.Client) bool 
 }
 
 func (p *PlanItem) GetUsageForm(user globals.AuthLike, db *sql.DB, cache *redis.Client) Usage {
+	used, offset := getSubscriptionUsage(cache, user, p.Id, p.ResetInterval)
 	return Usage{
-		Used:  p.GetUsage(user, db, cache),
-		Total: p.Value,
+		Used:          used,
+		Total:         p.Value,
+		Unit:          p.GetUnit(),
+		ResetInterval: p.ResetInterval,
+		ResetAt:       getNextResetAt(offset, p.ResetInterval).Format(time.RFC3339),
 	}
+}
+
+func (p *PlanItem) GetUnit() string {
+	return normalizePlanItemUnit(p.Unit)
 }
 
 func (p *PlanItem) IsInfinity() bool {
@@ -254,7 +326,7 @@ func (p *PlanItem) IsExceeded(user globals.AuthLike, db *sql.DB, cache *redis.Cl
 }
 
 func (p *PlanItem) Increase(user globals.AuthLike, cache *redis.Client) bool {
-	state := IncreaseSubscriptionUsage(cache, user, p.Id, p.Value)
+	state := increaseSubscriptionUsage(cache, user, p.Id, p.Value, p.ResetInterval, 1)
 	return state || p.IsInfinity()
 }
 
@@ -262,11 +334,11 @@ func (p *PlanItem) Decrease(user globals.AuthLike, cache *redis.Client) bool {
 	if p.Value == -1 {
 		return true
 	}
-	return DecreaseSubscriptionUsage(cache, user, p.Id)
+	return decreaseSubscriptionUsage(cache, user, p.Id, p.ResetInterval, 1)
 }
 
 func (p *PlanItem) Release(user globals.AuthLike, cache *redis.Client) bool {
-	return ReleaseSubscriptionUsage(cache, user, p.Id)
+	return releaseSubscriptionUsage(cache, user, p.Id, p.ResetInterval)
 }
 
 func (p *Plan) IncreaseUsage(user globals.AuthLike, cache *redis.Client, model string) bool {

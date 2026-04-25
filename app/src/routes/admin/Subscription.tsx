@@ -32,6 +32,13 @@ import { NumberInput } from "@/components/ui/number-input.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { MultiCombobox } from "@/components/ui/multi-combobox.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select.tsx";
 import { withNotify } from "@/api/common.ts";
 import { dispatchSubscriptionData } from "@/store/globals.ts";
 import { useDispatch } from "react-redux";
@@ -46,6 +53,27 @@ const planInitialConfig: PlanConfig = {
   enabled: false,
   plans: [],
 };
+
+const planItemUnits = ["times", "points"] as const;
+const planItemResetPresets = [
+  { value: "0", seconds: 0 },
+  { value: "18000", seconds: 5 * 60 * 60 },
+  { value: "86400", seconds: 24 * 60 * 60 },
+  { value: "604800", seconds: 7 * 24 * 60 * 60 },
+  { value: "custom", seconds: -1 },
+] as const;
+
+function getPlanItemUnit(item: PlanItem): "times" | "points" {
+  return item.unit === "points" ? "points" : "times";
+}
+
+function getPlanItemResetPreset(item: PlanItem): string {
+  const seconds = item.reset_interval ?? 0;
+  const preset = planItemResetPresets.find(
+    (option) => option.seconds === seconds,
+  );
+  return preset?.value ?? "custom";
+}
 
 type PlanLevelPayload = {
   level: number;
@@ -62,6 +90,14 @@ type PlanConfigAction =
   | { type: "set-item-id"; payload: PlanItemPayload & { id: string } }
   | { type: "set-item-name"; payload: PlanItemPayload & { name: string } }
   | { type: "set-item-value"; payload: PlanItemPayload & { value: number } }
+  | {
+      type: "set-item-unit";
+      payload: PlanItemPayload & { unit: "times" | "points" };
+    }
+  | {
+      type: "set-item-reset-interval";
+      payload: PlanItemPayload & { resetInterval: number };
+    }
   | { type: "set-item-icon"; payload: PlanItemPayload & { icon: string } }
   | { type: "add-item"; payload: PlanLevelPayload }
   | { type: "set-item-models"; payload: PlanItemPayload & { models: string[] } }
@@ -208,6 +244,48 @@ function reducer(state: PlanConfig, action: PlanConfigAction): PlanConfig {
           return plan;
         }),
       };
+    case "set-item-unit":
+      return {
+        ...state,
+        plans: state.plans.map((plan: Plan) => {
+          if (plan.level === action.payload.level) {
+            return {
+              ...plan,
+              items: plan.items.map((item: PlanItem, index: number) => {
+                if (index === action.payload.index) {
+                  return {
+                    ...item,
+                    unit: action.payload.unit,
+                  };
+                }
+                return item;
+              }),
+            };
+          }
+          return plan;
+        }),
+      };
+    case "set-item-reset-interval":
+      return {
+        ...state,
+        plans: state.plans.map((plan: Plan) => {
+          if (plan.level === action.payload.level) {
+            return {
+              ...plan,
+              items: plan.items.map((item: PlanItem, index: number) => {
+                if (index === action.payload.index) {
+                  return {
+                    ...item,
+                    reset_interval: action.payload.resetInterval,
+                  };
+                }
+                return item;
+              }),
+            };
+          }
+          return plan;
+        }),
+      };
     case "set-item-icon":
       return {
         ...state,
@@ -242,6 +320,8 @@ function reducer(state: PlanConfig, action: PlanConfigAction): PlanConfig {
                   id: "",
                   name: "",
                   value: 0,
+                  unit: "times",
+                  reset_interval: 0,
                   icon: "",
                   models: [],
                 },
@@ -594,6 +674,100 @@ function PlanConfig() {
                       }}
                     />
                   </div>
+
+                  <div className={`plan-editor-row`}>
+                    <p className={`plan-editor-label mr-2`}>
+                      {t("admin.plan.item-unit")}
+                      <Tips content={t("admin.plan.item-unit-tip")} />
+                    </p>
+                    <Select
+                      value={getPlanItemUnit(item)}
+                      onValueChange={(value: string) => {
+                        formDispatch({
+                          type: "set-item-unit",
+                          payload: {
+                            level: plan.level,
+                            unit: value === "points" ? "points" : "times",
+                            index,
+                          },
+                        });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {planItemUnits.map((unit) => (
+                          <SelectItem key={unit} value={unit}>
+                            {t(`admin.plan.item-unit-${unit}`)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className={`plan-editor-row`}>
+                    <p className={`plan-editor-label mr-2`}>
+                      {t("admin.plan.item-reset")}
+                      <Tips content={t("admin.plan.item-reset-tip")} />
+                    </p>
+                    <Select
+                      value={getPlanItemResetPreset(item)}
+                      onValueChange={(value: string) => {
+                        const resetInterval =
+                          value === "custom"
+                            ? Math.max(item.reset_interval ?? 3600, 1)
+                            : Number(value);
+                        formDispatch({
+                          type: "set-item-reset-interval",
+                          payload: {
+                            level: plan.level,
+                            resetInterval,
+                            index,
+                          },
+                        });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {planItemResetPresets.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {t(`admin.plan.item-reset-${option.value}`)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {getPlanItemResetPreset(item) === "custom" && (
+                    <div className={`plan-editor-row`}>
+                      <p className={`plan-editor-label mr-2`}>
+                        {t("admin.plan.item-reset-hours")}
+                      </p>
+                      <NumberInput
+                        value={Number(
+                          ((item.reset_interval ?? 0) / 3600).toFixed(2),
+                        )}
+                        min={0.01}
+                        step={0.5}
+                        onValueChange={(value: number) => {
+                          formDispatch({
+                            type: "set-item-reset-interval",
+                            payload: {
+                              level: plan.level,
+                              resetInterval: Math.max(
+                                1,
+                                Math.round(value * 3600),
+                              ),
+                              index,
+                            },
+                          });
+                        }}
+                      />
+                    </div>
+                  )}
 
                   {!stacked && (
                     <>

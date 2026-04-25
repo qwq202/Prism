@@ -46,6 +46,9 @@ import Tips from "@/components/Tips";
 type SubscriptionUsageValue = {
   used: number;
   total: number;
+  unit?: "times" | "points";
+  reset_interval?: number;
+  reset_at?: string;
 };
 
 function toSubscriptionUsage(
@@ -65,11 +68,18 @@ function toSubscriptionUsage(
     "used" in value &&
     "total" in value
   ) {
-    const usage = value as Record<"used" | "total", unknown>;
+    const usage = value as Record<string, unknown>;
     if (typeof usage.used === "number" && typeof usage.total === "number") {
       return {
         used: usage.used,
         total: usage.total,
+        unit: usage.unit === "points" ? "points" : "times",
+        reset_interval:
+          typeof usage.reset_interval === "number"
+            ? usage.reset_interval
+            : undefined,
+        reset_at:
+          typeof usage.reset_at === "string" ? usage.reset_at : undefined,
       };
     }
   }
@@ -431,6 +441,9 @@ function WalletPlanBox() {
                         usage?.[item.id],
                         item.value,
                       );
+                      if (itemUsage && item.unit === "points") {
+                        itemUsage.unit = "points";
+                      }
 
                       return (
                         itemUsage && (

@@ -106,6 +106,8 @@ export type PlanItem = {
   id: string;
   name: string;
   value: number;
+  unit?: "times" | "points";
+  reset_interval?: number;
   icon: string;
   models: string[];
 };

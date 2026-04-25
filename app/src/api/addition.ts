@@ -17,7 +17,17 @@ type SubscriptionResponse = {
   is_subscribed: boolean;
   expired: number;
   enterprise?: boolean;
-  usage: Record<string, number>;
+  usage: Record<
+    string,
+    | number
+    | {
+        used: number;
+        total: number;
+        unit?: "times" | "points";
+        reset_interval?: number;
+        reset_at?: string;
+      }
+  >;
   level: number;
   expired_at?: string;
   refresh?: number;
