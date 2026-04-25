@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
 import { collapseThinkingSelector } from "@/store/settings.ts";
+import { stripThinkTags } from "@/utils/thinking";
 
 interface ThinkContentProps {
   content: string;
@@ -23,7 +24,7 @@ function getExpandedState(collapseThinking: boolean, isComplete: boolean): boole
 
 export function ThinkContent({ content, isComplete = true }: ThinkContentProps) {
   const collapseThinking = useSelector(collapseThinkingSelector);
-  const displayContent = content.replace(/<\/?think>/g, "").trim();
+  const displayContent = stripThinkTags(content);
   const [isExpanded, setIsExpanded] = useState(
     getExpandedState(collapseThinking, isComplete),
   );

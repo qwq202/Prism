@@ -85,7 +85,7 @@ func TestSanitizeDSMLToolMarkupPreservesWhitespaceWithoutMarker(t *testing.T) {
 }
 
 func TestSanitizeDeepseekStreamTextRemovesNestedThinkTags(t *testing.T) {
-	input := "先想一下 <think>\ninner\n</think> 继续"
+	input := "先想一下 < THINK >\ninner\n</ Think > 继续"
 	got := sanitizeDeepseekStreamText(input)
 	if got != "先想一下 \ninner\n 继续" {
 		t.Fatalf("expected raw think tags to be stripped, got %q", got)

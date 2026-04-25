@@ -34,6 +34,7 @@ import { ThinkContent } from "@/components/ThinkContent";
 import ModelAvatar from "@/components/ModelAvatar.tsx";
 import { selectSupportModels } from "@/store/chat.ts";
 import { ToolCallStatus } from "@/components/ToolCallStatus";
+import { stripThinkTags } from "@/utils/thinking";
 
 type MessageProps = {
   index: number;
@@ -272,25 +273,40 @@ function MessageContent({
 
   // parse think content
   const parseThinkContent = (content: string) => {
-    // check if there is a start tag
+    const openMatch = content.match(/<\s*think\s*>/i);
+    if (!openMatch || openMatch.index === undefined) {
+      return null;
+    }
 
-    const startMatch = content.match(/<think>\n?(.*?)(?:<\/think>|$)/s);
-    if (startMatch) {
-      const thinkContent = startMatch[1];
-      // if there is an end tag, remove the whole matching part;
-      // if not, keep the remaining content
-      const hasEndTag = content.includes("</think>");
-      const restContent = hasEndTag
-        ? content.replace(startMatch[0], "").trim()
-        : content.substring(content.indexOf("<think>") + 7).trim();
+    const openEnd = openMatch.index + openMatch[0].length;
+    const closePattern = /<\s*\/\s*think\s*>/gi;
+    let closeMatch: RegExpExecArray | null = null;
+    let lastCloseMatch: RegExpExecArray | null = null;
 
+    while ((closeMatch = closePattern.exec(content)) !== null) {
+      if (closeMatch.index >= openEnd) {
+        lastCloseMatch = closeMatch;
+      }
+    }
+
+    if (!lastCloseMatch) {
       return {
-        thinkContent,
-        restContent: hasEndTag ? restContent : "",
-        isComplete: hasEndTag,
+        thinkContent: stripThinkTags(content.substring(openEnd)),
+        restContent: "",
+        isComplete: false,
       };
     }
-    return null;
+
+    const thinkContent = content.substring(openEnd, lastCloseMatch.index);
+    const restContent = content
+      .substring(lastCloseMatch.index + lastCloseMatch[0].length)
+      .trim();
+
+    return {
+      thinkContent: stripThinkTags(thinkContent),
+      restContent,
+      isComplete: true,
+    };
   };
 
   const parsedContent = message.content.length

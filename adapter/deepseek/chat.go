@@ -6,6 +6,7 @@ import (
 	"chat/utils"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -15,6 +16,8 @@ type ChatInstance struct {
 	isFirstReasoning bool
 	isReasonOver     bool
 }
+
+var deepseekThinkTagPattern = regexp.MustCompile(`(?i)<\s*/?\s*think\s*>`)
 
 func (c *ChatInstance) GetEndpoint() string {
 	return c.Endpoint
@@ -179,9 +182,7 @@ func sanitizeDSMLToolMarkup(content string) string {
 
 func sanitizeDeepseekStreamText(content string) string {
 	cleaned := sanitizeDSMLToolMarkup(content)
-	cleaned = strings.ReplaceAll(cleaned, "<think>", "")
-	cleaned = strings.ReplaceAll(cleaned, "</think>", "")
-	return cleaned
+	return deepseekThinkTagPattern.ReplaceAllString(cleaned, "")
 }
 
 func (c *ChatInstance) getChoices(form *ChatStreamResponse) *globals.Chunk {
