@@ -190,7 +190,7 @@
     "deepseek-thinking-level-off": "オフ",
     "deepseek-thinking-level-high": "High",
     "deepseek-thinking-level-max": "Max",
-    "deepseek-thinking-tip": "{{model}}は、DeepSeek thinking.typeとreasoning_effortをサポートしています。クローズ時に非思考モードを送信します。オープン時に選択した思考強度を使用します。",
+    "deepseek-thinking-tip": "{{model}}は DeepSeek 思考モードに対応しています。オフにすると非思考モードを使用し、オンにすると選択した思考強度を使用します。",
     "deepseek-pro-max-warning-title": "DeepSeek-V4 Pro の最大思考は大量の Token を消費します",
     "deepseek-pro-max-warning-desc": "最大思考は Pro のハード推論モードを有効にします。複雑なタスクには有効ですが、Token 使用量、応答時間、費用が大きく増える可能性があります。有効化する前に確認してください。",
     "deepseek-pro-max-warning-dont-remind": "次回から表示しない",
