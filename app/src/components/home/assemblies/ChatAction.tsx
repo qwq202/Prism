@@ -74,6 +74,11 @@ function formatModelLabel(model: string): string {
   return model.trim().toUpperCase();
 }
 
+function getStepPosition(index: number, total: number): string {
+  if (total <= 1) return "0%";
+  return `${(index / (total - 1)) * 100}%`;
+}
+
 type ChatActionProps = {
   style?: React.CSSProperties;
   className?: string;
@@ -173,10 +178,10 @@ export function WebAction() {
               isGeminiModel
                 ? t("chat.gemini-web")
                 : isXAIModel
-                  ? t("chat.xai-web")
-                  : isOpenAIWebModel
-                    ? t("chat.openai-web", { model: openAIModelLabel })
-                    : t("chat.web")
+                ? t("chat.xai-web")
+                : isOpenAIWebModel
+                ? t("chat.openai-web", { model: openAIModelLabel })
+                : t("chat.web")
             }
           >
             <Globe
@@ -540,9 +545,15 @@ export function OpenAIReasoningAction() {
               }}
             />
 
-            <div className="flex justify-between text-[11px] text-muted-foreground">
-              {availableEfforts.map((effort) => (
-                <span key={effort}>
+            <div className="relative h-4 text-[11px] text-muted-foreground">
+              {availableEfforts.map((effort, index) => (
+                <span
+                  key={effort}
+                  className="absolute top-0 -translate-x-1/2 whitespace-nowrap"
+                  style={{
+                    left: getStepPosition(index, availableEfforts.length),
+                  }}
+                >
                   {t(`chat.openai-reasoning-level-${effort}`)}
                 </span>
               ))}
