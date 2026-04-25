@@ -69,3 +69,41 @@ func TestBuildThinkingConfigDoesNotRequestSummaryForNone(t *testing.T) {
 		t.Fatalf("expected no summary request when reasoning is disabled, got %#v", config)
 	}
 }
+
+func TestBuildDeepseekThinkingConfigRequestsReasoningEffort(t *testing.T) {
+	instance := &conversation.Conversation{}
+	instance.SetDeepseekThinkingEnabled(true)
+	instance.SetDeepseekReasoningEffort("max")
+
+	config, effort := buildDeepseekThinkingConfig(instance, "deepseek-v4-pro")
+	payload, ok := config.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected deepseek thinking config map, got %#v", config)
+	}
+
+	if payload["type"] != "enabled" {
+		t.Fatalf("expected deepseek thinking to be enabled, got %#v", payload["type"])
+	}
+	if effort == nil || *effort != "max" {
+		t.Fatalf("expected deepseek reasoning effort max, got %#v", effort)
+	}
+}
+
+func TestBuildDeepseekThinkingConfigDisablesThinking(t *testing.T) {
+	instance := &conversation.Conversation{}
+	instance.SetDeepseekThinkingEnabled(false)
+	instance.SetDeepseekReasoningEffort("max")
+
+	config, effort := buildDeepseekThinkingConfig(instance, "deepseek-v4-flash")
+	payload, ok := config.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected deepseek thinking config map, got %#v", config)
+	}
+
+	if payload["type"] != "disabled" {
+		t.Fatalf("expected deepseek thinking to be disabled, got %#v", payload["type"])
+	}
+	if effort != nil {
+		t.Fatalf("expected no reasoning effort when deepseek thinking is disabled, got %#v", effort)
+	}
+}

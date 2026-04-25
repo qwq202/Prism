@@ -13,25 +13,27 @@ const defaultConversationName = "new chat"
 const defaultConversationContext = 8
 
 type Conversation struct {
-	Auth                   bool              `json:"auth"`
-	UserID                 int64             `json:"user_id"`
-	Id                     int64             `json:"id"`
-	Name                   string            `json:"name"`
-	Message                []globals.Message `json:"message"`
-	Model                  string            `json:"model"`
-	TaskID                 string            `json:"task_id,omitempty"`
-	EnableWeb              bool              `json:"enable_web"`
-	WebSearch              bool              `json:"web_search"`
-	URLContext             bool              `json:"url_context"`
-	XSearch                bool              `json:"x_search"`
-	GeminiThinkingBudget   int               `json:"gemini_thinking_budget"`
-	OpenAIReasoningEffort  string            `json:"openai_reasoning_effort"`
-	OpenAIReasoningSummary string            `json:"openai_reasoning_summary"`
-	Shared                 bool              `json:"shared"`
-	Context                int               `json:"context"`
-	CustomInstruction      string            `json:"custom_instruction,omitempty"`
-	MemoryEnabled          bool              `json:"memory_enabled"`
-	MemoryHistoryEnabled   bool              `json:"memory_history_enabled"`
+	Auth                     bool              `json:"auth"`
+	UserID                   int64             `json:"user_id"`
+	Id                       int64             `json:"id"`
+	Name                     string            `json:"name"`
+	Message                  []globals.Message `json:"message"`
+	Model                    string            `json:"model"`
+	TaskID                   string            `json:"task_id,omitempty"`
+	EnableWeb                bool              `json:"enable_web"`
+	WebSearch                bool              `json:"web_search"`
+	URLContext               bool              `json:"url_context"`
+	XSearch                  bool              `json:"x_search"`
+	GeminiThinkingBudget     int               `json:"gemini_thinking_budget"`
+	DeepseekThinkingDisabled bool              `json:"deepseek_thinking_disabled"`
+	DeepseekReasoningEffort  string            `json:"deepseek_reasoning_effort"`
+	OpenAIReasoningEffort    string            `json:"openai_reasoning_effort"`
+	OpenAIReasoningSummary   string            `json:"openai_reasoning_summary"`
+	Shared                   bool              `json:"shared"`
+	Context                  int               `json:"context"`
+	CustomInstruction        string            `json:"custom_instruction,omitempty"`
+	MemoryEnabled            bool              `json:"memory_enabled"`
+	MemoryHistoryEnabled     bool              `json:"memory_history_enabled"`
 
 	MaxTokens         *int     `json:"max_tokens,omitempty"`
 	Temperature       *float32 `json:"temperature,omitempty"`
@@ -43,21 +45,23 @@ type Conversation struct {
 }
 
 type FormMessage struct {
-	Type                   string `json:"type"`
-	Message                string `json:"message"`
-	Web                    bool   `json:"web"`
-	WebSearch              bool   `json:"web_search"`
-	URLContext             bool   `json:"url_context"`
-	XSearch                bool   `json:"x_search"`
-	GeminiThinkingBudget   int    `json:"gemini_thinking_budget"`
-	OpenAIReasoningEffort  string `json:"openai_reasoning_effort"`
-	OpenAIReasoningSummary string `json:"openai_reasoning_summary"`
-	Model                  string `json:"model"`
-	IgnoreContext          bool   `json:"ignore_context"`
-	Context                int    `json:"context"`
-	CustomInstruction      string `json:"custom_instruction,omitempty"`
-	MemoryEnabled          bool   `json:"memory_enabled"`
-	MemoryHistoryEnabled   bool   `json:"memory_history_enabled"`
+	Type                    string `json:"type"`
+	Message                 string `json:"message"`
+	Web                     bool   `json:"web"`
+	WebSearch               bool   `json:"web_search"`
+	URLContext              bool   `json:"url_context"`
+	XSearch                 bool   `json:"x_search"`
+	GeminiThinkingBudget    int    `json:"gemini_thinking_budget"`
+	DeepseekThinkingEnabled *bool  `json:"deepseek_thinking_enabled,omitempty"`
+	DeepseekReasoningEffort string `json:"deepseek_reasoning_effort"`
+	OpenAIReasoningEffort   string `json:"openai_reasoning_effort"`
+	OpenAIReasoningSummary  string `json:"openai_reasoning_summary"`
+	Model                   string `json:"model"`
+	IgnoreContext           bool   `json:"ignore_context"`
+	Context                 int    `json:"context"`
+	CustomInstruction       string `json:"custom_instruction,omitempty"`
+	MemoryEnabled           bool   `json:"memory_enabled"`
+	MemoryHistoryEnabled    bool   `json:"memory_history_enabled"`
 
 	// request params
 	MaxTokens         *int     `json:"max_tokens,omitempty"`
@@ -143,6 +147,14 @@ func (c *Conversation) GetGeminiThinkingBudget() *int {
 	return &c.GeminiThinkingBudget
 }
 
+func (c *Conversation) IsDeepseekThinkingEnabled() bool {
+	return !c.DeepseekThinkingDisabled
+}
+
+func (c *Conversation) GetDeepseekReasoningEffort() string {
+	return globals.NormalizeDeepseekReasoningEffort(c.DeepseekReasoningEffort)
+}
+
 func (c *Conversation) GetOpenAIReasoningEffort() string {
 	return strings.TrimSpace(strings.ToLower(c.OpenAIReasoningEffort))
 }
@@ -184,6 +196,14 @@ func (c *Conversation) SetEnableXSearch(enable bool) {
 
 func (c *Conversation) SetGeminiThinkingBudget(budget int) {
 	c.GeminiThinkingBudget = budget
+}
+
+func (c *Conversation) SetDeepseekThinkingEnabled(enabled bool) {
+	c.DeepseekThinkingDisabled = !enabled
+}
+
+func (c *Conversation) SetDeepseekReasoningEffort(effort string) {
+	c.DeepseekReasoningEffort = globals.NormalizeDeepseekReasoningEffort(effort)
 }
 
 func (c *Conversation) SetOpenAIReasoningEffort(effort string) {
@@ -414,6 +434,12 @@ func (c *Conversation) ApplyParam(form *FormMessage) {
 	c.SetEnableURLContext(utils.Multi(form.Web && !form.WebSearch && !form.URLContext && !form.XSearch, true, form.URLContext))
 	c.SetEnableXSearch(form.XSearch)
 	c.SetGeminiThinkingBudget(form.GeminiThinkingBudget)
+	if form.DeepseekThinkingEnabled != nil {
+		c.SetDeepseekThinkingEnabled(*form.DeepseekThinkingEnabled)
+	}
+	if strings.TrimSpace(form.DeepseekReasoningEffort) != "" {
+		c.SetDeepseekReasoningEffort(form.DeepseekReasoningEffort)
+	}
 	c.SetOpenAIReasoningEffort(form.OpenAIReasoningEffort)
 	c.SetOpenAIReasoningSummary(form.OpenAIReasoningSummary)
 	c.SetContextLength(form.Context, form.IgnoreContext)

@@ -107,6 +107,8 @@ type initialStateType = {
   xai_x_search: boolean;
   openai_responses_web_search: boolean;
   gemini_thinking_budget: number;
+  deepseek_thinking_enabled: boolean;
+  deepseek_reasoning_effort: string;
   openai_reasoning_effort: string;
   openai_reasoning_summary: string;
   current: number;
@@ -152,6 +154,12 @@ export function isGeminiModelId(model: string | undefined | null): boolean {
 
 export function isXAIModelId(model: string | undefined | null): boolean {
   return !!model && model.toLowerCase().startsWith("grok");
+}
+
+export function isDeepSeekV4ModelId(model: string | undefined | null): boolean {
+  if (!model) return false;
+  const normalized = model.trim().toLowerCase();
+  return normalized === "deepseek-v4-flash" || normalized === "deepseek-v4-pro";
 }
 
 export type OpenAIResponsesCapabilities = {
@@ -285,6 +293,14 @@ export function normalizeOpenAIResponsesReasoningSummary(
   return ["none", "concise", "auto", "detailed"].includes(normalized)
     ? normalized
     : "auto";
+}
+
+export function normalizeDeepSeekReasoningEffort(
+  effort: string | undefined | null,
+): string {
+  const normalized = (effort || "").trim().toLowerCase();
+  if (normalized === "max" || normalized === "xhigh") return "max";
+  return "high";
 }
 
 export function isGeminiNoThinkingModel(
@@ -446,6 +462,11 @@ const chatSlice = createSlice({
       false,
     ),
     gemini_thinking_budget: getNumberMemory("gemini_thinking_budget", 0),
+    deepseek_thinking_enabled:
+      getMemory("deepseek_thinking_enabled") !== "false",
+    deepseek_reasoning_effort: normalizeDeepSeekReasoningEffort(
+      getMemory("deepseek_reasoning_effort"),
+    ),
     openai_reasoning_effort: getMemory("openai_reasoning_effort") || "none",
     openai_reasoning_summary: normalizeOpenAIResponsesReasoningSummary(
       getMemory("openai_reasoning_summary"),
@@ -686,6 +707,16 @@ const chatSlice = createSlice({
       setNumberMemory("gemini_thinking_budget", action.payload as number);
       state.gemini_thinking_budget = action.payload as number;
     },
+    setDeepSeekThinkingEnabled: (state, action) => {
+      const enabled = action.payload as boolean;
+      setMemory("deepseek_thinking_enabled", enabled ? "true" : "false");
+      state.deepseek_thinking_enabled = enabled;
+    },
+    setDeepSeekReasoningEffort: (state, action) => {
+      const effort = normalizeDeepSeekReasoningEffort(action.payload as string);
+      setMemory("deepseek_reasoning_effort", effort);
+      state.deepseek_reasoning_effort = effort;
+    },
     setOpenAIReasoningEffort: (state, action) => {
       setMemory("openai_reasoning_effort", action.payload as string);
       state.openai_reasoning_effort = action.payload as string;
@@ -774,6 +805,8 @@ export const {
   setXAIXSearch,
   setOpenAIResponsesWebSearch,
   setGeminiThinkingBudget,
+  setDeepSeekThinkingEnabled,
+  setDeepSeekReasoningEffort,
   setOpenAIReasoningEffort,
   setOpenAIReasoningSummary,
   setModelList,
@@ -815,6 +848,10 @@ export const selectOpenAIResponsesWebSearch = (state: RootState): boolean =>
   state.chat.openai_responses_web_search;
 export const selectGeminiThinkingBudget = (state: RootState): number =>
   state.chat.gemini_thinking_budget;
+export const selectDeepSeekThinkingEnabled = (state: RootState): boolean =>
+  state.chat.deepseek_thinking_enabled;
+export const selectDeepSeekReasoningEffort = (state: RootState): string =>
+  state.chat.deepseek_reasoning_effort;
 export const selectOpenAIReasoningEffort = (state: RootState): string =>
   state.chat.openai_reasoning_effort;
 export const selectOpenAIReasoningSummary = (state: RootState): string =>
@@ -935,6 +972,8 @@ export function useMessageActions() {
     selectOpenAIResponsesWebSearch,
   );
   const gemini_thinking_budget = useSelector(selectGeminiThinkingBudget);
+  const deepseek_thinking_enabled = useSelector(selectDeepSeekThinkingEnabled);
+  const deepseek_reasoning_effort = useSelector(selectDeepSeekReasoningEffort);
   const openai_reasoning_effort = useSelector(selectOpenAIReasoningEffort);
   const openai_reasoning_summary = useSelector(selectOpenAIReasoningSummary);
   const support_models = useSelector(selectSupportModels);
@@ -978,6 +1017,7 @@ export function useMessageActions() {
       const targetModel = using_model || model;
       const enableGeminiNativeWeb = isGeminiModelId(targetModel);
       const enableXAINativeWeb = isXAIModelId(targetModel);
+      const enableDeepSeekThinkingControl = isDeepSeekV4ModelId(targetModel);
       const enableOpenAINativeWeb = isOpenAIResponsesNativeWebModel(
         support_models,
         targetModel,
@@ -1028,6 +1068,13 @@ export function useMessageActions() {
         gemini_thinking_budget: supportsGeminiThinkingBudgetControl(targetModel)
           ? gemini_thinking_budget
           : undefined,
+        deepseek_thinking_enabled: enableDeepSeekThinkingControl
+          ? deepseek_thinking_enabled
+          : undefined,
+        deepseek_reasoning_effort:
+          enableDeepSeekThinkingControl && deepseek_thinking_enabled
+            ? deepseek_reasoning_effort
+            : undefined,
         openai_reasoning_effort: enableOpenAIReasoningControl
           ? openAIReasoningEffortForRequest
           : undefined,
@@ -1071,6 +1118,7 @@ export function useMessageActions() {
     restart: () => {
       const enableGeminiNativeWeb = isGeminiModelId(model);
       const enableXAINativeWeb = isXAIModelId(model);
+      const enableDeepSeekThinkingControl = isDeepSeekV4ModelId(model);
       const enableOpenAINativeWeb = isOpenAIResponsesNativeWebModel(
         support_models,
         model,
@@ -1107,6 +1155,13 @@ export function useMessageActions() {
         gemini_thinking_budget: supportsGeminiThinkingBudgetControl(model)
           ? gemini_thinking_budget
           : undefined,
+        deepseek_thinking_enabled: enableDeepSeekThinkingControl
+          ? deepseek_thinking_enabled
+          : undefined,
+        deepseek_reasoning_effort:
+          enableDeepSeekThinkingControl && deepseek_thinking_enabled
+            ? deepseek_reasoning_effort
+            : undefined,
         openai_reasoning_effort: enableOpenAIReasoningControl
           ? openAIReasoningEffortForRequest
           : undefined,

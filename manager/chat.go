@@ -121,6 +121,19 @@ func buildThinkingConfig(instance *conversation.Conversation, model string) inte
 	return config
 }
 
+func buildDeepseekThinkingConfig(instance *conversation.Conversation, model string) (interface{}, *string) {
+	if instance == nil || !globals.IsDeepseekV4Model(model) {
+		return nil, nil
+	}
+
+	if !instance.IsDeepseekThinkingEnabled() {
+		return map[string]interface{}{"type": "disabled"}, nil
+	}
+
+	effort := instance.GetDeepseekReasoningEffort()
+	return map[string]interface{}{"type": "enabled"}, &effort
+}
+
 func sendToolCallEvents(conn *Connection, calls *globals.ToolCalls, status string, quota float32, plan bool) error {
 	if calls == nil || len(*calls) == 0 {
 		return nil
@@ -312,6 +325,12 @@ func buildChatProps(
 	toolChoice *interface{},
 	disableCache bool,
 ) *adaptercommon.ChatProps {
+	thinking := buildThinkingConfig(instance, model)
+	var reasoningEffort *string
+	if thinking == nil {
+		thinking, reasoningEffort = buildDeepseekThinkingConfig(instance, model)
+	}
+
 	return adaptercommon.CreateChatProps(&adaptercommon.ChatProps{
 		Model:                model,
 		OriginalModel:        model,
@@ -328,7 +347,8 @@ func buildChatProps(
 		EnableURLContext:     instance.IsEnableURLContext(),
 		EnableXSearch:        instance.IsEnableXSearch(),
 		GeminiThinkingBudget: instance.GetGeminiThinkingBudget(),
-		Thinking:             buildThinkingConfig(instance, model),
+		Thinking:             thinking,
+		ReasoningEffort:      reasoningEffort,
 		MaxTokens:            instance.GetMaxTokens(),
 		Temperature:          instance.GetTemperature(),
 		TopP:                 instance.GetTopP(),

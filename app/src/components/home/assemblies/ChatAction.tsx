@@ -1,8 +1,11 @@
 import {
   getOpenAIResponsesCapabilities,
+  isDeepSeekV4ModelId,
   isGeminiModelId,
   isOpenAIResponsesNativeWebModel,
   isXAIModelId,
+  selectDeepSeekReasoningEffort,
+  selectDeepSeekThinkingEnabled,
   selectOpenAIReasoningEffort,
   selectOpenAIReasoningSummary,
   selectOpenAIResponsesWebSearch,
@@ -17,6 +20,8 @@ import {
   setOpenAIReasoningEffort,
   setOpenAIReasoningSummary,
   setOpenAIResponsesWebSearch,
+  setDeepSeekReasoningEffort,
+  setDeepSeekThinkingEnabled,
   setGeminiThinkingBudget,
   setGeminiGoogleSearch,
   setGeminiURLContext,
@@ -69,6 +74,7 @@ const geminiThinkingPresets = [
 ];
 
 const openAIReasoningSummaryLevels = ["concise", "auto", "detailed"];
+const deepSeekReasoningEfforts = ["high", "max"];
 
 function formatModelLabel(model: string): string {
   return model.trim().toUpperCase();
@@ -454,6 +460,114 @@ export function GeminiThinkingAction() {
             <div className="flex items-start">
               <Icon icon={<Info />} className="h-3 w-3 mr-1 mt-0.5 shrink-0" />
               {t("chat.gemini-thinking-tip")}
+            </div>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+export function DeepSeekThinkingAction() {
+  const { t } = useTranslation();
+  const dispatch = useDispatch();
+  const model = useSelector(selectModel);
+  const deepSeekThinkingEnabled = useSelector(selectDeepSeekThinkingEnabled);
+  const deepSeekReasoningEffort = useSelector(selectDeepSeekReasoningEffort);
+
+  if (!isDeepSeekV4ModelId(model)) {
+    return null;
+  }
+
+  const modelLabel = formatModelLabel(model);
+  const currentEffort = deepSeekReasoningEfforts.includes(
+    deepSeekReasoningEffort,
+  )
+    ? deepSeekReasoningEffort
+    : "high";
+  const levelIndex = Math.max(
+    0,
+    deepSeekReasoningEfforts.indexOf(currentEffort),
+  );
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <div>
+          <ChatAction
+            active={deepSeekThinkingEnabled}
+            text={t("chat.deepseek-thinking", { model: modelLabel })}
+          >
+            <Brain
+              className={cn("h-4 w-4", deepSeekThinkingEnabled && "enable")}
+            />
+          </ChatAction>
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-3" side="top" align="start">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="deepseek-thinking-toggle" className="text-sm">
+              {t("chat.deepseek-thinking-enable", { model: modelLabel })}
+            </Label>
+            <Switch
+              id="deepseek-thinking-toggle"
+              checked={deepSeekThinkingEnabled}
+              onCheckedChange={(state) => {
+                dispatch(setDeepSeekThinkingEnabled(state));
+              }}
+            />
+          </div>
+
+          <div
+            className={cn(
+              "space-y-2",
+              !deepSeekThinkingEnabled && "opacity-50",
+            )}
+          >
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{t("chat.deepseek-thinking-depth")}</span>
+              <span>
+                {deepSeekThinkingEnabled
+                  ? t(`chat.deepseek-thinking-level-${currentEffort}`)
+                  : t("chat.deepseek-thinking-level-off")}
+              </span>
+            </div>
+
+            <Slider
+              disabled={!deepSeekThinkingEnabled}
+              value={[levelIndex]}
+              min={0}
+              max={deepSeekReasoningEfforts.length - 1}
+              step={1}
+              onValueChange={(value) => {
+                const next = deepSeekReasoningEfforts[value[0]];
+                next && dispatch(setDeepSeekReasoningEffort(next));
+              }}
+            />
+
+            <div className="relative h-4 text-[11px] text-muted-foreground">
+              {deepSeekReasoningEfforts.map((effort, index) => (
+                <span
+                  key={effort}
+                  className="absolute top-0 -translate-x-1/2 whitespace-nowrap"
+                  style={{
+                    left: getStepPosition(
+                      index,
+                      deepSeekReasoningEfforts.length,
+                    ),
+                  }}
+                >
+                  {t(`chat.deepseek-thinking-level-${effort}`)}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-md bg-muted p-2 text-xs">
+            <div className="flex items-start">
+              <Icon icon={<Info />} className="h-3 w-3 mr-1 mt-0.5 shrink-0" />
+              {t("chat.deepseek-thinking-tip", { model: modelLabel })}
             </div>
           </div>
         </div>

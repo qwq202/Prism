@@ -256,7 +256,14 @@
     "openai-reasoning-summary-detail": "摘要詳細度",
     "openai-reasoning-summary-level-concise": "簡潔",
     "openai-reasoning-summary-level-auto": "自動",
-    "openai-reasoning-summary-level-detailed": "詳細"
+    "openai-reasoning-summary-level-detailed": "詳細",
+    "deepseek-thinking": "{{model}} 思考",
+    "deepseek-thinking-enable": "啟用{{model}} 思考",
+    "deepseek-thinking-depth": "思考強度",
+    "deepseek-thinking-level-off": "關閉",
+    "deepseek-thinking-level-high": "高",
+    "deepseek-thinking-level-max": "最大",
+    "deepseek-thinking-tip": "{{model}} 支援DeepSeek thinking.type 與reasoning_effort。關閉時發送非思考模式；開啟時使用所選思考強度。"
   },
   "message": {
     "copy": "複製訊息",

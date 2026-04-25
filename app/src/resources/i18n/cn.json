@@ -255,6 +255,12 @@
     "openai-reasoning-summary-level-concise": "简洁",
     "openai-reasoning-summary-level-auto": "自动",
     "openai-reasoning-summary-level-detailed": "详细",
+    "deepseek-thinking": "{{model}} 思考",
+    "deepseek-thinking-enable": "启用 {{model}} 思考",
+    "deepseek-thinking-depth": "思考强度",
+    "deepseek-thinking-level-off": "关闭",
+    "deepseek-thinking-level-high": "高",
+    "deepseek-thinking-level-max": "最大",
     "gemini-thinking-enable": "启用 Gemini 思考",
     "gemini-thinking-depth": "思考深度",
     "gemini-thinking-level-off": "关闭",
@@ -273,6 +279,7 @@
     "gemini-thinking-tip": "支持 Gemini 原生思考。开启后会按思考深度消耗更多 Token。",
     "openai-web-enable-tip": "使用 OpenAI 原生 Web Search，会消耗额外的工具调用费用或 Token。",
     "openai-reasoning-tip": "{{model}} 支持 reasoning.effort 与 reasoning.summary。summary 关闭时只思考不展示摘要；auto 会使用当前模型可用的最详细摘要。",
+    "deepseek-thinking-tip": "{{model}} 支持 DeepSeek thinking.type 与 reasoning_effort。关闭时发送非思考模式；开启时使用所选思考强度。",
     "web-disable-toast": "已关闭联网搜索",
     "web-enable-page-summary-toast": "已开启逐页总结",
     "web-enable-page-summary-tip": "逐页总结可能会消耗更多 Token 并使输出变慢",
@@ -1396,7 +1403,7 @@
       "epayAggregation": "聚合支付模式",
       "epayAggregationTip": "聚合支付模式，开启后点击将不会选择支付方式 **直接跳转至聚合支付页面**\n请确保您的易支付支持聚合支付模式",
       "stripeTitle": "Stripe",
-      "stripeTip":"Stripe 是一种广泛使用的国际在线支付系统，支持多种支付方式，包括信用卡、借记卡、Apple Pay、Google Pay等。它为用户提供了安全、便捷的支付体验，特别适合需要处理国际支付的业务。",
+      "stripeTip": "Stripe 是一种广泛使用的国际在线支付系统，支持多种支付方式，包括信用卡、借记卡、Apple Pay、Google Pay等。它为用户提供了安全、便捷的支付体验，特别适合需要处理国际支付的业务。",
       "stripeEnabled": "启用 Stripe",
       "stripeSecretKey": "Stripe Secret Key",
       "stripeSecretKeyPlaceholder": "请输入 Stripe Secret Key",
@@ -1562,13 +1569,13 @@
           "title": "CoAI Pro",
           "description": "CoAI Pro 商业版授权，解锁对接多种支付渠道、用户（组）倍率控制、内容审核、会话日志等全部商业功能"
         },
-        "multiKey": { 
+        "multiKey": {
           "title": "多令牌管理",
           "description": "多 API KEY 管理, 支持一单元内多令牌分发管理, 支持设置可调用模型，余额限制，调用日志，状态管理，对接指南等高级功能"
         },
         "stripe": {
           "title": "Stripe 支付",
-            "description": "Stripe Hosted Checkout 高级支付模块，支持 Stripe 银行卡/Bank/Link/微信/Alipay+ 等几十余种支付对接，支持多种货币支付"
+          "description": "Stripe Hosted Checkout 高级支付模块，支持 Stripe 银行卡/Bank/Link/微信/Alipay+ 等几十余种支付对接，支持多种货币支付"
         },
         "paypal": {
           "title": "PayPal 支付",

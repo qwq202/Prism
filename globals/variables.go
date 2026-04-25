@@ -271,6 +271,17 @@ func IsDeepseekReasoningReplayModel(model string) bool {
 	return IsDeepseekV4Model(model)
 }
 
+func NormalizeDeepseekReasoningEffort(effort string) string {
+	switch strings.TrimSpace(strings.ToLower(effort)) {
+	case "max", "xhigh":
+		return "max"
+	case "high", "medium", "low":
+		return "high"
+	default:
+		return "high"
+	}
+}
+
 func IsDeepseekThinkingDisabled(thinking interface{}) bool {
 	if thinking == nil {
 		return false

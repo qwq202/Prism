@@ -183,7 +183,14 @@
     "openai-reasoning-summary-detail": "概要の詳細",
     "openai-reasoning-summary-level-concise": "簡潔",
     "openai-reasoning-summary-level-auto": "オート",
-    "openai-reasoning-summary-level-detailed": "ディテール:"
+    "openai-reasoning-summary-level-detailed": "ディテール:",
+    "deepseek-thinking": "{{model}}リフレクション",
+    "deepseek-thinking-enable": "{{model}}の思考を有効にする",
+    "deepseek-thinking-depth": "思考強度",
+    "deepseek-thinking-level-off": "オフ",
+    "deepseek-thinking-level-high": "高い",
+    "deepseek-thinking-level-max": "最も大きい",
+    "deepseek-thinking-tip": "{{model}}は、DeepSeek thinking.typeとreasoning_effortをサポートしています。クローズ時に非思考モードを送信します。オープン時に選択した思考強度を使用します。"
   },
   "message": {
     "copy": "メッセージをコピー",

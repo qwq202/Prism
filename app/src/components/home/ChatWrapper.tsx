@@ -28,6 +28,7 @@ import { forgetMemory, popMemory } from "@/utils/memory.ts";
 import { alignSelector } from "@/store/settings.ts";
 import { FileArray } from "@/api/file.ts";
 import {
+  DeepSeekThinkingAction,
   GeminiThinkingAction,
   NewConversationAction,
   OpenAIReasoningAction,
@@ -217,6 +218,15 @@ function ChatWrapper() {
                 transition={{ duration: 0.3, delay: 0.25 }}
               >
                 <OpenAIReasoningAction />
+              </motion.div>
+              <motion.div
+                key="deepseek-thinking-action"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: 0.3, delay: 0.3 }}
+              >
+                <DeepSeekThinkingAction />
               </motion.div>
               <motion.div
                 key="file-action"

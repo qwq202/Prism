@@ -183,7 +183,14 @@
     "openai-reasoning-summary-detail": "Краткая информация",
     "openai-reasoning-summary-level-concise": "Лаконичный",
     "openai-reasoning-summary-level-auto": "Автоматический",
-    "openai-reasoning-summary-level-detailed": "Детальная разработка"
+    "openai-reasoning-summary-level-detailed": "Детальная разработка",
+    "deepseek-thinking": "{{model}} Размышления",
+    "deepseek-thinking-enable": "Включить {{model}} мышление",
+    "deepseek-thinking-depth": "Интенсивность мышления",
+    "deepseek-thinking-level-off": "Закрыт",
+    "deepseek-thinking-level-high": "Высокое",
+    "deepseek-thinking-level-max": "Максим. ",
+    "deepseek-thinking-tip": "{{model}} поддерживает DeepSeek thinking.type и reasoning_effort. Отправьте немыслимый режим при закрытии; используйте выбранную интенсивность мышления при открытии."
   },
   "message": {
     "copy": "Копировать сообщение",
