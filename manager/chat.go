@@ -574,28 +574,6 @@ func containsMemoryToolCall(calls *globals.ToolCalls) bool {
 	return false
 }
 
-func sendToolFinalAnswer(conn *Connection, liveBuffer *utils.Buffer, responseBuffer *utils.Buffer, plan bool) error {
-	if responseBuffer == nil {
-		return nil
-	}
-
-	if content := responseBuffer.Read(); content != "" {
-		liveBuffer.Write(content)
-		if err := conn.SendClient(globals.ChatSegmentResponse{
-			Message: content,
-			Quota:   liveBuffer.GetQuota(),
-			End:     false,
-			Plan:    plan,
-		}); err != nil {
-			return err
-		}
-	}
-
-	liveBuffer.SetGeminiHiddenMetadata(responseBuffer.GetGeminiHiddenMetadata())
-	liveBuffer.SetClaudeHiddenMetadata(responseBuffer.GetClaudeHiddenMetadata())
-	return nil
-}
-
 func syncToolFinalMetadata(liveBuffer *utils.Buffer, responseBuffer *utils.Buffer) {
 	if liveBuffer == nil || responseBuffer == nil {
 		return
@@ -761,10 +739,7 @@ func createToolChatTask(
 			true,
 		)
 
-		var streamBuffer *utils.Buffer
-		if round > 0 {
-			streamBuffer = liveBuffer
-		}
+		streamBuffer := liveBuffer
 
 		hit, err, interrupted = createRoundTask(conn, user, roundBuffer, streamBuffer, db, cache, group, props, plan)
 		if err != nil || interrupted {
@@ -773,13 +748,7 @@ func createToolChatTask(
 
 		assistant := extractAssistantMessageFromBuffer(roundBuffer, false)
 		if assistant.ToolCalls == nil || len(*assistant.ToolCalls) == 0 {
-			if streamBuffer == nil {
-				if err := sendToolFinalAnswer(conn, liveBuffer, roundBuffer, plan); err != nil {
-					return hit, err, true
-				}
-			} else {
-				syncToolFinalMetadata(liveBuffer, roundBuffer)
-			}
+			syncToolFinalMetadata(liveBuffer, roundBuffer)
 			return hit, nil, false
 		}
 
