@@ -573,6 +573,28 @@ func containsMemoryToolCall(calls *globals.ToolCalls) bool {
 	return false
 }
 
+func sendToolFinalAnswer(conn *Connection, liveBuffer *utils.Buffer, responseBuffer *utils.Buffer, plan bool) error {
+	if responseBuffer == nil {
+		return nil
+	}
+
+	if content := responseBuffer.Read(); content != "" {
+		liveBuffer.Write(content)
+		if err := conn.SendClient(globals.ChatSegmentResponse{
+			Message: content,
+			Quota:   liveBuffer.GetQuota(),
+			End:     false,
+			Plan:    plan,
+		}); err != nil {
+			return err
+		}
+	}
+
+	liveBuffer.SetGeminiHiddenMetadata(responseBuffer.GetGeminiHiddenMetadata())
+	liveBuffer.SetClaudeHiddenMetadata(responseBuffer.GetClaudeHiddenMetadata())
+	return nil
+}
+
 func summarizeMemoryRecords(memories []memory.Record) string {
 	if len(memories) == 0 {
 		return "[]"
@@ -728,19 +750,9 @@ func createToolChatTask(
 
 		assistant := extractAssistantMessageFromBuffer(roundBuffer, false)
 		if assistant.ToolCalls == nil || len(*assistant.ToolCalls) == 0 {
-			if content := roundBuffer.Read(); content != "" {
-				liveBuffer.Write(content)
-				if err := conn.SendClient(globals.ChatSegmentResponse{
-					Message: content,
-					Quota:   liveBuffer.GetQuota(),
-					End:     false,
-					Plan:    plan,
-				}); err != nil {
-					return hit, err, true
-				}
+			if err := sendToolFinalAnswer(conn, liveBuffer, roundBuffer, plan); err != nil {
+				return hit, err, true
 			}
-			liveBuffer.SetGeminiHiddenMetadata(roundBuffer.GetGeminiHiddenMetadata())
-			liveBuffer.SetClaudeHiddenMetadata(roundBuffer.GetClaudeHiddenMetadata())
 			return hit, nil, false
 		}
 
@@ -762,7 +774,7 @@ func createToolChatTask(
 				round+1,
 				model,
 				utils.ToString(toolMessage.ToolCallId),
-				toolMessage.Content,
+				summarizeToolCallArguments(toolMessage.Content),
 			))
 		}
 		if err := sendToolResultEvents(conn, assistant.ToolCalls, toolMessages, liveBuffer.GetQuota(), plan); err != nil {
@@ -782,9 +794,35 @@ func createToolChatTask(
 	}
 
 	globals.Warn(fmt.Sprintf(
-		"[tools] exceeded max tool rounds for model %s without final answer",
+		"[tools] reached max tool rounds for model %s; requesting final answer without tools",
 		model,
 	))
+
+	finalBuffer := utils.NewBuffer(model, workingSegment, liveBuffer.GetCharge())
+	liveBuffer.InputTokens += finalBuffer.CountInputToken()
+	liveBuffer.Quota += utils.CountInputQuota(liveBuffer.GetCharge(), finalBuffer.CountInputToken())
+
+	props := buildChatProps(
+		conn,
+		instance,
+		model,
+		workingSegment,
+		finalBuffer,
+		memoryPrompt,
+		recentChatsPrompt,
+		nil,
+		nil,
+		true,
+	)
+
+	hit, err, interrupted = createRoundTask(conn, user, finalBuffer, nil, db, cache, group, props, plan)
+	if err != nil || interrupted {
+		return hit, err, interrupted
+	}
+
+	if err := sendToolFinalAnswer(conn, liveBuffer, finalBuffer, plan); err != nil {
+		return hit, err, true
+	}
 
 	return hit, nil, false
 }

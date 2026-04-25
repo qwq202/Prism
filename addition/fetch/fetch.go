@@ -22,7 +22,7 @@ import (
 
 const (
 	ToolName         = "fetch_webpage"
-	maxFetchBytes    = 768 * 1024
+	maxFetchBytes    = 2 * 1024 * 1024
 	maxPageTextRunes = 12000
 )
 
@@ -164,8 +164,9 @@ func fetchURL(rawURL string, maxTextRunes int) pageResult {
 		result.Error = err.Error()
 		return result
 	}
-	req.Header.Set("User-Agent", "coai-fetch/1.0")
-	req.Header.Set("Accept", "text/html,text/plain;q=0.9,*/*;q=0.5")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.5")
+	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
 
 	resp, err := client.Do(req)
 	if err != nil {
