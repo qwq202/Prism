@@ -536,15 +536,15 @@ export function DeepSeekThinkingAction() {
               onValueChange={(value) => {
                 value && dispatch(setDeepSeekReasoningEffort(value));
               }}
-              className="grid grid-cols-2 gap-1"
+              className="grid grid-cols-2 gap-1 rounded-full border border-border bg-muted p-1"
             >
               {deepSeekReasoningEfforts.map((effort) => (
                 <ToggleGroupItem
                   key={effort}
                   value={effort}
-                  variant="outline"
+                  variant="default"
                   size="sm"
-                  className="w-full"
+                  className="h-8 w-full rounded-full text-xs text-muted-foreground hover:bg-background/80 hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
                 >
                   {t(`chat.deepseek-thinking-level-${effort}`)}
                 </ToggleGroupItem>
