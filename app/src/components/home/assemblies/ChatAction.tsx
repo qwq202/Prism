@@ -484,6 +484,10 @@ export function DeepSeekThinkingAction() {
   )
     ? deepSeekReasoningEffort
     : "high";
+  const currentEffortIndex = Math.max(
+    0,
+    deepSeekReasoningEfforts.indexOf(currentEffort),
+  );
 
   return (
     <Popover>
@@ -529,27 +533,34 @@ export function DeepSeekThinkingAction() {
               </span>
             </div>
 
-            <ToggleGroup
-              type="single"
-              value={currentEffort}
-              disabled={!deepSeekThinkingEnabled}
-              onValueChange={(value) => {
-                value && dispatch(setDeepSeekReasoningEffort(value));
-              }}
-              className="grid grid-cols-2 gap-1 rounded-full border border-border bg-muted p-1"
-            >
+            <div className="relative grid grid-cols-2 gap-1 overflow-hidden rounded-md border border-black/10 bg-white p-1 dark:border-white/15 dark:bg-black">
+              <span
+                className="absolute inset-y-1 left-1 rounded-sm bg-black transition-transform duration-300 ease-out dark:bg-white"
+                style={{
+                  width: "calc(50% - 0.375rem)",
+                  transform:
+                    currentEffortIndex === 0
+                      ? "translateX(0)"
+                      : "translateX(calc(100% + 0.25rem))",
+                }}
+              />
               {deepSeekReasoningEfforts.map((effort) => (
-                <ToggleGroupItem
+                <button
                   key={effort}
-                  value={effort}
-                  variant="default"
-                  size="sm"
-                  className="h-8 w-full rounded-full text-xs text-muted-foreground hover:bg-background/80 hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
+                  type="button"
+                  disabled={!deepSeekThinkingEnabled}
+                  onClick={() => dispatch(setDeepSeekReasoningEffort(effort))}
+                  className={cn(
+                    "relative z-10 h-8 rounded-sm text-xs font-medium transition-colors duration-200 disabled:cursor-not-allowed",
+                    currentEffort === effort
+                      ? "text-white dark:text-black"
+                      : "text-black/70 hover:text-black dark:text-white/70 dark:hover:text-white",
+                  )}
                 >
                   {t(`chat.deepseek-thinking-level-${effort}`)}
-                </ToggleGroupItem>
+                </button>
               ))}
-            </ToggleGroup>
+            </div>
           </div>
 
           <div className="rounded-md bg-muted p-2 text-xs">
