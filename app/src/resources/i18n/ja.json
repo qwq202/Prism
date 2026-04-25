@@ -178,7 +178,12 @@
     "openai-reasoning-level-high": "高い",
     "openai-reasoning-level-xhigh": "非常に高い",
     "openai-web-enable-tip": "OpenAIネイティブWeb検索を使用すると、追加のツールコール料金またはトークンが消費されます。",
-    "openai-reasoning-tip": "GPT-5.4は、none、low、medium、high、およびxhigh.effortの5つの理由をサポートしています。思考レベルが高いほど、速度が遅くなり、コストが高くなります。"
+    "openai-reasoning-tip": "GPT-5.4は、none、low、medium、high、およびxhigh.effortの5つの理由をサポートしています。思考レベルが高いほど、速度が遅くなり、コストが高くなります。",
+    "openai-reasoning-summary-enable": "思考の要約を表示",
+    "openai-reasoning-summary-detail": "概要の詳細",
+    "openai-reasoning-summary-level-concise": "簡潔",
+    "openai-reasoning-summary-level-auto": "オート",
+    "openai-reasoning-summary-level-detailed": "ディテール:"
   },
   "message": {
     "copy": "メッセージをコピー",

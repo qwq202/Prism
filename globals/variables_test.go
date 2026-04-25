@@ -49,6 +49,24 @@ func TestNormalizeOpenAIResponsesReasoningEffort(t *testing.T) {
 	}
 }
 
+func TestNormalizeOpenAIResponsesReasoningSummary(t *testing.T) {
+	if got := NormalizeOpenAIResponsesReasoningSummary(""); got != "auto" {
+		t.Fatalf("expected empty summary to default to auto, got %q", got)
+	}
+
+	if got := NormalizeOpenAIResponsesReasoningSummary(" DETAILED "); got != "detailed" {
+		t.Fatalf("expected detailed summary, got %q", got)
+	}
+
+	if got := NormalizeOpenAIResponsesReasoningSummary("none"); got != "none" {
+		t.Fatalf("expected none summary, got %q", got)
+	}
+
+	if got := NormalizeOpenAIResponsesReasoningSummary("verbose"); got != "auto" {
+		t.Fatalf("expected invalid summary to default to auto, got %q", got)
+	}
+}
+
 func TestCapabilitiesForOpenAIResponsesModels(t *testing.T) {
 	tests := []struct {
 		name                string

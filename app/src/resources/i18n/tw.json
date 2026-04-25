@@ -251,7 +251,12 @@
     "openai-reasoning-level-high": "高",
     "openai-reasoning-level-xhigh": "極高",
     "openai-web-enable-tip": "使用OpenAI 原生Web Search，會消耗額外的工具呼叫費用或Token。",
-    "openai-reasoning-tip": "GPT-5.4 支持none、low、medium、high、xhigh 五檔reasoning.effort，思考程度越高，通常越慢也越貴。"
+    "openai-reasoning-tip": "GPT-5.4 支持none、low、medium、high、xhigh 五檔reasoning.effort，思考程度越高，通常越慢也越貴。",
+    "openai-reasoning-summary-enable": "顯示思考摘要",
+    "openai-reasoning-summary-detail": "摘要詳細度",
+    "openai-reasoning-summary-level-concise": "簡潔",
+    "openai-reasoning-summary-level-auto": "自動",
+    "openai-reasoning-summary-level-detailed": "詳細"
   },
   "message": {
     "copy": "複製訊息",

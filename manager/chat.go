@@ -112,7 +112,10 @@ func buildThinkingConfig(instance *conversation.Conversation, model string) inte
 		"effort": effort,
 	}
 	if effort != "none" {
-		config["summary"] = "auto"
+		summary := globals.NormalizeOpenAIResponsesReasoningSummary(instance.GetOpenAIReasoningSummary())
+		if summary != "none" {
+			config["summary"] = summary
+		}
 	}
 
 	return config

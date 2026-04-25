@@ -170,6 +170,11 @@
     "openai-reasoning-level-medium": "Medium",
     "openai-reasoning-level-high": "High",
     "openai-reasoning-level-xhigh": "XHigh",
+    "openai-reasoning-summary-enable": "Show reasoning summary",
+    "openai-reasoning-summary-detail": "Summary detail",
+    "openai-reasoning-summary-level-concise": "Concise",
+    "openai-reasoning-summary-level-auto": "Auto",
+    "openai-reasoning-summary-level-detailed": "Detailed",
     "gemini-thinking-enable": "Enable Gemini Thinking",
     "gemini-thinking-depth": "Thinking depth:",
     "gemini-thinking-level-off": "Close",
@@ -178,7 +183,7 @@
     "gemini-thinking-level-high": "In Depth",
     "gemini-thinking-tip": "The current model supports Gemini native thinking budget control. When turned off, thinking is disabled; when turned on, it returns to Gemini's thinking summary and consumes more tokens according to the depth of thinking you choose.",
     "openai-web-enable-tip": "Using OpenAI native Web Search may incur extra built-in tool costs or token usage.",
-    "openai-reasoning-tip": "GPT-5.4 supports reasoning.effort values none, low, medium, high, and xhigh. Higher effort is usually slower and more expensive."
+    "openai-reasoning-tip": "GPT-5.4 supports reasoning.effort and reasoning.summary. When summary is off, the model can still reason without showing a summary; auto uses the most detailed summary available for the model."
   },
   "message": {
     "copy": "Copy Message",

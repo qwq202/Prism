@@ -241,6 +241,18 @@ func NormalizeOpenAIResponsesReasoningEffort(model string, effort string, native
 	return normalized
 }
 
+func NormalizeOpenAIResponsesReasoningSummary(summary string) string {
+	normalized := strings.TrimSpace(strings.ToLower(summary))
+	switch normalized {
+	case "", "auto":
+		return "auto"
+	case "none", "concise", "detailed":
+		return normalized
+	default:
+		return "auto"
+	}
+}
+
 func IsGeminiNoThinkingModel(model string) bool {
 	return strings.HasSuffix(strings.TrimSpace(model), "-nothinking")
 }

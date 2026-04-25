@@ -178,7 +178,12 @@
     "openai-reasoning-level-high": "Высокое",
     "openai-reasoning-level-xhigh": "Чрезвычайно высокий",
     "openai-web-enable-tip": "Использование OpenAI Native Web Search требует дополнительных сборов за вызов инструментов или токенов.",
-    "openai-reasoning-tip": "GPT-5.4 поддерживает пять причин: none, low, medium, high и xhigh.effort. Чем выше уровень мышления, тем он медленнее и дороже."
+    "openai-reasoning-tip": "GPT-5.4 поддерживает пять причин: none, low, medium, high и xhigh.effort. Чем выше уровень мышления, тем он медленнее и дороже.",
+    "openai-reasoning-summary-enable": "Показать краткое описание мыслей",
+    "openai-reasoning-summary-detail": "Краткая информация",
+    "openai-reasoning-summary-level-concise": "Лаконичный",
+    "openai-reasoning-summary-level-auto": "Автоматический",
+    "openai-reasoning-summary-level-detailed": "Детальная разработка"
   },
   "message": {
     "copy": "Копировать сообщение",

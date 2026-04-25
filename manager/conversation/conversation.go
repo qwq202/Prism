@@ -13,24 +13,25 @@ const defaultConversationName = "new chat"
 const defaultConversationContext = 8
 
 type Conversation struct {
-	Auth                  bool              `json:"auth"`
-	UserID                int64             `json:"user_id"`
-	Id                    int64             `json:"id"`
-	Name                  string            `json:"name"`
-	Message               []globals.Message `json:"message"`
-	Model                 string            `json:"model"`
-	TaskID                string            `json:"task_id,omitempty"`
-	EnableWeb             bool              `json:"enable_web"`
-	WebSearch             bool              `json:"web_search"`
-	URLContext            bool              `json:"url_context"`
-	XSearch               bool              `json:"x_search"`
-	GeminiThinkingBudget  int               `json:"gemini_thinking_budget"`
-	OpenAIReasoningEffort string            `json:"openai_reasoning_effort"`
-	Shared                bool              `json:"shared"`
-	Context               int               `json:"context"`
-	CustomInstruction     string            `json:"custom_instruction,omitempty"`
-	MemoryEnabled         bool              `json:"memory_enabled"`
-	MemoryHistoryEnabled  bool              `json:"memory_history_enabled"`
+	Auth                   bool              `json:"auth"`
+	UserID                 int64             `json:"user_id"`
+	Id                     int64             `json:"id"`
+	Name                   string            `json:"name"`
+	Message                []globals.Message `json:"message"`
+	Model                  string            `json:"model"`
+	TaskID                 string            `json:"task_id,omitempty"`
+	EnableWeb              bool              `json:"enable_web"`
+	WebSearch              bool              `json:"web_search"`
+	URLContext             bool              `json:"url_context"`
+	XSearch                bool              `json:"x_search"`
+	GeminiThinkingBudget   int               `json:"gemini_thinking_budget"`
+	OpenAIReasoningEffort  string            `json:"openai_reasoning_effort"`
+	OpenAIReasoningSummary string            `json:"openai_reasoning_summary"`
+	Shared                 bool              `json:"shared"`
+	Context                int               `json:"context"`
+	CustomInstruction      string            `json:"custom_instruction,omitempty"`
+	MemoryEnabled          bool              `json:"memory_enabled"`
+	MemoryHistoryEnabled   bool              `json:"memory_history_enabled"`
 
 	MaxTokens         *int     `json:"max_tokens,omitempty"`
 	Temperature       *float32 `json:"temperature,omitempty"`
@@ -42,20 +43,21 @@ type Conversation struct {
 }
 
 type FormMessage struct {
-	Type                  string `json:"type"`
-	Message               string `json:"message"`
-	Web                   bool   `json:"web"`
-	WebSearch             bool   `json:"web_search"`
-	URLContext            bool   `json:"url_context"`
-	XSearch               bool   `json:"x_search"`
-	GeminiThinkingBudget  int    `json:"gemini_thinking_budget"`
-	OpenAIReasoningEffort string `json:"openai_reasoning_effort"`
-	Model                 string `json:"model"`
-	IgnoreContext         bool   `json:"ignore_context"`
-	Context               int    `json:"context"`
-	CustomInstruction     string `json:"custom_instruction,omitempty"`
-	MemoryEnabled         bool   `json:"memory_enabled"`
-	MemoryHistoryEnabled  bool   `json:"memory_history_enabled"`
+	Type                   string `json:"type"`
+	Message                string `json:"message"`
+	Web                    bool   `json:"web"`
+	WebSearch              bool   `json:"web_search"`
+	URLContext             bool   `json:"url_context"`
+	XSearch                bool   `json:"x_search"`
+	GeminiThinkingBudget   int    `json:"gemini_thinking_budget"`
+	OpenAIReasoningEffort  string `json:"openai_reasoning_effort"`
+	OpenAIReasoningSummary string `json:"openai_reasoning_summary"`
+	Model                  string `json:"model"`
+	IgnoreContext          bool   `json:"ignore_context"`
+	Context                int    `json:"context"`
+	CustomInstruction      string `json:"custom_instruction,omitempty"`
+	MemoryEnabled          bool   `json:"memory_enabled"`
+	MemoryHistoryEnabled   bool   `json:"memory_history_enabled"`
 
 	// request params
 	MaxTokens         *int     `json:"max_tokens,omitempty"`
@@ -145,6 +147,10 @@ func (c *Conversation) GetOpenAIReasoningEffort() string {
 	return strings.TrimSpace(strings.ToLower(c.OpenAIReasoningEffort))
 }
 
+func (c *Conversation) GetOpenAIReasoningSummary() string {
+	return strings.TrimSpace(strings.ToLower(c.OpenAIReasoningSummary))
+}
+
 func (c *Conversation) GetContextLength() int {
 	if c.Context <= 0 {
 		return defaultConversationContext
@@ -182,6 +188,10 @@ func (c *Conversation) SetGeminiThinkingBudget(budget int) {
 
 func (c *Conversation) SetOpenAIReasoningEffort(effort string) {
 	c.OpenAIReasoningEffort = strings.TrimSpace(strings.ToLower(effort))
+}
+
+func (c *Conversation) SetOpenAIReasoningSummary(summary string) {
+	c.OpenAIReasoningSummary = globals.NormalizeOpenAIResponsesReasoningSummary(summary)
 }
 
 func (c *Conversation) GetTemperature() *float32 {
@@ -405,6 +415,7 @@ func (c *Conversation) ApplyParam(form *FormMessage) {
 	c.SetEnableXSearch(form.XSearch)
 	c.SetGeminiThinkingBudget(form.GeminiThinkingBudget)
 	c.SetOpenAIReasoningEffort(form.OpenAIReasoningEffort)
+	c.SetOpenAIReasoningSummary(form.OpenAIReasoningSummary)
 	c.SetContextLength(form.Context, form.IgnoreContext)
 	c.SetCustomInstruction(form.CustomInstruction)
 	c.SetMemoryEnabled(form.MemoryEnabled)

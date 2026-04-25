@@ -108,6 +108,7 @@ type initialStateType = {
   openai_responses_web_search: boolean;
   gemini_thinking_budget: number;
   openai_reasoning_effort: string;
+  openai_reasoning_summary: string;
   current: number;
   model_list: string[];
   market: boolean;
@@ -259,8 +260,8 @@ export function supportsOpenAIResponsesReasoningControl(
   model: string | undefined | null,
 ): boolean {
   return (
-    getOpenAIResponsesCapabilities(supportModels, model).reasoningEfforts.length >
-    0
+    getOpenAIResponsesCapabilities(supportModels, model).reasoningEfforts
+      .length > 0
   );
 }
 
@@ -272,7 +273,18 @@ export function normalizeOpenAIResponsesReasoningEffort(
   const capabilities = getOpenAIResponsesCapabilities(supportModels, model);
   const normalized = (effort || "").trim().toLowerCase();
   if (!normalized) return undefined;
-  return capabilities.reasoningEfforts.includes(normalized) ? normalized : undefined;
+  return capabilities.reasoningEfforts.includes(normalized)
+    ? normalized
+    : undefined;
+}
+
+export function normalizeOpenAIResponsesReasoningSummary(
+  summary: string | undefined | null,
+): string {
+  const normalized = (summary || "").trim().toLowerCase();
+  return ["none", "concise", "auto", "detailed"].includes(normalized)
+    ? normalized
+    : "auto";
 }
 
 export function isGeminiNoThinkingModel(
@@ -429,9 +441,15 @@ const chatSlice = createSlice({
     gemini_url_context: getBooleanMemory("gemini_url_context", false),
     xai_web_search: getBooleanMemory("xai_web_search", false),
     xai_x_search: getBooleanMemory("xai_x_search", false),
-    openai_responses_web_search: getBooleanMemory("openai_responses_web_search", false),
+    openai_responses_web_search: getBooleanMemory(
+      "openai_responses_web_search",
+      false,
+    ),
     gemini_thinking_budget: getNumberMemory("gemini_thinking_budget", 0),
     openai_reasoning_effort: getMemory("openai_reasoning_effort") || "none",
+    openai_reasoning_summary: normalizeOpenAIResponsesReasoningSummary(
+      getMemory("openai_reasoning_summary"),
+    ),
     current: -1,
     model: getModel(offline, getMemory("model")),
     model_list: getModelList(offline, getArrayMemory("model_mark_list")),
@@ -658,7 +676,10 @@ const chatSlice = createSlice({
       state.xai_x_search = action.payload as boolean;
     },
     setOpenAIResponsesWebSearch: (state, action) => {
-      setMemory("openai_responses_web_search", action.payload ? "true" : "false");
+      setMemory(
+        "openai_responses_web_search",
+        action.payload ? "true" : "false",
+      );
       state.openai_responses_web_search = action.payload as boolean;
     },
     setGeminiThinkingBudget: (state, action) => {
@@ -668,6 +689,13 @@ const chatSlice = createSlice({
     setOpenAIReasoningEffort: (state, action) => {
       setMemory("openai_reasoning_effort", action.payload as string);
       state.openai_reasoning_effort = action.payload as string;
+    },
+    setOpenAIReasoningSummary: (state, action) => {
+      const summary = normalizeOpenAIResponsesReasoningSummary(
+        action.payload as string,
+      );
+      setMemory("openai_reasoning_summary", summary);
+      state.openai_reasoning_summary = summary;
     },
     setCurrent: (state, action) => {
       const current = action.payload as number;
@@ -747,6 +775,7 @@ export const {
   setOpenAIResponsesWebSearch,
   setGeminiThinkingBudget,
   setOpenAIReasoningEffort,
+  setOpenAIReasoningSummary,
   setModelList,
   addModelList,
   removeModelList,
@@ -788,6 +817,8 @@ export const selectGeminiThinkingBudget = (state: RootState): number =>
   state.chat.gemini_thinking_budget;
 export const selectOpenAIReasoningEffort = (state: RootState): string =>
   state.chat.openai_reasoning_effort;
+export const selectOpenAIReasoningSummary = (state: RootState): string =>
+  state.chat.openai_reasoning_summary;
 export const selectCurrent = (state: RootState): number => state.chat.current;
 export const selectModelList = (state: RootState): string[] =>
   state.chat.model_list;
@@ -900,9 +931,12 @@ export function useMessageActions() {
   const gemini_url_context = useSelector(selectGeminiURLContext);
   const xai_web_search = useSelector(selectXAIWebSearch);
   const xai_x_search = useSelector(selectXAIXSearch);
-  const openai_responses_web_search = useSelector(selectOpenAIResponsesWebSearch);
+  const openai_responses_web_search = useSelector(
+    selectOpenAIResponsesWebSearch,
+  );
   const gemini_thinking_budget = useSelector(selectGeminiThinkingBudget);
   const openai_reasoning_effort = useSelector(selectOpenAIReasoningEffort);
+  const openai_reasoning_summary = useSelector(selectOpenAIReasoningSummary);
   const support_models = useSelector(selectSupportModels);
   const history = useSelector(historySelector);
   const context = useSelector(contextSelector);
@@ -950,12 +984,13 @@ export function useMessageActions() {
       );
       const enableOpenAIReasoningControl =
         supportsOpenAIResponsesReasoningControl(support_models, targetModel);
-      const openAIReasoningEffortForRequest = resolveOpenAIReasoningEffortForRequest(
-        support_models,
-        targetModel,
-        openai_reasoning_effort,
-        enableOpenAINativeWeb && openai_responses_web_search,
-      );
+      const openAIReasoningEffortForRequest =
+        resolveOpenAIReasoningEffortForRequest(
+          support_models,
+          targetModel,
+          openai_reasoning_effort,
+          enableOpenAINativeWeb && openai_responses_web_search,
+        );
 
       if (current === -1 && conversations[-1].messages.length === 0) {
         // preflight history if it's a new conversation
@@ -995,6 +1030,9 @@ export function useMessageActions() {
           : undefined,
         openai_reasoning_effort: enableOpenAIReasoningControl
           ? openAIReasoningEffortForRequest
+          : undefined,
+        openai_reasoning_summary: enableOpenAIReasoningControl
+          ? openai_reasoning_summary
           : undefined,
         model: targetModel,
         context: history,
@@ -1039,12 +1077,13 @@ export function useMessageActions() {
       );
       const enableOpenAIReasoningControl =
         supportsOpenAIResponsesReasoningControl(support_models, model);
-      const openAIReasoningEffortForRequest = resolveOpenAIReasoningEffortForRequest(
-        support_models,
-        model,
-        openai_reasoning_effort,
-        enableOpenAINativeWeb && openai_responses_web_search,
-      );
+      const openAIReasoningEffortForRequest =
+        resolveOpenAIReasoningEffortForRequest(
+          support_models,
+          model,
+          openai_reasoning_effort,
+          enableOpenAINativeWeb && openai_responses_web_search,
+        );
       if (!stack.hasConnection(current)) {
         stack.createConnection(current);
       }
@@ -1070,6 +1109,9 @@ export function useMessageActions() {
           : undefined,
         openai_reasoning_effort: enableOpenAIReasoningControl
           ? openAIReasoningEffortForRequest
+          : undefined,
+        openai_reasoning_summary: enableOpenAIReasoningControl
+          ? openai_reasoning_summary
           : undefined,
         model,
         context: history,

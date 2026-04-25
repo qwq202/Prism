@@ -4,6 +4,7 @@ import {
   isOpenAIResponsesNativeWebModel,
   isXAIModelId,
   selectOpenAIReasoningEffort,
+  selectOpenAIReasoningSummary,
   selectOpenAIResponsesWebSearch,
   selectGeminiThinkingBudget,
   selectGeminiGoogleSearch,
@@ -14,6 +15,7 @@ import {
   selectXAIWebSearch,
   selectXAIXSearch,
   setOpenAIReasoningEffort,
+  setOpenAIReasoningSummary,
   setOpenAIResponsesWebSearch,
   setGeminiThinkingBudget,
   setGeminiGoogleSearch,
@@ -26,7 +28,14 @@ import {
   useMessages,
 } from "@/store/chat.ts";
 import { infoWebSearchSelector } from "@/store/info.ts";
-import { Brain, Globe, Info, MessageSquarePlus, Wifi, WifiOff } from "lucide-react";
+import {
+  Brain,
+  Globe,
+  Info,
+  MessageSquarePlus,
+  Wifi,
+  WifiOff,
+} from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { useTranslation } from "react-i18next";
 import React from "react";
@@ -50,6 +59,7 @@ import { Switch } from "@/components/ui/switch.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
 import { ButtonProps } from "@/components/ui/button.tsx";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 
 const geminiThinkingPresets = [
   { label: "off", budget: 0 },
@@ -57,6 +67,8 @@ const geminiThinkingPresets = [
   { label: "medium", budget: 4096 },
   { label: "high", budget: 8192 },
 ];
+
+const openAIReasoningSummaryLevels = ["concise", "auto", "detailed"];
 
 type ChatActionProps = {
   style?: React.CSSProperties;
@@ -69,15 +81,7 @@ type ChatActionProps = {
 
 export const ChatAction = React.forwardRef<HTMLButtonElement, ChatActionProps>(
   (
-    {
-      className,
-      text,
-      children,
-      active,
-      show = true,
-      onClick,
-      ...props
-    },
+    { className, text, children, active, show = true, onClick, ...props },
     ref,
   ) => {
     return (
@@ -133,7 +137,10 @@ export function WebAction() {
 
   const isGeminiModel = isGeminiModelId(model);
   const isXAIModel = isXAIModelId(model);
-  const isOpenAIWebModel = isOpenAIResponsesNativeWebModel(supportModels, model);
+  const isOpenAIWebModel = isOpenAIResponsesNativeWebModel(
+    supportModels,
+    model,
+  );
 
   const geminiWebEnabled = geminiGoogleSearch || geminiURLContext;
   const xaiSearchEnabled = xaiWebSearch || xaiXSearch;
@@ -148,28 +155,49 @@ export function WebAction() {
       <PopoverTrigger asChild>
         <div>
           <ChatAction
-            active={isGeminiModel ? geminiWebEnabled : isXAIModel ? xaiSearchEnabled : isOpenAIWebModel ? openAIWebEnabled : web}
-            text={isGeminiModel ? t("chat.gemini-web") : isXAIModel ? t("chat.xai-web") : isOpenAIWebModel ? t("chat.openai-web") : t("chat.web")}
+            active={
+              isGeminiModel
+                ? geminiWebEnabled
+                : isXAIModel
+                ? xaiSearchEnabled
+                : isOpenAIWebModel
+                ? openAIWebEnabled
+                : web
+            }
+            text={
+              isGeminiModel
+                ? t("chat.gemini-web")
+                : isXAIModel
+                ? t("chat.xai-web")
+                : isOpenAIWebModel
+                ? t("chat.openai-web")
+                : t("chat.web")
+            }
           >
             <Globe
               className={cn(
                 "h-4 w-4 web",
-                (isGeminiModel ? geminiWebEnabled : isXAIModel ? xaiSearchEnabled : isOpenAIWebModel ? openAIWebEnabled : web) && "enable",
+                (isGeminiModel
+                  ? geminiWebEnabled
+                  : isXAIModel
+                  ? xaiSearchEnabled
+                  : isOpenAIWebModel
+                  ? openAIWebEnabled
+                  : web) && "enable",
               )}
             />
           </ChatAction>
         </div>
       </PopoverTrigger>
-      <PopoverContent
-        className="w-64 p-3"
-        side="top"
-        align="start"
-      >
+      <PopoverContent className="w-64 p-3" side="top" align="start">
         <div className="space-y-4">
           {isGeminiModel ? (
             <>
               <div className="flex items-center justify-between">
-                <Label htmlFor="gemini-google-search-toggle" className="text-sm">
+                <Label
+                  htmlFor="gemini-google-search-toggle"
+                  className="text-sm"
+                >
                   {t("chat.gemini-google-search")}
                 </Label>
                 <Switch
@@ -196,7 +224,10 @@ export function WebAction() {
 
               <div className="rounded-md bg-muted p-2 text-xs">
                 <div className="flex items-start">
-                  <Icon icon={<Info />} className="h-3 w-3 mr-1 mt-0.5 shrink-0" />
+                  <Icon
+                    icon={<Info />}
+                    className="h-3 w-3 mr-1 mt-0.5 shrink-0"
+                  />
                   {t("chat.gemini-web-enable-tip")}
                 </div>
               </div>
@@ -231,7 +262,10 @@ export function WebAction() {
 
               <div className="rounded-md bg-muted p-2 text-xs">
                 <div className="flex items-start">
-                  <Icon icon={<Info />} className="h-3 w-3 mr-1 mt-0.5 shrink-0" />
+                  <Icon
+                    icon={<Info />}
+                    className="h-3 w-3 mr-1 mt-0.5 shrink-0"
+                  />
                   {t("chat.xai-web-enable-tip")}
                 </div>
               </div>
@@ -265,7 +299,10 @@ export function WebAction() {
 
               <div className="rounded-md bg-muted p-2 text-xs">
                 <div className="flex items-start">
-                  <Icon icon={<Info />} className="h-3 w-3 mr-1 mt-0.5 shrink-0" />
+                  <Icon
+                    icon={<Info />}
+                    className="h-3 w-3 mr-1 mt-0.5 shrink-0"
+                  />
                   {t("chat.openai-web-enable-tip")}
                 </div>
               </div>
@@ -273,7 +310,9 @@ export function WebAction() {
           ) : (
             <>
               <div className="flex items-center justify-between">
-                <Label htmlFor="web-search-toggle" className="text-sm">{t("chat.web-search")}</Label>
+                <Label htmlFor="web-search-toggle" className="text-sm">
+                  {t("chat.web-search")}
+                </Label>
                 <Switch
                   id="web-search-toggle"
                   checked={web}
@@ -281,7 +320,9 @@ export function WebAction() {
                     toast(t("chat.web-search"), {
                       description: (
                         <div className={`flex flex-col`}>
-                          <div className={`flex flex-row items-center flex-wrap`}>
+                          <div
+                            className={`flex flex-row items-center flex-wrap`}
+                          >
                             <Icon
                               icon={!web ? <Wifi /> : <WifiOff />}
                               className={`h-4 w-4 mr-1 shrink-0`}
@@ -293,7 +334,10 @@ export function WebAction() {
                           <div
                             className={`mt-1.5 flex flex-row items-center rounded-md border scale-80 py-1 px-2`}
                           >
-                            <Icon icon={<Info />} className={`h-3 w-3 mr-1 shrink-0`} />
+                            <Icon
+                              icon={<Info />}
+                              className={`h-3 w-3 mr-1 shrink-0`}
+                            />
                             {t("chat.web-enable-tip")}
                           </div>
                         </div>
@@ -341,10 +385,7 @@ export function GeminiThinkingAction() {
     <Popover>
       <PopoverTrigger asChild>
         <div>
-          <ChatAction
-            active={enabled}
-            text={t("chat.gemini-thinking")}
-          >
+          <ChatAction active={enabled} text={t("chat.gemini-thinking")}>
             <Brain className={cn("h-4 w-4", enabled && "enable")} />
           </ChatAction>
         </div>
@@ -352,10 +393,7 @@ export function GeminiThinkingAction() {
       <PopoverContent className="w-72 p-3" side="top" align="start">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <Label
-              htmlFor="gemini-thinking-toggle"
-              className="text-sm"
-            >
+            <Label htmlFor="gemini-thinking-toggle" className="text-sm">
               {t("chat.gemini-thinking-enable")}
             </Label>
             <Switch
@@ -363,7 +401,9 @@ export function GeminiThinkingAction() {
               checked={enabled}
               onCheckedChange={(state) => {
                 dispatch(
-                  setGeminiThinkingBudget(state ? geminiThinkingPresets[2].budget : 0),
+                  setGeminiThinkingBudget(
+                    state ? geminiThinkingPresets[2].budget : 0,
+                  ),
                 );
               }}
             />
@@ -374,7 +414,9 @@ export function GeminiThinkingAction() {
               <span>{t("chat.gemini-thinking-depth")}</span>
               <span>
                 {enabled
-                  ? t(`chat.gemini-thinking-level-${geminiThinkingPresets[levelIndex].label}`)
+                  ? t(
+                      `chat.gemini-thinking-level-${geminiThinkingPresets[levelIndex].label}`,
+                    )
                   : t("chat.gemini-thinking-level-off")}
               </span>
             </div>
@@ -416,6 +458,7 @@ export function OpenAIReasoningAction() {
   const model = useSelector(selectModel);
   const supportModels = useSelector(selectSupportModels);
   const openAIReasoningEffort = useSelector(selectOpenAIReasoningEffort);
+  const openAIReasoningSummary = useSelector(selectOpenAIReasoningSummary);
   const openAIResponsesWebSearch = useSelector(selectOpenAIResponsesWebSearch);
   const capabilities = getOpenAIResponsesCapabilities(supportModels, model);
 
@@ -428,6 +471,8 @@ export function OpenAIReasoningAction() {
       ? capabilities.reasoningEfforts.filter((item) => item !== "minimal")
       : capabilities.reasoningEfforts;
   const enabled = openAIReasoningEffort !== "none";
+  const summaryEnabled = openAIReasoningSummary !== "none";
+  const currentSummary = summaryEnabled ? openAIReasoningSummary : "auto";
   const fallbackEffort = availableEfforts.includes("medium")
     ? "medium"
     : availableEfforts[0];
@@ -442,10 +487,7 @@ export function OpenAIReasoningAction() {
     <Popover>
       <PopoverTrigger asChild>
         <div>
-          <ChatAction
-            active={enabled}
-            text={t("chat.openai-reasoning")}
-          >
+          <ChatAction active={enabled} text={t("chat.openai-reasoning")}>
             <Brain className={cn("h-4 w-4", enabled && "enable")} />
           </ChatAction>
         </div>
@@ -453,10 +495,7 @@ export function OpenAIReasoningAction() {
       <PopoverContent className="w-72 p-3" side="top" align="start">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <Label
-              htmlFor="openai-reasoning-toggle"
-              className="text-sm"
-            >
+            <Label htmlFor="openai-reasoning-toggle" className="text-sm">
               {t("chat.openai-reasoning-enable")}
             </Label>
             <Switch
@@ -494,8 +533,67 @@ export function OpenAIReasoningAction() {
 
             <div className="flex justify-between text-[11px] text-muted-foreground">
               {availableEfforts.map((effort) => (
-                <span key={effort}>{t(`chat.openai-reasoning-level-${effort}`)}</span>
+                <span key={effort}>
+                  {t(`chat.openai-reasoning-level-${effort}`)}
+                </span>
               ))}
+            </div>
+          </div>
+
+          <div className={cn("space-y-2", !enabled && "opacity-50")}>
+            <div className="flex items-center justify-between">
+              <Label
+                htmlFor="openai-reasoning-summary-toggle"
+                className="text-sm"
+              >
+                {t("chat.openai-reasoning-summary-enable")}
+              </Label>
+              <Switch
+                id="openai-reasoning-summary-toggle"
+                disabled={!enabled}
+                checked={summaryEnabled}
+                onCheckedChange={(state) => {
+                  dispatch(
+                    setOpenAIReasoningSummary(state ? currentSummary : "none"),
+                  );
+                }}
+              />
+            </div>
+
+            <div
+              className={cn(
+                "space-y-2",
+                (!enabled || !summaryEnabled) && "opacity-50",
+              )}
+            >
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{t("chat.openai-reasoning-summary-detail")}</span>
+                <span>
+                  {t(`chat.openai-reasoning-summary-level-${currentSummary}`)}
+                </span>
+              </div>
+
+              <ToggleGroup
+                type="single"
+                value={currentSummary}
+                disabled={!enabled || !summaryEnabled}
+                onValueChange={(value) => {
+                  value && dispatch(setOpenAIReasoningSummary(value));
+                }}
+                className="grid grid-cols-3 gap-1"
+              >
+                {openAIReasoningSummaryLevels.map((summary) => (
+                  <ToggleGroupItem
+                    key={summary}
+                    value={summary}
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                  >
+                    {t(`chat.openai-reasoning-summary-level-${summary}`)}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
             </div>
           </div>
 
