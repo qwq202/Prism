@@ -202,7 +202,7 @@ func TestCreateChatPropsInjectsCurrentModelReference(t *testing.T) {
 
 func TestCreateChatPropsUpdatesExistingCurrentModelReference(t *testing.T) {
 	props := CreateChatProps(&ChatProps{
-		Model: "deepseek-chat",
+		Model: "deepseek-v4-flash",
 		Message: []globals.Message{
 			{
 				Role: globals.System,
@@ -222,7 +222,7 @@ func TestCreateChatPropsUpdatesExistingCurrentModelReference(t *testing.T) {
 		t.Fatalf("expected previous model reference to be replaced, got %q", content)
 	}
 
-	if !strings.Contains(content, "The user is currently chatting with model: deepseek-chat.") {
+	if !strings.Contains(content, "The user is currently chatting with model: deepseek-v4-flash.") {
 		t.Fatalf("expected updated current model reference, got %q", content)
 	}
 
@@ -253,7 +253,7 @@ func TestCreateChatPropsAvoidsDuplicateMemoryCapabilityInjection(t *testing.T) {
 
 func TestCreateChatPropsInjectsReferenceSectionsAlongsideMemoryCapabilityState(t *testing.T) {
 	props := CreateChatProps(&ChatProps{
-		Model:                "deepseek-chat",
+		Model:                "deepseek-v4-flash",
 		MemoryEnabled:        true,
 		MemoryHistoryEnabled: true,
 		MemoryPrompt:         "Remember that the user likes Genshin Impact.",

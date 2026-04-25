@@ -4,7 +4,7 @@ import "testing"
 
 func TestValidatePlanConfigModels(t *testing.T) {
 	originalConduit := ConduitInstance
-	ConduitInstance = &Manager{Models: []string{"deepseek-chat", "grok-4-1-fast-reasoning"}}
+	ConduitInstance = &Manager{Models: []string{"deepseek-v4-flash", "grok-4-1-fast-reasoning"}}
 	defer func() {
 		ConduitInstance = originalConduit
 	}()
@@ -16,7 +16,7 @@ func TestValidatePlanConfigModels(t *testing.T) {
 				Items: []PlanItem{
 					{
 						Id:     "valid-item",
-						Models: []string{"deepseek-chat"},
+						Models: []string{"deepseek-v4-flash"},
 					},
 				},
 			},
@@ -34,7 +34,7 @@ func TestValidatePlanConfigModels(t *testing.T) {
 				Items: []PlanItem{
 					{
 						Id:     "invalid-item",
-						Models: []string{"deepseek-chat", "gpt-4o"},
+						Models: []string{"deepseek-v4-flash", "gpt-4o"},
 					},
 				},
 			},

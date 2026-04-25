@@ -268,16 +268,10 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
   deepseek: {
     endpoint: "https://api.deepseek.com",
     format: "<api-key>",
-    models: [
-      "deepseek-v4-pro",
-      "deepseek-v4-flash",
-      "deepseek-chat",
-      "deepseek-reasoner",
-    ],
+    models: ["deepseek-v4-pro", "deepseek-v4-flash"],
     description:
       "> DeepSeek 渠道使用官方 **Chat Completions API**，接入点填写 *https://api.deepseek.com* 或其反代地址，系统会请求 *`/chat/completions`*。 \n" +
       "> 官方已发布 **DeepSeek-V4** 预览模型 **deepseek-v4-pro** 与 **deepseek-v4-flash**，二者均支持 1M 上下文与 Thinking / Non-Thinking 双模式。 \n" +
-      "> 旧模型别名 **deepseek-chat** 与 **deepseek-reasoner** 将于 **2026-07-24 15:59 UTC** 后停止访问，目前分别路由到 **deepseek-v4-flash** 的非思考 / 思考模式。 \n" +
       "> 系统现已适配官方最新的 **thinking**、**reasoning_effort**、**response_format**、**stream_options**、**logprobs / top_logprobs**、**tools / tool_choice** 等参数。 \n",
   },
 };

@@ -163,8 +163,6 @@ const (
 	Gemini3ProImagePreview       = "gemini-3-pro-image-preview"
 	GeminiExp1206                = "gemini-exp-1206"
 	GoogleImagen002              = "imagen-3.0-generate-002"
-	DeepseekV3                   = "deepseek-chat"
-	DeepseekR1                   = "deepseek-reasoner"
 	DeepseekV4Flash              = "deepseek-v4-flash"
 	DeepseekV4Pro                = "deepseek-v4-pro"
 )
@@ -270,8 +268,7 @@ func IsDeepseekV4Model(model string) bool {
 }
 
 func IsDeepseekReasoningReplayModel(model string) bool {
-	normalized := NormalizeDeepseekModel(model)
-	return normalized == DeepseekR1 || IsDeepseekV4Model(normalized)
+	return IsDeepseekV4Model(model)
 }
 
 func IsDeepseekThinkingDisabled(thinking interface{}) bool {

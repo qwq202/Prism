@@ -149,12 +149,6 @@ export const pricing: PricingDataset = [
     output: 0.000375,
   },
   {
-    models: ["deepseek-chat", "deepseek-coder"],
-    input: 0.001,
-    output: 0.002,
-    currency: Currency.CNY,
-  },
-  {
     models: ["deepseek-v4-flash"],
     input: 0.00014,
     output: 0.00028,

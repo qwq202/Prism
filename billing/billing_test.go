@@ -58,8 +58,8 @@ func seedBillingRecord(
 func TestListRecordsFiltersByPartialTokenNameAndInclusiveDate(t *testing.T) {
 	db := openBillingTestDB(t)
 
-	seedBillingRecord(t, db, "root", "consume", "alpha-main-token", "deepseek-chat", "2026-04-22 15:30:00")
-	seedBillingRecord(t, db, "root", "consume", "beta-secondary-token", "deepseek-chat", "2026-04-21 23:59:59")
+	seedBillingRecord(t, db, "root", "consume", "alpha-main-token", "deepseek-v4-flash", "2026-04-22 15:30:00")
+	seedBillingRecord(t, db, "root", "consume", "beta-secondary-token", "deepseek-v4-flash", "2026-04-21 23:59:59")
 	seedBillingRecord(t, db, "root", "topup", "alpha-topup-token", "grok-4-1-fast", "2026-04-22 09:00:00")
 
 	data, err := ListRecords(db, true, 1, 0, RecordQuery{

@@ -3,7 +3,7 @@ package utils
 import "testing"
 
 func TestGetEncodingForChatModelUsesDeepseekFallback(t *testing.T) {
-	encoding, fallback, err := getEncodingForChatModel("deepseek-chat")
+	encoding, fallback, err := getEncodingForChatModel("deepseek-v4-flash")
 	if err != nil {
 		t.Fatalf("expected deepseek fallback encoder, got error: %v", err)
 	}

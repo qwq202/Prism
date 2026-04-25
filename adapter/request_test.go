@@ -213,85 +213,6 @@ func TestSanitizeChatMessagesForRequestKeepsClaudeMetadataOnMiniMax(t *testing.T
 	}
 }
 
-func TestSanitizeChatMessagesForRequestStripsVisibleThinkingWhenSwitchingToDeepseekChat(t *testing.T) {
-	props := &adaptercommon.ChatProps{
-		OriginalModel: "deepseek-chat",
-		Message: []globals.Message{
-			{
-				Role:             globals.Assistant,
-				Model:            "MiniMax-M2.7-highspeed",
-				Content:          "<think>\nplan\n</think>\n\nAnswer",
-				ReasoningContent: utils.ToPtr("plan"),
-				ClaudeHiddenMetadata: &globals.ClaudeHiddenMetadata{
-					ThinkingBlocks: []globals.ClaudeThinkingBlock{
-						{Thinking: "plan", Signature: "sig-mini"},
-					},
-				},
-			},
-			{Role: globals.User, Content: "那你现在是谁"},
-		},
-	}
-
-	restore := sanitizeChatMessagesForRequest(requestTestChannelConfig{
-		channelType:    globals.DeepseekChannelType,
-		reflectedModel: "deepseek-chat",
-	}, props)
-
-	if props.Message[0].Content != "Answer" {
-		t.Fatalf("expected visible think block to be stripped for deepseek-chat, got %q", props.Message[0].Content)
-	}
-
-	if props.Message[0].ReasoningContent != nil {
-		t.Fatalf("expected reasoning content to be stripped for deepseek-chat, got %#v", props.Message[0].ReasoningContent)
-	}
-
-	if props.Message[0].ClaudeHiddenMetadata != nil {
-		t.Fatalf("expected claude metadata to be stripped for deepseek-chat, got %#v", props.Message[0].ClaudeHiddenMetadata)
-	}
-
-	restore()
-	if props.Message[0].ReasoningContent == nil || *props.Message[0].ReasoningContent != "plan" {
-		t.Fatalf("expected original reasoning content to be restored, got %#v", props.Message[0].ReasoningContent)
-	}
-
-	if props.Message[0].Content != "<think>\nplan\n</think>\n\nAnswer" {
-		t.Fatalf("expected original assistant content to be restored, got %q", props.Message[0].Content)
-	}
-}
-
-func TestSanitizeChatMessagesForRequestKeepsReasoningReplayForDeepseekReasoner(t *testing.T) {
-	props := &adaptercommon.ChatProps{
-		OriginalModel: "deepseek-reasoner",
-		Message: []globals.Message{
-			{
-				Role:             globals.Assistant,
-				Model:            "deepseek-reasoner",
-				Content:          "<think>\nplan\n</think>\n\nAnswer",
-				ReasoningContent: utils.ToPtr("plan"),
-			},
-			{Role: globals.User, Content: "继续"},
-		},
-	}
-
-	restore := sanitizeChatMessagesForRequest(requestTestChannelConfig{
-		channelType:    globals.DeepseekChannelType,
-		reflectedModel: "deepseek-reasoner",
-	}, props)
-
-	if props.Message[0].Content != "<think>\nplan\n</think>\n\nAnswer" {
-		t.Fatalf("expected deepseek-reasoner thinking replay to remain, got %q", props.Message[0].Content)
-	}
-
-	if props.Message[0].ReasoningContent == nil || *props.Message[0].ReasoningContent != "plan" {
-		t.Fatalf("expected deepseek-reasoner reasoning replay to remain, got %#v", props.Message[0].ReasoningContent)
-	}
-
-	restore()
-	if props.Message[0].ReasoningContent == nil || *props.Message[0].ReasoningContent != "plan" {
-		t.Fatalf("expected reasoning replay to remain after restore, got %#v", props.Message[0].ReasoningContent)
-	}
-}
-
 func TestSanitizeChatMessagesForRequestKeepsReasoningReplayForDeepseekV4(t *testing.T) {
 	props := &adaptercommon.ChatProps{
 		OriginalModel: globals.DeepseekV4Pro,
@@ -395,7 +316,7 @@ func TestSanitizeChatMessagesForRequestStripsOrphanedToolCallsButKeepsAssistantT
 	}
 
 	props := &adaptercommon.ChatProps{
-		OriginalModel: "deepseek-chat",
+		OriginalModel: "deepseek-v4-flash",
 		Message: []globals.Message{
 			{Role: globals.User, Content: "你记一下"},
 			{
@@ -409,7 +330,7 @@ func TestSanitizeChatMessagesForRequestStripsOrphanedToolCallsButKeepsAssistantT
 
 	restore := sanitizeChatMessagesForRequest(requestTestChannelConfig{
 		channelType:    globals.DeepseekChannelType,
-		reflectedModel: "deepseek-chat",
+		reflectedModel: "deepseek-v4-flash",
 	}, props)
 
 	if got := len(props.Message); got != 3 {
@@ -443,7 +364,7 @@ func TestSanitizeChatMessagesForRequestKeepsMatchedToolCalls(t *testing.T) {
 	}
 
 	props := &adaptercommon.ChatProps{
-		OriginalModel: "deepseek-chat",
+		OriginalModel: "deepseek-v4-flash",
 		Message: []globals.Message{
 			{Role: globals.User, Content: "你记一下"},
 			{
@@ -462,7 +383,7 @@ func TestSanitizeChatMessagesForRequestKeepsMatchedToolCalls(t *testing.T) {
 
 	restore := sanitizeChatMessagesForRequest(requestTestChannelConfig{
 		channelType:    globals.DeepseekChannelType,
-		reflectedModel: "deepseek-chat",
+		reflectedModel: "deepseek-v4-flash",
 	}, props)
 
 	if props.Message[1].ToolCalls == nil || len(*props.Message[1].ToolCalls) != 1 {

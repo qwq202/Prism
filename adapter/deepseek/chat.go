@@ -105,9 +105,6 @@ func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps, stream bool) 
 
 func isReasoningRequest(model string, thinking interface{}) bool {
 	normalized := globals.NormalizeDeepseekModel(model)
-	if normalized == globals.DeepseekR1 {
-		return true
-	}
 	if globals.IsDeepseekV4Model(normalized) {
 		return !globals.IsDeepseekThinkingDisabled(thinking)
 	}
