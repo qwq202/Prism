@@ -37,6 +37,7 @@ import {
   Brain,
   Globe,
   Info,
+  TriangleAlert,
   MessageSquarePlus,
   Wifi,
   WifiOff,
@@ -48,6 +49,17 @@ import { cn } from "@/components/ui/lib/utils.ts";
 import { toast } from "sonner";
 import Icon from "@/components/utils/Icon.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
+import {
+  Dialog,
+  DialogAction,
+  DialogCancel,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog.tsx";
 import {
   Tooltip,
   TooltipContent,
@@ -65,6 +77,7 @@ import { Label } from "@/components/ui/label.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
 import { ButtonProps } from "@/components/ui/button.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
+import { getBooleanMemory, setMemory } from "@/utils/memory.ts";
 
 const geminiThinkingPresets = [
   { label: "off", budget: 0 },
@@ -75,6 +88,8 @@ const geminiThinkingPresets = [
 
 const openAIReasoningSummaryLevels = ["concise", "auto", "detailed"];
 const deepSeekReasoningEfforts = ["high", "max"];
+const deepSeekProMaxWarningMemoryKey =
+  "deepseek_v4_pro_max_reasoning_warning_dismissed";
 
 function formatModelLabel(model: string): string {
   return model.trim().toUpperCase();
@@ -474,11 +489,14 @@ export function DeepSeekThinkingAction() {
   const model = useSelector(selectModel);
   const deepSeekThinkingEnabled = useSelector(selectDeepSeekThinkingEnabled);
   const deepSeekReasoningEffort = useSelector(selectDeepSeekReasoningEffort);
+  const [proMaxWarningOpen, setProMaxWarningOpen] = React.useState(false);
+  const [proMaxWarningCountdown, setProMaxWarningCountdown] = React.useState(0);
+  const [proMaxWarningDismissed, setProMaxWarningDismissed] = React.useState(
+    () => getBooleanMemory(deepSeekProMaxWarningMemoryKey, false),
+  );
+  const [doNotRemindProMax, setDoNotRemindProMax] = React.useState(false);
 
-  if (!isDeepSeekV4ModelId(model)) {
-    return null;
-  }
-
+  const isDeepSeekProModel = model.trim().toLowerCase() === "deepseek-v4-pro";
   const currentEffort = deepSeekReasoningEfforts.includes(
     deepSeekReasoningEffort,
   )
@@ -488,90 +506,187 @@ export function DeepSeekThinkingAction() {
     0,
     deepSeekReasoningEfforts.indexOf(currentEffort),
   );
+  const proMaxWarningLocked = proMaxWarningCountdown > 0;
+
+  React.useEffect(() => {
+    if (!proMaxWarningOpen || proMaxWarningCountdown <= 0) return;
+
+    const timer = window.setTimeout(() => {
+      setProMaxWarningCountdown((value) => Math.max(0, value - 1));
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [proMaxWarningOpen, proMaxWarningCountdown]);
+
+  const applyDeepSeekReasoningEffort = (effort: string) => {
+    dispatch(setDeepSeekReasoningEffort(effort));
+  };
+
+  const requestDeepSeekReasoningEffort = (effort: string) => {
+    if (
+      isDeepSeekProModel &&
+      effort === "max" &&
+      currentEffort !== "max" &&
+      !proMaxWarningDismissed
+    ) {
+      setDoNotRemindProMax(false);
+      setProMaxWarningCountdown(5);
+      setProMaxWarningOpen(true);
+      return;
+    }
+
+    applyDeepSeekReasoningEffort(effort);
+  };
+
+  const confirmDeepSeekProMaxReasoning = () => {
+    if (proMaxWarningLocked) return;
+
+    if (doNotRemindProMax) {
+      setMemory(deepSeekProMaxWarningMemoryKey, "true");
+      setProMaxWarningDismissed(true);
+    }
+
+    applyDeepSeekReasoningEffort("max");
+    setProMaxWarningOpen(false);
+  };
+
+  const setDeepSeekProMaxWarningOpen = (open: boolean) => {
+    setProMaxWarningOpen(open);
+  };
+
+  if (!isDeepSeekV4ModelId(model)) {
+    return null;
+  }
 
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <div>
-          <ChatAction
-            active={deepSeekThinkingEnabled}
-            text={t("chat.deepseek-thinking")}
-          >
-            <Brain
-              className={cn("h-4 w-4", deepSeekThinkingEnabled && "enable")}
-            />
-          </ChatAction>
-        </div>
-      </PopoverTrigger>
-      <PopoverContent className="w-72 p-3" side="top" align="start">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="deepseek-thinking-toggle" className="text-sm">
-              {t("chat.deepseek-thinking-enable")}
-            </Label>
-            <Switch
-              id="deepseek-thinking-toggle"
-              checked={deepSeekThinkingEnabled}
-              onCheckedChange={(state) => {
-                dispatch(setDeepSeekThinkingEnabled(state));
-              }}
-            />
+    <>
+      <Popover>
+        <PopoverTrigger asChild>
+          <div>
+            <ChatAction
+              active={deepSeekThinkingEnabled}
+              text={t("chat.deepseek-thinking")}
+            >
+              <Brain
+                className={cn("h-4 w-4", deepSeekThinkingEnabled && "enable")}
+              />
+            </ChatAction>
           </div>
-
-          <div
-            className={cn(
-              "space-y-2",
-              !deepSeekThinkingEnabled && "opacity-50",
-            )}
-          >
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{t("chat.deepseek-thinking-depth")}</span>
-              <span>
-                {deepSeekThinkingEnabled
-                  ? t(`chat.deepseek-thinking-level-${currentEffort}`)
-                  : t("chat.deepseek-thinking-level-off")}
-              </span>
-            </div>
-
-            <div className="relative grid grid-cols-2 gap-1 overflow-hidden rounded-md border border-black/10 bg-white p-1 dark:border-white/15 dark:bg-black">
-              <span
-                className="absolute inset-y-1 left-1 rounded-sm bg-black transition-transform duration-300 ease-out dark:bg-white"
-                style={{
-                  width: "calc(50% - 0.375rem)",
-                  transform:
-                    currentEffortIndex === 0
-                      ? "translateX(0)"
-                      : "translateX(calc(100% + 0.25rem))",
+        </PopoverTrigger>
+        <PopoverContent className="w-72 p-3" side="top" align="start">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="deepseek-thinking-toggle" className="text-sm">
+                {t("chat.deepseek-thinking-enable")}
+              </Label>
+              <Switch
+                id="deepseek-thinking-toggle"
+                checked={deepSeekThinkingEnabled}
+                onCheckedChange={(state) => {
+                  dispatch(setDeepSeekThinkingEnabled(state));
                 }}
               />
-              {deepSeekReasoningEfforts.map((effort) => (
-                <button
-                  key={effort}
-                  type="button"
-                  disabled={!deepSeekThinkingEnabled}
-                  onClick={() => dispatch(setDeepSeekReasoningEffort(effort))}
-                  className={cn(
-                    "relative z-10 h-8 rounded-sm text-xs font-medium transition-colors duration-200 disabled:cursor-not-allowed",
-                    currentEffort === effort
-                      ? "text-white dark:text-black"
-                      : "text-black/70 hover:text-black dark:text-white/70 dark:hover:text-white",
-                  )}
-                >
-                  {t(`chat.deepseek-thinking-level-${effort}`)}
-                </button>
-              ))}
             </div>
-          </div>
 
-          <div className="rounded-md bg-muted p-2 text-xs">
-            <div className="flex items-start">
-              <Icon icon={<Info />} className="h-3 w-3 mr-1 mt-0.5 shrink-0" />
-              {t("chat.deepseek-thinking-tip")}
+            <div
+              className={cn(
+                "space-y-2",
+                !deepSeekThinkingEnabled && "opacity-50",
+              )}
+            >
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{t("chat.deepseek-thinking-depth")}</span>
+                <span>
+                  {deepSeekThinkingEnabled
+                    ? t(`chat.deepseek-thinking-level-${currentEffort}`)
+                    : t("chat.deepseek-thinking-level-off")}
+                </span>
+              </div>
+
+              <div className="relative grid grid-cols-2 gap-1 overflow-hidden rounded-md border border-black/10 bg-white p-1 dark:border-white/15 dark:bg-black">
+                <span
+                  className="absolute inset-y-1 left-1 rounded-sm bg-black transition-transform duration-300 ease-out dark:bg-white"
+                  style={{
+                    width: "calc(50% - 0.375rem)",
+                    transform:
+                      currentEffortIndex === 0
+                        ? "translateX(0)"
+                        : "translateX(calc(100% + 0.25rem))",
+                  }}
+                />
+                {deepSeekReasoningEfforts.map((effort) => (
+                  <button
+                    key={effort}
+                    type="button"
+                    disabled={!deepSeekThinkingEnabled}
+                    onClick={() => requestDeepSeekReasoningEffort(effort)}
+                    className={cn(
+                      "relative z-10 h-8 rounded-sm text-xs font-medium transition-colors duration-200 disabled:cursor-not-allowed",
+                      currentEffort === effort
+                        ? "text-white dark:text-black"
+                        : "text-black/70 hover:text-black dark:text-white/70 dark:hover:text-white",
+                    )}
+                  >
+                    {t(`chat.deepseek-thinking-level-${effort}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-md bg-muted p-2 text-xs">
+              <div className="flex items-start">
+                <Icon
+                  icon={<Info />}
+                  className="h-3 w-3 mr-1 mt-0.5 shrink-0"
+                />
+                {t("chat.deepseek-thinking-tip")}
+              </div>
             </div>
           </div>
-        </div>
-      </PopoverContent>
-    </Popover>
+        </PopoverContent>
+      </Popover>
+
+      <Dialog
+        open={proMaxWarningOpen}
+        onOpenChange={setDeepSeekProMaxWarningOpen}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader notTextCentered>
+            <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-md bg-black text-white dark:bg-white dark:text-black">
+              <TriangleAlert className="h-5 w-5" />
+            </div>
+            <DialogTitle>{t("chat.deepseek-pro-max-warning-title")}</DialogTitle>
+            <DialogDescription>
+              {t("chat.deepseek-pro-max-warning-desc")}
+            </DialogDescription>
+          </DialogHeader>
+
+          <label className="flex cursor-pointer items-center gap-2 rounded-md border p-3 text-sm">
+            <Checkbox
+              checked={doNotRemindProMax}
+              onCheckedChange={(checked) => {
+                setDoNotRemindProMax(checked === true);
+              }}
+            />
+            <span>{t("chat.deepseek-pro-max-warning-dont-remind")}</span>
+          </label>
+
+          <DialogFooter>
+            <DialogCancel>{t("cancel")}</DialogCancel>
+            <DialogAction
+              disabled={proMaxWarningLocked}
+              onClick={confirmDeepSeekProMaxReasoning}
+            >
+              {proMaxWarningLocked
+                ? t("chat.deepseek-pro-max-warning-wait", {
+                    count: proMaxWarningCountdown,
+                  })
+                : t("chat.deepseek-pro-max-warning-confirm")}
+            </DialogAction>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

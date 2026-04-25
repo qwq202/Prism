@@ -190,7 +190,12 @@
     "deepseek-thinking-level-off": "Закрыт",
     "deepseek-thinking-level-high": "Высокое",
     "deepseek-thinking-level-max": "Максим. ",
-    "deepseek-thinking-tip": "{{model}} поддерживает DeepSeek thinking.type и reasoning_effort. Отправьте немыслимый режим при закрытии; используйте выбранную интенсивность мышления при открытии."
+    "deepseek-thinking-tip": "{{model}} поддерживает DeepSeek thinking.type и reasoning_effort. Отправьте немыслимый режим при закрытии; используйте выбранную интенсивность мышления при открытии.",
+    "deepseek-pro-max-warning-title": "Максимальное мышление DeepSeek-V4 Pro расходует много Token",
+    "deepseek-pro-max-warning-desc": "Максимальное мышление включает жесткий режим рассуждения Pro. Он полезен для сложных задач, но может значительно увеличить расход Token, задержку ответа и стоимость. Подтвердите включение.",
+    "deepseek-pro-max-warning-dont-remind": "Больше не напоминать",
+    "deepseek-pro-max-warning-wait": "Доступно через {{count}} с",
+    "deepseek-pro-max-warning-confirm": "Включить максимальное мышление"
   },
   "message": {
     "copy": "Копировать сообщение",
