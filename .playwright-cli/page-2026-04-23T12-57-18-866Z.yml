@@ -1,0 +1,226 @@
+- generic:
+  - generic:
+    - list
+    - navigation:
+      - generic:
+        - generic:
+          - button:
+            - img
+        - generic:
+          - button:
+            - img
+        - generic:
+          - button:
+            - img
+        - generic:
+          - button:
+            - generic:
+              - paragraph: R
+    - generic:
+      - generic:
+        - generic:
+          - img
+        - generic:
+          - generic:
+            - button:
+              - img
+        - generic:
+          - generic:
+            - button:
+              - img
+        - generic:
+          - generic:
+            - button:
+              - img
+        - generic:
+          - generic:
+            - button:
+              - img
+        - generic:
+          - generic:
+            - button:
+              - img
+        - generic:
+          - generic:
+            - button:
+              - img
+      - generic:
+        - generic [ref=e178]:
+          - generic [ref=e179]:
+            - generic [ref=e180]:
+              - button [ref=e183] [cursor=pointer]:
+                - img [ref=e184]
+              - button [ref=e188] [cursor=pointer]:
+                - img [ref=e189]
+              - button [ref=e194] [cursor=pointer]:
+                - img [ref=e195]
+            - generic [ref=e198]:
+              - img [ref=e199]
+              - textbox [ref=e297]:
+                - /placeholder: 搜索对话...
+          - generic [ref=e203]:
+            - generic [ref=e205] [cursor=pointer]:
+              - img [ref=e206]
+              - generic [ref=e208]: 你好
+              - button [ref=e209]:
+                - img [ref=e211]
+            - generic [ref=e216] [cursor=pointer]:
+              - img [ref=e217]
+              - generic [ref=e219]: 你是谁
+              - button [ref=e220]:
+                - img [ref=e222]
+            - generic [ref=e227] [cursor=pointer]:
+              - img [ref=e228]
+              - generic [ref=e230]: 我去
+              - button [ref=e231]:
+                - img [ref=e233]
+            - generic [ref=e238] [cursor=pointer]:
+              - img [ref=e239]
+              - generic [ref=e241]: hello
+              - button [ref=e242]:
+                - img [ref=e244]
+        - generic:
+          - generic:
+            - paragraph: 公告通知
+            - generic:
+              - button:
+                - img
+              - paragraph: 了解更多
+        - generic:
+          - generic:
+            - combobox:
+              - generic:
+                - generic:
+                  - img
+          - generic:
+            - button [disabled]:
+              - img
+          - generic:
+            - button:
+              - img
+          - generic:
+            - button:
+              - img
+        - generic:
+          - textbox:
+            - /placeholder: 输入聊天内容...
+          - generic:
+            - generic:
+              - img
+              - text: Enter
+            - generic:
+              - img
+              - text: Ctrl + Enter
+          - generic:
+            - button:
+              - generic:
+                - generic:
+                  - img
+              - generic: 发送
+  - dialog "设置" [ref=e299]:
+    - generic [ref=e300]:
+      - heading "设置" [level=2] [ref=e301]
+      - generic [ref=e302]:
+        - generic [ref=e303]:
+          - generic [ref=e304]:
+            - generic [ref=e305]:
+              - generic [ref=e306]: 版本
+              - generic [ref=e307]:
+                - text: v4.25.0
+                - generic [ref=e308]: Community
+            - generic [ref=e309]:
+              - generic [ref=e310]: 主题
+              - button [ref=e313] [cursor=pointer]:
+                - img
+                - img
+                - img [ref=e314]
+            - generic [ref=e316]:
+              - generic [ref=e317]: 语言
+              - combobox [ref=e319] [cursor=pointer]:
+                - generic: 简体中文
+                - img [ref=e320]
+          - generic [ref=e322]:
+            - generic [ref=e323]:
+              - generic [ref=e324]: 发送键
+              - combobox [ref=e326] [cursor=pointer]:
+                - generic: Enter
+                - img [ref=e327]
+            - generic [ref=e329]:
+              - generic [ref=e330]: 聊天框居中
+              - checkbox [ref=e332] [cursor=pointer]
+            - generic [ref=e333]:
+              - generic [ref=e334]: 默认隐藏工具栏
+              - checkbox [ref=e336] [cursor=pointer]
+            - generic [ref=e337]:
+              - generic [ref=e338]: 隐藏工具栏文字
+              - checkbox [checked] [ref=e340] [cursor=pointer]:
+                - generic:
+                  - img
+            - generic [ref=e341]:
+              - generic [ref=e342]: 默认折叠思考内容
+              - checkbox [ref=e344] [cursor=pointer]
+          - generic [ref=e345]:
+            - generic [ref=e346]:
+              - generic [ref=e347]: 保留上下文
+              - checkbox [checked] [ref=e349] [cursor=pointer]:
+                - generic:
+                  - img
+            - generic [ref=e350]:
+              - generic [ref=e351]: 最大历史会话数
+              - textbox [ref=e352]: "8"
+            - generic [ref=e353]:
+              - generic [ref=e354]:
+                - text: 最大回复 Token 数
+                - button [ref=e355] [cursor=pointer]:
+                  - img [ref=e357]
+              - textbox [ref=e360]: "0"
+            - generic [ref=e361]:
+              - generic [ref=e362]:
+                - text: 温度
+                - button [ref=e363] [cursor=pointer]:
+                  - img [ref=e365]
+              - slider [ref=e372] [cursor=pointer]
+              - paragraph [ref=e373]: "0.6"
+            - generic [ref=e374]:
+              - generic [ref=e375]:
+                - text: 存在惩罚
+                - button [ref=e376] [cursor=pointer]:
+                  - img [ref=e378]
+              - slider [ref=e385] [cursor=pointer]
+              - paragraph [ref=e386]: "0.0"
+            - generic [ref=e387]:
+              - generic [ref=e388]:
+                - text: 频率惩罚
+                - button [ref=e389] [cursor=pointer]:
+                  - img [ref=e391]
+              - slider [ref=e398] [cursor=pointer]
+              - paragraph [ref=e399]: "0.0"
+            - generic [ref=e400]:
+              - generic [ref=e401]:
+                - text: 重复惩罚
+                - button [ref=e402] [cursor=pointer]:
+                  - img [ref=e404]
+              - slider [ref=e411] [cursor=pointer]
+              - paragraph [ref=e412]: "1.0"
+            - generic [ref=e413]:
+              - generic [ref=e414]:
+                - text: 核采样概率阈值
+                - button [ref=e415] [cursor=pointer]:
+                  - img [ref=e417]
+              - slider [ref=e424] [cursor=pointer]
+              - paragraph [ref=e425]: "1.0"
+            - generic [ref=e426]:
+              - generic [ref=e427]:
+                - text: 采样候选集大小
+                - button [ref=e428] [cursor=pointer]:
+                  - img [ref=e430]
+              - slider [ref=e437] [cursor=pointer]
+              - paragraph [ref=e438]: "5"
+          - generic [ref=e440]:
+            - generic [ref=e441]: 重置全部设置
+            - button "重置" [ref=e443] [cursor=pointer]
+        - paragraph [ref=e445]: 内存占用 79.77 MB
+    - img [ref=e447] [cursor=pointer]
+    - button "Close" [ref=e452] [cursor=pointer]:
+      - img [ref=e453]
+      - generic [ref=e456]: Close

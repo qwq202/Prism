@@ -4,14 +4,15 @@ import {
   Settings,
   Sparkles,
   Plus,
-  Image as ImageIcon,
   Languages,
   SlidersHorizontal,
   Palette,
   Ratio,
   Upload,
+  ImagePlus,
+  ChevronRight,
+  ArrowUp,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -20,29 +21,32 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/components/ui/lib/utils";
 
 type Mode = "generate" | "edit";
 
+
 function Drawing() {
   const [mode, setMode] = useState<Mode>("generate");
+  const [prompt, setPrompt] = useState("");
+  const [focused, setFocused] = useState(false);
 
   return (
-    <div className="flex h-full min-h-0 w-full bg-background text-foreground font-sans overflow-hidden">
-      {/* Left Sidebar - Configuration */}
-      <aside className="w-72 min-h-0 bg-card border-r border-border flex flex-col z-10 shrink-0">
-        {/* Config Content */}
-        <div className="p-6 flex-1 flex flex-col gap-6 overflow-y-auto">
-          {/* Provider Selection */}
-          <div className="space-y-3">
+    <div className="flex h-full min-h-0 w-full bg-background text-foreground overflow-hidden">
+      {/* Left Sidebar */}
+      <aside className="w-72 min-h-0 flex flex-col z-10 shrink-0 border-r border-border/60 bg-card/50 backdrop-blur-sm">
+        <div className="p-5 flex-1 flex flex-col gap-5 overflow-y-auto">
+          {/* Provider */}
+          <div className="space-y-2.5">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-semibold text-foreground">模型提供商</label>
-              <Button variant="ghost" size="sm" className="h-8 px-2 text-muted-foreground hover:text-primary">
-                <Settings className="w-3.5 h-3.5 mr-1" />
+              <label className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">模型</label>
+              <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors group">
+                <Settings className="w-3 h-3 group-hover:rotate-45 transition-transform duration-300" />
                 管理
-              </Button>
+              </button>
             </div>
             <Select defaultValue="openai">
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full h-10 text-sm border-border/60 bg-background/60">
                 <SelectValue placeholder="选择模型" />
               </SelectTrigger>
               <SelectContent>
@@ -53,161 +57,169 @@ function Drawing() {
             </Select>
           </div>
 
-          {/* Empty State / Notice */}
-          <div className="mt-8 flex-1 flex flex-col items-center justify-center text-center">
-            <div className="w-20 h-20 bg-muted rounded-2xl flex items-center justify-center mb-5 border border-border">
-              <ImageIcon className="w-8 h-8 text-muted-foreground" />
+          {/* Empty state */}
+          <div className="mt-2 flex-1 flex flex-col items-center justify-center text-center gap-4">
+            <div className="relative">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/10 to-blue-500/10 border border-border/60 flex items-center justify-center">
+                <ImagePlus className="w-7 h-7 text-muted-foreground/60" />
+              </div>
+              <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-400/80 flex items-center justify-center">
+                <span className="text-[8px] font-bold text-amber-950">!</span>
+              </div>
             </div>
-            <h3 className="text-sm font-semibold text-foreground mb-2">暂无可用模型</h3>
-            <p className="text-muted-foreground text-xs leading-relaxed mb-6 px-2">
-              请先新增模型并设置端点类型为图像生成以开始创作。
-            </p>
-            <Button className="w-full">
-              <Settings className="w-4 h-4 mr-2" />
+            <div className="space-y-1.5 px-2">
+              <p className="text-sm font-medium text-foreground/80">暂无可用模型</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                新增模型并设置端点类型为图像生成以开始创作
+              </p>
+            </div>
+            <button className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors group">
               去设置
-            </Button>
+              <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </button>
           </div>
         </div>
       </aside>
 
-      {/* Main Canvas Area */}
-      <main className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-background overflow-hidden">
-        {/* Subtle grid background for the entire main area */}
-        <div className="absolute inset-0 bg-[radial-gradient(hsl(var(--muted-foreground))_1px,transparent_1px)] [background-size:24px_24px] opacity-[0.05]"></div>
+      {/* Main Area */}
+      <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        {/* Background */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,hsl(var(--primary)/0.06),transparent)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(hsl(var(--muted-foreground))_1px,transparent_1px)] [background-size:28px_28px] opacity-[0.035]" />
 
-        {/* Top Controls - Floating */}
+        {/* Mode Toggle */}
         <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20">
-          <div className="relative grid grid-cols-2 items-center rounded-full border border-border/80 bg-background/90 p-1.5 shadow-sm backdrop-blur-xl">
+          <div className="relative grid grid-cols-2 items-center rounded-full border border-border/70 bg-background/80 p-1 shadow-sm backdrop-blur-xl">
             <div
-              className={`pointer-events-none absolute inset-y-1.5 left-1.5 w-[calc(50%-0.375rem)] rounded-full bg-foreground shadow-sm transition-transform duration-300 ease-out ${
-                mode === "edit" ? "translate-x-full" : "translate-x-0"
-              }`}
+              className={cn(
+                "pointer-events-none absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full bg-foreground shadow-sm transition-all duration-300 ease-out",
+                mode === "edit" && "translate-x-full"
+              )}
             />
-            <button
-              onClick={() => setMode("generate")}
-              className={`relative z-10 min-w-[72px] px-7 py-2.5 rounded-full text-sm font-medium transition-colors duration-300 ${
-                mode === "generate"
-                  ? "text-background"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              aria-pressed={mode === "generate"}
-            >
-              绘图
-            </button>
-            <button
-              onClick={() => setMode("edit")}
-              className={`relative z-10 min-w-[72px] px-7 py-2.5 rounded-full text-sm font-medium transition-colors duration-300 ${
-                mode === "edit"
-                  ? "text-background"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              aria-pressed={mode === "edit"}
-            >
-              编辑
-            </button>
+            {(["generate", "edit"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={cn(
+                  "relative z-10 min-w-[76px] px-6 py-2 rounded-full text-sm font-medium transition-colors duration-300",
+                  mode === m ? "text-background" : "text-muted-foreground hover:text-foreground"
+                )}
+                aria-pressed={mode === m}
+              >
+                {m === "generate" ? "绘图" : "编辑"}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Canvas (No square box) */}
-        <div className="flex-1 flex flex-col items-center justify-center pb-32 relative z-10">
-          <div className="flex flex-col items-center justify-center gap-5">
-            <div className="flex flex-col items-center gap-1.5">
-              <span className="text-foreground/80 font-medium tracking-wide text-base">开始你的创作</span>
-              <span className="text-muted-foreground/60 text-sm">在下方输入描述，AI 将为你生成精美图片</span>
+        {/* Empty Canvas */}
+        <div className="flex-1 flex flex-col items-center justify-center pb-44 relative z-10">
+          <div className="flex flex-col items-center gap-3 select-none">
+            <div className="w-14 h-14 rounded-3xl bg-gradient-to-br from-violet-500/15 via-blue-500/10 to-transparent border border-border/50 flex items-center justify-center mb-1 shadow-inner">
+              <Sparkles className="w-6 h-6 text-muted-foreground/50" />
             </div>
+            <p className="text-base font-semibold text-foreground/70 tracking-wide">开始你的创作</p>
+            <p className="text-sm text-muted-foreground/50">在下方描述你想要的图像，AI 将为你实现</p>
           </div>
         </div>
 
-        {/* Input Area - Floating Bottom */}
-        <div className="absolute bottom-5 left-0 right-0 px-4 sm:bottom-8 sm:px-8 flex justify-center z-20 pointer-events-none">
-          <div className="pointer-events-auto w-full max-w-3xl overflow-hidden rounded-[26px] border border-white/80 bg-white/[0.88] shadow-[0_24px_80px_rgba(15,23,42,0.16),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl transition-all duration-300 focus-within:border-sky-300/80 focus-within:shadow-[0_28px_90px_rgba(14,165,233,0.20),inset_0_1px_0_rgba(255,255,255,0.95)] dark:border-border/80 dark:bg-background/[0.92] dark:focus-within:border-primary/50">
-            <div className="flex items-center justify-between gap-3 border-b border-slate-200/70 px-5 py-3 dark:border-border/50">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-[0_10px_24px_rgba(15,23,42,0.18)] dark:bg-foreground dark:text-background">
-                  <Wand2 className="h-4 w-4" />
+        {/* Floating Input */}
+        <div className="absolute bottom-6 left-0 right-0 px-6 sm:bottom-8 sm:px-10 flex justify-center z-20 pointer-events-none">
+          <div
+            className={cn(
+              "pointer-events-auto w-full max-w-2xl rounded-2xl transition-all duration-200",
+              "border bg-background/96 backdrop-blur-2xl",
+              focused
+                ? "border-border shadow-[0_24px_64px_-12px_rgba(0,0,0,0.16),0_0_0_1px_rgba(0,0,0,0.02)] dark:shadow-[0_24px_64px_-12px_rgba(0,0,0,0.5)]"
+                : "border-border/55 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.1)] dark:shadow-[0_8px_32px_-8px_rgba(0,0,0,0.4)]"
+            )}
+          >
+            {/* Meta row */}
+            <div className="flex items-center justify-between px-4 pt-3.5 pb-0">
+              <div className="flex items-center gap-2">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-foreground text-background">
+                  <Wand2 className="h-3 w-3" />
                 </div>
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-foreground">
-                    图像提示词
-                  </div>
-                  <div className="truncate text-xs text-muted-foreground">
-                    支持中文描述，文本内容用双引号包裹
-                  </div>
-                </div>
+                <span className="text-[13px] font-semibold text-foreground">图像提示词</span>
+                <span className="text-[11px] text-muted-foreground/50 hidden sm:inline">· 支持中文，文本用"双引号"包裹</span>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-11 w-11 shrink-0 rounded-2xl text-muted-foreground hover:bg-sky-50 hover:text-sky-700 dark:hover:bg-primary/10 dark:hover:text-primary"
-                aria-label="上传参考图"
+              <button
+                className="rounded-md p-1.5 text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50 transition-all duration-150"
                 title="上传参考图"
               >
-                <Upload className="h-[18px] w-[18px]" />
-              </Button>
+                <Upload className="h-3.5 w-3.5" />
+              </button>
             </div>
+
+            {/* Textarea */}
             <Textarea
-              className="min-h-[104px] w-full resize-none border-0 bg-transparent px-5 py-4 text-[15px] leading-relaxed text-foreground shadow-none outline-none placeholder:text-muted-foreground/60 focus-visible:ring-0 focus-visible:ring-offset-0"
-              placeholder='输入你的图片描述，文本绘制用 "双引号" 包裹'
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              className="min-h-[84px] w-full resize-none border-0 bg-transparent px-4 py-3 text-sm leading-relaxed text-foreground shadow-none placeholder:text-muted-foreground/35 focus-visible:ring-0 focus-visible:ring-offset-0"
+              placeholder='描述你想生成的图像...'
             />
-            <div className="flex flex-col gap-3 border-t border-slate-200/70 bg-slate-50/75 px-4 py-3 dark:border-border/50 dark:bg-muted/15 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-10 rounded-full border border-slate-200/80 bg-white/80 px-3 text-muted-foreground shadow-sm hover:bg-sky-50 hover:text-sky-700 dark:border-border/70 dark:bg-background/70 dark:hover:bg-primary/10 dark:hover:text-primary"
-                >
-                  <Languages className="mr-2 h-4 w-4" />
-                  翻译
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-10 rounded-full border border-slate-200/80 bg-white/80 px-3 text-muted-foreground shadow-sm hover:bg-rose-50 hover:text-rose-700 dark:border-border/70 dark:bg-background/70 dark:hover:bg-primary/10 dark:hover:text-primary"
-                >
-                  <Palette className="mr-2 h-4 w-4" />
-                  风格
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-10 rounded-full border border-slate-200/80 bg-white/80 px-3 text-muted-foreground shadow-sm hover:bg-amber-50 hover:text-amber-700 dark:border-border/70 dark:bg-background/70 dark:hover:bg-primary/10 dark:hover:text-primary"
-                >
-                  <Ratio className="mr-2 h-4 w-4" />
-                  比例
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-10 w-10 rounded-full border border-slate-200/80 bg-white/80 text-muted-foreground shadow-sm hover:bg-slate-100 hover:text-foreground dark:border-border/70 dark:bg-background/70"
-                  aria-label="高级参数"
+
+            {/* Toolbar */}
+            <div className="flex items-center justify-between px-2.5 pb-2.5 gap-2">
+              <div className="flex items-center">
+                {[
+                  { icon: Languages, label: "翻译" },
+                  { icon: Palette, label: "风格" },
+                  { icon: Ratio, label: "比例" },
+                ].map(({ icon: Icon, label }) => (
+                  <button
+                    key={label}
+                    className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs text-muted-foreground/70 hover:text-foreground hover:bg-muted/50 transition-all duration-150 font-medium"
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {label}
+                  </button>
+                ))}
+                <div className="mx-1 h-4 w-px bg-border/60" />
+                <button
+                  className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50 transition-all duration-150"
                   title="高级参数"
                 >
-                  <SlidersHorizontal className="h-4 w-4" />
-                </Button>
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                </button>
               </div>
-              <Button className="h-11 shrink-0 rounded-2xl bg-slate-950 px-5 font-semibold text-white shadow-[0_12px_28px_rgba(15,23,42,0.22)] transition-all hover:-translate-y-0.5 hover:bg-slate-900 hover:shadow-[0_16px_34px_rgba(15,23,42,0.26)] dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90">
-                <Sparkles className="mr-2 h-4 w-4" />
-                生成图片
-              </Button>
+
+              <button
+                disabled={!prompt.trim()}
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-full transition-all duration-150 shrink-0 select-none",
+                  prompt.trim()
+                    ? "bg-foreground text-background hover:opacity-85 active:scale-[0.96] shadow-sm"
+                    : "bg-muted/60 text-muted-foreground/40 cursor-not-allowed"
+                )}
+                aria-label="生成图片"
+                title="生成图片"
+              >
+                <ArrowUp className="h-4 w-4" />
+              </button>
             </div>
           </div>
         </div>
       </main>
 
       {/* Right Sidebar - History */}
-      <aside className="w-24 min-h-0 bg-card border-l border-border flex flex-col z-10 shrink-0">
-        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 items-center no-scrollbar">
-          {/* Empty slot */}
-          <button className="w-14 h-14 border-2 border-dashed border-border rounded-xl flex items-center justify-center text-muted-foreground hover:border-primary/50 hover:text-primary hover:bg-primary/5 transition-all">
-            <Plus className="w-5 h-5" />
+      <aside className="w-[72px] min-h-0 bg-card/50 border-l border-border/60 flex flex-col z-10 shrink-0 backdrop-blur-sm">
+        <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3 items-center no-scrollbar pt-4">
+          <button className="w-12 h-12 border-2 border-dashed border-border/60 rounded-2xl flex items-center justify-center text-muted-foreground/60 hover:border-primary/40 hover:text-primary/60 hover:bg-primary/5 transition-all duration-200 group">
+            <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" />
           </button>
-          {/* Active slot dummy */}
-          <div className="w-14 h-14 border-2 border-primary rounded-xl bg-muted shadow-sm relative cursor-pointer overflow-hidden group">
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors"></div>
+          <div className="w-12 h-12 border-2 border-primary/60 rounded-2xl bg-gradient-to-br from-violet-500/10 to-blue-500/10 shadow-sm relative cursor-pointer overflow-hidden group ring-2 ring-primary/10">
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-blue-500/5 group-hover:from-violet-500/10 group-hover:to-blue-500/10 transition-all" />
           </div>
-          {/* History slots */}
-          <div className="w-14 h-14 border border-border rounded-xl bg-muted cursor-pointer hover:border-primary/50 transition-colors overflow-hidden opacity-60 hover:opacity-100"></div>
-          <div className="w-14 h-14 border border-border rounded-xl bg-muted cursor-pointer hover:border-primary/50 transition-colors overflow-hidden opacity-60 hover:opacity-100"></div>
+          {[0.5, 0.3].map((opacity, i) => (
+            <div
+              key={i}
+              className="w-12 h-12 border border-border/50 rounded-2xl bg-muted/40 cursor-pointer hover:border-border hover:bg-muted/60 transition-all duration-200 overflow-hidden"
+              style={{ opacity }}
+            />
+          ))}
         </div>
       </aside>
     </div>

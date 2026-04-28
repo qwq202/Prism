@@ -857,49 +857,50 @@ export function OpenAIReasoningAction() {
               />
             </div>
 
-            {summaryEnabled && (
-              <div className={cn("space-y-2", !enabled && "opacity-50")}>
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{t("chat.openai-reasoning-summary-detail")}</span>
-                  <span>
-                    {t(`chat.openai-reasoning-summary-level-${currentSummary}`)}
-                  </span>
-                </div>
-
-                <div className="relative grid grid-cols-3 gap-1 overflow-hidden rounded-md border border-black/10 bg-white p-1 dark:border-white/15 dark:bg-black">
-                  <span
-                    className="absolute inset-y-1 left-1 rounded-sm bg-black transition-transform duration-300 ease-out dark:bg-white"
-                    style={{
-                      width: "calc((100% - 1rem) / 3)",
-                      transform:
-                        currentSummaryIndex === 0
-                          ? "translateX(0)"
-                          : `translateX(calc(${currentSummaryIndex * 100}% + ${
-                              currentSummaryIndex * 0.25
-                            }rem))`,
-                    }}
-                  />
-                  {openAIReasoningSummaryLevels.map((summary) => (
-                    <button
-                      key={summary}
-                      type="button"
-                      disabled={!enabled}
-                      onClick={() =>
-                        dispatch(setOpenAIReasoningSummary(summary))
-                      }
-                      className={cn(
-                        "relative z-10 h-8 rounded-sm text-xs font-medium transition-colors duration-200 disabled:cursor-not-allowed",
-                        currentSummary === summary
-                          ? "text-white dark:text-black"
-                          : "text-black/70 hover:text-black dark:text-white/70 dark:hover:text-white",
-                      )}
-                    >
-                      {t(`chat.openai-reasoning-summary-level-${summary}`)}
-                    </button>
-                  ))}
-                </div>
+            <div
+              className={cn(
+                "space-y-2",
+                (!enabled || !summaryEnabled) && "opacity-50",
+              )}
+            >
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{t("chat.openai-reasoning-summary-detail")}</span>
+                <span>
+                  {t(`chat.openai-reasoning-summary-level-${currentSummary}`)}
+                </span>
               </div>
-            )}
+
+              <div className="relative grid grid-cols-3 gap-1 overflow-hidden rounded-md border border-black/10 bg-white p-1 dark:border-white/15 dark:bg-black">
+                <span
+                  className="absolute inset-y-1 left-1 rounded-sm bg-black transition-transform duration-300 ease-out dark:bg-white"
+                  style={{
+                    width: "calc((100% - 1rem) / 3)",
+                    transform:
+                      currentSummaryIndex === 0
+                        ? "translateX(0)"
+                        : `translateX(calc(${currentSummaryIndex * 100}% + ${
+                            currentSummaryIndex * 0.25
+                          }rem))`,
+                  }}
+                />
+                {openAIReasoningSummaryLevels.map((summary) => (
+                  <button
+                    key={summary}
+                    type="button"
+                    disabled={!enabled || !summaryEnabled}
+                    onClick={() => dispatch(setOpenAIReasoningSummary(summary))}
+                    className={cn(
+                      "relative z-10 h-8 rounded-sm text-xs font-medium transition-colors duration-200 disabled:cursor-not-allowed",
+                      currentSummary === summary
+                        ? "text-white dark:text-black"
+                        : "text-black/70 hover:text-black dark:text-white/70 dark:hover:text-white",
+                    )}
+                  >
+                    {t(`chat.openai-reasoning-summary-level-${summary}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className="rounded-md bg-muted p-2 text-xs">

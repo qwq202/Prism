@@ -1,0 +1,81 @@
+- generic [ref=e2]:
+  - region "Notifications (F8)":
+    - list
+  - navigation [ref=e3]:
+    - generic [ref=e4]:
+      - button [ref=e6] [cursor=pointer]:
+        - img [ref=e7]
+      - button [ref=e10] [cursor=pointer]:
+        - img
+        - img
+        - img [ref=e11]
+      - button [ref=e14] [cursor=pointer]:
+        - img [ref=e15]
+      - button "登录" [ref=e19] [cursor=pointer]
+  - generic [ref=e20]:
+    - generic [ref=e21]:
+      - img [ref=e23] [cursor=pointer]
+      - button [ref=e27] [cursor=pointer]:
+        - img [ref=e28]
+      - button [ref=e32] [cursor=pointer]:
+        - img [ref=e33]
+      - button [ref=e37] [cursor=pointer]:
+        - img [ref=e38]
+      - button [ref=e43] [cursor=pointer]:
+        - img [ref=e44]
+      - button [ref=e49] [cursor=pointer]:
+        - img [ref=e50]
+    - generic [ref=e53]:
+      - generic [ref=e55]:
+        - generic [ref=e56]:
+          - generic [ref=e57]:
+            - button [ref=e60] [cursor=pointer]:
+              - img [ref=e61]
+            - button [ref=e65] [cursor=pointer]:
+              - img [ref=e66]
+            - button [ref=e71] [cursor=pointer]:
+              - img [ref=e72]
+          - generic [ref=e75]:
+            - img [ref=e76]
+            - textbox "搜索对话..." [ref=e79]
+        - generic [ref=e81]: 您当前处于匿名模式，对话将不会被保存。
+        - button "登录以享受更多功能" [ref=e83] [cursor=pointer]:
+          - img [ref=e84]
+          - text: 登录以享受更多功能
+      - generic:
+        - generic:
+          - generic [ref=e87]:
+            - generic [ref=e88]:
+              - img
+              - paragraph [ref=e91]: 公告通知
+              - generic [ref=e92] [cursor=pointer]:
+                - button [ref=e93]:
+                  - img [ref=e94]
+                - paragraph [ref=e96]: 了解更多
+            - generic [ref=e97] [cursor=pointer]:
+              - generic:
+                - paragraph: 暂无公告
+          - generic:
+            - generic [ref=e99]:
+              - combobox "模型" [ref=e101] [cursor=pointer]:
+                - img "Minimax" [ref=e104]
+              - generic [ref=e106]:
+                - button [disabled]:
+                  - img
+              - button [ref=e108] [cursor=pointer]:
+                - img [ref=e109]
+              - button [ref=e114] [cursor=pointer]:
+                - img [ref=e115]
+            - generic [ref=e117]:
+              - textbox "输入聊天内容..." [active] [ref=e118]
+              - generic:
+                - generic [ref=e119]:
+                  - generic [ref=e120]:
+                    - img [ref=e121]
+                    - text: Enter
+                  - generic [ref=e124]:
+                    - img [ref=e125]
+                    - text: Ctrl + Enter
+                - button "发送" [ref=e129] [cursor=pointer]:
+                  - img [ref=e132]
+                  - generic [ref=e135]: 发送

@@ -1,0 +1,108 @@
+- generic [ref=e2]:
+  - region "Notifications (F8)":
+    - list
+  - region "Notifications alt+T":
+    - list:
+      - status [ref=e160]:
+        - img [ref=e162]
+        - generic [ref=e164]:
+          - generic [ref=e165]: 登录成功
+          - generic [ref=e166]: 您已成功登录。
+  - navigation [ref=e3]:
+    - generic [ref=e4]:
+      - button [ref=e6] [cursor=pointer]:
+        - img [ref=e7]
+      - button [ref=e10] [cursor=pointer]:
+        - img
+        - img
+        - img [ref=e11]
+      - button [ref=e14] [cursor=pointer]:
+        - img [ref=e15]
+      - button "R" [ref=e168] [cursor=pointer]:
+        - paragraph [ref=e170]: R
+  - generic [ref=e20]:
+    - generic [ref=e21]:
+      - img [ref=e23] [cursor=pointer]
+      - button [ref=e27] [cursor=pointer]:
+        - img [ref=e28]
+      - button [ref=e32] [cursor=pointer]:
+        - img [ref=e33]
+      - button [ref=e37] [cursor=pointer]:
+        - img [ref=e38]
+      - button [ref=e43] [cursor=pointer]:
+        - img [ref=e44]
+      - button [ref=e49] [cursor=pointer]:
+        - img [ref=e50]
+      - button [ref=e173] [cursor=pointer]:
+        - img [ref=e174]
+    - generic [ref=e176]:
+      - generic [ref=e178]:
+        - generic [ref=e179]:
+          - generic [ref=e180]:
+            - button [ref=e183] [cursor=pointer]:
+              - img [ref=e184]
+            - button [ref=e188] [cursor=pointer]:
+              - img [ref=e189]
+            - button [ref=e194] [cursor=pointer]:
+              - img [ref=e195]
+          - generic [ref=e198]:
+            - img [ref=e199]
+            - textbox "搜索对话..." [ref=e202]
+        - generic [ref=e203]:
+          - generic [ref=e205] [cursor=pointer]:
+            - img [ref=e206]
+            - generic [ref=e208]: 你好
+            - button [ref=e209]:
+              - img [ref=e211]
+          - generic [ref=e216] [cursor=pointer]:
+            - img [ref=e217]
+            - generic [ref=e219]: 你是谁
+            - button [ref=e220]:
+              - img [ref=e222]
+          - generic [ref=e227] [cursor=pointer]:
+            - img [ref=e228]
+            - generic [ref=e230]: 我去
+            - button [ref=e231]:
+              - img [ref=e233]
+          - generic [ref=e238] [cursor=pointer]:
+            - img [ref=e239]
+            - generic [ref=e241]: hello
+            - button [ref=e242]:
+              - img [ref=e244]
+      - generic:
+        - generic:
+          - generic [ref=e248]:
+            - generic [ref=e249]:
+              - img
+              - paragraph [ref=e252]: 公告通知
+              - generic [ref=e253] [cursor=pointer]:
+                - button [ref=e254]:
+                  - img [ref=e255]
+                - paragraph [ref=e257]: 了解更多
+            - generic [ref=e258] [cursor=pointer]:
+              - generic:
+                - paragraph: 暂无公告
+          - generic:
+            - generic [ref=e260]:
+              - combobox "模型" [ref=e262] [cursor=pointer]:
+                - img "Minimax" [ref=e265]
+              - generic [ref=e267]:
+                - button [disabled]:
+                  - img
+              - button [ref=e269] [cursor=pointer]:
+                - img [ref=e270]
+              - button [ref=e275] [cursor=pointer]:
+                - img [ref=e276]
+            - generic [ref=e278]:
+              - textbox "输入聊天内容..." [ref=e279]
+              - generic:
+                - generic [ref=e280]:
+                  - generic [ref=e281]:
+                    - img [ref=e282]
+                    - text: Enter
+                  - generic [ref=e285]:
+                    - img [ref=e286]
+                    - text: Ctrl + Enter
+                - button "发送" [ref=e290] [cursor=pointer]:
+                  - img [ref=e293]
+                  - generic [ref=e296]: 发送

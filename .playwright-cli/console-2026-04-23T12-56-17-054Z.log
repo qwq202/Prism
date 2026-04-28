@@ -1,0 +1,124 @@
+[     636ms] [INFO] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold @ http://localhost:5173/node_modules/.vite/deps/chunk-RIZJ2OQM.js?v=5ce4b958:21535
+[    1068ms] [ERROR] Warning: Each child in a list should have a unique "key" prop. See https://reactjs.org/link/warning-keys for more information.%s 
+    at GroupSelectItemBadge (http://localhost:5173/src/components/SelectGroup.tsx:53:32)
+    at div
+    at GroupSelectItem (http://localhost:5173/src/components/SelectGroup.tsx:72:19)
+    at span
+    at http://localhost:5173/node_modules/.vite/deps/chunk-TDVUL66H.js?v=5ce4b958:40:13
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=5ce4b958:948:11
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-TDVUL66H.js?v=5ce4b958:40:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-NJI75ECK.js?v=5ce4b958:56:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-NJI75ECK.js?v=5ce4b958:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-WKCNE7B5.js?v=5ce4b958:54:13
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-KIXQCSXF.js?v=5ce4b958:46:15)
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=5ce4b958:860:11
+    at _c10 (http://localhost:5173/src/components/ui/select.tsx:154:61)
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-TDVUL66H.js?v=5ce4b958:40:13
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-KIXQCSXF.js?v=5ce4b958:46:15)
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=5ce4b958:829:11
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-TDVUL66H.js?v=5ce4b958:40:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-NJI75ECK.js?v=5ce4b958:56:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-NJI75ECK.js?v=5ce4b958:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-WKCNE7B5.js?v=5ce4b958:41:13
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=5ce4b958:772:11
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-NJI75ECK.js?v=5ce4b958:56:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-NJI75ECK.js?v=5ce4b958:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-WKCNE7B5.js?v=5ce4b958:41:13
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-KIXQCSXF.js?v=5ce4b958:46:15)
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=5ce4b958:289:100
+    at http://localhost:5173/node_modules/.vite/deps/chunk-NJI75ECK.js?v=5ce4b958:56:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-NJI75ECK.js?v=5ce4b958:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-TDVUL66H.js?v=5ce4b958:40:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-PIFOYQGB.js?v=5ce4b958:288:11
+    at SelectPortal
+    at _c6 (http://localhost:5173/src/components/ui/select.tsx:92:63)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-KIXQCSXF.js?v=5ce4b958:46:15)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-KIXQCSXF.js?v=5ce4b958:46:15)
+    at CollectionProvider (http://localhost:5173/node_modules/.vite/deps/chunk-WKCNE7B5.js?v=5ce4b958:27:13)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-KIXQCSXF.js?v=5ce4b958:46:15)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-KIXQCSXF.js?v=5ce4b958:46:15)
+    at $cf1ac5d9fe0e8206$export$badac9ada3a0bdf9 (http://localhost:5173/node_modules/.vite/deps/chunk-TMIPMPPD.js?v=5ce4b958:319:11)
+    at $cc7e05a45900e73f$export$ef9b1a59e592288f (http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=5ce4b958:97:11)
+    at ModelArea (http://localhost:5173/src/components/home/ModelArea.tsx?t=1776948693918:267:19)
+    at div
+    at MotionComponent (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=5ce4b958:444:40)
+    at PresenceChild (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=5ce4b958:7646:24)
+    at AnimatePresence (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=5ce4b958:7703:26)
+    at div
+    at MotionComponent (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=5ce4b958:444:40)
+    at div
+    at div
+    at div
+    at ChatWrapper (http://localhost:5173/src/components/home/ChatWrapper.tsx?t=1776948693918:72:19)
+    at div
+    at Home
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=5ce4b958:3405:5)
+    at Outlet (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=5ce4b958:3728:26)
+    at div
+    at ErrorBoundary (http://localhost:5173/src/components/ErrorBoundary.tsx?t=1776948693918:157:9)
+    at I18nextWithTranslation (http://localhost:5173/node_modules/.vite/deps/react-i18next.js?v=5ce4b958:753:9)
+    at Home
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=5ce4b958:3405:5)
+    at RenderErrorBoundary (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=5ce4b958:3365:5)
+    at DataRoutes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=5ce4b958:4376:5)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=5ce4b958:3735:15)
+    at RouterProvider (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=5ce4b958:4249:5)
+    at AppRouter
+    at ThemeProvider (http://localhost:5173/src/components/ThemeProvider.tsx:48:33)
+    at AppProvider (http://localhost:5173/src/components/app/AppProvider.tsx?t=1776948717169:22:24)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/react-redux.js?v=5ce4b958:1084:3)
+    at App @ http://localhost:5173/node_modules/.vite/deps/chunk-RIZJ2OQM.js?v=5ce4b958:520
+[   23794ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ http://localhost:5173/login:0
+[   46780ms] [LOG] [auth] user info: {admin: true, status: true, user: root} @ http://localhost:5173/src/store/auth.ts:70
+[   46792ms] [LOG] [cron] register quota and plan fetching tasks: 13, 14 @ http://localhost:5173/src/components/app/NavBar.tsx?t=1776948693918:85
+[   46836ms] [LOG] [redux] receive task `refreshQuota` event:  949.572 @ http://localhost:5173/src/store/quota.ts:14
+[   46837ms] [LOG] [redux] receive task `refreshSubscription` event:  {enterprise: false, expired: -20567, expired_at: 1970-01-01 08:00:00, is_subscribed: false, level: 0} @ http://localhost:5173/src/store/subscription.ts:17
+[   60743ms] [ERROR] Warning: React does not recognize the `%s` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `%s` instead. If you accidentally passed it from a parent component, remove it from the DOM element.%s acceptNaN acceptnan 
+    at input
+    at http://localhost:5173/src/components/ui/input.tsx:15:60
+    at http://localhost:5173/src/components/ui/number-input.tsx:16:66
+    at div
+    at div
+    at div
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-NJI75ECK.js?v=5ce4b958:56:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-NJI75ECK.js?v=5ce4b958:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-TDVUL66H.js?v=5ce4b958:40:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-4LMC2KS4.js?v=5ce4b958:284:11
+    at _c8 (http://localhost:5173/src/components/ui/dialog.tsx:145:67)
+    at div
+    at DialogHeader (http://localhost:5173/src/components/ui/dialog.tsx:114:25)
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-TDVUL66H.js?v=5ce4b958:40:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-PIFOYQGB.js?v=5ce4b958:58:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-NJI75ECK.js?v=5ce4b958:56:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-NJI75ECK.js?v=5ce4b958:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-TDVUL66H.js?v=5ce4b958:40:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-JFPDKAQB.js?v=5ce4b958:44:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-4LMC2KS4.js?v=5ce4b958:247:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-4LMC2KS4.js?v=5ce4b958:179:100
+    at $921a889cee6df7e8$export$99c2b779aa4e8b8b (http://localhost:5173/node_modules/.vite/deps/chunk-E4MRQMEB.js?v=5ce4b958:27:11)
+    at http://localhost:5173/node_modules/.vite/deps/chunk-4LMC2KS4.js?v=5ce4b958:164:106
+    at http://localhost:5173/node_modules/.vite/deps/chunk-NJI75ECK.js?v=5ce4b958:56:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-NJI75ECK.js?v=5ce4b958:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-TDVUL66H.js?v=5ce4b958:40:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-PIFOYQGB.js?v=5ce4b958:288:11
+    at $921a889cee6df7e8$export$99c2b779aa4e8b8b (http://localhost:5173/node_modules/.vite/deps/chunk-E4MRQMEB.js?v=5ce4b958:27:11)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-KIXQCSXF.js?v=5ce4b958:46:15)
+    at $5d3850c4d0b4e6c7$export$dad7c95542bacce0 (http://localhost:5173/node_modules/.vite/deps/chunk-4LMC2KS4.js?v=5ce4b958:107:11)
+    at DialogPortal (http://localhost:5173/src/components/ui/dialog.tsx:18:28)
+    at http://localhost:5173/src/components/ui/dialog.tsx:38:69
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-KIXQCSXF.js?v=5ce4b958:46:15)
+    at $5d3850c4d0b4e6c7$export$3ddf2d174ce01153 (http://localhost:5173/node_modules/.vite/deps/chunk-4LMC2KS4.js?v=5ce4b958:52:11)
+    at SettingsDialog (http://localhost:5173/src/dialogs/SettingsDialog.tsx?t=1776948717169:35:25)
+    at DialogManager
+    at ThemeProvider (http://localhost:5173/src/components/ThemeProvider.tsx:48:33)
+    at AppProvider (http://localhost:5173/src/components/app/AppProvider.tsx?t=1776948717169:22:24)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/react-redux.js?v=5ce4b958:1084:3)
+    at App @ http://localhost:5173/node_modules/.vite/deps/chunk-RIZJ2OQM.js?v=5ce4b958:520
+[   76810ms] [LOG] [redux] receive task `refreshSubscription` event:  {enterprise: false, expired: -20567, expired_at: 1970-01-01 08:00:00, is_subscribed: false, level: 0} @ http://localhost:5173/src/store/subscription.ts:17
+[   76813ms] [LOG] [redux] receive task `refreshQuota` event:  949.572 @ http://localhost:5173/src/store/quota.ts:14
