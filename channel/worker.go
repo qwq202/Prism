@@ -3,6 +3,7 @@ package channel
 import (
 	"chat/adapter"
 	adaptercommon "chat/adapter/common"
+	"chat/connection"
 	"chat/globals"
 	"chat/utils"
 	"fmt"
@@ -10,6 +11,18 @@ import (
 
 	"github.com/go-redis/redis/v8"
 )
+
+func channelStatKey(prefix string, channelId int) string {
+	return fmt.Sprintf("nio:%s-%d-%s", prefix, channelId, time.Now().Format("2006-01-02"))
+}
+
+func incrChannelRequest(channelId int) {
+	utils.IncrOnce(connection.Cache, channelStatKey("channel-req", channelId), time.Hour*24*7)
+}
+
+func incrChannelError(channelId int) {
+	utils.IncrOnce(connection.Cache, channelStatKey("channel-err", channelId), time.Hour*24*7)
+}
 
 func cacheModelForChatProps(props *adaptercommon.ChatProps) string {
 	if props == nil {
@@ -108,9 +121,11 @@ func NewChatRequest(group string, props *adaptercommon.ChatProps, hook globals.H
 			}
 			props.MaxRetries = utils.ToPtr(channel.GetRetry())
 			if err = adapter.NewChatRequest(channel, props, hook); adapter.IsSkipError(err) {
+				incrChannelRequest(channel.GetId())
 				return err
 			}
 
+			incrChannelError(channel.GetId())
 			globals.Warn(fmt.Sprintf("[channel] caught error %s for model %s at channel %s", err.Error(), props.OriginalModel, channel.GetName()))
 		}
 	}

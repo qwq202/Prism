@@ -8,6 +8,10 @@ export type Broadcast = {
 
 export type BroadcastInfo = Broadcast & {
   poster: string;
+  type: "broadcast" | "popup" | "banner";
+  start_at: string;
+  end_at: string;
+  is_active: boolean;
   created_at: string;
 };
 
@@ -74,14 +78,25 @@ export async function getBroadcastList(): Promise<BroadcastInfo[]> {
   }
 }
 
+export type CreateBroadcastParams = {
+  content: string;
+  notify_all?: boolean;
+  type?: "broadcast" | "popup" | "banner";
+  start_at?: string;
+  end_at?: string;
+  is_active?: boolean;
+};
+
 export async function createBroadcast(
   content: string,
   notify_all?: boolean,
+  extra?: Omit<CreateBroadcastParams, "content" | "notify_all">,
 ): Promise<CommonBroadcastResponse> {
   try {
     const resp = await axios.post("/broadcast/create", {
       content,
       notify_all,
+      ...extra,
     });
     return resp.data as CommonBroadcastResponse;
   } catch (e) {
@@ -108,12 +123,22 @@ export async function removeBroadcast(
   }
 }
 
+export type UpdateBroadcastParams = {
+  id: number;
+  content: string;
+  type?: "broadcast" | "popup" | "banner";
+  start_at?: string;
+  end_at?: string;
+  is_active?: boolean;
+};
+
 export async function updateBroadcast(
   id: number,
   content: string,
+  extra?: Omit<UpdateBroadcastParams, "id" | "content">,
 ): Promise<CommonBroadcastResponse> {
   try {
-    const resp = await axios.post("/broadcast/update", { id, content });
+    const resp = await axios.post("/broadcast/update", { id, content, ...extra });
     return resp.data as CommonBroadcastResponse;
   } catch (e) {
     console.warn(e);

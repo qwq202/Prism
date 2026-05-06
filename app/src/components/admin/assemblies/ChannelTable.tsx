@@ -37,6 +37,8 @@ import {
   deactivateChannel,
   deleteChannel,
   listChannel,
+  getChannelStats,
+  type ChannelStat,
 } from "@/admin/api/channel.ts";
 import { cn } from "@/components/ui/lib/utils.ts";
 import { getApiModels } from "@/api/v1.ts";
@@ -89,6 +91,108 @@ export function TypeBadge({ type, className, variant }: TypeBadgeProps) {
   );
 }
 
+// ── Health badge ──────────────────────────────────────────────────────────────
+function HealthBadge({ stat }: { stat: ChannelStat | undefined }) {
+  if (!stat || (stat.requests === 0 && stat.errors === 0)) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground/50 select-none">
+        <Circle className="h-2 w-2 fill-current" />
+        <span>—</span>
+      </span>
+    );
+  }
+
+  const rate = stat.error_rate;
+  const total = stat.requests + stat.errors;
+
+  let color: string;
+  let label: string;
+  if (rate === 0) {
+    color = "text-green-500";
+    label = "正常";
+  } else if (rate < 0.1) {
+    color = "text-yellow-500";
+    label = `${(rate * 100).toFixed(0)}% 错误`;
+  } else {
+    color = "text-red-500";
+    label = `${(rate * 100).toFixed(0)}% 错误`;
+  }
+
+  return (
+    <span
+      className={cn("inline-flex items-center gap-1 text-xs select-none whitespace-nowrap", color)}
+      title={`今日 ${total} 次请求，${stat.errors} 次错误`}
+    >
+      <Circle className="h-2 w-2 fill-current shrink-0" />
+      <span>{label}</span>
+      <span className="text-muted-foreground/60">({total})</span>
+    </span>
+  );
+}
+
+// ── Summary bar ───────────────────────────────────────────────────────────────
+function HealthSummaryBar({
+  channels,
+  statsMap,
+  loading,
+}: {
+  channels: Channel[];
+  statsMap: Map<number, ChannelStat>;
+  loading: boolean;
+}) {
+  const active = channels.filter((c) => c.state);
+  const withData = active.filter(
+    (c) => statsMap.has(c.id) && (statsMap.get(c.id)!.requests + statsMap.get(c.id)!.errors) > 0,
+  );
+  const healthy = withData.filter((c) => (statsMap.get(c.id)?.error_rate ?? 0) === 0);
+  const warn = withData.filter((c) => {
+    const r = statsMap.get(c.id)?.error_rate ?? 0;
+    return r > 0 && r < 0.1;
+  });
+  const critical = withData.filter((c) => (statsMap.get(c.id)?.error_rate ?? 0) >= 0.1);
+  const idle = active.filter((c) => !statsMap.has(c.id) || (statsMap.get(c.id)!.requests + statsMap.get(c.id)!.errors) === 0);
+
+  if (active.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 py-2 text-xs text-muted-foreground select-none">
+      {loading ? (
+        <span className="animate-pulse">加载健康数据…</span>
+      ) : (
+        <>
+          <span className="font-medium text-foreground/70">今日健康状态</span>
+          {healthy.length > 0 && (
+            <span className="flex items-center gap-1 text-green-500">
+              <Circle className="h-2 w-2 fill-current" />
+              正常 {healthy.length}
+            </span>
+          )}
+          {warn.length > 0 && (
+            <span className="flex items-center gap-1 text-yellow-500">
+              <Circle className="h-2 w-2 fill-current" />
+              告警 {warn.length}
+            </span>
+          )}
+          {critical.length > 0 && (
+            <span className="flex items-center gap-1 text-red-500">
+              <Circle className="h-2 w-2 fill-current" />
+              异常 {critical.length}
+            </span>
+          )}
+          {idle.length > 0 && (
+            <span className="flex items-center gap-1 opacity-50">
+              <Circle className="h-2 w-2 fill-current" />
+              无流量 {idle.length}
+            </span>
+          )}
+          <span className="ml-auto opacity-50">共 {active.length} 个启用渠道</span>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Sync dialog ───────────────────────────────────────────────────────────────
 type SyncDialogProps = {
   dispatch: ChannelDispatch;
   open: boolean;
@@ -180,6 +284,7 @@ function SyncDialog({ dispatch, open, setOpen }: SyncDialogProps) {
   );
 }
 
+// ── Main table component ──────────────────────────────────────────────────────
 function ChannelTable({
   display,
   dispatch,
@@ -192,16 +297,34 @@ function ChannelTable({
   const [search, setSearch] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [open, setOpen] = useState<boolean>(false);
-
   const [blockDisplayType, setBlockDisplayType] = useState<boolean>(false);
+
+  // ── Health state ──
+  const [statsMap, setStatsMap] = useState<Map<number, ChannelStat>>(new Map());
+  const [statsLoading, setStatsLoading] = useState<boolean>(false);
+
+  const loadStats = async (channels: Channel[]) => {
+    if (channels.length === 0) return;
+    setStatsLoading(true);
+    const ids = channels.map((c) => c.id);
+    const resp = await getChannelStats(ids);
+    const m = new Map<number, ChannelStat>();
+    for (const s of resp.stats) m.set(s.channel_id, s);
+    setStatsMap(m);
+    setStatsLoading(false);
+  };
 
   const refresh = async () => {
     setLoading(true);
     const resp = await listChannel();
     setLoading(false);
     if (!resp.status) withNotify(t, resp);
-    else setData(resp.data);
+    else {
+      setData(resp.data);
+      await loadStats(resp.data);
+    }
   };
+
   useEffectAsync(refresh, []);
   useEffectAsync(refresh, [display]);
 
@@ -218,6 +341,7 @@ function ChannelTable({
       weight: true,
       ["secret-number"]: true,
       ["retry-name"]: true,
+      health: true,
       state: true,
       action: true,
     },
@@ -303,8 +427,16 @@ function ChannelTable({
             <RotateCw className={cn(`h-4 w-4`, loading && `animate-spin`)} />
           </Button>
         </div>
+
+        {/* Health summary bar */}
+        <HealthSummaryBar
+          channels={data || []}
+          statsMap={statsMap}
+          loading={statsLoading}
+        />
+
         {!blockDisplayType ? (
-          <Table className={`channel-table mt-4`}>
+          <Table className={`channel-table mt-2`}>
             <TableHeader>
               <TableRow className={`select-none whitespace-nowrap`}>
                 <TableCell className={merge("id")}>
@@ -328,6 +460,7 @@ function ChannelTable({
                 <TableCell className={merge("retry-name")}>
                   {t("admin.channels.retry-name")}
                 </TableCell>
+                <TableCell className={merge("health")}>今日状态</TableCell>
                 <TableCell className={merge("state")}>
                   {t("admin.channels.state")}
                 </TableCell>
@@ -357,6 +490,9 @@ function ChannelTable({
                   </TableCell>
                   <TableCell className={merge("retry-name")}>
                     {chan.retry}
+                  </TableCell>
+                  <TableCell className={merge("health")}>
+                    <HealthBadge stat={statsMap.get(chan.id)} />
                   </TableCell>
                   <TableCell className={merge("state")}>
                     {chan.state ? (
@@ -472,6 +608,10 @@ function ChannelTable({
                     </Label>
                     <span className={`font-bold`}>{chan.retry}</span>
                   </div>
+                </div>
+                {/* Health row in card view */}
+                <div className="mt-2 pt-2 border-t">
+                  <HealthBadge stat={statsMap.get(chan.id)} />
                 </div>
                 <div className={`flex flex-row items-center space-x-1 mt-2`}>
                   <OperationAction

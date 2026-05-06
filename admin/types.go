@@ -73,6 +73,26 @@ type RedeemGenerateResponse struct {
 	Data    []string `json:"data"`
 }
 
+type RedeemBatchData struct {
+	Id        string  `json:"id"`
+	Quota     float32 `json:"quota"`
+	Count     int     `json:"count"`
+	UsedCount int     `json:"used_count"`
+	CreatedAt string  `json:"created_at"`
+}
+
+type RedeemBatchResponse struct {
+	Status  bool              `json:"status"`
+	Message string            `json:"message"`
+	Data    []RedeemBatchData `json:"data"`
+}
+
+type RedeemBatchCodesResponse struct {
+	Status  bool         `json:"status"`
+	Message string       `json:"message"`
+	Data    []RedeemData `json:"data"`
+}
+
 type UserData struct {
 	Id           int64   `json:"id"`
 	Username     string  `json:"username"`

@@ -138,6 +138,88 @@ func GetErrorData(cache *redis.Client) ErrorChartForm {
 	}
 }
 
+func GetChannelStats(cache *redis.Client, channelIds []int) ChannelStatsResponse {
+	today := getDay()
+	stats := make([]ChannelStats, 0, len(channelIds))
+
+	for _, id := range channelIds {
+		req := utils.MustInt(cache, getChannelRequestFormat(today, id))
+		errCount := utils.MustInt(cache, getChannelErrorFormat(today, id))
+		total := req + errCount
+
+		var errorRate float64
+		if total > 0 {
+			errorRate = float64(errCount) / float64(total)
+		}
+
+		stats = append(stats, ChannelStats{
+			ChannelId: id,
+			Requests:  req,
+			Errors:    errCount,
+			ErrorRate: errorRate,
+		})
+	}
+
+	return ChannelStatsResponse{Stats: stats}
+}
+
+func GetActiveUserData(cache *redis.Client) ActiveUserChartForm {
+	dates := getDays(14)
+
+	return ActiveUserChartForm{
+		Date: getDates(dates),
+		Value: utils.Each[time.Time, int64](dates, func(date time.Time) int64 {
+			key := getActiveUserFormat(getFormat(date))
+			count, err := cache.SCard(cache.Context(), key).Result()
+			if err != nil {
+				return 0
+			}
+			return count
+		}),
+	}
+}
+
+func GetRegistrationData(db *sql.DB) RegistrationChartForm {
+	dates := getDays(14)
+	dateStrings := getDates(dates)
+
+	counts := make(map[string]int64)
+	rows, err := globals.QueryDb(db, `
+		SELECT DATE(created_at) as d, COUNT(*) as c
+		FROM auth
+		WHERE created_at >= ?
+		GROUP BY DATE(created_at)
+	`, dates[0].Format("2006-01-02"))
+	if err == nil {
+		for rows.Next() {
+			var d string
+			var c int64
+			if rows.Scan(&d, &c) == nil {
+				counts[d] = c
+			}
+		}
+	}
+
+	values := utils.Each[time.Time, int64](dates, func(date time.Time) int64 {
+		return counts[getFormat(date)]
+	})
+
+	return RegistrationChartForm{
+		Date:  dateStrings,
+		Value: values,
+	}
+}
+
+func GetConversionFunnel(db *sql.DB) ConversionFunnelForm {
+	var form ConversionFunnelForm
+
+	_ = globals.QueryRowDb(db, `SELECT COUNT(*) FROM auth`).Scan(&form.Registered)
+	_ = globals.QueryRowDb(db, `SELECT COUNT(DISTINCT user_id) FROM subscription WHERE total_month > 0`).Scan(&form.EverSubscribed)
+	_ = globals.QueryRowDb(db, `SELECT COUNT(*) FROM subscription WHERE expired_at > NOW()`).Scan(&form.ActiveSubscribed)
+
+	return form
+}
+
 func GetUserTypeData(db *sql.DB) (UserTypeForm, error) {
 	var form UserTypeForm
 

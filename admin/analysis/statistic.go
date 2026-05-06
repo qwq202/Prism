@@ -13,6 +13,12 @@ func IncrErrorRequest(cache *redis.Client) {
 	utils.IncrOnce(cache, getErrorFormat(getDay()), time.Hour*24*7*2)
 }
 
+func IncrActiveUser(cache *redis.Client, user string) {
+	key := getActiveUserFormat(getDay())
+	cache.SAdd(cache.Context(), key, user)
+	cache.Expire(cache.Context(), key, time.Hour*24*14)
+}
+
 func IncrBillingRequest(cache *redis.Client, amount int64, isAdmin bool) {
 	if isAdmin {
 		// do not count billing for admin user
@@ -51,6 +57,10 @@ func AnalyseRequest(model string, user string, buffer *utils.Buffer, err error) 
 		// add rpm/tpm to root
 		IncrRpm(instance, "root", 1)
 		IncrTpm(instance, "root", token)
+
+		if user != "" {
+			IncrActiveUser(instance, user)
+		}
 	}
 }
 

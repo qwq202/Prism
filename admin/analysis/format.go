@@ -62,3 +62,15 @@ func getTpmFormat(t string, user string) string {
 func getRpmFormat(t string, user string) string {
 	return fmt.Sprintf("nio:rpm-analysis-%s-%s", user, t)
 }
+
+func getChannelRequestFormat(t string, channelId int) string {
+	return fmt.Sprintf("nio:channel-req-%d-%s", channelId, t)
+}
+
+func getChannelErrorFormat(t string, channelId int) string {
+	return fmt.Sprintf("nio:channel-err-%d-%s", channelId, t)
+}
+
+func getActiveUserFormat(t string) string {
+	return fmt.Sprintf("nio:active-users-%s", t)
+}

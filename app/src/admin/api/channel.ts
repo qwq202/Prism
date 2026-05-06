@@ -76,3 +76,28 @@ export async function deactivateChannel(id: number): Promise<CommonResponse> {
     return { status: false, error: getErrorMessage(e) };
   }
 }
+
+export type ChannelStat = {
+  channel_id: number;
+  requests: number;
+  errors: number;
+  error_rate: number;
+};
+
+export type ChannelStatsResponse = {
+  stats: ChannelStat[];
+};
+
+export async function getChannelStats(
+  channelIds?: number[],
+): Promise<ChannelStatsResponse> {
+  try {
+    const response = await axios.post("/admin/analytics/channel", {
+      channel_ids: channelIds ?? [],
+    });
+    return response.data as ChannelStatsResponse;
+  } catch (e) {
+    console.warn(e);
+    return { stats: [] };
+  }
+}

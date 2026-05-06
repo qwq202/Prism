@@ -9,6 +9,14 @@ import (
 	"strings"
 )
 
+type redeemExecer interface {
+	Exec(query string, args ...interface{}) (sql.Result, error)
+}
+
+func execRedeemSql(execer redeemExecer, query string, args ...interface{}) (sql.Result, error) {
+	return execer.Exec(globals.PreflightSql(query), args...)
+}
+
 func GetRedeemData(db *sql.DB, page int64) PaginationForm {
 	var data []interface{}
 	var total int64
@@ -66,10 +74,30 @@ func DeleteRedeemCode(db *sql.DB, code string) error {
 }
 
 func GenerateRedeemCodes(db *sql.DB, num int, quota float32) RedeemGenerateResponse {
+	batchId := utils.GenerateChar(16)
+
+	tx, err := db.Begin()
+	if err != nil {
+		return RedeemGenerateResponse{Status: false, Message: err.Error()}
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	_, err = execRedeemSql(tx, `
+		INSERT INTO redeem_batch (id, quota, count) VALUES (?, ?, ?)
+	`, batchId, quota, num)
+	if err != nil {
+		return RedeemGenerateResponse{Status: false, Message: err.Error()}
+	}
+
 	arr := make([]string, 0)
 	idx := 0
 	for idx < num {
-		code, err := CreateRedeemCode(db, quota)
+		code, err := createRedeemCode(tx, quota, batchId)
 
 		if err != nil {
 			return RedeemGenerateResponse{
@@ -81,22 +109,94 @@ func GenerateRedeemCodes(db *sql.DB, num int, quota float32) RedeemGenerateRespo
 		idx++
 	}
 
+	if err := tx.Commit(); err != nil {
+		return RedeemGenerateResponse{Status: false, Message: err.Error()}
+	}
+	committed = true
+
 	return RedeemGenerateResponse{
 		Status: true,
 		Data:   arr,
 	}
 }
 
-func CreateRedeemCode(db *sql.DB, quota float32) (string, error) {
+func createRedeemCode(execer redeemExecer, quota float32, batchId string) (string, error) {
 	code := fmt.Sprintf("nio-%s", utils.GenerateChar(32))
-	_, err := globals.ExecDb(db, `
-		INSERT INTO redeem (code, quota) VALUES (?, ?)
-	`, code, quota)
+	_, err := execRedeemSql(execer, `
+		INSERT INTO redeem (code, quota, batch_id) VALUES (?, ?, ?)
+	`, code, quota, batchId)
 
-	if err != nil && strings.Contains(err.Error(), "Duplicate entry") {
-		// code name is duplicate
-		return CreateRedeemCode(db, quota)
+	if err != nil && isDuplicateRedeemCodeError(err) {
+		return createRedeemCode(execer, quota, batchId)
 	}
 
 	return code, err
+}
+
+func isDuplicateRedeemCodeError(err error) bool {
+	content := err.Error()
+	return strings.Contains(content, "Duplicate entry") ||
+		strings.Contains(strings.ToLower(content), "unique constraint failed")
+}
+
+func GetRedeemBatches(db *sql.DB) RedeemBatchResponse {
+	rows, err := globals.QueryDb(db, `
+		SELECT rb.id, rb.quota, rb.count, rb.created_at,
+		       COALESCE(SUM(CASE WHEN r.used = TRUE THEN 1 ELSE 0 END), 0) as used_count
+		FROM redeem_batch rb
+		LEFT JOIN redeem r ON r.batch_id = rb.id
+		GROUP BY rb.id, rb.quota, rb.count, rb.created_at
+		ORDER BY rb.created_at DESC
+	`)
+	if err != nil {
+		return RedeemBatchResponse{Status: false, Message: err.Error()}
+	}
+
+	var batches []RedeemBatchData
+	for rows.Next() {
+		var b RedeemBatchData
+		var createdAt []uint8
+		if err := rows.Scan(&b.Id, &b.Quota, &b.Count, &createdAt, &b.UsedCount); err != nil {
+			return RedeemBatchResponse{Status: false, Message: err.Error()}
+		}
+		b.CreatedAt = utils.ConvertTime(createdAt).Format("2006-01-02 15:04:05")
+		batches = append(batches, b)
+	}
+
+	if batches == nil {
+		batches = []RedeemBatchData{}
+	}
+
+	return RedeemBatchResponse{Status: true, Data: batches}
+}
+
+func GetBatchCodes(db *sql.DB, batchId string) RedeemBatchCodesResponse {
+	rows, err := globals.QueryDb(db, `
+		SELECT code, quota, used, created_at, updated_at
+		FROM redeem
+		WHERE batch_id = ?
+		ORDER BY id ASC
+	`, batchId)
+	if err != nil {
+		return RedeemBatchCodesResponse{Status: false, Message: err.Error()}
+	}
+
+	var codes []RedeemData
+	for rows.Next() {
+		var r RedeemData
+		var createdAt []uint8
+		var updatedAt []uint8
+		if err := rows.Scan(&r.Code, &r.Quota, &r.Used, &createdAt, &updatedAt); err != nil {
+			return RedeemBatchCodesResponse{Status: false, Message: err.Error()}
+		}
+		r.CreatedAt = utils.ConvertTime(createdAt).Format("2006-01-02 15:04:05")
+		r.UpdatedAt = utils.ConvertTime(updatedAt).Format("2006-01-02 15:04:05")
+		codes = append(codes, r)
+	}
+
+	if codes == nil {
+		codes = []RedeemData{}
+	}
+
+	return RedeemBatchCodesResponse{Status: true, Data: codes}
 }

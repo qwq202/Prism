@@ -19,6 +19,10 @@ func Register(app *gin.RouterGroup) {
 	app.GET("/admin/analytics/billing", BillingAnalysisAPI)
 	app.GET("/admin/analytics/error", ErrorAnalysisAPI)
 	app.GET("/admin/analytics/user", UserTypeAnalysisAPI)
+	app.POST("/admin/analytics/channel", ChannelAnalysisAPI)
+	app.GET("/admin/analytics/active-users", ActiveUserAnalysisAPI)
+	app.GET("/admin/analytics/registrations", RegistrationAnalysisAPI)
+	app.GET("/admin/analytics/funnel", ConversionFunnelAPI)
 
 	app.GET("/admin/invitation/list", InvitationPaginationAPI)
 	app.POST("/admin/invitation/generate", GenerateInvitationAPI)
@@ -27,6 +31,8 @@ func Register(app *gin.RouterGroup) {
 	app.GET("/admin/redeem/list", RedeemListAPI)
 	app.POST("/admin/redeem/generate", GenerateRedeemAPI)
 	app.POST("/admin/redeem/delete", DeleteRedeemAPI)
+	app.GET("/admin/redeem/batch/list", RedeemBatchListAPI)
+	app.GET("/admin/redeem/batch/:id", RedeemBatchCodesAPI)
 
 	app.GET("/admin/user/list", UserPaginationAPI)
 	app.POST("/admin/user/quota", UserQuotaAPI)
@@ -38,6 +44,7 @@ func Register(app *gin.RouterGroup) {
 	app.POST("/admin/user/ban", BanAPI)
 	app.POST("/admin/user/admin", SetAdminAPI)
 	app.POST("/admin/user/root", UpdateRootPasswordAPI)
+	app.POST("/admin/user/batch", BatchUserAPI)
 
 	app.POST("/admin/market/update", UpdateMarketAPI)
 

@@ -62,6 +62,24 @@ import { DialogClose } from "@radix-ui/react-dialog";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select.tsx";
+import { Switch } from "@/components/ui/switch.tsx";
+
+type BroadcastType = "broadcast" | "popup" | "banner";
+
+const TYPE_COLORS: Record<BroadcastType, string> = {
+  broadcast: "secondary",
+  popup: "default",
+  banner: "gold",
+};
 
 type CreateBroadcastDialogProps = {
   onCreated?: () => void;
@@ -72,19 +90,30 @@ function CreateBroadcastDialog(props: CreateBroadcastDialogProps) {
   const [open, setOpen] = useState<boolean>(false);
   const [content, setContent] = useState<string>("");
   const [notifyAll, setNotifyAll] = useState<boolean>(false);
+  const [type, setType] = useState<BroadcastType>("broadcast");
+  const [startAt, setStartAt] = useState<string>("");
+  const [endAt, setEndAt] = useState<string>("");
+  const [isActive, setIsActive] = useState<boolean>(true);
 
   async function postBroadcast() {
     const broadcast = content.trim();
     if (broadcast.length === 0) return;
-    const resp = await createBroadcast(broadcast, notifyAll);
+    const resp = await createBroadcast(broadcast, notifyAll, {
+      type,
+      start_at: startAt,
+      end_at: endAt,
+      is_active: isActive,
+    });
     if (resp.status) {
       toast.success(t("admin.post-success"), {
         description: t("admin.post-success-prompt"),
       });
-
       setContent("");
       setNotifyAll(false);
-
+      setType("broadcast");
+      setStartAt("");
+      setEndAt("");
+      setIsActive(true);
       setOpen(false);
       props.onCreated?.();
     } else {
@@ -106,29 +135,58 @@ function CreateBroadcastDialog(props: CreateBroadcastDialogProps) {
         <DialogHeader>
           <DialogTitle>{t("admin.create-broadcast")}</DialogTitle>
           <DialogDescription asChild>
-            <div className={`pt-4`}>
-              <p className="text-sm text-secondary mb-6 border p-2 rounded-md">
-                {t("admin.broadcast-tip")}
-              </p>
+            <div className={`pt-4 space-y-4`}>
               <Textarea
                 placeholder={t("admin.broadcast-placeholder")}
                 value={content}
-                rows={5}
+                rows={4}
                 onChange={(e) => setContent(e.target.value)}
               />
 
-              <div className="flex items-center space-x-2 mt-4">
+              <div className="flex flex-row items-center gap-3">
+                <Label className="shrink-0">{t("admin.broadcast-type")}</Label>
+                <Select value={type} onValueChange={(v) => setType(v as BroadcastType)}>
+                  <SelectTrigger className="w-36">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="broadcast">{t("admin.broadcast-type-broadcast")}</SelectItem>
+                    <SelectItem value="popup">{t("admin.broadcast-type-popup")}</SelectItem>
+                    <SelectItem value="banner">{t("admin.broadcast-type-banner")}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center gap-2 ml-auto">
+                  <Switch id="is-active-create" checked={isActive} onCheckedChange={setIsActive} />
+                  <Label htmlFor="is-active-create">{t("admin.broadcast-active")}</Label>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">{t("admin.broadcast-start-at")}</Label>
+                  <Input
+                    type="datetime-local"
+                    value={startAt}
+                    onChange={(e) => setStartAt(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">{t("admin.broadcast-end-at")}</Label>
+                  <Input
+                    type="datetime-local"
+                    value={endAt}
+                    onChange={(e) => setEndAt(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
                 <Checkbox
                   id="notify-all"
                   checked={notifyAll}
-                  onCheckedChange={(checked) =>
-                    setNotifyAll(checked as boolean)
-                  }
+                  onCheckedChange={(checked) => setNotifyAll(checked as boolean)}
                 />
-                <Label
-                  htmlFor="notify-all"
-                  className="text-sm font-medium text-primary cursor-pointer"
-                >
+                <Label htmlFor="notify-all" className="text-sm font-medium text-primary cursor-pointer">
                   {t("admin.notify-all")}
                 </Label>
               </div>
@@ -139,12 +197,7 @@ function CreateBroadcastDialog(props: CreateBroadcastDialogProps) {
           <DialogClose asChild>
             <Button variant={`outline`}>{t("admin.cancel")}</Button>
           </DialogClose>
-          <Button
-            unClickable
-            variant={`default`}
-            onClick={postBroadcast}
-            loading={true}
-          >
+          <Button unClickable variant={`default`} onClick={postBroadcast} loading={true}>
             {t("admin.post")}
           </Button>
         </DialogFooter>
@@ -175,7 +228,12 @@ function BroadcastItem({ item, onRefresh }: BroadcastItemProps) {
         setOpen={setOpen}
         submittable
         onSubmit={async (value: string) => {
-          const resp = await updateBroadcast(item.index, value);
+          const resp = await updateBroadcast(item.index, value, {
+            type: item.type,
+            start_at: item.start_at,
+            end_at: item.end_at,
+            is_active: item.is_active,
+          });
           withNotify(t, resp, true);
           onRefresh?.();
         }}
@@ -209,8 +267,27 @@ function BroadcastItem({ item, onRefresh }: BroadcastItemProps) {
         </AlertDialogContent>
       </AlertDialog>
       <TableCell>{item.index}</TableCell>
+      <TableCell>
+        <Badge variant={(TYPE_COLORS[item.type] ?? "secondary") as "secondary" | "default" | "gold"}>
+          {t(`admin.broadcast-type-${item.type}`)}
+        </Badge>
+      </TableCell>
+      <TableCell>
+        <Badge variant={item.is_active ? "default" : "outline"}>
+          {item.is_active ? t("admin.broadcast-active") : t("admin.broadcast-inactive")}
+        </Badge>
+      </TableCell>
       <TableCell>{extractMessage(item.content, 25)}</TableCell>
       <TableCell>{item.poster}</TableCell>
+      <TableCell>
+        {item.start_at || item.end_at ? (
+          <span className="text-xs text-muted-foreground">
+            {item.start_at || "∞"} → {item.end_at || "∞"}
+          </span>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        )}
+      </TableCell>
       <TableCell>{item.created_at}</TableCell>
       <TableCell>
         <DropdownMenu>
@@ -283,8 +360,11 @@ function BroadcastTable() {
           <TableHeader>
             <TableRow className={`select-none whitespace-nowrap`}>
               <TableHead>ID</TableHead>
+              <TableHead>{t("admin.type")}</TableHead>
+              <TableHead>{t("admin.state")}</TableHead>
               <TableHead>{t("admin.broadcast-content")}</TableHead>
               <TableHead>{t("admin.poster")}</TableHead>
+              <TableHead>{t("admin.broadcast-schedule")}</TableHead>
               <TableHead>{t("admin.post-at")}</TableHead>
               <TableHead>{t("admin.action")}</TableHead>
             </TableRow>

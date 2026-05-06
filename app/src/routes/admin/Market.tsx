@@ -19,9 +19,12 @@ import {
   Activity,
   AlertCircle,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   GripVertical,
   Import,
+  Layers,
+  List,
   Maximize,
   Minimize,
   Plus,
@@ -98,7 +101,8 @@ type MarketAction =
   | { type: "add-below"; payload: MarketIndexedPayload }
   | { type: "upward"; payload: MarketIndexedPayload }
   | { type: "downward"; payload: MarketIndexedPayload }
-  | { type: "move"; payload: { fromIndex: number; toIndex: number } };
+  | { type: "move"; payload: { fromIndex: number; toIndex: number } }
+  | { type: "bulk-update-default"; payload: { ids: string[]; default: boolean } };
 
 type MarketDispatch = Dispatch<MarketAction>;
 
@@ -378,6 +382,12 @@ function reducer(state: MarketForm, action: MarketAction): MarketForm {
       const [moved] = next.splice(fromIndex, 1);
       next.splice(toIndex, 0, moved);
       return next;
+    }
+    case "bulk-update-default": {
+      const idSet = new Set(action.payload.ids);
+      return state.map((model) =>
+        idSet.has(model.id) ? { ...model, default: action.payload.default } : model
+      );
     }
     default:
       throw new Error();
@@ -984,6 +994,157 @@ function MarketAlert({
   );
 }
 
+type GroupSectionProps = {
+  groupName: string;
+  models: Model[];
+  allIndices: Map<string, number>;
+  form: MarketForm;
+  dispatch: MarketDispatch;
+  stacked: boolean;
+  channelModels: string[];
+};
+
+function GroupSection({
+  groupName,
+  models,
+  allIndices,
+  form,
+  dispatch,
+  stacked,
+  channelModels,
+}: GroupSectionProps) {
+  const { t } = useTranslation();
+  const [collapsed, setCollapsed] = useState<boolean>(false);
+
+  const allEnabled = models.every((m) => m.default);
+  const allDisabled = models.every((m) => !m.default);
+
+  const modelIds = models.map((m) => m.id);
+
+  return (
+    <div className="mb-4">
+      <div className="flex items-center gap-2 mb-2 px-1 py-1 bg-muted/40 rounded-md">
+        <button
+          className="flex items-center gap-1 text-sm font-medium text-foreground hover:text-primary transition-colors"
+          onClick={() => setCollapsed(!collapsed)}
+        >
+          {collapsed ? (
+            <ChevronRight className="h-4 w-4" />
+          ) : (
+            <ChevronDown className="h-4 w-4" />
+          )}
+          <span>{groupName || t("admin.market.ungrouped")}</span>
+          <span className="text-xs text-muted-foreground ml-1">({models.length})</span>
+        </button>
+        <div className="grow" />
+        <Button
+          size="sm"
+          variant={allEnabled ? "default" : "outline"}
+          className="h-6 text-xs px-2"
+          onClick={() =>
+            dispatch({
+              type: "bulk-update-default",
+              payload: { ids: modelIds, default: true },
+            })
+          }
+        >
+          {t("admin.market.enable-all")}
+        </Button>
+        <Button
+          size="sm"
+          variant={allDisabled ? "default" : "outline"}
+          className="h-6 text-xs px-2"
+          onClick={() =>
+            dispatch({
+              type: "bulk-update-default",
+              payload: { ids: modelIds, default: false },
+            })
+          }
+        >
+          {t("admin.market.disable-all")}
+        </Button>
+      </div>
+      {!collapsed && (
+        <div className="pl-2">
+          {models.map((model) => {
+            const globalIndex = allIndices.get(model.seed as string) ?? 0;
+            return (
+              <MarketItem
+                key={model.seed as string}
+                model={model}
+                form={form}
+                stacked={stacked}
+                dispatch={dispatch}
+                index={globalIndex}
+                channelModels={channelModels}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+type GroupedMarketViewProps = {
+  form: MarketForm;
+  dispatch: MarketDispatch;
+  stacked: boolean;
+  channelModels: string[];
+};
+
+function GroupedMarketView({
+  form,
+  dispatch,
+  stacked,
+  channelModels,
+}: GroupedMarketViewProps) {
+  const groups = useMemo(() => {
+    const groupMap = new Map<string, Model[]>();
+    for (const model of form) {
+      const tags = model.tag || [];
+      const editableTags = tags.filter((t) => marketEditableTags.includes(t));
+      const groupKey = editableTags.length > 0 ? editableTags[0] : "";
+      if (!groupMap.has(groupKey)) groupMap.set(groupKey, []);
+      groupMap.get(groupKey)!.push(model);
+    }
+    return groupMap;
+  }, [form]);
+
+  const allIndices = useMemo(() => {
+    const m = new Map<string, number>();
+    form.forEach((model, idx) => m.set(model.seed as string, idx));
+    return m;
+  }, [form]);
+
+  const sortedGroupKeys = useMemo(() => {
+    const keys = Array.from(groups.keys());
+    const emptyIdx = keys.indexOf("");
+    if (emptyIdx > -1) {
+      keys.splice(emptyIdx, 1);
+      keys.push("");
+    }
+    return keys;
+  }, [groups]);
+
+  return (
+    <>
+      {sortedGroupKeys.map((groupKey) => (
+        <GroupSection
+          key={groupKey}
+          groupName={groupKey}
+          models={groups.get(groupKey)!}
+          allIndices={allIndices}
+          form={form}
+          dispatch={dispatch}
+          stacked={stacked}
+          channelModels={channelModels}
+        />
+      ))}
+    </>
+  );
+}
+
 function Market() {
   const { t } = useTranslation();
 
@@ -991,6 +1152,7 @@ function Market() {
   const [stepAll, setStepAll] = useState<boolean>(false);
 
   const [stacked, setStacked] = useState<boolean>(true);
+  const [grouped, setGrouped] = useState<boolean>(false);
 
   const [form, dispatch] = useReducer(reducer, []);
   const [open, setOpen] = useState<boolean>(false);
@@ -1105,6 +1267,18 @@ function Market() {
             </Button>
             <div className={`grow`} />
             <Button
+              variant={grouped ? "default" : "outline"}
+              size={`icon`}
+              className={`mr-2`}
+              title={t("admin.market.grouped-view")}
+              onClick={() => setGrouped(!grouped)}
+            >
+              <Icon
+                icon={grouped ? <Layers /> : <List />}
+                className={`h-4 w-4`}
+              />
+            </Button>
+            <Button
               variant={`outline`}
               size={`icon`}
               className={`mr-2`}
@@ -1163,12 +1337,21 @@ function Market() {
                   ref={provided.innerRef}
                 >
                   {form.length > 0 ? (
-                    <MarketGroup
-                      form={form}
-                      dispatch={dispatch}
-                      stacked={stacked}
-                      channelModels={channelModels}
-                    />
+                    grouped ? (
+                      <GroupedMarketView
+                        form={form}
+                        dispatch={dispatch}
+                        stacked={stacked}
+                        channelModels={channelModels}
+                      />
+                    ) : (
+                      <MarketGroup
+                        form={form}
+                        dispatch={dispatch}
+                        stacked={stacked}
+                        channelModels={channelModels}
+                      />
+                    )
                   ) : (
                     <p className={`align-center text-sm empty`}>
                       {t("admin.empty")}

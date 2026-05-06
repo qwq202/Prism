@@ -176,6 +176,52 @@ func banUser(db *sql.DB, id int64, isBanned bool) error {
 	return err
 }
 
+func batchUsers(db *sql.DB, ids []int64, action string, value float32) error {
+	switch action {
+	case "ban", "unban", "add_quota":
+	default:
+		return fmt.Errorf("invalid batch action")
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	for _, id := range ids {
+		switch action {
+		case "ban":
+			_, err = tx.Exec(globals.PreflightSql(`
+				UPDATE auth SET is_banned = ? WHERE id = ?
+			`), true, id)
+		case "unban":
+			_, err = tx.Exec(globals.PreflightSql(`
+				UPDATE auth SET is_banned = ? WHERE id = ?
+			`), false, id)
+		case "add_quota":
+			_, err = tx.Exec(globals.PreflightSql(
+				"INSERT INTO quota (user_id, quota, used) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE quota = quota + ?",
+			), id, value, 0., value)
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
+
+	return nil
+}
+
 func quotaMigration(db *sql.DB, id int64, quota float32, override bool) error {
 	// if quota is negative, then decrease quota
 	// if quota is positive, then increase quota

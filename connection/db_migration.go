@@ -16,11 +16,15 @@ func validSqlError(err error) bool {
 	}
 
 	content := err.Error()
+	lower := strings.ToLower(content)
 
 	// Error 1060: Duplicate column name
 	// Error 1050: Table already exists
+	// SQLite: duplicate column name
 
-	return !(strings.Contains(content, "Error 1060") || strings.Contains(content, "Error 1050"))
+	return !(strings.Contains(content, "Error 1060") ||
+		strings.Contains(content, "Error 1050") ||
+		strings.Contains(lower, "duplicate column name"))
 }
 
 func checkSqlError(_ sql.Result, err error) error {
@@ -88,6 +92,56 @@ func doMysqlMigration(execer migrationExecer) error {
 		return err
 	}
 
+	// add batch_id to redeem table for batch history tracking
+	if err := execSql(execer, `
+		ALTER TABLE redeem
+		ADD COLUMN batch_id VARCHAR(32) NULL;
+	`); err != nil {
+		return err
+	}
+
+	// create redeem_batch table for batch metadata
+	if err := execSql(execer, `
+		CREATE TABLE IF NOT EXISTS redeem_batch (
+		  id VARCHAR(32) PRIMARY KEY,
+		  quota DECIMAL(16, 4),
+		  count INT DEFAULT 0,
+		  used_count INT DEFAULT 0,
+		  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
+	`); err != nil {
+		return err
+	}
+
+	// add type/schedule fields to broadcast table
+	if err := execSql(execer, `
+		ALTER TABLE broadcast
+		ADD COLUMN type VARCHAR(20) DEFAULT 'broadcast';
+	`); err != nil {
+		return err
+	}
+
+	if err := execSql(execer, `
+		ALTER TABLE broadcast
+		ADD COLUMN start_at DATETIME NULL;
+	`); err != nil {
+		return err
+	}
+
+	if err := execSql(execer, `
+		ALTER TABLE broadcast
+		ADD COLUMN end_at DATETIME NULL;
+	`); err != nil {
+		return err
+	}
+
+	if err := execSql(execer, `
+		ALTER TABLE broadcast
+		ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
+	`); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -99,6 +153,56 @@ func doSqliteMigration(execer migrationExecer) error {
 	if err := execSql(execer, `
 		ALTER TABLE conversation
 		ADD COLUMN task_id VARCHAR(255) NULL;
+	`); err != nil {
+		return err
+	}
+
+	// add batch_id to redeem table
+	if err := execSql(execer, `
+		ALTER TABLE redeem
+		ADD COLUMN batch_id VARCHAR(32) NULL;
+	`); err != nil {
+		return err
+	}
+
+	// create redeem_batch table
+	if err := execSql(execer, `
+		CREATE TABLE IF NOT EXISTS redeem_batch (
+		  id VARCHAR(32) PRIMARY KEY,
+		  quota DECIMAL(16, 4),
+		  count INTEGER DEFAULT 0,
+		  used_count INTEGER DEFAULT 0,
+		  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
+	`); err != nil {
+		return err
+	}
+
+	// add type/schedule fields to broadcast table
+	if err := execSql(execer, `
+		ALTER TABLE broadcast
+		ADD COLUMN type VARCHAR(20) DEFAULT 'broadcast';
+	`); err != nil {
+		return err
+	}
+
+	if err := execSql(execer, `
+		ALTER TABLE broadcast
+		ADD COLUMN start_at DATETIME NULL;
+	`); err != nil {
+		return err
+	}
+
+	if err := execSql(execer, `
+		ALTER TABLE broadcast
+		ADD COLUMN end_at DATETIME NULL;
+	`); err != nil {
+		return err
+	}
+
+	if err := execSql(execer, `
+		ALTER TABLE broadcast
+		ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
 	`); err != nil {
 		return err
 	}

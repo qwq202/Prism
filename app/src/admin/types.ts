@@ -36,6 +36,22 @@ export type ErrorChartResponse = {
   value: number[];
 };
 
+export type ActiveUserChartResponse = {
+  date: string[];
+  value: number[];
+};
+
+export type RegistrationChartResponse = {
+  date: string[];
+  value: number[];
+};
+
+export type ConversionFunnelResponse = {
+  registered: number;
+  ever_subscribed: number;
+  active_subscribed: number;
+};
+
 export type UserTypeChartResponse = {
   total: number;
   normal: number;
@@ -95,6 +111,26 @@ export type RedeemGenerateResponse = {
   status: boolean;
   data: string[];
   message: string;
+};
+
+export type RedeemBatch = {
+  id: string;
+  quota: number;
+  count: number;
+  used_count: number;
+  created_at: string;
+};
+
+export type RedeemBatchResponse = {
+  status: boolean;
+  message: string;
+  data: RedeemBatch[];
+};
+
+export type RedeemBatchCodesResponse = {
+  status: boolean;
+  message: string;
+  data: Redeem[];
 };
 
 export type UserData = {

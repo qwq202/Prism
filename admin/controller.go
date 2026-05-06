@@ -2,6 +2,7 @@ package admin
 
 import (
 	"chat/admin/analysis"
+	"chat/channel"
 	"chat/utils"
 	"net/http"
 	"strconv"
@@ -138,6 +139,42 @@ func UserTypeAnalysisAPI(c *gin.Context) {
 	}
 }
 
+type ChannelAnalysisRequest struct {
+	ChannelIds []int `json:"channel_ids"`
+}
+
+func ChannelAnalysisAPI(c *gin.Context) {
+	cache := utils.GetCacheFromContext(c)
+
+	var req ChannelAnalysisRequest
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.ChannelIds) == 0 {
+		// fall back to all channels in conduit
+		seq := channel.ConduitInstance.Sequence
+		ids := make([]int, 0, len(seq))
+		for _, ch := range seq {
+			ids = append(ids, ch.GetId())
+		}
+		req.ChannelIds = ids
+	}
+
+	c.JSON(http.StatusOK, analysis.GetChannelStats(cache, req.ChannelIds))
+}
+
+func ActiveUserAnalysisAPI(c *gin.Context) {
+	cache := utils.GetCacheFromContext(c)
+	c.JSON(http.StatusOK, analysis.GetActiveUserData(cache))
+}
+
+func RegistrationAnalysisAPI(c *gin.Context) {
+	db := utils.GetDBFromContext(c)
+	c.JSON(http.StatusOK, analysis.GetRegistrationData(db))
+}
+
+func ConversionFunnelAPI(c *gin.Context) {
+	db := utils.GetDBFromContext(c)
+	c.JSON(http.StatusOK, analysis.GetConversionFunnel(db))
+}
+
 func parsePageQuery(c *gin.Context) (int64, bool) {
 	raw := strings.TrimSpace(c.Query("page"))
 	if raw == "" {
@@ -183,6 +220,17 @@ func DeleteRedeemAPI(c *gin.Context) {
 		"status": err == nil,
 		"error":  err,
 	})
+}
+
+func RedeemBatchListAPI(c *gin.Context) {
+	db := utils.GetDBFromContext(c)
+	c.JSON(http.StatusOK, GetRedeemBatches(db))
+}
+
+func RedeemBatchCodesAPI(c *gin.Context) {
+	db := utils.GetDBFromContext(c)
+	batchId := c.Param("id")
+	c.JSON(http.StatusOK, GetBatchCodes(db, batchId))
 }
 
 func InvitationPaginationAPI(c *gin.Context) {
@@ -385,6 +433,39 @@ func UserQuotaAPI(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status": true,
 	})
+}
+
+type BatchUserForm struct {
+	Ids    []int64  `json:"ids"`
+	Action string   `json:"action"`
+	Value  *float32 `json:"value"`
+}
+
+func BatchUserAPI(c *gin.Context) {
+	db := utils.GetDBFromContext(c)
+
+	var form BatchUserForm
+	if err := c.ShouldBindJSON(&form); err != nil {
+		c.JSON(http.StatusOK, gin.H{"status": false, "message": err.Error()})
+		return
+	}
+
+	if len(form.Ids) == 0 {
+		c.JSON(http.StatusOK, gin.H{"status": false, "message": "no users selected"})
+		return
+	}
+
+	quota := float32(0)
+	if form.Value != nil {
+		quota = *form.Value
+	}
+
+	if err := batchUsers(db, form.Ids, form.Action, quota); err != nil {
+		c.JSON(http.StatusOK, gin.H{"status": false, "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": true})
 }
 
 func UserSubscriptionAPI(c *gin.Context) {

@@ -8,6 +8,8 @@ import {
 } from "@/admin/types.ts";
 import {
   banUserOperation,
+  BatchUserAction,
+  batchUserOperation,
   getUserList,
   initialUserFilter,
   quotaOperation,
@@ -37,6 +39,7 @@ import {
 import { Button } from "@/components/ui/button.tsx";
 import {
   ArrowDownNarrowWide,
+  Ban,
   CalendarCheck2,
   CalendarClock,
   CalendarOff,
@@ -77,6 +80,7 @@ import { Separator } from "@/components/ui/separator.tsx";
 import { toast } from "sonner";
 import { Badge } from "../ui/badge";
 import type { TFunction } from "i18next";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
 
 type OperationMenuProps = {
   user: UserData;
@@ -375,6 +379,8 @@ function UserTable() {
   const [page, setPage] = useState<number>(0);
   const [search, setSearch] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [batchQuota, setBatchQuota] = useState<string>("5");
 
   const [filter, filterDispatch] = useReducer(formReducer<UserFilterProps>(), {
     ...initialUserFilter,
@@ -392,11 +398,42 @@ function UserTable() {
     setLoading(true);
     const resp = await getUserList(page, search, filter);
     setLoading(false);
-    if (resp.status) setData(resp as UserResponse);
-    else
+    if (resp.status) {
+      setData(resp as UserResponse);
+      setSelected(new Set());
+    } else
       toast.error(t("admin.error"), {
         description: resp.message,
       });
+  }
+
+  async function executeBatch(action: BatchUserAction, value?: number) {
+    const ids = Array.from(selected);
+    const resp = await batchUserOperation(ids, action, value);
+    if (resp.status) {
+      toast.success(t("admin.batch-success", { count: ids.length }));
+      await update();
+    } else {
+      toast.error(t("admin.error"), { description: resp.message });
+    }
+  }
+
+  const allChecked = data.data.length > 0 && data.data.every((u) => selected.has(u.id));
+
+  function toggleAll() {
+    if (allChecked) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(data.data.map((u) => u.id)));
+    }
+  }
+
+  function toggleOne(id: number) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   }
   useEffectAsync(update, [page]);
 
@@ -521,6 +558,12 @@ function UserTable() {
           <Table>
             <TableHeader>
               <TableRow className={`select-none whitespace-nowrap`}>
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={allChecked}
+                    onCheckedChange={toggleAll}
+                  />
+                </TableHead>
                 <TableHead>ID</TableHead>
                 <TableHead>{t("admin.username")}</TableHead>
                 <TableHead>{t("admin.email")}</TableHead>
@@ -537,7 +580,13 @@ function UserTable() {
             </TableHeader>
             <TableBody>
               {(data.data || []).map((user, idx) => (
-                <TableRow key={idx}>
+                <TableRow key={idx} className={selected.has(user.id) ? "bg-muted/50" : ""}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selected.has(user.id)}
+                      onCheckedChange={() => toggleOne(user.id)}
+                    />
+                  </TableCell>
                   <TableCell>{user.id}</TableCell>
                   <TableCell className={`whitespace-nowrap`}>
                     {user.username}
@@ -594,6 +643,32 @@ function UserTable() {
           <RotateCw className={`h-4 w-4`} />
         </Button>
       </div>
+      {selected.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-background border shadow-lg rounded-full px-4 py-2">
+          <span className="text-sm font-medium mr-1">{t("admin.selected", { count: selected.size })}</span>
+          <Button size="sm" variant="destructive" onClick={() => executeBatch("ban")}>
+            <Ban className="h-3.5 w-3.5 mr-1" />
+            {t("admin.ban")}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => executeBatch("unban")}>
+            {t("admin.unban")}
+          </Button>
+          <div className="flex items-center gap-1">
+            <Input
+              className="w-20 h-8 text-sm"
+              value={batchQuota}
+              onChange={(e) => setBatchQuota(e.target.value.replace(/[^\d.]/g, ""))}
+            />
+            <Button size="sm" variant="outline" onClick={() => executeBatch("add_quota", Number(batchQuota))}>
+              <PlusCircle className="h-3.5 w-3.5 mr-1" />
+              {t("admin.quota")}
+            </Button>
+          </div>
+          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+            {t("cancel")}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

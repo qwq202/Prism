@@ -1,12 +1,17 @@
 import {
+  ActiveUserChartResponse,
   BillingChartResponse,
   CommonResponse,
+  ConversionFunnelResponse,
   ErrorChartResponse,
   InfoResponse,
   InvitationGenerateResponse,
   InvitationResponse,
   ModelChartResponse,
+  RedeemBatchCodesResponse,
+  RedeemBatchResponse,
   RedeemResponse,
+  RegistrationChartResponse,
   RequestChartResponse,
   UserResponse,
   UserTypeChartResponse,
@@ -327,5 +332,70 @@ export async function releaseUsageOperation(
     return response.data as CommonResponse;
   } catch (e) {
     return { status: false, message: getErrorMessage(e) };
+  }
+}
+
+export type BatchUserAction = "ban" | "unban" | "add_quota";
+
+export async function batchUserOperation(
+  ids: number[],
+  action: BatchUserAction,
+  value?: number,
+): Promise<CommonResponse> {
+  try {
+    const response = await axios.post("/admin/user/batch", { ids, action, value });
+    return response.data as CommonResponse;
+  } catch (e) {
+    return { status: false, message: getErrorMessage(e) };
+  }
+}
+
+export async function getRedeemBatchList(): Promise<RedeemBatchResponse> {
+  try {
+    const response = await axios.get("/admin/redeem/batch/list");
+    return response.data as RedeemBatchResponse;
+  } catch (e) {
+    return { status: false, message: getErrorMessage(e), data: [] };
+  }
+}
+
+export async function getRedeemBatchCodes(
+  batchId: string,
+): Promise<RedeemBatchCodesResponse> {
+  try {
+    const response = await axios.get(`/admin/redeem/batch/${batchId}`);
+    return response.data as RedeemBatchCodesResponse;
+  } catch (e) {
+    return { status: false, message: getErrorMessage(e), data: [] };
+  }
+}
+
+export async function getActiveUserChart(): Promise<ActiveUserChartResponse> {
+  try {
+    const response = await axios.get("/admin/analytics/active-users");
+    return response.data as ActiveUserChartResponse;
+  } catch (e) {
+    console.warn(e);
+    return { date: [], value: [] };
+  }
+}
+
+export async function getRegistrationChart(): Promise<RegistrationChartResponse> {
+  try {
+    const response = await axios.get("/admin/analytics/registrations");
+    return response.data as RegistrationChartResponse;
+  } catch (e) {
+    console.warn(e);
+    return { date: [], value: [] };
+  }
+}
+
+export async function getConversionFunnel(): Promise<ConversionFunnelResponse> {
+  try {
+    const response = await axios.get("/admin/analytics/funnel");
+    return response.data as ConversionFunnelResponse;
+  } catch (e) {
+    console.warn(e);
+    return { registered: 0, ever_subscribed: 0, active_subscribed: 0 };
   }
 }
