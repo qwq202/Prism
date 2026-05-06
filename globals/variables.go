@@ -76,11 +76,6 @@ func IsConfiguredVisionModel(model string) bool {
 }
 
 func OriginIsAllowed(uri string) bool {
-	if len(AllowedOrigins) == 0 {
-		// if allowed origins is empty, allow all origins
-		return true
-	}
-
 	instance, _ := url.Parse(uri)
 	if instance == nil {
 		return false
@@ -88,6 +83,10 @@ func OriginIsAllowed(uri string) bool {
 
 	if instance.Hostname() == "localhost" || instance.Scheme == "file" {
 		return true
+	}
+
+	if len(AllowedOrigins) == 0 {
+		return false
 	}
 
 	if strings.HasPrefix(instance.Host, "www.") {

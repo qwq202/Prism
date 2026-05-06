@@ -146,6 +146,18 @@ func TestParseTokenClaimsAcceptsSafeClaims(t *testing.T) {
 	}
 }
 
+func TestConstantTimeStringEqualRequiresSameValueAndLength(t *testing.T) {
+	if !constantTimeStringEqual("123456", "123456") {
+		t.Fatalf("expected equal strings to match")
+	}
+	if constantTimeStringEqual("123456", "654321") {
+		t.Fatalf("expected different strings to be rejected")
+	}
+	if constantTimeStringEqual("123456", "0123456") {
+		t.Fatalf("expected equal hash comparison to still require same original length")
+	}
+}
+
 func TestCreateApiKeyStoresHash(t *testing.T) {
 	db := openAuthSecurityTestDB(t)
 	user := GetUserByName(db, "root")

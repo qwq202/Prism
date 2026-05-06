@@ -5,6 +5,8 @@ import (
 	"chat/globals"
 	"chat/utils"
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -96,13 +98,19 @@ func getCode(c *gin.Context, cache *redis.Client, email string) string {
 	return code
 }
 
+func constantTimeStringEqual(expected string, actual string) bool {
+	expectedHash := sha256.Sum256([]byte(expected))
+	actualHash := sha256.Sum256([]byte(actual))
+	return subtle.ConstantTimeCompare(expectedHash[:], actualHash[:]) == 1 && len(expected) == len(actual)
+}
+
 func checkCode(c *gin.Context, cache *redis.Client, email, code string) bool {
 	storage := getCode(c, cache, email)
 	if len(storage) == 0 {
 		return false
 	}
 
-	if storage != code {
+	if !constantTimeStringEqual(storage, code) {
 		return false
 	}
 
