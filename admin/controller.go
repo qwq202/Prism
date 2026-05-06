@@ -477,7 +477,12 @@ func ListLoggerAPI(c *gin.Context) {
 
 func DownloadLoggerAPI(c *gin.Context) {
 	path := c.Query("path")
-	getBlobFile(c, path)
+	if err := getBlobFile(c, path); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status": false,
+			"error":  err.Error(),
+		})
+	}
 }
 
 func DeleteLoggerAPI(c *gin.Context) {
@@ -528,9 +533,9 @@ func PaymentOrderRecheckAPI(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":       ok,
-		"order_state":  state,
-		"is_changed":   false,
+		"status":      ok,
+		"order_state": state,
+		"is_changed":  false,
 	})
 }
 
