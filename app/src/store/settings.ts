@@ -26,7 +26,7 @@ export const initialSettings = {
   hide_model: false,
   hide_toolbar: false,
   hide_toolbar_text: true,
-  collapse_thinking: false,
+  collapse_thinking: true,
   persona_style: "default",
   persona_warmth: "default",
   persona_enthusiasm: "default",
@@ -136,7 +136,10 @@ export const settingsSlice = createSlice({
     hide_model: getBooleanMemory("hide_model", false), // hide model
     hide_toolbar: getBooleanMemory("hide_toolbar", false), // hide toolbar
     hide_toolbar_text: getBooleanMemory("hide_toolbar_text", true), // hide toolbar text
-    collapse_thinking: getBooleanMemory("collapse_thinking", false), // collapse thinking content by default
+    collapse_thinking: getBooleanMemory(
+      "collapse_thinking",
+      initialSettings.collapse_thinking,
+    ), // collapse thinking content by default
     persona_style: getMemory("persona_style", initialSettings.persona_style),
     persona_warmth: getMemory(
       "persona_warmth",
