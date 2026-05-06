@@ -12,6 +12,18 @@ import (
 
 const pageSize int64 = 20
 
+const recordFilterWhereSQL = `
+		WHERE (? = 0 OR b.user_id = ?)
+		  AND (? = 0 OR b.user_id = ?)
+		  AND (? = 0 OR a.username LIKE ? OR b.username LIKE ?)
+		  AND (? = 0 OR b.created_at >= ?)
+		  AND (? = 0 OR b.created_at < ?)
+		  AND (? = 0 OR b.created_at <= ?)
+		  AND (? = 0 OR b.token_name LIKE ?)
+		  AND (? = 0 OR b.model LIKE ?)
+		  AND (? = 0 OR b.type = ?)
+`
+
 type Record struct {
 	Id              int64     `json:"id"`
 	UserId          int64     `json:"user_id"`
@@ -119,83 +131,98 @@ func buildRecordTimeRange(value string, isEnd bool) (string, error) {
 	return "", fmt.Errorf("invalid time format: %s", value)
 }
 
-func ListRecords(db *sql.DB, isAdmin bool, userId int64, page int64, query RecordQuery) (RecordData, error) {
-	var conditions []string
-	var args []interface{}
-
-	if !isAdmin {
-		conditions = append(conditions, "b.user_id = ?")
-		args = append(args, userId)
-	} else if query.UserId > 0 {
-		conditions = append(conditions, "b.user_id = ?")
-		args = append(args, query.UserId)
-	} else if query.Username != "" {
-		conditions = append(conditions, "(a.username LIKE ? OR b.username LIKE ?)")
-		args = append(args, "%"+query.Username+"%", "%"+query.Username+"%")
+func sqlFlag(enabled bool) int {
+	if enabled {
+		return 1
 	}
+	return 0
+}
 
-	if query.StartTime != "" {
-		startTime, err := buildRecordTimeRange(query.StartTime, false)
+func recordLikeFilter(value string) string {
+	return "%" + value + "%"
+}
+
+func buildRecordFilterArgs(isAdmin bool, userId int64, query RecordQuery) ([]interface{}, error) {
+	userScopeEnabled := !isAdmin
+	adminUserEnabled := isAdmin && query.UserId > 0
+	usernameEnabled := isAdmin && query.UserId <= 0 && query.Username != ""
+
+	startEnabled := query.StartTime != ""
+	startTime := ""
+	if startEnabled {
+		parsed, err := buildRecordTimeRange(query.StartTime, false)
 		if err != nil {
-			return RecordData{}, err
+			return nil, err
 		}
-		conditions = append(conditions, "b.created_at >= ?")
-		args = append(args, startTime)
+		startTime = parsed
 	}
 
+	endExclusiveEnabled := false
+	endInclusiveEnabled := false
+	endTime := ""
 	if query.EndTime != "" {
-		endTime, err := buildRecordTimeRange(query.EndTime, true)
+		parsed, err := buildRecordTimeRange(query.EndTime, true)
 		if err != nil {
-			return RecordData{}, err
+			return nil, err
 		}
+		endTime = parsed
 		if len(strings.TrimSpace(query.EndTime)) == len("2006-01-02") {
-			conditions = append(conditions, "b.created_at < ?")
+			endExclusiveEnabled = true
 		} else {
-			conditions = append(conditions, "b.created_at <= ?")
+			endInclusiveEnabled = true
 		}
-		args = append(args, endTime)
 	}
 
-	if query.TokenName != "" {
-		conditions = append(conditions, "b.token_name LIKE ?")
-		args = append(args, "%"+query.TokenName+"%")
-	}
+	tokenNameEnabled := query.TokenName != ""
+	modelEnabled := query.Model != ""
+	typeEnabled := query.Type != "" && query.Type != "all"
+	usernameLike := recordLikeFilter(query.Username)
 
-	if query.Model != "" {
-		conditions = append(conditions, "b.model LIKE ?")
-		args = append(args, "%"+query.Model+"%")
-	}
+	return []interface{}{
+		sqlFlag(userScopeEnabled), userId,
+		sqlFlag(adminUserEnabled), query.UserId,
+		sqlFlag(usernameEnabled), usernameLike, usernameLike,
+		sqlFlag(startEnabled), startTime,
+		sqlFlag(endExclusiveEnabled), endTime,
+		sqlFlag(endInclusiveEnabled), endTime,
+		sqlFlag(tokenNameEnabled), recordLikeFilter(query.TokenName),
+		sqlFlag(modelEnabled), recordLikeFilter(query.Model),
+		sqlFlag(typeEnabled), query.Type,
+	}, nil
+}
 
-	if query.Type != "" && query.Type != "all" {
-		conditions = append(conditions, "b.type = ?")
-		args = append(args, query.Type)
-	}
-
-	where := ""
-	if len(conditions) > 0 {
-		where = "WHERE " + strings.Join(conditions, " AND ")
-	}
-
-	var total int64
-	countArgs := make([]interface{}, len(args))
-	copy(countArgs, args)
-
-	if err := globals.QueryRowDb(db, fmt.Sprintf("SELECT COUNT(*) FROM billing b %s", where), countArgs...).Scan(&total); err != nil {
+func ListRecords(db *sql.DB, isAdmin bool, userId int64, page int64, query RecordQuery) (RecordData, error) {
+	filterArgs, err := buildRecordFilterArgs(isAdmin, userId, query)
+	if err != nil {
 		return RecordData{}, err
 	}
 
-	queryArgs := append(args, pageSize, page*pageSize)
-	rows, err := globals.QueryDb(db, fmt.Sprintf(`
+	var total int64
+	countArgs := make([]interface{}, len(filterArgs))
+	copy(countArgs, filterArgs)
+
+	countQuery := `
+		SELECT COUNT(*)
+		FROM billing b
+		LEFT JOIN auth a ON a.id = b.user_id
+	` + recordFilterWhereSQL
+
+	if err := globals.QueryRowDb(db, countQuery, countArgs...).Scan(&total); err != nil {
+		return RecordData{}, err
+	}
+
+	queryArgs := append(filterArgs, pageSize, page*pageSize)
+	rows, err := globals.QueryDb(db, `
 		SELECT b.id, b.user_id, COALESCE(a.username, b.username, ''), b.type, COALESCE(b.token_name, ''),
 		       b.model, b.input_tokens, b.output_tokens, b.quota, b.duration,
 		       COALESCE(b.detail, ''), COALESCE(b.prompts, ''), COALESCE(b.response_prompts, ''),
 		       COALESCE(b.channel, 0), COALESCE(b.channel_name, ''), b.created_at
 		FROM billing b
 		LEFT JOIN auth a ON a.id = b.user_id
-		%s
+	`+recordFilterWhereSQL+`
 		ORDER BY b.id DESC
 		LIMIT ? OFFSET ?
-	`, where), queryArgs...)
+	`, queryArgs...)
 	if err != nil {
 		return RecordData{}, err
 	}

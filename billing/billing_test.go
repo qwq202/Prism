@@ -86,6 +86,24 @@ func TestListRecordsFiltersByPartialTokenNameAndInclusiveDate(t *testing.T) {
 	}
 }
 
+func TestListRecordsTreatsUsernameFilterAsBoundParameter(t *testing.T) {
+	db := openBillingTestDB(t)
+
+	seedBillingRecord(t, db, "root", "consume", "alpha-main-token", "deepseek-v4-flash", "2026-04-22 15:30:00")
+	seedBillingRecord(t, db, "alice", "consume", "beta-secondary-token", "grok-4-1-fast", "2026-04-23 09:00:00")
+
+	data, err := ListRecords(db, true, 1, 0, RecordQuery{
+		Username: "%' OR 1=1 --",
+	})
+	if err != nil {
+		t.Fatalf("list records: %v", err)
+	}
+
+	if len(data.Records) != 0 {
+		t.Fatalf("expected malicious username filter to match no records, got %d (%#v)", len(data.Records), data.Records)
+	}
+}
+
 func TestListRecordsRejectsInvalidDateFilter(t *testing.T) {
 	db := openBillingTestDB(t)
 
