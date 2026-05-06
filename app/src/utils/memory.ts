@@ -35,7 +35,11 @@ export function getMemory(key: string, defaultValue?: string): string {
   if (volatileKeys.has(key)) {
     return (sessionStorage.getItem(key) || (defaultValue ?? "")).trim();
   }
-  return (localStorage.getItem(key) || (defaultValue ?? "")).trim();
+  return (
+    localStorage.getItem(key) ||
+    sessionStorage.getItem(key) ||
+    (defaultValue ?? "")
+  ).trim();
 }
 
 export function getBooleanMemory(key: string, defaultValue: boolean): boolean {
