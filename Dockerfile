@@ -41,7 +41,11 @@ FROM alpine
 # Install dependencies
 RUN apk upgrade --no-cache && \
     apk add --no-cache wget ca-certificates tzdata && \
-    update-ca-certificates 2>/dev/null || true
+    (update-ca-certificates 2>/dev/null || true) && \
+    addgroup -S chat && \
+    adduser -S -G chat chat && \
+    mkdir -p /config /logs /storage /db && \
+    chown -R chat:chat /config /logs /storage /db
 
 # Set timezone
 RUN echo "Asia/Shanghai" > /etc/timezone && \
@@ -61,6 +65,8 @@ VOLUME ["/config", "/logs", "/storage"]
 
 # Expose port
 EXPOSE 8094
+
+USER chat
 
 # Run application
 CMD ["./chat"]

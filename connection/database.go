@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/go-sql-driver/mysql"
 	_ "github.com/go-sql-driver/mysql"
@@ -76,8 +77,10 @@ func getConn() *sql.DB {
 func ConnectDatabase() *sql.DB {
 	db := getConn()
 
-	db.SetMaxOpenConns(512)
-	db.SetMaxIdleConns(64)
+	db.SetMaxOpenConns(64)
+	db.SetMaxIdleConns(16)
+	db.SetConnMaxLifetime(30 * time.Minute)
+	db.SetConnMaxIdleTime(5 * time.Minute)
 
 	CreateUserTable(db)
 	CreateConversationTable(db)

@@ -73,15 +73,13 @@ func CreateRecord(db *sql.DB, userId int64, username string, recordType string,
 	quota float64, duration float32, detail string, prompts string, responsePrompts string,
 	channelId int, channelName string) {
 
-	go func() {
-		_, err := globals.ExecDb(db, `
+	_, err := globals.ExecDb(db, `
 			INSERT INTO billing (user_id, username, type, token_name, model, input_tokens, output_tokens, quota, duration, detail, prompts, response_prompts, channel, channel_name)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`, userId, username, recordType, tokenName, model, inputTokens, outputTokens, quota, duration, detail, prompts, responsePrompts, channelId, channelName)
-		if err != nil {
-			globals.Warn(fmt.Sprintf("[billing] failed to create record: %s", err.Error()))
-		}
-	}()
+	if err != nil {
+		globals.Warn(fmt.Sprintf("[billing] failed to create record: %s", err.Error()))
+	}
 }
 
 func resolveChannelNameByModel(model string) string {

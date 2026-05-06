@@ -6,6 +6,10 @@ import (
 	"strings"
 )
 
+type migrationExecer interface {
+	Exec(query string, args ...interface{}) (sql.Result, error)
+}
+
 func validSqlError(err error) bool {
 	if err == nil {
 		return false
@@ -27,21 +31,40 @@ func checkSqlError(_ sql.Result, err error) error {
 	return nil
 }
 
-func execSql(db *sql.DB, sql string, args ...interface{}) error {
-	return checkSqlError(globals.ExecDb(db, sql, args...))
+func execSql(execer migrationExecer, query string, args ...interface{}) error {
+	return checkSqlError(execer.Exec(globals.PreflightSql(query), args...))
+}
+
+func runMigrationTx(db *sql.DB, migrate func(migrationExecer) error) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+
+	if err := migrate(tx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func doMigration(db *sql.DB) error {
 	if globals.SqliteEngine {
-		return doSqliteMigration(db)
+		return runMigrationTx(db, doSqliteMigration)
 	}
+
+	return runMigrationTx(db, doMysqlMigration)
+}
+
+func doMysqlMigration(execer migrationExecer) error {
 
 	// v3.10 migration
 
 	// update `quota`, `used` field in `quota` table
 	// migrate `DECIMAL(16, 4)` to `DECIMAL(24, 6)`
 
-	if err := execSql(db, `
+	if err := execSql(execer, `
 		ALTER TABLE quota
 		MODIFY COLUMN quota DECIMAL(24, 6),
 		MODIFY COLUMN used DECIMAL(24, 6);
@@ -50,7 +73,7 @@ func doMigration(db *sql.DB) error {
 	}
 
 	// add new field `is_banned` in `auth` table
-	if err := execSql(db, `
+	if err := execSql(execer, `
 		ALTER TABLE auth
 		ADD COLUMN is_banned BOOLEAN DEFAULT FALSE;
 	`); err != nil {
@@ -58,7 +81,7 @@ func doMigration(db *sql.DB) error {
 	}
 
 	// add new field `task_id` in `conversation` table to store task id (e.g., video job id)
-	if err := execSql(db, `
+	if err := execSql(execer, `
 		ALTER TABLE conversation
 		ADD COLUMN task_id VARCHAR(255) NULL;
 	`); err != nil {
@@ -68,12 +91,12 @@ func doMigration(db *sql.DB) error {
 	return nil
 }
 
-func doSqliteMigration(db *sql.DB) error {
+func doSqliteMigration(execer migrationExecer) error {
 	// v3.10 added sqlite support, no migration needed before this version
 
 	// v4 migration
 	// add new field `task_id` in `conversation` table to store task id (e.g., video job id)
-	if err := execSql(db, `
+	if err := execSql(execer, `
 		ALTER TABLE conversation
 		ADD COLUMN task_id VARCHAR(255) NULL;
 	`); err != nil {

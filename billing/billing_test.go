@@ -104,6 +104,36 @@ func TestListRecordsTreatsUsernameFilterAsBoundParameter(t *testing.T) {
 	}
 }
 
+func TestCreateRecordPersistsBeforeReturning(t *testing.T) {
+	db := openBillingTestDB(t)
+
+	CreateRecord(
+		db,
+		1,
+		"root",
+		"consume",
+		"sync-token",
+		"gpt-5.4-mini",
+		12,
+		34,
+		0.56,
+		1.2,
+		"detail",
+		"prompt",
+		"response",
+		7,
+		"channel",
+	)
+
+	var count int
+	if err := globals.QueryRowDb(db, "SELECT COUNT(*) FROM billing WHERE token_name = ?", "sync-token").Scan(&count); err != nil {
+		t.Fatalf("count billing record: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected billing record to be persisted before return, got %d", count)
+	}
+}
+
 func TestListRecordsRejectsInvalidDateFilter(t *testing.T) {
 	db := openBillingTestDB(t)
 
