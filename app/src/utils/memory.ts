@@ -1,19 +1,19 @@
 const volatileKeys = new Set<string>();
-const volatileMemory = new Map<string, string>();
 
 export function markVolatileMemoryKey(key: string) {
   volatileKeys.add(key);
-  volatileMemory.delete(key);
+  const persistedValue = localStorage.getItem(key);
+  if (persistedValue && !sessionStorage.getItem(key)) {
+    sessionStorage.setItem(key, persistedValue.trim());
+  }
   localStorage.removeItem(key);
-  sessionStorage.removeItem(key);
 }
 
 export function setMemory(key: string, value: string) {
   const data = value.trim();
   if (volatileKeys.has(key)) {
-    volatileMemory.set(key, data);
+    sessionStorage.setItem(key, data);
     localStorage.removeItem(key);
-    sessionStorage.removeItem(key);
     return;
   }
   localStorage.setItem(key, data);
@@ -33,7 +33,7 @@ export function setArrayMemory(key: string, value: string[]) {
 
 export function getMemory(key: string, defaultValue?: string): string {
   if (volatileKeys.has(key)) {
-    return (volatileMemory.get(key) || (defaultValue ?? "")).trim();
+    return (sessionStorage.getItem(key) || (defaultValue ?? "")).trim();
   }
   return (localStorage.getItem(key) || (defaultValue ?? "")).trim();
 }
@@ -54,13 +54,11 @@ export function getArrayMemory(key: string): string[] {
 }
 
 export function forgetMemory(key: string) {
-  volatileMemory.delete(key);
   localStorage.removeItem(key);
   sessionStorage.removeItem(key);
 }
 
 export function clearMemory() {
-  volatileMemory.clear();
   localStorage.clear();
   sessionStorage.clear();
 }
