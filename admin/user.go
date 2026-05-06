@@ -130,10 +130,13 @@ func passwordMigration(db *sql.DB, cache *redis.Client, id int64, password strin
 	if len(password) < 6 || len(password) > 36 {
 		return fmt.Errorf("password length must be between 6 and 36")
 	}
-	hash_passwd := utils.Sha2Encrypt(password)
+	hash_passwd, err := utils.HashPassword(password)
+	if err != nil {
+		return err
+	}
 
 	// Update password in database
-	_, err := globals.ExecDb(db, `
+	_, err = globals.ExecDb(db, `
 		UPDATE auth SET password = ? WHERE id = ?
 	`, hash_passwd, id)
 
@@ -243,9 +246,14 @@ func UpdateRootPassword(db *sql.DB, cache *redis.Client, password string) error 
 		return fmt.Errorf("password length must be between 6 and 36")
 	}
 
+	hash, err := utils.HashPassword(password)
+	if err != nil {
+		return err
+	}
+
 	if _, err := globals.ExecDb(db, `
 		UPDATE auth SET password = ? WHERE username = 'root'
-	`, utils.Sha2Encrypt(password)); err != nil {
+	`, hash); err != nil {
 		return err
 	}
 

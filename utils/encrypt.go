@@ -3,18 +3,51 @@ package utils
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/md5"
 	crand "crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"io"
+	"regexp"
+
+	"golang.org/x/crypto/bcrypt"
 )
+
+var legacySha256Pattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
 func Sha2Encrypt(raw string) string {
 	// return 64-bit hash
 	hash := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(hash[:])
+}
+
+func HmacSha256(raw string, secret string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(raw))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func HashPassword(raw string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(raw), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+
+	return string(hash), nil
+}
+
+func VerifyPassword(raw string, stored string) (bool, bool) {
+	if err := bcrypt.CompareHashAndPassword([]byte(stored), []byte(raw)); err == nil {
+		return true, false
+	}
+
+	if legacySha256Pattern.MatchString(stored) && Sha2Encrypt(raw) == stored {
+		return true, true
+	}
+
+	return false, false
 }
 
 func Sha2EncryptForm(form interface{}) string {

@@ -25,12 +25,19 @@ func ParseToken(c *gin.Context, token string) *User {
 		return nil
 	}
 	if claims, ok := instance.Claims.(jwt.MapClaims); ok && instance.Valid {
-		if int64(claims["exp"].(float64)) < time.Now().Unix() {
+		exp, ok := claims["exp"].(float64)
+		if !ok || int64(exp) < time.Now().Unix() {
+			return nil
+		}
+		username, ok := claims["username"].(string)
+		if !ok || strings.TrimSpace(username) == "" {
 			return nil
 		}
 		user := &User{
-			Username: claims["username"].(string),
-			Password: claims["password"].(string),
+			Username: username,
+		}
+		if password, ok := claims["password"].(string); ok {
+			user.Password = password
 		}
 		if !user.Validate(c) {
 			return nil
@@ -47,16 +54,7 @@ func ParseApiKey(c *gin.Context, key string) *User {
 		return nil
 	}
 
-	var user User
-	if err := globals.QueryRowDb(db, `
-			SELECT auth.id, auth.username, auth.password FROM auth 
-			INNER JOIN apikey ON auth.id = apikey.user_id 
-			WHERE apikey.api_key = ?
-			`, key).Scan(&user.ID, &user.Username, &user.Password); err != nil {
-		return nil
-	}
-
-	return &user
+	return ParseApiKeyByHash(db, key)
 }
 
 func getCode(c *gin.Context, cache *redis.Client, email string) string {
@@ -140,7 +138,10 @@ func SignUp(c *gin.Context, form RegisterForm) (string, error) {
 		return "", errors.New("invalid email verification code")
 	}
 
-	hash := utils.Sha2Encrypt(password)
+	hash, err := utils.HashPassword(password)
+	if err != nil {
+		return "", err
+	}
 
 	user := &User{
 		Username: username,
@@ -173,15 +174,20 @@ func Login(c *gin.Context, form LoginForm) (string, error) {
 		return "", errors.New("invalid username or password format")
 	}
 
-	hash := utils.Sha2Encrypt(password)
-
-	// get user from db by username (or email) and password
 	var user User
 	if err := globals.QueryRowDb(db, `
 			SELECT auth.id, auth.username, auth.password FROM auth 
-			WHERE (auth.username = ? OR auth.email = ?) AND auth.password = ?
-			`, username, username, hash).Scan(&user.ID, &user.Username, &user.Password); err != nil {
+			WHERE auth.username = ? OR auth.email = ?
+			`, username, username).Scan(&user.ID, &user.Username, &user.Password); err != nil {
 		return "", errors.New("invalid username or password")
+	}
+
+	if ok, upgrade := utils.VerifyPassword(password, user.Password); !ok {
+		return "", errors.New("invalid username or password")
+	} else if upgrade {
+		if err := user.UpdatePassword(db, utils.GetCacheFromContext(c), password); err != nil {
+			globals.Warn(fmt.Sprintf("failed to upgrade password hash for user %s: %s", user.Username, err.Error()))
+		}
 	}
 
 	if user.IsBanned(db) {
@@ -209,9 +215,13 @@ func DeepLogin(c *gin.Context, token string) (string, error) {
 
 		// register
 		password := utils.GenerateChar(64)
+		hash, err := utils.HashPassword(password)
+		if err != nil {
+			return "", err
+		}
 
-		_, err := globals.QueryDb(db, "INSERT INTO auth (bind_id, username, token, password) VALUES (?, ?, ?, ?)",
-			user.ID, user.Username, utils.Extract(token, 255, ""), utils.Sha2Encrypt(password))
+		_, err = globals.QueryDb(db, "INSERT INTO auth (bind_id, username, token, password) VALUES (?, ?, ?, ?)",
+			user.ID, user.Username, utils.Extract(token, 255, ""), hash)
 		if err != nil {
 			return "", err
 		}
@@ -234,7 +244,6 @@ func DeepLogin(c *gin.Context, token string) (string, error) {
 	}
 	u := &User{
 		Username: user.Username,
-		Password: password,
 	}
 
 	if u.IsBanned(db) {
@@ -283,7 +292,10 @@ func Reset(c *gin.Context, form ResetForm) error {
 }
 
 func (u *User) UpdatePassword(db *sql.DB, cache *redis.Client, password string) error {
-	hash := utils.Sha2Encrypt(password)
+	hash, err := utils.HashPassword(password)
+	if err != nil {
+		return err
+	}
 
 	if _, err := globals.ExecDb(db, `
 			UPDATE auth SET password = ? WHERE id = ?
@@ -297,18 +309,30 @@ func (u *User) UpdatePassword(db *sql.DB, cache *redis.Client, password string) 
 }
 
 func (u *User) Validate(c *gin.Context) bool {
-	if u.Username == "" || u.Password == "" {
+	if u.Username == "" {
 		return false
 	}
 	cache := utils.GetCacheFromContext(c)
+	db := utils.GetDBFromContext(c)
 
-	if password, err := cache.Get(c, fmt.Sprintf("nio:user:%s", u.Username)).Result(); err == nil && len(password) > 0 {
-		return u.Password == password
+	if u.Password != "" {
+		if password, err := cache.Get(c, fmt.Sprintf("nio:user:%s", u.Username)).Result(); err == nil && len(password) > 0 {
+			if u.Password != password {
+				return false
+			}
+
+			return !u.IsBanned(db)
+		}
 	}
 
-	db := utils.GetDBFromContext(c)
 	var count int
-	if err := globals.QueryRowDb(db, "SELECT COUNT(*) FROM auth WHERE username = ? AND password = ?", u.Username, u.Password).Scan(&count); err != nil || count == 0 {
+	var err error
+	if u.Password != "" {
+		err = globals.QueryRowDb(db, "SELECT COUNT(*) FROM auth WHERE username = ? AND password = ?", u.Username, u.Password).Scan(&count)
+	} else {
+		err = globals.QueryRowDb(db, "SELECT COUNT(*) FROM auth WHERE username = ?", u.Username).Scan(&count)
+	}
+	if err != nil || count == 0 {
 		if err != nil {
 			globals.Warn(fmt.Sprintf("validate user error: %s", err.Error()))
 		}
@@ -319,14 +343,15 @@ func (u *User) Validate(c *gin.Context) bool {
 		return false
 	}
 
-	cache.Set(c, fmt.Sprintf("nio:user:%s", u.Username), u.Password, 30*time.Minute)
+	if u.Password != "" {
+		cache.Set(c, fmt.Sprintf("nio:user:%s", u.Username), u.Password, 30*time.Minute)
+	}
 	return true
 }
 
 func (u *User) GenerateToken() (string, error) {
 	instance := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"username": u.Username,
-		"password": u.Password,
 		"exp":      time.Now().Add(time.Hour * 24 * 30).Unix(),
 	})
 	token, err := instance.SignedString([]byte(viper.GetString("secret")))
@@ -341,12 +366,6 @@ func (u *User) GenerateToken() (string, error) {
 func (u *User) GenerateTokenSafe(db *sql.DB) (string, error) {
 	if len(u.Username) == 0 {
 		if err := globals.QueryRowDb(db, "SELECT username FROM auth WHERE id = ?", u.ID).Scan(&u.Username); err != nil {
-			return "", err
-		}
-	}
-
-	if len(u.Password) == 0 {
-		if err := globals.QueryRowDb(db, "SELECT password FROM auth WHERE id = ?", u.ID).Scan(&u.Password); err != nil {
 			return "", err
 		}
 	}

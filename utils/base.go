@@ -1,8 +1,9 @@
 package utils
 
 import (
+	crand "crypto/rand"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"time"
 
 	"github.com/goccy/go-json"
@@ -10,27 +11,38 @@ import (
 )
 
 func Intn(n int) int {
-	source := rand.NewSource(time.Now().UnixNano())
-	r := rand.New(source)
-	return r.Intn(n)
+	if n <= 0 {
+		return 0
+	}
+
+	value, err := crand.Int(crand.Reader, big.NewInt(int64(n)))
+	if err != nil {
+		panic(fmt.Sprintf("crypto random failed: %v", err))
+	}
+
+	return int(value.Int64())
 }
 
 func Intn64(n int64) int64 {
-	source := rand.NewSource(time.Now().UnixNano())
-	r := rand.New(source)
-	return r.Int63n(n)
+	if n <= 0 {
+		return 0
+	}
+
+	value, err := crand.Int(crand.Reader, big.NewInt(n))
+	if err != nil {
+		panic(fmt.Sprintf("crypto random failed: %v", err))
+	}
+
+	return value.Int64()
 }
 
 func IntnSeed(n int, seed int) int {
-	// unix nano is the same if called in the same nanosecond, so we need to add another random seed
-	source := rand.NewSource(time.Now().UnixNano() + int64(seed))
-	r := rand.New(source)
-	return r.Intn(n)
+	return Intn(n)
 }
 
 func IntnSeq(n int, len int) (res []int) {
 	for i := 0; i < len; i++ {
-		res = append(res, IntnSeed(n, i))
+		res = append(res, Intn(n))
 	}
 
 	return res

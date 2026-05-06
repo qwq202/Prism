@@ -114,10 +114,15 @@ func InitRootUser(db *sql.DB) {
 
 	if count == 0 {
 		globals.Debug("[service] no user found, creating root user (username: root, password: chatnio123456, email: root@example.com)")
-		_, err := globals.ExecDb(db, `
+		hash, err := utils.HashPassword("chatnio123456")
+		if err != nil {
+			globals.Warn(fmt.Sprintf("[service] failed to hash root password: %s", err.Error()))
+			return
+		}
+		_, err = globals.ExecDb(db, `
 			INSERT INTO auth (username, password, email, is_admin, bind_id, token)
 			VALUES (?, ?, ?, ?, ?, ?)
-		`, "root", utils.Sha2Encrypt("chatnio123456"), "root@example.com", true, 0, "root")
+		`, "root", hash, "root@example.com", true, 0, "root")
 		if err != nil {
 			globals.Warn(fmt.Sprintf("[service] failed to create root user: %s", err.Error()))
 		}
