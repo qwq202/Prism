@@ -4,6 +4,8 @@ import (
 	"chat/globals"
 	"database/sql"
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -133,6 +135,46 @@ func TestPlanSharedPointPoolUsesCustomResetInterval(t *testing.T) {
 	}
 	if usage.ResetAt == "" {
 		t.Fatalf("expected next reset time to be exposed")
+	}
+}
+
+func TestPlanSharedPointPoolConcurrentConsumptionCannotExceedLimit(t *testing.T) {
+	_, cache := openPlanTestCache(t)
+	user := planTestUser{id: 88}
+	plan := Plan{
+		Level: 1,
+		Quota: 1,
+		Items: []PlanItem{
+			{
+				Id:     "all-models",
+				Models: []string{"gpt-5.1"},
+			},
+		},
+	}
+
+	var success atomic.Int64
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+
+	for i := 0; i < 12; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			if plan.ConsumePointPool(user, cache, "gpt-5.1", 0.25) {
+				success.Add(1)
+			}
+		}()
+	}
+
+	close(start)
+	wg.Wait()
+
+	if got := success.Load(); got != 4 {
+		t.Fatalf("expected exactly 4 successful point consumptions, got %d", got)
+	}
+	if usage := plan.GetPointUsage(user, cache); usage > plan.Quota {
+		t.Fatalf("expected point usage to stay within limit, got %f", usage)
 	}
 }
 

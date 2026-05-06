@@ -65,29 +65,25 @@ func (u *User) DecreaseQuota(db *sql.DB, quota float32) bool {
 }
 
 func (u *User) UseQuota(db *sql.DB, quota float32) bool {
-	if quota == 0 {
+	if quota <= 0 {
 		return true
 	}
-	if !u.DecreaseQuota(db, quota) {
+
+	result, err := globals.ExecDb(db, `
+		UPDATE quota
+		SET quota = quota - ?, used = used + ?, updated_at = CURRENT_TIMESTAMP
+		WHERE user_id = ? AND quota >= ?
+	`, quota, quota, u.GetID(db), quota)
+	if err != nil {
 		return false
 	}
-	return u.IncreaseUsedQuota(db, quota)
+
+	affected, err := result.RowsAffected()
+	return err == nil && affected > 0
 }
 
 func (u *User) PayedQuota(db *sql.DB, quota float32) bool {
-	if quota == 0 {
-		return true
-	}
-
-	current := u.GetQuota(db)
-	if quota > current {
-		return false
-	}
-
-	if !u.DecreaseQuota(db, quota) {
-		return false
-	}
-	return u.IncreaseUsedQuota(db, quota)
+	return u.UseQuota(db, quota)
 }
 
 func (u *User) PayedQuotaAsAmount(db *sql.DB, amount float32) bool {

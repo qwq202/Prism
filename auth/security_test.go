@@ -41,6 +41,7 @@ func openAuthSecurityTestDB(t *testing.T) *sql.DB {
 
 	connection.CreateUserTable(db)
 	connection.CreateApiKeyTable(db)
+	connection.CreateQuotaTable(db)
 
 	return db
 }
@@ -195,5 +196,37 @@ func TestParseApiKeyMigratesLegacyPlaintextKey(t *testing.T) {
 	}
 	if stored == legacyKey || !isHashedApiKey(stored) {
 		t.Fatalf("expected legacy api key to migrate to hash, got %q", stored)
+	}
+}
+
+func TestUseQuotaDeductsQuotaAndUsedAtomically(t *testing.T) {
+	db := openAuthSecurityTestDB(t)
+	user := GetUserByName(db, "root")
+	if user == nil {
+		t.Fatalf("expected root user")
+	}
+
+	if !user.SetQuota(db, 5) {
+		t.Fatalf("set quota")
+	}
+	if !user.UseQuota(db, 3) {
+		t.Fatalf("expected quota usage to succeed")
+	}
+
+	if got := user.GetQuota(db); got != 2 {
+		t.Fatalf("expected remaining quota 2, got %f", got)
+	}
+	if got := user.GetUsedQuota(db); got != 3 {
+		t.Fatalf("expected used quota 3, got %f", got)
+	}
+
+	if user.UseQuota(db, 3) {
+		t.Fatalf("expected over-quota usage to fail")
+	}
+	if got := user.GetQuota(db); got != 2 {
+		t.Fatalf("expected failed usage to keep quota 2, got %f", got)
+	}
+	if got := user.GetUsedQuota(db); got != 3 {
+		t.Fatalf("expected failed usage to keep used quota 3, got %f", got)
 	}
 }

@@ -3,6 +3,7 @@ package channel
 import (
 	"chat/globals"
 	"chat/utils"
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -44,6 +45,8 @@ type Usage struct {
 type UsageMap map[string]Usage
 
 var planExp int64 = 0
+
+var errPointPoolExceeded = errors.New("subscription point pool exceeded")
 
 const (
 	PlanItemUnitTimes      = "times"
@@ -159,36 +162,59 @@ func advanceUsageOffset(offset time.Time, now time.Time, resetInterval int64) (t
 	return offset, false
 }
 
+func parseSubscriptionUsageValue(value string, resetInterval int64, now time.Time) (usage int64, offset time.Time) {
+	offset = now
+
+	seg := strings.Split(value, "/")
+	if len(seg) != 2 {
+		return 0, offset
+	}
+
+	date, err := time.ParseInLocation("2006-01-02:15:04:05", seg[0], time.Local)
+	usage = utils.ParseInt64(seg[1])
+	if err != nil {
+		return 0, offset
+	}
+
+	if nextOffset, reset := advanceUsageOffset(date, now, resetInterval); reset {
+		return 0, nextOffset
+	} else {
+		return usage, nextOffset
+	}
+}
+
+func parseSubscriptionPointUsageValue(value string, resetInterval int64, now time.Time) (usage float32, offset time.Time) {
+	offset = now
+
+	seg := strings.Split(value, "/")
+	if len(seg) != 2 {
+		return 0, offset
+	}
+
+	date, err := time.ParseInLocation("2006-01-02:15:04:05", seg[0], time.Local)
+	usage = utils.ParseFloat32(seg[1])
+	if err != nil {
+		return 0, offset
+	}
+
+	if nextOffset, reset := advanceUsageOffset(date, now, resetInterval); reset {
+		return 0, nextOffset
+	} else {
+		return usage, nextOffset
+	}
+}
+
 func getSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string, resetInterval int64) (usage int64, offset time.Time) {
 	// example cache value: 2021-09-01:19:00:00/100
 	// if date is longer than the configured reset interval, reset usage
 
-	offset = time.Now()
-
 	key := globals.GetSubscriptionLimitFormat(t, user.HitID())
 	v, err := utils.GetCache(cache, key)
-	if (err != nil && errors.Is(err, redis.Nil)) || len(v) == 0 {
-		usage = 0
+	if err != nil && errors.Is(err, redis.Nil) {
+		v = ""
 	}
 
-	seg := strings.Split(v, "/")
-	if len(seg) != 2 {
-		usage = 0
-	} else {
-		date, err := time.ParseInLocation("2006-01-02:15:04:05", seg[0], time.Local)
-		usage = utils.ParseInt64(seg[1])
-		if err != nil {
-			usage = 0
-		} else {
-			offset = date
-			if nextOffset, reset := advanceUsageOffset(date, time.Now(), resetInterval); reset {
-				usage = 0
-				offset = nextOffset
-			} else {
-				offset = nextOffset
-			}
-		}
-	}
+	usage, offset = parseSubscriptionUsageValue(v, resetInterval, time.Now())
 
 	// set new cache value
 	_ = utils.SetCache(cache, key, getOffsetFormat(offset, usage), planExp)
@@ -197,36 +223,59 @@ func getSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string, 
 }
 
 func getSubscriptionPointUsage(cache *redis.Client, user globals.AuthLike, t string, resetInterval int64) (usage float32, offset time.Time) {
-	offset = time.Now()
-
 	key := globals.GetSubscriptionLimitFormat(t, user.HitID())
 	v, err := utils.GetCache(cache, key)
-	if (err != nil && errors.Is(err, redis.Nil)) || len(v) == 0 {
-		usage = 0
+	if err != nil && errors.Is(err, redis.Nil) {
+		v = ""
 	}
 
-	seg := strings.Split(v, "/")
-	if len(seg) != 2 {
-		usage = 0
-	} else {
-		date, err := time.ParseInLocation("2006-01-02:15:04:05", seg[0], time.Local)
-		usage = utils.ParseFloat32(seg[1])
-		if err != nil {
-			usage = 0
-		} else {
-			offset = date
-			if nextOffset, reset := advanceUsageOffset(date, time.Now(), resetInterval); reset {
-				usage = 0
-				offset = nextOffset
-			} else {
-				offset = nextOffset
-			}
-		}
-	}
+	usage, offset = parseSubscriptionPointUsageValue(v, resetInterval, time.Now())
 
 	_ = utils.SetCache(cache, key, getFloatOffsetFormat(offset, usage), planExp)
 
 	return
+}
+
+func consumeSubscriptionPointUsage(cache *redis.Client, key string, limit float32, resetInterval int64, amount float32) bool {
+	ctx := context.Background()
+
+	for attempts := 0; attempts < 32; attempts++ {
+		err := cache.Watch(ctx, func(tx *redis.Tx) error {
+			value, err := tx.Get(ctx, key).Result()
+			if err != nil {
+				if errors.Is(err, redis.Nil) {
+					value = ""
+				} else {
+					return err
+				}
+			}
+
+			used, offset := parseSubscriptionPointUsageValue(value, resetInterval, time.Now())
+			used += amount
+			if used > limit {
+				return errPointPoolExceeded
+			}
+
+			_, err = tx.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+				pipe.Set(ctx, key, getFloatOffsetFormat(offset, used), time.Duration(planExp)*time.Second)
+				return nil
+			})
+			return err
+		}, key)
+
+		if err == nil {
+			return true
+		}
+		if errors.Is(err, errPointPoolExceeded) {
+			return false
+		}
+		if errors.Is(err, redis.TxFailedErr) {
+			continue
+		}
+		return false
+	}
+
+	return false
 }
 
 func GetSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string) (usage int64, offset time.Time) {
@@ -312,13 +361,7 @@ func (p *Plan) ConsumePointPool(user globals.AuthLike, cache *redis.Client, mode
 	}
 
 	key := globals.GetSubscriptionLimitFormat(p.pointUsageKey(), user.HitID())
-	used, offset := getSubscriptionPointUsage(cache, user, p.pointUsageKey(), p.ResetInterval)
-	used += quota
-	if used > p.Quota {
-		return false
-	}
-
-	return utils.SetCache(cache, key, getFloatOffsetFormat(offset, used), planExp) == nil
+	return consumeSubscriptionPointUsage(cache, key, p.Quota, p.ResetInterval, quota)
 }
 
 func increaseSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string, limit int64, resetInterval int64, amount int64) bool {
