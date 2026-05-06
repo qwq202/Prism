@@ -25,6 +25,31 @@ func TestSaveResponseSkipsMetadataOnlyAssistantReply(t *testing.T) {
 	}
 }
 
+func TestConversationMessageAccessorsHandleEmptyAndOutOfRangeIndexes(t *testing.T) {
+	instance := NewAnonymousConversation()
+
+	if got := instance.GetLastMessage(); got.Role != "" || got.Content != "" {
+		t.Fatalf("expected empty last message on empty conversation, got %#v", got)
+	}
+	if got := instance.GetMessageById(0); got.Role != "" || got.Content != "" {
+		t.Fatalf("expected empty message for out-of-range index, got %#v", got)
+	}
+	if instance.HasMessageId(0) {
+		t.Fatalf("expected empty conversation not to have message id 0")
+	}
+
+	instance.AddMessage(globals.Message{Role: globals.User, Content: "hello"})
+	if !instance.HasMessageId(0) {
+		t.Fatalf("expected message id 0 to exist")
+	}
+	if instance.HasMessageId(-1) || instance.HasMessageId(1) {
+		t.Fatalf("expected negative and out-of-range indexes to be rejected")
+	}
+	if got := instance.GetMessageById(0); got.Content != "hello" {
+		t.Fatalf("expected valid message lookup, got %#v", got)
+	}
+}
+
 func TestSaveResponsePersistsToolCallsWithoutText(t *testing.T) {
 	instance := NewAnonymousConversation()
 	calls := globals.ToolCalls{

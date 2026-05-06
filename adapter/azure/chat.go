@@ -56,6 +56,19 @@ func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps, stream bool) 
 	}
 }
 
+func getChatResponseContent(data *ChatResponse) (string, error) {
+	if data == nil {
+		return "", fmt.Errorf("openai error: cannot parse response")
+	}
+	if data.Error.Message != "" {
+		return "", fmt.Errorf("openai error: %s", data.Error.Message)
+	}
+	if len(data.Choices) == 0 {
+		return "", fmt.Errorf("openai error: empty choices")
+	}
+	return data.Choices[0].Message.Content, nil
+}
+
 // CreateChatRequest is the native http request body for openai
 func (c *ChatInstance) CreateChatRequest(props *adaptercommon.ChatProps) (string, error) {
 	if globals.IsOpenAIDalleModel(props.Model) {
@@ -74,12 +87,7 @@ func (c *ChatInstance) CreateChatRequest(props *adaptercommon.ChatProps) (string
 	}
 
 	data := utils.MapToStruct[ChatResponse](res)
-	if data == nil {
-		return "", fmt.Errorf("openai error: cannot parse response")
-	} else if data.Error.Message != "" {
-		return "", fmt.Errorf("openai error: %s", data.Error.Message)
-	}
-	return data.Choices[0].Message.Content, nil
+	return getChatResponseContent(data)
 }
 
 // CreateStreamChatRequest is the stream response body for openai

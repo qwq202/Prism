@@ -340,7 +340,14 @@ func (c *Conversation) GetMessage() []globals.Message {
 	return c.Message
 }
 
+func (c *Conversation) HasMessageId(id int) bool {
+	return id >= 0 && id < len(c.Message)
+}
+
 func (c *Conversation) GetMessageById(id int) globals.Message {
+	if !c.HasMessageId(id) {
+		return globals.Message{}
+	}
 	return c.Message[id]
 }
 
@@ -446,6 +453,9 @@ func CopyMessage(message []globals.Message) []globals.Message {
 }
 
 func (c *Conversation) GetLastMessage() globals.Message {
+	if len(c.Message) == 0 {
+		return globals.Message{}
+	}
 	return c.Message[len(c.Message)-1]
 }
 

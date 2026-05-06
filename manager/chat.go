@@ -841,6 +841,13 @@ func createToolChatTask(
 	return hit, nil, false
 }
 
+func latestMessageContent(messages []globals.Message) (string, bool) {
+	if len(messages) == 0 {
+		return "", false
+	}
+	return messages[len(messages)-1].Content, true
+}
+
 func createChatTask(
 	conn *Connection, user *auth.User, buffer *utils.Buffer, db *sql.DB, cache *redis.Client,
 	model string, instance *conversation.Conversation, segment []globals.Message, plan bool,
@@ -866,9 +873,15 @@ func createChatTask(
 		}()
 
 		if globals.IsVideoModel(model) {
+			prompt, ok := latestMessageContent(segment)
+			if !ok {
+				chunkChan <- partialChunk{Chunk: nil, End: true, Hit: false, Error: errors.New("empty message segment")}
+				return
+			}
+
 			props := adaptercommon.CreateVideoProps(&adaptercommon.VideoProps{
 				Model:  model,
-				Prompt: segment[len(segment)-1].Content,
+				Prompt: prompt,
 			})
 			props.User = auth.GetUsernameString(db, user)
 

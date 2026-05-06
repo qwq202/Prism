@@ -75,6 +75,9 @@ func GetSharedMessages(db *sql.DB, userId int64, conversationId int64, refs []st
 			if err != nil {
 				continue
 			}
+			if !conversation.HasMessageId(id) {
+				continue
+			}
 			messages = append(messages, conversation.GetMessageById(id))
 		}
 	}
