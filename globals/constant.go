@@ -16,6 +16,7 @@ const (
 	ClaudeChannelType             = "claude"
 	GLMCodingPlanCNChannelType    = "glm-coding-plan-cn"
 	MiniMaxTokenPlanCNChannelType = "minimax-token-plan-cn"
+	XiaomiTokenPlanCNChannelType  = "xiaomi-token-plan-cn"
 	PalmChannelType               = "palm"
 	DeepseekChannelType           = "deepseek"
 )

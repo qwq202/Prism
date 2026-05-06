@@ -165,6 +165,10 @@ const (
 	GoogleImagen002              = "imagen-3.0-generate-002"
 	DeepseekV4Flash              = "deepseek-v4-flash"
 	DeepseekV4Pro                = "deepseek-v4-pro"
+	MiMoV25                      = "mimo-v2.5"
+	MiMoV25Pro                   = "mimo-v2.5-pro"
+	MiMoV2Omni                   = "mimo-v2-omni"
+	MiMoV2Pro                    = "mimo-v2-pro"
 )
 
 var OpenAIDalleModels = []string{
@@ -181,7 +185,8 @@ var VisionModels = []string{
 	Gemini20Flash, Gemini20Flash001, Gemini20FlashLite,
 	Gemini25Flash, Gemini25Pro, Gemini25FlashLitePreview, "gemini-2.5-flash-lite", "gemini-2.5-flash-preview-09-2025",
 	Gemini3Flash, Gemini3ProPreview, Gemini3ProImagePreview, "gemini-3-flash-preview", "gemini-3.1-pro-preview", "gemini-3.1-pro-preview-customtools", "gemini-3.1-flash-lite-preview", "gemini-3.1-flash-image-preview", // gemini
-	Claude3, // anthropic
+	Claude3,                                    // anthropic
+	MiMoV25, MiMoV25Pro, MiMoV2Omni, MiMoV2Pro, // xiaomi mimo
 }
 
 var VisionSkipModels = []string{

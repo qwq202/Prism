@@ -10,6 +10,7 @@ import (
 	"chat/adapter/openairesponses"
 	"chat/adapter/palm2"
 	"chat/adapter/xai"
+	"chat/adapter/xiaomitokenplan"
 	"chat/globals"
 	"fmt"
 )
@@ -22,6 +23,7 @@ var channelFactories = map[string]adaptercommon.FactoryCreator{
 	globals.ClaudeChannelType:             claude.NewChatInstanceFromConfig,
 	globals.GLMCodingPlanCNChannelType:    claude.NewChatInstanceFromConfig, // anthropic-compatible
 	globals.MiniMaxTokenPlanCNChannelType: minimaxtokenplan.NewChatInstanceFromConfig,
+	globals.XiaomiTokenPlanCNChannelType:  xiaomitokenplan.NewChatInstanceFromConfig,
 	globals.PalmChannelType:               palm2.NewChatInstanceFromConfig,
 	globals.DeepseekChannelType:           deepseek.NewChatInstanceFromConfig,
 }

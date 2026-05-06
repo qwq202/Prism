@@ -59,6 +59,7 @@ export const ChannelTypes: Record<string, string> = {
   claude: "Anthropic Claude",
   "glm-coding-plan-cn": "GLM Coding Plan（CN）",
   "minimax-token-plan-cn": "MiniMax Token Plan（CN）",
+  "xiaomi-token-plan-cn": "Xiaomi Token Plan (China)",
   palm: "Google Gemini",
   deepseek: "深度求索 DeepSeek",
 };
@@ -71,6 +72,7 @@ export const ShortChannelTypes: Record<string, string> = {
   claude: "Claude",
   "glm-coding-plan-cn": "GLM Coding",
   "minimax-token-plan-cn": "MiniMax",
+  "xiaomi-token-plan-cn": "Xiaomi TP",
   palm: "Gemini",
   deepseek: "DeepSeek",
 };
@@ -230,6 +232,22 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "MiniMax-M2",
       "MiniMax-M2.7",
       "MiniMax-M2.7-highspeed",
+    ],
+  },
+  "xiaomi-token-plan-cn": {
+    endpoint: "https://token-plan-cn.xiaomimimo.com/v1",
+    format: "<tp-api-key>",
+    description:
+      "> Xiaomi Token Plan (China) 渠道基于 **OpenAI Chat Completions API** 兼容格式，接入点默认填写 *https://token-plan-cn.xiaomimimo.com/v1*，系统会请求 *`/chat/completions`*。 \n" +
+      "> 密钥需使用 **Token Plan 专属 API Key**，格式通常为 **tp-xxxxx**，与按量计费 API Key **sk-xxxxx** 不可互通。 \n" +
+      "> 系统已单独适配小米 Token Plan 的 **api-key** 鉴权、**max_completion_tokens**、**thinking**、**reasoning_content** 与流式 Chat Completions 返回。 \n" +
+      "> 默认模型按官方快速接入和模型列表保留 **mimo-v2.5-pro**、**mimo-v2.5**、**mimo-v2-pro**、**mimo-v2-omni**、**mimo-v2-flash**。\n",
+    models: [
+      "mimo-v2.5-pro",
+      "mimo-v2.5",
+      "mimo-v2-pro",
+      "mimo-v2-omni",
+      "mimo-v2-flash",
     ],
   },
   palm: {
