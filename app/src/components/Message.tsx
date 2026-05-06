@@ -49,10 +49,12 @@ type MessageProps = {
   selected?: boolean;
   onFocus?: (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => void;
   onFocusLeave?: (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => void;
+  onMenuOpenChange?: (open: boolean) => void;
 };
 
 function MessageSegment(props: MessageProps) {
   const ref = useRef(null);
+  const menuOpenRef = useRef(false);
   const { message } = props;
 
   return (
@@ -62,6 +64,7 @@ function MessageSegment(props: MessageProps) {
       onClick={props.onFocus}
       onMouseEnter={props.onFocus}
       onMouseLeave={(event) => {
+        if (menuOpenRef.current) return;
         try {
           if (isContainDom(ref.current, event.relatedTarget as HTMLElement))
             return;
@@ -71,7 +74,13 @@ function MessageSegment(props: MessageProps) {
         }
       }}
     >
-      <MessageContent {...props} />
+      <MessageContent
+        {...props}
+        onMenuOpenChange={(open) => {
+          menuOpenRef.current = open;
+          props.onMenuOpenChange?.(open);
+        }}
+      />
       <MessageQuota message={message} />
     </div>
   );
@@ -134,6 +143,7 @@ type MessageMenuProps = {
   setEditedMessage: (message: string) => void;
   setOpen: (open: boolean) => void;
   align?: "start" | "end";
+  onOpenChange?: (open: boolean) => void;
 };
 
 function MessageMenu({
@@ -146,6 +156,7 @@ function MessageMenu({
   editedMessage,
   setEditedMessage,
   setOpen,
+  onOpenChange,
 }: MessageMenuProps) {
   const { t } = useTranslation();
   const isAssistant = message.role === "assistant";
@@ -153,9 +164,14 @@ function MessageMenu({
   const disableDelete = isAssistant && end && !notInOutput;
   const [dropdown, setDropdown] = useState(false);
 
+  const handleDropdownChange = (open: boolean) => {
+    setDropdown(open);
+    onOpenChange?.(open);
+  };
+
   return (
-    <DropdownMenu open={dropdown} onOpenChange={setDropdown}>
-      <DropdownMenuTrigger className={cn(`flex flex-row outline-none`)}>
+    <DropdownMenu open={dropdown} onOpenChange={handleDropdownChange}>
+      <DropdownMenuTrigger asChild>
         {children}
       </DropdownMenuTrigger>
       <DropdownMenuContent align={align}>
@@ -250,6 +266,7 @@ function MessageContent({
   selected,
   username,
   model,
+  onMenuOpenChange,
 }: MessageProps) {
   const isUser = message.role === "user";
   const hasContent = message.content.length > 0;
@@ -314,12 +331,15 @@ function MessageContent({
             setEditedMessage={setEditedMessage}
             setOpen={setOpen}
             align={isUser ? "end" : "start"}
+            onOpenChange={onMenuOpenChange}
           >
-            <div
-              className={`message-avatar flex flex-row items-center justify-center cursor-pointer select-none opacity-0 animate-fade-in`}
+            <button
+              type="button"
+              className={`message-avatar flex flex-row items-center justify-center cursor-pointer select-none opacity-0 animate-fade-in border-0 bg-transparent p-0 text-foreground`}
+              onClick={(event) => event.stopPropagation()}
             >
               <PencilLine className={`h-4 w-4`} />
-            </div>
+            </button>
           </MessageMenu>
         )}
       </div>
