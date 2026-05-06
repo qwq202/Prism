@@ -13,6 +13,7 @@ type ChatInstance struct {
 	ApiKey           string
 	isFirstReasoning bool
 	isReasonOver     bool
+	toolCalls        map[int]globals.ToolCall
 }
 
 func normalizeEndpoint(endpoint string) string {
@@ -29,6 +30,7 @@ func NewChatInstance(endpoint, apiKey string) *ChatInstance {
 		Endpoint:         normalizeEndpoint(endpoint),
 		ApiKey:           apiKey,
 		isFirstReasoning: true,
+		toolCalls:        make(map[int]globals.ToolCall),
 	}
 }
 

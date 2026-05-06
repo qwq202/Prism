@@ -103,3 +103,61 @@ func TestProcessLineStreamsReasoningContent(t *testing.T) {
 		t.Fatalf("expected reasoning close before content, got %q", chunk.Content)
 	}
 }
+
+func findToolCallByID(calls globals.ToolCalls, id string) *globals.ToolCall {
+	for i := range calls {
+		if calls[i].Id == id {
+			return &calls[i]
+		}
+	}
+	return nil
+}
+
+func TestProcessLineNormalizesInterleavedToolCallDeltas(t *testing.T) {
+	instance := NewChatInstance("", "tp-test")
+	buffer := &utils.Buffer{}
+
+	lines := []string{
+		`{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_search","type":"function","function":{"name":"search","arguments":""}}]},"index":0}]}`,
+		`{"choices":[{"delta":{"tool_calls":[{"index":1,"id":"call_calc","type":"function","function":{"name":"calculate","arguments":""}}]},"index":0}]}`,
+		`{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"query\":\"mi"}}]},"index":0}]}`,
+		`{"choices":[{"delta":{"tool_calls":[{"index":1,"function":{"arguments":"{\"expr\":\"1+"}}]},"index":0}]}`,
+		`{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"mo\"}"}}]},"index":0}]}`,
+		`{"choices":[{"delta":{"tool_calls":[{"index":1,"function":{"arguments":"1\"}"}}]},"index":0}]}`,
+	}
+
+	for _, line := range lines {
+		chunk, err := instance.ProcessLine(line)
+		if err != nil {
+			t.Fatalf("unexpected tool call chunk error: %v", err)
+		}
+		buffer.WriteChunk(chunk)
+	}
+
+	calls := buffer.GetToolCalls()
+	if calls == nil || len(*calls) != 2 {
+		t.Fatalf("expected two tool calls, got %#v", calls)
+	}
+
+	search := findToolCallByID(*calls, "call_search")
+	if search == nil {
+		t.Fatalf("expected call_search in %#v", *calls)
+	}
+	if search.Function.Name != "search" {
+		t.Fatalf("expected search tool name, got %q", search.Function.Name)
+	}
+	if search.Function.Arguments != `{"query":"mimo"}` {
+		t.Fatalf("expected search arguments to stay on index 0, got %q", search.Function.Arguments)
+	}
+
+	calculate := findToolCallByID(*calls, "call_calc")
+	if calculate == nil {
+		t.Fatalf("expected call_calc in %#v", *calls)
+	}
+	if calculate.Function.Name != "calculate" {
+		t.Fatalf("expected calculate tool name, got %q", calculate.Function.Name)
+	}
+	if calculate.Function.Arguments != `{"expr":"1+1"}` {
+		t.Fatalf("expected calculate arguments to stay on index 1, got %q", calculate.Function.Arguments)
+	}
+}

@@ -41,9 +41,14 @@ func hideRequestID(message string) string {
 	return message
 }
 
-func (c *ChatInstance) CreateStreamChatRequest(props *adaptercommon.ChatProps, callback globals.Hook) error {
+func (c *ChatInstance) resetStreamState() {
 	c.isFirstReasoning = true
 	c.isReasonOver = false
+	c.toolCalls = make(map[int]globals.ToolCall)
+}
+
+func (c *ChatInstance) CreateStreamChatRequest(props *adaptercommon.ChatProps, callback globals.Hook) error {
+	c.resetStreamState()
 
 	ticks := 0
 	err := utils.EventScanner(&utils.EventScannerProps{

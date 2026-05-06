@@ -72,6 +72,46 @@ func formatReasoningContent(reasoning *string, content string) string {
 	return fmt.Sprintf("<think>\n%s\n</think>\n\n%s", *reasoning, content)
 }
 
+func (c *ChatInstance) normalizeToolCalls(toolCalls *globals.ToolCalls) *globals.ToolCalls {
+	if toolCalls == nil || len(*toolCalls) == 0 {
+		return nil
+	}
+
+	normalized := make(globals.ToolCalls, 0, len(*toolCalls))
+	for fallbackIndex, call := range *toolCalls {
+		index := fallbackIndex
+		if call.Index != nil {
+			index = *call.Index
+		} else {
+			call.Index = utils.ToPtr(index)
+		}
+
+		previous := c.toolCalls[index]
+		if call.Id == "" {
+			call.Id = previous.Id
+		}
+		if call.Type == "" {
+			call.Type = previous.Type
+		}
+		if call.Function.Name == "" {
+			call.Function.Name = previous.Function.Name
+		}
+
+		c.toolCalls[index] = globals.ToolCall{
+			Index: call.Index,
+			Type:  call.Type,
+			Id:    call.Id,
+			Function: globals.ToolCallFunction{
+				Name: call.Function.Name,
+			},
+		}
+
+		normalized = append(normalized, call)
+	}
+
+	return &normalized
+}
+
 func (c *ChatInstance) getChoices(form *ChatStreamResponse) *globals.Chunk {
 	if len(form.Choices) == 0 {
 		return &globals.Chunk{Content: ""}
@@ -79,20 +119,21 @@ func (c *ChatInstance) getChoices(form *ChatStreamResponse) *globals.Chunk {
 
 	choice := form.Choices[0].Delta
 	reasoning := choice.ReasoningContent
+	toolCalls := c.normalizeToolCalls(choice.ToolCalls)
 
 	if !c.isFirstReasoning && !c.isReasonOver && reasoning == nil {
 		c.isReasonOver = true
 		if choice.Content != "" {
 			return &globals.Chunk{
 				Content:      fmt.Sprintf("\n</think>\n\n%s", choice.Content),
-				ToolCall:     choice.ToolCalls,
+				ToolCall:     toolCalls,
 				FunctionCall: choice.FunctionCall,
 			}
 		}
 
 		return &globals.Chunk{
 			Content:      "\n</think>\n\n",
-			ToolCall:     choice.ToolCalls,
+			ToolCall:     toolCalls,
 			FunctionCall: choice.FunctionCall,
 		}
 	}
@@ -109,7 +150,7 @@ func (c *ChatInstance) getChoices(form *ChatStreamResponse) *globals.Chunk {
 
 	return &globals.Chunk{
 		Content:          content,
-		ToolCall:         choice.ToolCalls,
+		ToolCall:         toolCalls,
 		FunctionCall:     choice.FunctionCall,
 		ReasoningContent: reasoning,
 	}
