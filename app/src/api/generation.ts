@@ -1,5 +1,6 @@
 import { tokenField, websocketEndpoint } from "@/conf/bootstrap.ts";
 import { getMemory } from "@/utils/memory.ts";
+import { getErrorMessage } from "@/utils/base.ts";
 
 export const endpoint = `${websocketEndpoint}/generation/create`;
 
@@ -104,7 +105,15 @@ export class GenerationManager {
         );
       };
       this.connection.onmessage = (event) => {
-        this.handleMessage(JSON.parse(event.data) as GenerationSegmentResponse);
+        try {
+          this.handleMessage(JSON.parse(event.data) as GenerationSegmentResponse);
+        } catch (e) {
+          console.warn(
+            `[generation] failed to parse websocket message: ${getErrorMessage(e)}`,
+          );
+          this.onError?.("invalid websocket message");
+          this.setProcessing(false);
+        }
       };
       this.connection.onclose = () => {
         this.setProcessing(false);

@@ -55,6 +55,17 @@ export function useMobile(): boolean {
   return mobile;
 }
 
+const safeUrlProtocols = new Set(["http:", "https:", "mailto:", "tel:", "blob:"]);
+
+function getSafeNavigationUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url, window.location.href);
+    return safeUrlProtocols.has(parsed.protocol) ? parsed.href : null;
+  } catch {
+    return null;
+  }
+}
+
 export function openWindow(url: string, target?: string): void {
   /**
    * Open a new window with the given URL.
@@ -63,15 +74,21 @@ export function openWindow(url: string, target?: string): void {
    * @param target The target of the URL.
    */
 
+  const safeUrl = getSafeNavigationUrl(url);
+  if (!safeUrl) return;
+
   if (mobile) {
-    window.location.href = url;
+    window.location.href = safeUrl;
   } else {
-    window.open(url, target);
+    window.open(safeUrl, target, "noopener,noreferrer");
   }
 }
 
 export function openPage(url: string): void {
-  window.location.href = url;
+  const safeUrl = getSafeNavigationUrl(url);
+  if (!safeUrl) return;
+
+  window.location.href = safeUrl;
 }
 
 export function openForm(
@@ -88,9 +105,12 @@ export function openForm(
    */
 
   const form = document.createElement("form");
+  const safeUrl = getSafeNavigationUrl(url);
+  if (!safeUrl) return;
+
   form.style.display = "none";
   form.method = method;
-  form.action = url;
+  form.action = safeUrl;
 
   !isSafari() && form.setAttribute("target", "_blank");
 

@@ -127,8 +127,14 @@ export class Connection {
       }, 3000);
     };
     this.connection.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      this.triggerCallback(message as StreamMessage);
+      try {
+        const message = JSON.parse(event.data);
+        this.triggerCallback(message as StreamMessage);
+      } catch (e) {
+        console.warn(
+          `[connection] failed to parse websocket message: ${getErrorMessage(e)}`,
+        );
+      }
     };
   }
 
