@@ -42,6 +42,11 @@ import Github from "@/components/ui/icons/Github.tsx";
 import { isTauri } from "@/utils/desktop.ts";
 import { useDeeptrain } from "@/conf/env.ts";
 import ThemeToggle from "@/components/ThemeProvider.tsx";
+import {
+  getLatestAvailableRelease,
+  isPreviewVersion,
+  type GitHubRelease,
+} from "@/utils/releases.ts";
 
 function SettingsDialog() {
   const { t, i18n } = useTranslation();
@@ -66,8 +71,12 @@ function SettingsDialog() {
   const repetitionPenalty = useSelector(settings.repetitionPenaltySelector);
 
   const [memorySize, setMemorySize] = useState(getMemoryPerformance());
+  const [latestRelease, setLatestRelease] = useState<GitHubRelease | null>(
+    null,
+  );
 
   const desktop = isTauri();
+  const previewVersion = isPreviewVersion(version);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -76,6 +85,30 @@ function SettingsDialog() {
 
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    let cancelled = false;
+
+    getLatestAvailableRelease(version)
+      .then((release) => {
+        if (!cancelled) {
+          setLatestRelease(release);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLatestRelease(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   return (
     <Dialog
@@ -94,7 +127,25 @@ function SettingsDialog() {
                     <div className={`grow`} />
                     <div className={`value`}>
                       v{version}
-                      <Badge className={`ml-1`}>Community</Badge>
+                      <Badge className={`ml-1`}>
+                        {t(
+                          previewVersion
+                            ? "settings.preview"
+                            : "settings.stable",
+                        )}
+                      </Badge>
+                      {latestRelease && (
+                        <a
+                          className={`ml-2 text-xs text-primary underline-offset-2 hover:underline`}
+                          href={latestRelease.html_url}
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          {t("settings.update-available", {
+                            version: latestRelease.tag_name,
+                          })}
+                        </a>
+                      )}
                     </div>
                   </div>
                   <div className={`item`}>
