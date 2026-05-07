@@ -53,31 +53,55 @@ const planInitialConfig: PlanConfig = {
   plans: [],
 };
 
-const defaultPointQuota = 1;
+const defaultPointQuota = 20;
+const defaultWeeklyQuota = 200;
 const defaultWindowResetInterval = 5 * 60 * 60;
 
 function hasPlanPointPool(plan: Plan): boolean {
   return (plan.quota ?? 0) > 0 || plan.quota === -1;
 }
 
-function getFinitePointQuota(value?: number): number {
-  return value && value > 0 ? value : defaultPointQuota;
+function getFinitePointQuota(
+  value?: number,
+  fallback = defaultPointQuota,
+): number {
+  return value && value > 0 ? value : fallback;
 }
 
-function normalizeShortWindowQuota(value?: number): number {
-  return value === -1 ? -1 : getFinitePointQuota(value);
+function normalizeShortWindowQuota(
+  value?: number,
+  fallback = defaultPointQuota,
+): number {
+  return value === -1 ? -1 : getFinitePointQuota(value, fallback);
+}
+
+function getLegacyQuotaFallback(plan: Plan): number {
+  if (plan.items.some((item) => item.value === -1)) return -1;
+  const legacyValues = plan.items
+    .map((item) => item.value)
+    .filter((value) => value > 0);
+  if (legacyValues.length === 0) return defaultPointQuota;
+  return Math.max(defaultPointQuota, ...legacyValues);
+}
+
+function getMigratedWeeklyQuota(plan: Plan, quota: number): number {
+  if (quota === -1 || plan.items.some((item) => item.value === -1)) return -1;
+  return getFinitePointQuota(
+    plan.weekly_quota,
+    Math.max(defaultWeeklyQuota, quota * 10),
+  );
 }
 
 function normalizeWindowQuotaPlan(plan: Plan): Plan {
   const wasWindowQuotaPlan = hasPlanPointPool(plan);
-  const quota = normalizeShortWindowQuota(plan.quota);
-  const resetInterval =
-    plan.reset_interval && plan.reset_interval > 0
-      ? plan.reset_interval
-      : defaultWindowResetInterval;
+  const quota = normalizeShortWindowQuota(
+    plan.quota,
+    getLegacyQuotaFallback(plan),
+  );
+  const resetInterval = defaultWindowResetInterval;
   const weeklyQuota = wasWindowQuotaPlan
-    ? (plan.weekly_quota ?? 0)
-    : getFinitePointQuota(plan.weekly_quota);
+    ? plan.weekly_quota ?? 0
+    : getMigratedWeeklyQuota(plan, quota);
 
   if (
     plan.quota === quota &&
@@ -193,7 +217,10 @@ function reducer(state: PlanConfig, action: PlanConfigAction): PlanConfig {
         ...state,
         plans: state.plans.map((plan: Plan) =>
           plan.level === action.payload.level
-            ? { ...plan, quota: normalizeShortWindowQuota(action.payload.quota) }
+            ? {
+                ...plan,
+                quota: normalizeShortWindowQuota(action.payload.quota),
+              }
             : plan,
         ),
       };
@@ -430,7 +457,10 @@ function CreditsPoolSettings({
                     payload: {
                       level: plan.level,
                       weeklyQuota: checked
-                        ? getFinitePointQuota(plan.weekly_quota)
+                        ? getFinitePointQuota(
+                            plan.weekly_quota,
+                            defaultWeeklyQuota,
+                          )
                         : 0,
                     },
                   })
@@ -793,10 +823,22 @@ function PlanConfig() {
     () => (conf ? conf.plans.flatMap((p: Plan) => p.items) : []),
     [conf],
   );
+  const confAllModelPlanCount = useMemo(
+    () =>
+      conf
+        ? conf.plans.filter(
+            (plan) => hasPlanPointPool(plan) && plan.items.length === 0,
+          ).length
+        : 0,
+    [conf],
+  );
   const confIncluding = useMemo(
     () => getUniqueList(confRules.flatMap((i: PlanItem) => i.models)),
     [confRules],
   );
+  const confRuleCount = confRules.length + confAllModelPlanCount;
+  const confModelCount =
+    confAllModelPlanCount > 0 ? availableModels.length : confIncluding.length;
 
   const refresh = async (ignoreUpdate?: boolean) => {
     setLoading(true);
@@ -851,8 +893,8 @@ function PlanConfig() {
       <PopupAlertDialog
         title={t("admin.plan.sync")}
         description={t("admin.plan.sync-result", {
-          length: confRules.length,
-          models: confIncluding.length,
+          length: confRuleCount,
+          models: confModelCount,
         })}
         open={syncOpen}
         setOpen={setSyncOpen}

@@ -171,7 +171,7 @@ func BuySubscription(db *sql.DB, cache *redis.Client, user *User, level int, mon
 	}
 
 	targetPlan := channel.PlanInstance.GetPlan(level)
-	if !targetPlan.IsSellable() {
+	if targetPlan.Level != level || !targetPlan.IsSellable() {
 		return errors.New("subscription plan is not available for sale")
 	}
 

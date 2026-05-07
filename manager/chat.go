@@ -230,7 +230,9 @@ func CollectQuota(c *gin.Context, user *auth.User, buffer *utils.Buffer, uncount
 
 	if uncountable {
 		if !auth.FinalizeSubscriptionUsage(db, utils.GetCacheFromContext(c), user, buffer.GetModel(), quota) {
-			user.UseQuota(db, quota)
+			if !user.UseQuota(db, quota) {
+				user.ForceUseQuota(db, quota)
+			}
 		}
 		return
 	}

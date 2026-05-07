@@ -139,7 +139,7 @@ func (c *PlanManager) IsEnabled() bool {
 }
 
 func (p *Plan) IsSellable() bool {
-	return p.Sellable == nil || *p.Sellable
+	return p.Level > 0 && (p.Sellable == nil || *p.Sellable)
 }
 
 func getOffsetFormat(offset time.Time, usage int64) string {
@@ -245,8 +245,6 @@ func getSubscriptionPointUsage(cache *redis.Client, user globals.AuthLike, t str
 	}
 
 	usage, offset = parseSubscriptionPointUsageValue(v, resetInterval, time.Now())
-
-	_ = utils.SetCache(cache, key, getFloatOffsetFormat(offset, usage), planExp)
 
 	return
 }

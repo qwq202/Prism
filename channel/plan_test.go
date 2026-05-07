@@ -4,6 +4,7 @@ import (
 	"chat/globals"
 	"database/sql"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -135,6 +136,14 @@ func TestPlanSharedPointPoolUsesCustomResetInterval(t *testing.T) {
 	}
 	if usage.ResetAt == "" {
 		t.Fatalf("expected next reset time to be exposed")
+	}
+
+	raw, err := server.Get(key)
+	if err != nil {
+		t.Fatalf("expected original point usage cache to remain readable: %v", err)
+	}
+	if !strings.HasSuffix(raw, "/2.000000") {
+		t.Fatalf("expected point usage reads not to overwrite cache, got %q", raw)
 	}
 }
 

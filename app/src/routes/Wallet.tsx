@@ -111,28 +111,26 @@ function getPlanResetLabel(
 function normalizePointWindowUsage(
   usage: SubscriptionUsageValue | null,
   total: number,
+  resetInterval = pointResetInterval,
 ): SubscriptionUsageValue {
   const resetAt = new Date(
-    Date.now() + pointResetInterval * 1000,
+    Date.now() +
+      (resetInterval > 0 ? resetInterval : pointResetInterval) * 1000,
   ).toISOString();
   if (!usage) {
     return {
       used: 0,
       total,
       unit: "points",
-      reset_interval: pointResetInterval,
+      reset_interval: resetInterval,
       reset_at: resetAt,
     };
   }
 
-  if (
-    !usage.reset_interval ||
-    usage.reset_interval === 0 ||
-    usage.reset_interval > pointResetInterval
-  ) {
+  if (!usage.reset_at) {
     return {
       ...usage,
-      reset_interval: pointResetInterval,
+      reset_interval: usage.reset_interval ?? resetInterval,
       reset_at: resetAt,
     };
   }
@@ -213,11 +211,12 @@ function PlanItem({ level, isYearly }: PlanItemProps) {
   }, [plan, isYearly]);
 
   const discountPercent = useMemo(() => {
+    if (!isYearly) return 0;
     const p = subscriptionData.find((p) => p.level === level);
     if (p && p.discounts && p.discounts["12"] !== undefined) {
       return Math.round((1 - p.discounts["12"]) * 100);
     }
-    return isYearly ? 20 : 0;
+    return 20;
   }, [subscriptionData, level, isYearly]);
 
   const iconEl =
@@ -533,6 +532,7 @@ function WalletPlanBox() {
                     const pointUsage = normalizePointWindowUsage(
                       toSubscriptionUsage(usage?.plan_points, planQuota),
                       planQuota,
+                      plan.reset_interval,
                     );
                     const weeklyUsage = toSubscriptionUsage(
                       usage?.plan_points_weekly,

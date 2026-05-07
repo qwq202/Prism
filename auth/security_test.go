@@ -242,3 +242,25 @@ func TestUseQuotaDeductsQuotaAndUsedAtomically(t *testing.T) {
 		t.Fatalf("expected failed usage to keep used quota 3, got %f", got)
 	}
 }
+
+func TestForceUseQuotaRecordsDebtAndUsage(t *testing.T) {
+	db := openAuthSecurityTestDB(t)
+	user := GetUserByName(db, "root")
+	if user == nil {
+		t.Fatalf("expected root user")
+	}
+
+	if !user.SetQuota(db, 1) {
+		t.Fatalf("set quota")
+	}
+	if !user.ForceUseQuota(db, 3) {
+		t.Fatalf("expected forced quota usage to succeed")
+	}
+
+	if got := user.GetQuota(db); got != -2 {
+		t.Fatalf("expected remaining quota -2, got %f", got)
+	}
+	if got := user.GetUsedQuota(db); got != 3 {
+		t.Fatalf("expected used quota 3, got %f", got)
+	}
+}

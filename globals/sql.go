@@ -59,6 +59,11 @@ func PreflightSql(sql string) string {
 					false,
 				},
 				{
+					"INSERT INTO quota (user_id, quota, used) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE quota = quota - ?, used = used + ?",
+					"INSERT INTO quota (user_id, quota, used) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET quota = quota - ?, used = used + ?",
+					false,
+				},
+				{
 					"INSERT INTO conversation (user_id, conversation_id, conversation_name, data, model, task_id) VALUES (?, ?, ?, ?, ?, ?)\n\t\tON DUPLICATE KEY UPDATE conversation_name = VALUES(conversation_name), data = VALUES(data), task_id = VALUES(task_id)",
 					"INSERT INTO conversation (user_id, conversation_id, conversation_name, data, model, task_id) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, conversation_id) DO UPDATE SET conversation_name = excluded.conversation_name, data = excluded.data, task_id = excluded.task_id",
 					false,
