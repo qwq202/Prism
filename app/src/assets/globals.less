@@ -144,6 +144,15 @@
   caret-color: hsl(var(--foreground)) !important;
 }
 
+.ui-input[type='password']::-ms-reveal,
+.ui-input[type='password']::-ms-clear,
+.ui-input[type='password']::-webkit-credentials-auto-fill-button,
+.ui-input[type='password']::-webkit-password-toggle-button {
+  display: none !important;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 @layer base {
   * {
     @apply border-border;
