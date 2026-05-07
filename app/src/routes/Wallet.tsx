@@ -507,30 +507,29 @@ function WalletPlanBox() {
                       fallbackResetLabel={t("admin.plan.plan-reset-0")}
                     />
                   )}
-                  {plan.items.map((item, index) => {
-                    const itemUsage = toSubscriptionUsage(
-                      usage?.[item.id],
-                      item.value,
-                    ) ?? {
-                      used: 0,
-                      total: item.value,
-                      unit: "times" as const,
-                    };
-                    return (
-                      <SubscriptionUsage
-                        name={item.name}
-                        usage={itemUsage}
-                        key={index}
-                        fallbackResetLabel={t("admin.plan.plan-reset-0")}
-                      />
-                    );
-                  })}
+                  {!hasPlanPointPool(plan) &&
+                    plan.items.map((item, index) => {
+                      const itemUsage = toSubscriptionUsage(
+                        usage?.[item.id],
+                        item.value,
+                      ) ?? {
+                        used: 0,
+                        total: item.value,
+                        unit: "times" as const,
+                      };
+                      return (
+                        <SubscriptionUsage
+                          name={item.name}
+                          usage={itemUsage}
+                          key={index}
+                          fallbackResetLabel={t("admin.plan.plan-reset-0")}
+                        />
+                      );
+                    })}
                   {(() => {
                     if (!hasPlanPointPool(plan)) return null;
                     const planQuota = plan.quota ?? 0;
                     const weeklyQuota = plan.weekly_quota ?? 0;
-                    const hasWeekly =
-                      weeklyQuota > 0 || plan.weekly_quota === -1;
                     const pointUsage = normalizePointWindowUsage(
                       toSubscriptionUsage(usage?.plan_points, planQuota),
                       planQuota,
@@ -539,14 +538,26 @@ function WalletPlanBox() {
                       usage?.plan_points_weekly,
                       weeklyQuota,
                     );
+                    const hasWeekly =
+                      weeklyQuota > 0 ||
+                      plan.weekly_quota === -1 ||
+                      weeklyUsage !== null;
+                    const weeklyTotal = weeklyUsage?.total ?? weeklyQuota;
                     const weeklyName = t("sub.plan-points-weekly");
                     const weeklyExhausted =
                       hasWeekly &&
-                      plan.weekly_quota !== -1 &&
+                      weeklyTotal !== -1 &&
                       weeklyUsage !== null &&
-                      weeklyUsage.used >= weeklyUsage.total;
+                      weeklyUsage.used >= weeklyTotal;
                     return (
-                      <div className="col-span-full grid grid-cols-2 gap-3">
+                      <div
+                        className={cn(
+                          "col-span-full grid gap-3",
+                          hasWeekly
+                            ? "grid-cols-1 md:grid-cols-2"
+                            : "grid-cols-1",
+                        )}
+                      >
                         <SubscriptionUsage
                           name={t("sub.plan-points")}
                           usage={pointUsage}
@@ -561,7 +572,7 @@ function WalletPlanBox() {
                             usage={
                               weeklyUsage ?? {
                                 used: 0,
-                                total: weeklyQuota,
+                                total: weeklyTotal,
                                 unit: "points",
                               }
                             }
