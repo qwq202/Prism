@@ -18,6 +18,7 @@ import { getMemory } from "@/utils/memory.ts";
 import { goAuth } from "@/utils/app.ts";
 import Avatar from "@/components/Avatar.tsx";
 import { appLogo } from "@/conf/env.ts";
+import PrismLogo from "@/components/PrismLogo.tsx";
 import { refreshQuota } from "@/store/quota.ts";
 import { refreshSubscription } from "@/store/subscription.ts";
 import { useEffectAsync } from "@/utils/hook.ts";
@@ -77,12 +78,19 @@ function NavBar() {
         >
           <Menu className={`w-5 h-5`} />
         </Button>
-        <img
-          className={`logo w-9 h-9 scale-110`}
-          src={appLogo}
-          alt=""
-          onClick={() => router.navigate("/")}
-        />
+        {appLogo === "/favicon.svg" ? (
+          <PrismLogo
+            className={`logo w-9 h-9 scale-110 cursor-pointer`}
+            onClick={() => router.navigate("/")}
+          />
+        ) : (
+          <img
+            className={`logo w-9 h-9 scale-110`}
+            src={appLogo}
+            alt=""
+            onClick={() => router.navigate("/")}
+          />
+        )}
         <div className={`grow`} />
         <ThemeToggle size="icon-md" className={`rounded-full overflow-hidden`} />
         <Button

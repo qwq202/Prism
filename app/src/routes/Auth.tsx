@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import { getQueryParam } from "@/utils/path.ts";
 import { setMemory } from "@/utils/memory.ts";
 import { appLogo, appName, useDeeptrain } from "@/conf/env.ts";
+import PrismLogo from "@/components/PrismLogo.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { goAuth } from "@/utils/app.ts";
 import { Label } from "@/components/ui/label.tsx";
@@ -147,7 +148,11 @@ function Login() {
   return (
     <ScrollArea className={`w-full h-full grid place-items-center`}>
       <div className={`auth-container`}>
-        <img className={`logo`} src={appLogo} alt="" />
+        {appLogo === "/favicon.svg" ? (
+          <PrismLogo className={`logo`} />
+        ) : (
+          <img className={`logo`} src={appLogo} alt="" />
+        )}
         <div className={`title`}>
           {t("login")} {appName}
         </div>

@@ -659,32 +659,58 @@ function UserTable() {
           <RotateCw className={`h-4 w-4`} />
         </Button>
       </div>
-      {selected.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-background border shadow-lg rounded-full px-4 py-2">
-          <span className="text-sm font-medium mr-1">{t("admin.selected", { count: selected.size })}</span>
-          <Button size="sm" variant="destructive" onClick={() => executeBatch("ban")}>
+      <div
+        className={`fixed bottom-0 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ease-in-out ${
+          selected.size > 0
+            ? "translate-y-0 opacity-100"
+            : "translate-y-full opacity-0 pointer-events-none"
+        }`}
+      >
+        <div className="flex items-center gap-2 bg-background border border-b-0 shadow-lg rounded-t-2xl px-4 py-3">
+          <span className="text-sm font-medium mr-1">
+            {t("admin.selected", { count: selected.size })}
+          </span>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => executeBatch("ban")}
+          >
             <Ban className="h-3.5 w-3.5 mr-1" />
             {t("admin.ban")}
           </Button>
-          <Button size="sm" variant="outline" onClick={() => executeBatch("unban")}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => executeBatch("unban")}
+          >
             {t("admin.unban")}
           </Button>
           <div className="flex items-center gap-1">
             <Input
               className="w-20 h-8 text-sm"
               value={batchQuota}
-              onChange={(e) => setBatchQuota(e.target.value.replace(/[^\d.]/g, ""))}
+              onChange={(e) =>
+                setBatchQuota(e.target.value.replace(/[^\d.]/g, ""))
+              }
             />
-            <Button size="sm" variant="outline" onClick={() => executeBatch("add_quota", Number(batchQuota))}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => executeBatch("add_quota", Number(batchQuota))}
+            >
               <PlusCircle className="h-3.5 w-3.5 mr-1" />
               {t("admin.quota")}
             </Button>
           </div>
-          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setSelected(new Set())}
+          >
             {t("cancel")}
           </Button>
         </div>
-      )}
+      </div>
     </div>
   );
 }

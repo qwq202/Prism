@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <style>
+    text { fill: #000000; }
+    @media (prefers-color-scheme: dark) {
+      text { fill: #ffffff; }
+    }
+  </style>
+  <!-- Letter P -->
+  <text
+    x="10"
+    y="50"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="52"
+    font-weight="bold"
+    letter-spacing="-2"
+  >P</text>
+  <!-- Blue dot -->
+  <circle cx="50" cy="48" r="7" fill="#3b82f6"/>
+</svg>

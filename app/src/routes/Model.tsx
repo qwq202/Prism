@@ -686,17 +686,17 @@ function ModelDetailPanel({
                     className={cn(
                       "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
                       {
-                        "text-amber-700 bg-amber-100/80": tag === "official",
-                        "text-blue-700 bg-blue-100/80": tag === "multi-modal",
-                        "text-green-700 bg-green-100/80": tag === "web",
-                        "text-purple-700 bg-purple-100/80": tag === "high-quality",
-                        "text-red-700 bg-red-100/80": tag === "high-price",
-                        "text-gray-700 bg-gray-100/80": tag === "open-source",
-                        "text-indigo-700 bg-indigo-100/80": tag === "image-generation",
-                        "text-yellow-700 bg-yellow-100/80": tag === "fast",
-                        "text-orange-700 bg-orange-100/80": tag === "unstable",
-                        "text-teal-700 bg-teal-100/80": tag === "high-context",
-                        "text-emerald-700 bg-emerald-100/80": tag === "free",
+                        "text-amber-600 dark:text-amber-400 bg-amber-100/80 dark:bg-amber-900/30": tag === "official",
+                        "text-blue-600 dark:text-blue-400 bg-blue-100/80 dark:bg-blue-900/30": tag === "multi-modal",
+                        "text-green-600 dark:text-green-400 bg-green-100/80 dark:bg-green-900/30": tag === "web",
+                        "text-purple-600 dark:text-purple-400 bg-purple-100/80 dark:bg-purple-900/30": tag === "high-quality",
+                        "text-red-600 dark:text-red-400 bg-red-100/80 dark:bg-red-900/30": tag === "high-price",
+                        "text-muted-foreground bg-muted/60": tag === "open-source",
+                        "text-indigo-600 dark:text-indigo-400 bg-indigo-100/80 dark:bg-indigo-900/30": tag === "image-generation",
+                        "text-yellow-600 dark:text-yellow-400 bg-yellow-100/80 dark:bg-yellow-900/30": tag === "fast",
+                        "text-orange-600 dark:text-orange-400 bg-orange-100/80 dark:bg-orange-900/30": tag === "unstable",
+                        "text-teal-600 dark:text-teal-400 bg-teal-100/80 dark:bg-teal-900/30": tag === "high-context",
+                        "text-emerald-600 dark:text-emerald-400 bg-emerald-100/80 dark:bg-emerald-900/30": tag === "free",
                       }
                     )}
                     initial={{ opacity: 0, scale: 0.75 }}
@@ -735,25 +735,25 @@ function ModelDetailPanel({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.16, duration: quickEnter }}
               >
-                <div className="rounded-xl border bg-gradient-to-br from-blue-50/60 to-transparent p-3.5">
-                  <div className="flex items-center gap-1.5 text-blue-600 mb-2">
+                <div className="rounded-xl border bg-gradient-to-br from-blue-50/60 dark:from-blue-950/30 to-transparent p-3.5">
+                  <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 mb-2">
                     <ArrowUpFromDot className="w-3.5 h-3.5" />
-                    <span className="text-xs font-medium">输入</span>
+                    <span className="text-xs font-medium">{t("input")}</span>
                   </div>
                   <p className="text-2xl font-bold text-foreground leading-none">
                     {parseFloat((model.price.input * unitValue).toPrecision(8))}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">点数 / {unitLabel} tokens</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t("quota")} / {unitLabel} tokens</p>
                 </div>
-                <div className="rounded-xl border bg-gradient-to-br from-violet-50/60 to-transparent p-3.5">
-                  <div className="flex items-center gap-1.5 text-violet-600 mb-2">
+                <div className="rounded-xl border bg-gradient-to-br from-violet-50/60 dark:from-violet-950/30 to-transparent p-3.5">
+                  <div className="flex items-center gap-1.5 text-violet-600 dark:text-violet-400 mb-2">
                     <ArrowDownToDot className="w-3.5 h-3.5" />
-                    <span className="text-xs font-medium">输出</span>
+                    <span className="text-xs font-medium">{t("output")}</span>
                   </div>
                   <p className="text-2xl font-bold text-foreground leading-none">
                     {parseFloat((model.price.output * unitValue).toPrecision(8))}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">点数 / {unitLabel} tokens</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t("quota")} / {unitLabel} tokens</p>
                 </div>
               </motion.div>
             )}
@@ -788,7 +788,7 @@ function ModelDetailPanel({
             className={cn(
               "shrink-0 w-10 h-10 rounded-xl border flex items-center justify-center transition-colors",
               state
-                ? "text-amber-500 bg-amber-50 border-amber-200"
+                ? "text-amber-500 bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-800"
                 : "text-muted-foreground border-input hover:bg-accent",
             )}
             whileHover={{ scale: 1.08 }}

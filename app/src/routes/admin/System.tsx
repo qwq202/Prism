@@ -200,7 +200,7 @@ function General({ data, dispatch, onChange }: CompProps<GeneralState>) {
             })
           }
           placeholder={t("admin.system.logoTip", {
-            logo: `${window.location.protocol}//${window.location.host}/favicon.ico`,
+            logo: `${window.location.protocol}//${window.location.host}/favicon.svg`,
           })}
         />
       </ParagraphItem>

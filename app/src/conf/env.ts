@@ -2,11 +2,11 @@ import { updateDocumentTitle, updateFavicon } from "@/utils/dom.ts";
 import { setMemory } from "@/utils/memory.ts";
 
 export let appName =
-  localStorage.getItem("app_name") || import.meta.env.VITE_APP_NAME || "CoAI";
+  localStorage.getItem("app_name") || import.meta.env.VITE_APP_NAME || "Prism";
 export let appLogo =
   localStorage.getItem("app_logo") ||
   import.meta.env.VITE_APP_LOGO ||
-  "/favicon.ico";
+  "/favicon.svg";
 export let docsEndpoint =
   localStorage.getItem("docs_url") ||
   import.meta.env.VITE_DOCS_ENDPOINT ||
@@ -18,7 +18,7 @@ export const useDeeptrain = !!import.meta.env.VITE_USE_DEEPTRAIN;
 export const backendEndpoint = import.meta.env.VITE_BACKEND_ENDPOINT || "/api";
 export const deeptrainEndpoint =
   import.meta.env.VITE_DEEPTRAIN_ENDPOINT || "https://deeptrain.net";
-export const deeptrainAppName = import.meta.env.VITE_DEEPTRAIN_APP || "coai";
+export const deeptrainAppName = import.meta.env.VITE_DEEPTRAIN_APP || "prism";
 export const deeptrainApiEndpoint =
   import.meta.env.VITE_DEEPTRAIN_API_ENDPOINT || "https://api.deeptrain.net";
 
@@ -67,7 +67,7 @@ export function setAppName(name: string): void {
   /**
    * set the app name in localStorage
    */
-  name = name.trim() || "CoAI";
+  name = name.trim() || "Prism";
   setMemory("app_name", name);
   appName = name;
 
@@ -78,7 +78,7 @@ export function setAppLogo(logo: string): void {
   /**
    * set the app logo in localStorage
    */
-  logo = logo.trim() || "/favicon.ico";
+  logo = logo.trim() || "/favicon.svg";
   setMemory("app_logo", logo);
   appLogo = logo;
 

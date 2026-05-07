@@ -235,7 +235,7 @@ function SyncDialog({
         open={open && !builtin}
         setOpen={setOpen}
         defaultValue={"https://api.chatnio.net"}
-        alert={system === "" ? t("admin.coai-format-only") : undefined}
+        alert={system === "" ? t("admin.format-only") : undefined}
         onSubmit={async (endpoint): Promise<boolean> => {
           const path = system === "newapi"
             ? `${endpoint.replace(/\/$/, "")}/api/ratio_config`
@@ -362,7 +362,7 @@ function ChargeAction({
               open(false);
             }}
           >
-            CoAI
+            Prism
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() => {

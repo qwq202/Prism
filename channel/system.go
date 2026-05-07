@@ -330,7 +330,7 @@ func (c *SystemConfig) GetSearchDepth() string {
 func (c *SystemConfig) GetAppName() string {
 	title := strings.TrimSpace(c.General.Title)
 	if len(title) == 0 {
-		return "CoAI.Dev"
+		return "Prism"
 	}
 
 	return title

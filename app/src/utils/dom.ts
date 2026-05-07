@@ -320,7 +320,10 @@ export function updateFavicon(url?: string) {
    */
   if (!url || url.trim() === "") return;
   const link = document.querySelector("link[rel*='icon']");
-  return link && link.setAttribute("href", url);
+  if (!link) return;
+  link.setAttribute("href", url);
+  if (url.endsWith(".svg")) link.setAttribute("type", "image/svg+xml");
+  else link.removeAttribute("type");
 }
 
 export function updateDocumentTitle(title?: string) {
