@@ -674,6 +674,8 @@
     "enterprise": "エンタープライズ版",
     "action": "操作",
     "search-username": "ユーザー名を検索",
+    "add-user": "ユーザーを追加",
+    "add-user-desc": "新しいログインユーザーを作成します。",
     "quota-action": "ポイントの変更",
     "quota-action-desc": "ポイント変更値を入力してください（プラスは増加、マイナスは減少）",
     "subscription-action": "サブスクリプション時間管理",

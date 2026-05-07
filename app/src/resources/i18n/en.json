@@ -693,6 +693,8 @@
     "enterprise": "Enterprise",
     "action": "Action",
     "search-username": "Search Username",
+    "add-user": "Add user",
+    "add-user-desc": "Create a new login user.",
     "quota-action": "Quota Change",
     "quota-action-desc": "Please enter the quota change value (positive for increase, negative for decrease)",
     "subscription-action": "Subscription Time Management",

@@ -1001,6 +1001,8 @@
     "enterprise": "企业版",
     "action": "操作",
     "search-username": "搜索用户名",
+    "add-user": "添加用户",
+    "add-user-desc": "创建一个新的登录用户。",
     "password-action": "修改密码",
     "password-action-desc": "请输入用户的新密码",
     "set-admin-action": "设为管理员",

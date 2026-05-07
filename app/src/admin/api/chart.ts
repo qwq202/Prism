@@ -220,6 +220,23 @@ export async function getUserList(
   }
 }
 
+export async function createUserOperation(
+  username: string,
+  email: string,
+  password: string,
+): Promise<CommonResponse> {
+  try {
+    const response = await axios.post("/admin/user/create", {
+      username,
+      email,
+      password,
+    });
+    return response.data as CommonResponse;
+  } catch (e) {
+    return { status: false, message: getErrorMessage(e) };
+  }
+}
+
 export async function updatePassword(
   id: number,
   password: string,

@@ -10,6 +10,7 @@ import {
   banUserOperation,
   BatchUserAction,
   batchUserOperation,
+  createUserOperation,
   getUserList,
   initialUserFilter,
   quotaOperation,
@@ -75,6 +76,7 @@ import {
   DialogTitle,
   DialogFooter,
   DialogAction,
+  DialogCancel,
 } from "@/components/ui/dialog.tsx";
 import { RadioBox } from "@/components/ui/radio-box.tsx";
 import { formReducer } from "@/utils/form.ts";
@@ -87,6 +89,12 @@ import { Checkbox } from "@/components/ui/checkbox.tsx";
 type OperationMenuProps = {
   user: UserData;
   onRefresh?: () => void;
+};
+
+type CreateUserFormState = {
+  username: string;
+  email: string;
+  password: string;
 };
 
 enum UserType {
@@ -397,6 +405,12 @@ function UserTable() {
   const [loading, setLoading] = useState<boolean>(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [batchQuota, setBatchQuota] = useState<string>("5");
+  const [createOpen, setCreateOpen] = useState<boolean>(false);
+  const [createForm, setCreateForm] = useState<CreateUserFormState>({
+    username: "",
+    email: "",
+    password: "",
+  });
 
   const [filter, filterDispatch] = useReducer(formReducer<UserFilterProps>(), {
     ...initialUserFilter,
@@ -437,6 +451,29 @@ function UserTable() {
   const allChecked = data.data.length > 0 && data.data.every((u) => selected.has(u.id));
   const batchActionClass = "h-10 w-24 px-3 text-sm shrink-0";
   const batchQuotaInputClass = "h-10 w-24 text-sm shrink-0";
+
+  const updateCreateForm = (key: keyof CreateUserFormState, value: string) => {
+    setCreateForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const resetCreateForm = () => {
+    setCreateForm({ username: "", email: "", password: "" });
+  };
+
+  async function createUser() {
+    const resp = await createUserOperation(
+      createForm.username,
+      createForm.email,
+      createForm.password,
+    );
+    doToast(t, resp);
+
+    if (resp.status) {
+      setCreateOpen(false);
+      resetCreateForm();
+      await update();
+    }
+  }
 
   function toggleAll() {
     if (allChecked) {
@@ -558,6 +595,45 @@ function UserTable() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        <Dialog
+          open={createOpen}
+          onOpenChange={(open) => {
+            setCreateOpen(open);
+            if (!open) resetCreateForm();
+          }}
+        >
+          <DialogContent>
+            <DialogTitle>{t("admin.add-user")}</DialogTitle>
+            <DialogDescription>{t("admin.add-user-desc")}</DialogDescription>
+            <div className="grid gap-3">
+              <Input
+                placeholder={t("admin.username")}
+                value={createForm.username}
+                onChange={(e) => updateCreateForm("username", e.target.value)}
+              />
+              <Input
+                placeholder={t("admin.email")}
+                value={createForm.email}
+                onChange={(e) => updateCreateForm("email", e.target.value)}
+              />
+              <Input
+                type="password"
+                placeholder={t("auth.password")}
+                value={createForm.password}
+                onChange={(e) => updateCreateForm("password", e.target.value)}
+                onKeyDown={async (e) => {
+                  if (isEnter(e)) await createUser();
+                }}
+              />
+            </div>
+            <DialogFooter>
+              <DialogCancel>{t("cancel")}</DialogCancel>
+              <DialogAction onClick={createUser}>
+                {t("admin.add-user")}
+              </DialogAction>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         <Input
           className={`search`}
           placeholder={t("admin.search-username")}
@@ -569,6 +645,13 @@ function UserTable() {
         />
         <Button size={`icon`} className={`flex-shrink-0 ml-2`} onClick={update}>
           <Search className={`h-4 w-4`} />
+        </Button>
+        <Button
+          className={`flex-shrink-0 ml-2`}
+          onClick={() => setCreateOpen(true)}
+        >
+          <PlusCircle className={`h-4 w-4 mr-2`} />
+          {t("admin.add-user")}
         </Button>
       </div>
       {(data.data && data.data.length > 0) || page > 0 ? (

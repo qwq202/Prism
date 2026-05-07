@@ -35,6 +35,7 @@ func Register(app *gin.RouterGroup) {
 	app.GET("/admin/redeem/batch/:id", RedeemBatchCodesAPI)
 
 	app.GET("/admin/user/list", UserPaginationAPI)
+	app.POST("/admin/user/create", CreateUserAPI)
 	app.POST("/admin/user/quota", UserQuotaAPI)
 	app.POST("/admin/user/subscription", UserSubscriptionAPI)
 	app.POST("/admin/user/level", SubscriptionLevelAPI)

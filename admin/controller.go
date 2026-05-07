@@ -33,6 +33,12 @@ type PasswordMigrationForm struct {
 	Password string `json:"password"`
 }
 
+type CreateUserForm struct {
+	Username string `json:"username" binding:"required"`
+	Email    string `json:"email" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
 type EmailMigrationForm struct {
 	Id    int64  `json:"id"`
 	Email string `json:"email"`
@@ -303,6 +309,31 @@ func UserPaginationAPI(c *gin.Context) {
 
 	search := strings.TrimSpace(c.Query("search"))
 	c.JSON(http.StatusOK, getUsersForm(db, page, search))
+}
+
+func CreateUserAPI(c *gin.Context) {
+	db := utils.GetDBFromContext(c)
+
+	var form CreateUserForm
+	if err := c.ShouldBindJSON(&form); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	if err := createUser(db, form.Username, form.Email, form.Password); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": true,
+	})
 }
 
 func UpdatePasswordAPI(c *gin.Context) {

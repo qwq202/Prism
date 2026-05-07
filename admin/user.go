@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"fmt"
 	"math"
+	"net/mail"
 	"strings"
 	"time"
 
@@ -123,6 +124,94 @@ func clearUserCache(cache *redis.Client) error {
 		}
 	}
 	return iter.Err()
+}
+
+func validateNewUser(username string, email string, password string) error {
+	username = strings.TrimSpace(username)
+	email = strings.TrimSpace(email)
+	password = strings.TrimSpace(password)
+
+	if len(username) < 2 || len(username) > 24 {
+		return fmt.Errorf("username length must be between 2 and 24")
+	}
+	if len(password) < 6 || len(password) > 36 {
+		return fmt.Errorf("password length must be between 6 and 36")
+	}
+	if len(email) < 1 || len(email) > 255 {
+		return fmt.Errorf("invalid email format")
+	}
+	addr, err := mail.ParseAddress(email)
+	if err != nil || addr.Address != email {
+		return fmt.Errorf("invalid email format")
+	}
+
+	return nil
+}
+
+func createUser(db *sql.DB, username string, email string, password string) error {
+	username = strings.TrimSpace(username)
+	email = strings.TrimSpace(email)
+	password = strings.TrimSpace(password)
+
+	if err := validateNewUser(username, email, password); err != nil {
+		return err
+	}
+
+	var count int64
+	if err := globals.QueryRowDb(db, "SELECT COUNT(*) FROM auth WHERE username = ?", username).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return fmt.Errorf("username is already taken")
+	}
+
+	if err := globals.QueryRowDb(db, "SELECT COUNT(*) FROM auth WHERE email = ?", email).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return fmt.Errorf("email is already taken")
+	}
+
+	hash, err := utils.HashPassword(password)
+	if err != nil {
+		return err
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var bindID int64
+	if err := tx.QueryRow(globals.PreflightSql("SELECT COALESCE(MAX(bind_id), -1) + 1 FROM auth")).Scan(&bindID); err != nil {
+		return err
+	}
+
+	result, err := tx.Exec(globals.PreflightSql(`
+		INSERT INTO auth (username, password, email, bind_id, token)
+		VALUES (?, ?, ?, ?, ?)
+	`), username, hash, email, bindID, utils.Sha2Encrypt(email+username))
+	if err != nil {
+		return err
+	}
+
+	userID, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+
+	initialQuota := float32(0)
+	if channel.SystemInstance != nil {
+		initialQuota = float32(channel.SystemInstance.GetInitialQuota())
+	}
+	if _, err := tx.Exec(globals.PreflightSql(`
+		INSERT INTO quota (user_id, quota, used) VALUES (?, ?, ?)
+	`), userID, initialQuota, 0.); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func passwordMigration(db *sql.DB, cache *redis.Client, id int64, password string) error {

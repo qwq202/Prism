@@ -781,6 +781,8 @@
     "enterprise": "企業版",
     "action": "操作",
     "search-username": "搜尋使用者名稱",
+    "add-user": "新增使用者",
+    "add-user-desc": "建立一個新的登入使用者。",
     "password-action": "變更密碼",
     "password-action-desc": "請輸入使用者的新密碼",
     "set-admin-action": "設為管理員",
