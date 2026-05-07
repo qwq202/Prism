@@ -1272,7 +1272,7 @@
       "sellable": "販売中",
       "sellable-tip": "無効にすると購入ページに表示されず、新規購入、更新、アップグレード、ダウングレードもバックエンドで拒否されます。",
       "sellable-off": "販売停止",
-      "plan-quota-hint": "-1 で無制限。0 にするとクレジットモードを無効にします。",
+      "plan-quota-hint": "-1 で無制限。短周期クォータに 0 は指定できません。",
       "items-requests-title": "モデルグループと回数制限",
       "items-requests-desc": "モデルグループと月次リクエスト上限を定義します。",
       "items-points-title": "アクセス可能なモデルグループ",

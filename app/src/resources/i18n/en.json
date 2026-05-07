@@ -1303,7 +1303,7 @@
       "sellable": "Available for sale",
       "sellable-tip": "When disabled, this plan is hidden from the purchase page and the backend rejects new purchases, renewals, upgrades, or downgrades to it.",
       "sellable-off": "Off sale",
-      "plan-quota-hint": "Use -1 for unlimited. Set 0 to disable credit mode.",
+      "plan-quota-hint": "Use -1 for unlimited. The short-window quota cannot be 0.",
       "items-requests-title": "Model Groups & Request Limits",
       "items-requests-desc": "Define model groups and their monthly request allowances.",
       "items-points-title": "Accessible Model Groups",

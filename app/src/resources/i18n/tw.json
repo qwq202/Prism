@@ -926,7 +926,7 @@
       "sellable": "上架售賣",
       "sellable-tip": "關閉後該套餐不會出現在使用者購買頁，後端也會拒絕新的購買、續費或升降級到此套餐。",
       "sellable-off": "已下架",
-      "plan-quota-hint": "設為 -1 表示無限；設為 0 會關閉點數模式。",
+      "plan-quota-hint": "設為 -1 表示無限；短週期額度不能為 0。",
       "items-requests-title": "模型分组与次数限制",
       "items-requests-desc": "定义模型分组及其每月可用请求次数。",
       "items-points-title": "可访问模型分组",

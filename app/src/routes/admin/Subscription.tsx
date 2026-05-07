@@ -20,7 +20,6 @@ import {
   ChevronUp,
   Coins,
   GripVertical,
-  Hash,
   Plus,
   RotateCw,
   Save,
@@ -33,13 +32,6 @@ import { NumberInput } from "@/components/ui/number-input.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { MultiCombobox } from "@/components/ui/multi-combobox.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select.tsx";
 import { withNotify } from "@/api/common.ts";
 import { dispatchSubscriptionData } from "@/store/globals.ts";
 import { useDispatch } from "react-redux";
@@ -61,21 +53,8 @@ const planInitialConfig: PlanConfig = {
   plans: [],
 };
 
-const planResetPresets = [
-  { value: "0", seconds: 0 },
-  { value: "18000", seconds: 5 * 60 * 60 },
-  { value: "86400", seconds: 24 * 60 * 60 },
-  { value: "604800", seconds: 7 * 24 * 60 * 60 },
-  { value: "custom", seconds: -1 },
-] as const;
-
 const defaultPointQuota = 1;
-
-function getPlanResetPreset(plan: Plan): string {
-  const seconds = plan.reset_interval ?? 0;
-  const preset = planResetPresets.find((option) => option.seconds === seconds);
-  return preset?.value ?? "custom";
-}
+const defaultWindowResetInterval = 5 * 60 * 60;
 
 function hasPlanPointPool(plan: Plan): boolean {
   return (plan.quota ?? 0) > 0 || plan.quota === -1;
@@ -83,6 +62,47 @@ function hasPlanPointPool(plan: Plan): boolean {
 
 function getFinitePointQuota(value?: number): number {
   return value && value > 0 ? value : defaultPointQuota;
+}
+
+function normalizeShortWindowQuota(value?: number): number {
+  return value === -1 ? -1 : getFinitePointQuota(value);
+}
+
+function normalizeWindowQuotaPlan(plan: Plan): Plan {
+  const wasWindowQuotaPlan = hasPlanPointPool(plan);
+  const quota = normalizeShortWindowQuota(plan.quota);
+  const resetInterval =
+    plan.reset_interval && plan.reset_interval > 0
+      ? plan.reset_interval
+      : defaultWindowResetInterval;
+  const weeklyQuota = wasWindowQuotaPlan
+    ? (plan.weekly_quota ?? 0)
+    : getFinitePointQuota(plan.weekly_quota);
+
+  if (
+    plan.quota === quota &&
+    plan.reset_interval === resetInterval &&
+    (plan.weekly_quota ?? 0) === weeklyQuota
+  )
+    return plan;
+
+  return {
+    ...plan,
+    quota,
+    reset_interval: resetInterval,
+    weekly_quota: weeklyQuota,
+  };
+}
+
+function normalizeWindowQuotaConfig(config: PlanConfig): PlanConfig {
+  let changed = false;
+  const plans = config.plans.map((plan: Plan) => {
+    const normalized = normalizeWindowQuotaPlan(plan);
+    if (normalized !== plan) changed = true;
+    return normalized;
+  });
+  if (!changed) return config;
+  return { ...config, plans };
 }
 
 type PlanLevelPayload = { level: number };
@@ -101,13 +121,8 @@ type PlanConfigAction =
       type: "set-weekly-quota";
       payload: PlanLevelPayload & { weeklyQuota: number };
     }
-  | {
-      type: "set-plan-reset-interval";
-      payload: PlanLevelPayload & { resetInterval: number };
-    }
   | { type: "set-item-id"; payload: PlanItemPayload & { id: string } }
   | { type: "set-item-name"; payload: PlanItemPayload & { name: string } }
-  | { type: "set-item-value"; payload: PlanItemPayload & { value: number } }
   | { type: "set-item-icon"; payload: PlanItemPayload & { icon: string } }
   | { type: "add-item"; payload: PlanLevelPayload }
   | { type: "set-item-models"; payload: PlanItemPayload & { models: string[] } }
@@ -152,7 +167,7 @@ function sanitizePlanConfigModels(
 function reducer(state: PlanConfig, action: PlanConfigAction): PlanConfig {
   switch (action.type) {
     case "set":
-      return action.payload;
+      return normalizeWindowQuotaConfig(action.payload);
     case "set-enabled":
       return { ...state, enabled: action.payload };
     case "set-plan-sellable":
@@ -178,7 +193,7 @@ function reducer(state: PlanConfig, action: PlanConfigAction): PlanConfig {
         ...state,
         plans: state.plans.map((plan: Plan) =>
           plan.level === action.payload.level
-            ? { ...plan, quota: action.payload.quota }
+            ? { ...plan, quota: normalizeShortWindowQuota(action.payload.quota) }
             : plan,
         ),
       };
@@ -188,15 +203,6 @@ function reducer(state: PlanConfig, action: PlanConfigAction): PlanConfig {
         plans: state.plans.map((plan: Plan) =>
           plan.level === action.payload.level
             ? { ...plan, weekly_quota: action.payload.weeklyQuota }
-            : plan,
-        ),
-      };
-    case "set-plan-reset-interval":
-      return {
-        ...state,
-        plans: state.plans.map((plan: Plan) =>
-          plan.level === action.payload.level
-            ? { ...plan, reset_interval: action.payload.resetInterval }
             : plan,
         ),
       };
@@ -226,22 +232,6 @@ function reducer(state: PlanConfig, action: PlanConfigAction): PlanConfig {
                 items: plan.items.map((item: PlanItem, index: number) =>
                   index === action.payload.index
                     ? { ...item, name: action.payload.name }
-                    : item,
-                ),
-              }
-            : plan,
-        ),
-      };
-    case "set-item-value":
-      return {
-        ...state,
-        plans: state.plans.map((plan: Plan) =>
-          plan.level === action.payload.level
-            ? {
-                ...plan,
-                items: plan.items.map((item: PlanItem, index: number) =>
-                  index === action.payload.index
-                    ? { ...item, value: action.payload.value }
                     : item,
                 ),
               }
@@ -371,84 +361,6 @@ function reducer(state: PlanConfig, action: PlanConfigAction): PlanConfig {
 const DISCOUNT_MONTHS = [1, 3, 6, 12, 36];
 const DEFAULT_DISCOUNTS: Record<number, number> = { 6: 10, 12: 20, 36: 30 };
 
-// ─── Billing mode selector ────────────────────────────────────────────────────
-function BillingModeSelector({
-  isPointsMode,
-  onSwitch,
-}: {
-  isPointsMode: boolean;
-  onSwitch: (mode: "requests" | "points") => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <div className="grid grid-cols-2 gap-3">
-      <button
-        type="button"
-        onClick={() => onSwitch("requests")}
-        className={cn(
-          "flex items-center gap-3 rounded-lg border p-3 text-left transition-all",
-          !isPointsMode
-            ? "border-primary bg-primary/5 ring-1 ring-primary/20"
-            : "border-border hover:bg-muted/40",
-        )}
-      >
-        <Hash
-          className={cn(
-            "h-4 w-4 shrink-0",
-            !isPointsMode ? "text-primary" : "text-muted-foreground",
-          )}
-        />
-        <div className="min-w-0">
-          <p
-            className={cn(
-              "text-sm font-medium truncate",
-              !isPointsMode ? "text-primary" : "text-foreground",
-            )}
-          >
-            {t("admin.plan.mode-requests")}
-          </p>
-          <p className="text-xs text-muted-foreground truncate">
-            {t("admin.plan.mode-requests-desc")}
-          </p>
-        </div>
-      </button>
-
-      <button
-        type="button"
-        onClick={() => onSwitch("points")}
-        className={cn(
-          "flex items-center gap-3 rounded-lg border p-3 text-left transition-all",
-          isPointsMode
-            ? "border-amber-500 bg-amber-50/50 dark:bg-amber-950/20 ring-1 ring-amber-500/20"
-            : "border-border hover:bg-muted/40",
-        )}
-      >
-        <Coins
-          className={cn(
-            "h-4 w-4 shrink-0",
-            isPointsMode ? "text-amber-500" : "text-muted-foreground",
-          )}
-        />
-        <div className="min-w-0">
-          <p
-            className={cn(
-              "text-sm font-medium truncate",
-              isPointsMode
-                ? "text-amber-600 dark:text-amber-400"
-                : "text-foreground",
-            )}
-          >
-            {t("admin.plan.mode-points")}
-          </p>
-          <p className="text-xs text-muted-foreground truncate">
-            {t("admin.plan.mode-points-desc")}
-          </p>
-        </div>
-      </button>
-    </div>
-  );
-}
-
 // ─── Credits pool settings ────────────────────────────────────────────────────
 function CreditsPoolSettings({
   plan,
@@ -489,7 +401,10 @@ function CreditsPoolSettings({
               onValueChange={(value) =>
                 formDispatch({
                   type: "set-plan-quota",
-                  payload: { level: plan.level, quota: value },
+                  payload: {
+                    level: plan.level,
+                    quota: normalizeShortWindowQuota(value),
+                  },
                 })
               }
             />
@@ -558,40 +473,7 @@ function PlanEditor({
   formDispatch: React.Dispatch<PlanConfigAction>;
 }) {
   const { t } = useTranslation();
-  const isPointsMode = hasPlanPointPool(plan);
-
-  const handleModeSwitch = (mode: "requests" | "points") => {
-    if (mode === "requests") {
-      formDispatch({
-        type: "set-plan-quota",
-        payload: { level: plan.level, quota: 0 },
-      });
-      formDispatch({
-        type: "set-weekly-quota",
-        payload: { level: plan.level, weeklyQuota: 0 },
-      });
-    } else {
-      formDispatch({
-        type: "set-plan-quota",
-        payload: { level: plan.level, quota: getFinitePointQuota(plan.quota) },
-      });
-      formDispatch({
-        type: "set-plan-reset-interval",
-        payload: { level: plan.level, resetInterval: 18000 },
-      });
-      formDispatch({
-        type: "set-weekly-quota",
-        payload: {
-          level: plan.level,
-          weeklyQuota: getFinitePointQuota(plan.weekly_quota),
-        },
-      });
-    }
-  };
-
-  const colTemplate = isPointsMode
-    ? "1.5rem 1fr 1fr minmax(0,1.2fr) auto"
-    : "1.5rem 1fr 1fr 6rem minmax(0,1.2fr) auto";
+  const colTemplate = "1.5rem 1fr 1fr minmax(0,1.2fr) auto";
 
   return (
     <div className="space-y-5">
@@ -616,112 +498,33 @@ function PlanEditor({
         />
       </div>
 
-      {/* ── Section 2: Billing Mode ── */}
-      <BillingModeSelector
-        isPointsMode={isPointsMode}
-        onSwitch={handleModeSwitch}
-      />
-
-      {/* ── Section 3: Pricing & Quotas ── */}
+      {/* ── Section 2: Pricing & Quotas ── */}
       <div className="space-y-3">
         <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           {t("admin.plan.price")}
         </h3>
 
-        {isPointsMode ? (
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                {t("admin.plan.price")}
-                <Tips
-                  className="inline-block"
-                  content={t("admin.plan.price-tip")}
-                />
-              </Label>
-              <NumberInput
-                value={plan.price}
-                onValueChange={(value) =>
-                  formDispatch({
-                    type: "set-price",
-                    payload: { level: plan.level, price: value },
-                  })
-                }
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1">
+              {t("admin.plan.price")}
+              <Tips
+                className="inline-block"
+                content={t("admin.plan.price-tip")}
               />
-            </div>
-            <CreditsPoolSettings plan={plan} formDispatch={formDispatch} />
+            </Label>
+            <NumberInput
+              value={plan.price}
+              onValueChange={(value) =>
+                formDispatch({
+                  type: "set-price",
+                  payload: { level: plan.level, price: value },
+                })
+              }
+            />
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                {t("admin.plan.price")}
-                <Tips
-                  className="inline-block"
-                  content={t("admin.plan.price-tip")}
-                />
-              </Label>
-              <NumberInput
-                value={plan.price}
-                onValueChange={(value) =>
-                  formDispatch({
-                    type: "set-price",
-                    payload: { level: plan.level, price: value },
-                  })
-                }
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                {t("admin.plan.plan-reset")}
-                <Tips
-                  className="inline-block"
-                  content={t("admin.plan.plan-reset-tip")}
-                />
-              </Label>
-              <Select
-                value={getPlanResetPreset(plan)}
-                onValueChange={(value) => {
-                  const resetInterval =
-                    value === "custom"
-                      ? Math.max(plan.reset_interval ?? 3600, 1)
-                      : Number(value);
-                  formDispatch({
-                    type: "set-plan-reset-interval",
-                    payload: { level: plan.level, resetInterval },
-                  });
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {planResetPresets.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {t(`admin.plan.plan-reset-${option.value}`)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {getPlanResetPreset(plan) === "custom" && (
-                <NumberInput
-                  value={Number(((plan.reset_interval ?? 0) / 3600).toFixed(2))}
-                  min={0.01}
-                  step={0.5}
-                  onValueChange={(value) =>
-                    formDispatch({
-                      type: "set-plan-reset-interval",
-                      payload: {
-                        level: plan.level,
-                        resetInterval: Math.max(1, Math.round(value * 3600)),
-                      },
-                    })
-                  }
-                />
-              )}
-            </div>
-          </div>
-        )}
+          <CreditsPoolSettings plan={plan} formDispatch={formDispatch} />
+        </div>
       </div>
 
       {/* ── Section 3: Model Groups ── */}
@@ -729,14 +532,10 @@ function PlanEditor({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              {isPointsMode
-                ? t("admin.plan.items-points-title")
-                : t("admin.plan.items-requests-title")}
+              {t("admin.plan.items-points-title")}
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {isPointsMode
-                ? t("admin.plan.items-points-desc")
-                : t("admin.plan.items-requests-desc")}
+              {t("admin.plan.items-points-desc")}
             </p>
           </div>
           <Button
@@ -754,11 +553,7 @@ function PlanEditor({
         {plan.items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 border border-dashed rounded-lg text-muted-foreground text-sm gap-1.5">
             <Plus className="h-6 w-6 opacity-30" />
-            <span>
-              {isPointsMode
-                ? t("admin.plan.no-items-points")
-                : t("admin.plan.no-items")}
-            </span>
+            <span>{t("admin.plan.no-items-points")}</span>
           </div>
         ) : (
           <div className="rounded-lg border overflow-hidden">
@@ -772,12 +567,6 @@ function PlanEditor({
                 <Tips content={t("admin.plan.item-id-placeholder")} />
               </span>
               <span>{t("admin.plan.item-name")}</span>
-              {!isPointsMode && (
-                <span className="flex items-center gap-1">
-                  {t("admin.plan.item-value")}
-                  <Tips content={t("admin.plan.item-value-tip")} />
-                </span>
-              )}
               <span className="flex items-center gap-1 pl-2">
                 {t("admin.plan.item-models")}
                 <Tips content={t("admin.plan.item-models-tip")} />
@@ -827,21 +616,6 @@ function PlanEditor({
                     placeholder={t("admin.plan.item-name-placeholder")}
                     className="h-9 text-sm"
                   />
-
-                  {!isPointsMode && (
-                    <NumberInput
-                      value={item.value}
-                      min={-1}
-                      acceptNegative={true}
-                      onValueChange={(value) =>
-                        formDispatch({
-                          type: "set-item-value",
-                          payload: { level: plan.level, value, index },
-                        })
-                      }
-                      className="h-9 text-sm"
-                    />
-                  )}
 
                   <MultiCombobox
                     align="start"
@@ -1033,8 +807,10 @@ function PlanConfig() {
   };
 
   const save = async (data?: PlanConfig) => {
-    const payload = sanitizePlanConfigModels(data ?? form, availableModels);
-    if (payload !== (data ?? form)) formDispatch({ type: "set", payload });
+    const source = data ?? form;
+    const normalized = normalizeWindowQuotaConfig(source);
+    const payload = sanitizePlanConfigModels(normalized, availableModels);
+    if (payload !== source) formDispatch({ type: "set", payload });
     const res = await setPlanConfig(payload);
     withNotify(t, res, true);
     if (res.status)
@@ -1044,7 +820,8 @@ function PlanConfig() {
   useEffectAsync(async () => await refresh(true), []);
 
   useEffect(() => {
-    const sanitized = sanitizePlanConfigModels(form, availableModels);
+    const normalized = normalizeWindowQuotaConfig(form);
+    const sanitized = sanitizePlanConfigModels(normalized, availableModels);
     if (sanitized !== form) formDispatch({ type: "set", payload: sanitized });
   }, [availableModels, form]);
 
@@ -1063,7 +840,9 @@ function PlanConfig() {
         defaultValue={"https://api.chatnio.net"}
         alert={t("admin.format-only")}
         onSubmit={async (endpoint): Promise<boolean> => {
-          const conf = await getExternalPlanConfig(endpoint);
+          const conf = normalizeWindowQuotaConfig(
+            await getExternalPlanConfig(endpoint),
+          );
           setConf(conf);
           setSyncOpen(true);
           return true;
@@ -1134,35 +913,23 @@ function PlanConfig() {
         {form.enabled && activePlans.length > 0 && (
           <Tabs defaultValue={defaultTab}>
             <TabsList>
-              {activePlans.map((plan) => {
-                const isPoints = hasPlanPointPool(plan);
-                return (
-                  <TabsTrigger
-                    key={plan.level}
-                    value={plan.level.toString()}
-                    className="gap-1.5"
-                  >
-                    <span>{t(`sub.${getPlanName(plan.level)}`)}</span>
-                    {plan.sellable === false && (
-                      <span className="text-[10px] font-normal px-1.5 py-0.5 rounded text-muted-foreground bg-muted">
-                        {t("admin.plan.sellable-off")}
-                      </span>
-                    )}
-                    <span
-                      className={cn(
-                        "text-[10px] font-normal px-1.5 py-0.5 rounded",
-                        isPoints
-                          ? "text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30"
-                          : "text-muted-foreground bg-muted",
-                      )}
-                    >
-                      {isPoints
-                        ? t("admin.plan.mode-points-short")
-                        : t("admin.plan.mode-requests-short")}
+              {activePlans.map((plan) => (
+                <TabsTrigger
+                  key={plan.level}
+                  value={plan.level.toString()}
+                  className="gap-1.5"
+                >
+                  <span>{t(`sub.${getPlanName(plan.level)}`)}</span>
+                  {plan.sellable === false && (
+                    <span className="text-[10px] font-normal px-1.5 py-0.5 rounded text-muted-foreground bg-muted">
+                      {t("admin.plan.sellable-off")}
                     </span>
-                  </TabsTrigger>
-                );
-              })}
+                  )}
+                  <span className="text-[10px] font-normal px-1.5 py-0.5 rounded text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30">
+                    {t("admin.plan.mode-points-short")}
+                  </span>
+                </TabsTrigger>
+              ))}
             </TabsList>
 
             {activePlans.map((plan) => (
