@@ -390,7 +390,7 @@ function WalletPlanBox() {
   const expired = useSelector(expiredSelector);
   const refresh = useSelector(refreshSelector);
   const usage = useSelector(usageSelector);
-  const [isYearly, setIsYearly] = useState(true);
+  const [isYearly, setIsYearly] = useState(false);
   const subscriptionData = useSelector(subscriptionDataSelector);
   const relayPlan = useSelector(infoRelayPlanSelector);
 
