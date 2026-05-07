@@ -963,9 +963,6 @@ function PlanConfig() {
                       {t("admin.plan.sellable-off")}
                     </span>
                   )}
-                  <span className="text-[10px] font-normal px-1.5 py-0.5 rounded text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30">
-                    {t("admin.plan.mode-points-short")}
-                  </span>
                 </TabsTrigger>
               ))}
             </TabsList>
