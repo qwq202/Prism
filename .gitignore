@@ -2,6 +2,7 @@ app/node_modules
 .pnpm-store
 .vscode
 .idea
+.DS_Store
 config.yaml
 config.dev.yaml
 storage
