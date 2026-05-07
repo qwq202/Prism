@@ -187,6 +187,49 @@ func TestPlanSharedPointPoolConcurrentConsumptionCannotExceedLimit(t *testing.T)
 	}
 }
 
+func TestPlanPointAndWeeklyPoolsCanResetIndependently(t *testing.T) {
+	_, cache := openPlanTestCache(t)
+	user := planTestUser{id: 99}
+	plan := Plan{
+		Level:       1,
+		Quota:       10,
+		WeeklyQuota: 10,
+		Items: []PlanItem{
+			{
+				Id:     "all-models",
+				Models: []string{"gpt-5.1"},
+			},
+		},
+	}
+
+	if !plan.ConsumePointPool(user, cache, "gpt-5.1", 3) {
+		t.Fatalf("expected point and weekly usage to be consumed")
+	}
+	if got := plan.GetPointUsage(user, cache); got != 3 {
+		t.Fatalf("expected point usage 3, got %f", got)
+	}
+	if got := plan.GetWeeklyPointUsage(user, cache); got != 3 {
+		t.Fatalf("expected weekly usage 3, got %f", got)
+	}
+
+	if !plan.ReleasePointPool(user, cache) {
+		t.Fatalf("expected point usage reset to succeed")
+	}
+	if got := plan.GetPointUsage(user, cache); got != 0 {
+		t.Fatalf("expected point usage 0 after reset, got %f", got)
+	}
+	if got := plan.GetWeeklyPointUsage(user, cache); got != 3 {
+		t.Fatalf("expected weekly usage to remain 3, got %f", got)
+	}
+
+	if !plan.ReleaseWeeklyPool(user, cache) {
+		t.Fatalf("expected weekly usage reset to succeed")
+	}
+	if got := plan.GetWeeklyPointUsage(user, cache); got != 0 {
+		t.Fatalf("expected weekly usage 0 after reset, got %f", got)
+	}
+}
+
 func TestPlanItemDefaultsToMonthlyTimesQuota(t *testing.T) {
 	_, cache := openPlanTestCache(t)
 	user := planTestUser{id: 7}

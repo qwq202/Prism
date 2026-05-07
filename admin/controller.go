@@ -65,7 +65,8 @@ type SubscriptionLevelForm struct {
 }
 
 type ReleaseUsageForm struct {
-	Id int64 `json:"id" binding:"required"`
+	Id   int64  `json:"id" binding:"required"`
+	Type string `json:"type"`
 }
 
 type UpdateRootPasswordForm struct {
@@ -541,7 +542,7 @@ func ReleaseUsageAPI(c *gin.Context) {
 		return
 	}
 
-	err := releaseUsage(db, cache, form.Id)
+	err := releaseUsage(db, cache, form.Id, form.Type)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  false,

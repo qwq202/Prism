@@ -264,7 +264,13 @@ func subscriptionLevelMigration(db *sql.DB, id int64, level int64) error {
 	return err
 }
 
-func releaseUsage(db *sql.DB, cache *redis.Client, id int64) error {
+const (
+	releaseUsageTypeAll  = "all"
+	releaseUsageTypeHour = "hour"
+	releaseUsageTypeWeek = "week"
+)
+
+func releaseUsage(db *sql.DB, cache *redis.Client, id int64, usageType string) error {
 	var level sql.NullInt64
 	if err := globals.QueryRowDb(db, `
 		SELECT level FROM subscription WHERE user_id = ?
@@ -279,8 +285,21 @@ func releaseUsage(db *sql.DB, cache *redis.Client, id int64) error {
 	u := &AuthLike{ID: id}
 
 	plan := channel.PlanInstance.GetPlan(int(level.Int64))
-	if !plan.ReleaseAll(u, cache) {
-		return fmt.Errorf("cannot release usage")
+	switch usageType {
+	case "", releaseUsageTypeAll:
+		if !plan.ReleaseAll(u, cache) {
+			return fmt.Errorf("cannot reset subscription usage")
+		}
+	case releaseUsageTypeHour:
+		if !plan.ReleasePointPool(u, cache) {
+			return fmt.Errorf("cannot reset hourly subscription usage")
+		}
+	case releaseUsageTypeWeek:
+		if !plan.ReleaseWeeklyPool(u, cache) {
+			return fmt.Errorf("cannot reset weekly subscription usage")
+		}
+	default:
+		return fmt.Errorf("invalid subscription usage reset type")
 	}
 
 	return nil

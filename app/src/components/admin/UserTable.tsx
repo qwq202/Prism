@@ -13,6 +13,7 @@ import {
   getUserList,
   initialUserFilter,
   quotaOperation,
+  type ReleaseUsageType,
   releaseUsageOperation,
   setAdminOperation,
   subscriptionLevelOperation,
@@ -42,8 +43,9 @@ import {
   Ban,
   CalendarCheck2,
   CalendarClock,
-  CalendarOff,
   CalendarPlus,
+  CalendarRange,
+  Clock,
   CloudCog,
   CloudFog,
   Filter,
@@ -126,9 +128,18 @@ function OperationMenu({ user, onRefresh }: OperationMenuProps) {
   const [subscriptionOpen, setSubscriptionOpen] = useState<boolean>(false);
   const [subscriptionLevelOpen, setSubscriptionLevelOpen] =
     useState<boolean>(false);
-  const [releaseOpen, setReleaseOpen] = useState<boolean>(false);
+  const [releaseHourOpen, setReleaseHourOpen] = useState<boolean>(false);
+  const [releaseWeekOpen, setReleaseWeekOpen] = useState<boolean>(false);
   const [banOpen, setBanOpen] = useState<boolean>(false);
   const [adminOpen, setAdminOpen] = useState<boolean>(false);
+
+  const handleReleaseUsage = async (type: ReleaseUsageType) => {
+    const resp = await releaseUsageOperation(user.id, type);
+    doToast(t, resp);
+
+    if (resp.status) onRefresh?.();
+    return resp.status;
+  };
 
   return (
     <>
@@ -249,18 +260,19 @@ function OperationMenu({ user, onRefresh }: OperationMenuProps) {
       />
       <PopupDialog
         type={popupTypes.Empty}
-        title={t("admin.release-subscription-action")}
-        name={t("admin.release-subscription")}
-        description={t("admin.release-subscription-action-desc")}
-        open={releaseOpen}
-        setOpen={setReleaseOpen}
-        onSubmit={async () => {
-          const resp = await releaseUsageOperation(user.id);
-          doToast(t, resp);
-
-          if (resp.status) onRefresh?.();
-          return resp.status;
-        }}
+        title={t("admin.reset-hour-limit-action")}
+        description={t("admin.reset-hour-limit-action-desc")}
+        open={releaseHourOpen}
+        setOpen={setReleaseHourOpen}
+        onSubmit={() => handleReleaseUsage("hour")}
+      />
+      <PopupDialog
+        type={popupTypes.Empty}
+        title={t("admin.reset-weekly-limit-action")}
+        description={t("admin.reset-weekly-limit-action-desc")}
+        open={releaseWeekOpen}
+        setOpen={setReleaseWeekOpen}
+        onSubmit={() => handleReleaseUsage("week")}
       />
       <PopupDialog
         disabled={username === user.username}
@@ -360,9 +372,13 @@ function OperationMenu({ user, onRefresh }: OperationMenuProps) {
             <CalendarCheck2 className={`h-4 w-4 mr-2`} />
             {t("admin.subscription-level")}
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setReleaseOpen(true)}>
-            <CalendarOff className={`h-4 w-4 mr-2`} />
-            {t("admin.release-subscription-action")}
+          <DropdownMenuItem onClick={() => setReleaseHourOpen(true)}>
+            <Clock className={`h-4 w-4 mr-2`} />
+            {t("admin.reset-hour-limit-action")}
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setReleaseWeekOpen(true)}>
+            <CalendarRange className={`h-4 w-4 mr-2`} />
+            {t("admin.reset-weekly-limit-action")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

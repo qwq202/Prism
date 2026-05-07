@@ -324,11 +324,14 @@ export async function subscriptionLevelOperation(
   }
 }
 
+export type ReleaseUsageType = "hour" | "week";
+
 export async function releaseUsageOperation(
   id: number,
+  type: ReleaseUsageType,
 ): Promise<CommonResponse> {
   try {
-    const response = await axios.post("/admin/user/release", { id });
+    const response = await axios.post("/admin/user/release", { id, type });
     return response.data as CommonResponse;
   } catch (e) {
     return { status: false, message: getErrorMessage(e) };

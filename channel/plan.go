@@ -658,21 +658,36 @@ func (p *Plan) ReleaseUsage(user globals.AuthLike, cache *redis.Client, model st
 	return false
 }
 
-func (p *Plan) ReleaseAll(user globals.AuthLike, cache *redis.Client) bool {
-	if p.HasPointPool() {
-		key := globals.GetSubscriptionLimitFormat(p.pointUsageKey(), user.HitID())
-		_, offset := getSubscriptionPointUsage(cache, user, p.pointUsageKey(), p.pointResetInterval())
-		if err := utils.SetCache(cache, key, getFloatOffsetFormat(offset, 0), planExp); err != nil {
-			return false
-		}
+func releasePointUsage(cache *redis.Client, user globals.AuthLike, key string, usageKey string, resetInterval int64) bool {
+	_, offset := getSubscriptionPointUsage(cache, user, usageKey, resetInterval)
+	return utils.SetCache(cache, key, getFloatOffsetFormat(offset, 0), planExp) == nil
+}
+
+func (p *Plan) ReleasePointPool(user globals.AuthLike, cache *redis.Client) bool {
+	if !p.HasPointPool() {
+		return false
 	}
 
-	if p.HasWeeklyPool() {
-		weeklyKey := globals.GetSubscriptionLimitFormat(p.weeklyUsageKey(), user.HitID())
-		_, offset := getSubscriptionPointUsage(cache, user, p.weeklyUsageKey(), weeklyResetInterval)
-		if err := utils.SetCache(cache, weeklyKey, getFloatOffsetFormat(offset, 0), planExp); err != nil {
-			return false
-		}
+	key := globals.GetSubscriptionLimitFormat(p.pointUsageKey(), user.HitID())
+	return releasePointUsage(cache, user, key, p.pointUsageKey(), p.pointResetInterval())
+}
+
+func (p *Plan) ReleaseWeeklyPool(user globals.AuthLike, cache *redis.Client) bool {
+	if !p.HasWeeklyPool() {
+		return false
+	}
+
+	key := globals.GetSubscriptionLimitFormat(p.weeklyUsageKey(), user.HitID())
+	return releasePointUsage(cache, user, key, p.weeklyUsageKey(), weeklyResetInterval)
+}
+
+func (p *Plan) ReleaseAll(user globals.AuthLike, cache *redis.Client) bool {
+	if p.HasPointPool() && !p.ReleasePointPool(user, cache) {
+		return false
+	}
+
+	if p.HasWeeklyPool() && !p.ReleaseWeeklyPool(user, cache) {
+		return false
 	}
 
 	for _, usage := range p.Items {
