@@ -101,15 +101,35 @@ func (u *User) DowngradePlan(db *sql.DB, target int) error {
 	}
 
 	now := time.Now()
-	weight := channel.PlanInstance.GetPlan(current).Price / channel.PlanInstance.GetPlan(target).Price
-	stamp := float32(expired.Unix()-now.Unix()) * weight
-
-	// ceil expired time
-	expiredAt := now.Add(time.Duration(stamp)*time.Second).AddDate(0, 0, -1)
+	expiredAt := calculateDowngradeExpiredAt(
+		expired,
+		now,
+		channel.PlanInstance.GetPlan(current).Price,
+		channel.PlanInstance.GetPlan(target).Price,
+	)
 	date := utils.ConvertSqlTime(expiredAt)
 	_, err := globals.ExecDb(db, "UPDATE subscription SET level = ?, expired_at = ? WHERE user_id = ?", target, date, u.GetID(db))
 
 	return err
+}
+
+func calculateDowngradeExpiredAt(expired time.Time, now time.Time, currentPrice float32, targetPrice float32) time.Time {
+	if currentPrice <= 0 || targetPrice <= 0 {
+		return expired
+	}
+
+	weight := currentPrice / targetPrice
+	if math.IsNaN(float64(weight)) || math.IsInf(float64(weight), 0) || weight <= 0 {
+		return expired
+	}
+
+	stamp := float32(expired.Unix()-now.Unix()) * weight
+	if math.IsNaN(float64(stamp)) || math.IsInf(float64(stamp), 0) || stamp <= 0 {
+		return expired
+	}
+
+	// ceil expired time
+	return now.Add(time.Duration(stamp)*time.Second).AddDate(0, 0, -1)
 }
 
 func (u *User) CountUpgradePrice(db *sql.DB, target int) float32 {
