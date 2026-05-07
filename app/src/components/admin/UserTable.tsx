@@ -643,11 +643,16 @@ function UserTable() {
             if (isEnter(e)) await update();
           }}
         />
-        <Button size={`icon`} className={`flex-shrink-0 ml-2`} onClick={update}>
+        <Button
+          size={`icon`}
+          classNameWrapper={`flex-shrink-0 ml-2`}
+          onClick={update}
+        >
           <Search className={`h-4 w-4`} />
         </Button>
         <Button
-          className={`flex-shrink-0 ml-2`}
+          className={`whitespace-nowrap`}
+          classNameWrapper={`flex-shrink-0 ml-2`}
           onClick={() => setCreateOpen(true)}
         >
           <PlusCircle className={`h-4 w-4 mr-2`} />
