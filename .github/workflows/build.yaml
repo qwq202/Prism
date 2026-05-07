@@ -34,7 +34,7 @@ jobs:
         run: |
           cd app
           npm install -g pnpm
-          pnpm install
+          pnpm install --no-frozen-lockfile
           pnpm build
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v4.0.0
