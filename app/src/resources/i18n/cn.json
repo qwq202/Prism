@@ -568,11 +568,12 @@
     "upgrade-price-notice": "仅供参考",
     "upgrade-price-notice-tip": "升级费用仅供参考，实际价格以服务器精准计算为准",
     "expired": "订阅剩余天数",
-    "quota-manage": "订阅配额",
-    "plan-points": "套餐点数",
+    "quota-manage": "额度窗口",
+    "plan-times": "套餐次数",
+    "plan-points": "5 小时额度",
     "expired-days": "您的订阅将于 {{days}} 天后到期",
-    "refresh-days": "您的配额将于 {{refresh_days}} 天后刷新",
-    "get-refresh-days": "开始使用配额以获取刷新日期",
+    "refresh-days": "您的额度窗口将于 {{refresh_days}} 天后刷新",
+    "get-refresh-days": "开始使用额度以获取刷新日期",
     "time": {
       "1": "1个月",
       "3": "3个月",
@@ -588,7 +589,27 @@
     "failed-prompt": "订阅失败，请确保您有足够的余额。",
     "failed-quota-prompt": "订阅失败，您的余额不足 ({{quota}} 点数)",
     "migrate-failed": "变更失败",
-    "sub-migrate-failed-prompt": "您的订阅变更失败，原因：{{reason}}"
+    "sub-migrate-failed-prompt": "您的订阅变更失败，原因：{{reason}}",
+    "plan-points-pool": "窗口额度",
+    "plan-points-unlimited": "无限额度",
+    "plan-points-amount": "每窗口 {{amount}} 点数",
+    "plan-points-desc": "可用于所有已覆盖模型的周期额度",
+    "plan-points-reset": "{{period}}重置",
+    "reset-in-days": "{{days}} 天后重置",
+    "reset-in-hours": "{{hours}} 小时后重置",
+    "reset-in-minutes": "{{minutes}} 分钟后重置",
+    "reset-in": "{{time}}后重置",
+    "reset-days": "{{days}}天",
+    "reset-hours": "{{hours}}小时",
+    "reset-minutes": "{{minutes}}分钟",
+    "plan-points-weekly": "每周额度",
+    "plan-points-weekly-reset": "每周重置",
+    "points-remaining": "剩余 {{pct}}%",
+    "points-unlimited": "无限",
+    "times-remaining": "剩余 {{remaining}} 次",
+    "times-unlimited": "无限次数",
+    "blocked-by": "已被阻断 — {{name}}已用尽",
+    "reset-at": "重置时间：{{time}}"
   },
   "cancel": "取消",
   "confirm": "确认",
@@ -926,6 +947,8 @@
     "funnel-registered": "注册用户",
     "funnel-ever-subscribed": "曾订阅",
     "funnel-active-subscribed": "当前订阅",
+    "funnel-churned": "已流失",
+    "funnel-never-subscribed": "从未订阅",
     "requests": "请求量",
     "times": "异常次数",
     "empty": "无数据",
@@ -1021,7 +1044,6 @@
     "unban": "解封",
     "default-password": "密码修改提示",
     "default-password-prompt": "您的管理员密码为默认密码，为了您的账号安全，请尽快修改密码。（前往后台管理 - 系统设置 - 修改 Root 密码）",
-    "coai-format-only": "此格式为 CoAI 独有格式",
     "identity": {
       "normal": "普通用户",
       "api_paid": "其他付费用户",
@@ -1091,7 +1113,7 @@
       "sync-option": "同步选项",
       "sync-site": "上游地址",
       "sync-tip": "同步上游模型市场",
-      "sync-placeholder": "请输入上游 CoAI 的 API 地址，如：https://api.chatnio.net",
+      "sync-placeholder": "请输入上游 Prism 的 API 地址，如：https://api.chatnio.net",
       "sync-failed": "同步失败",
       "sync-failed-prompt": "地址无法请求或者模型市场模型为空\n（端点：{{endpoint}}）",
       "sync-success": "同步成功",
@@ -1129,10 +1151,10 @@
       "item-name-placeholder": "请输入实体名称 (Item Name 用于显示在订阅列表中的实体名，如：GPT-4)",
       "item-value": "配额",
       "item-value-tip": "套餐项配额，-1 表示无限",
-      "plan-quota": "套餐点数",
-      "plan-quota-tip": "套餐直接提供的共享点数，套餐内所有模型都会消耗这笔点数。0 表示沿用单项按次配额，-1 表示无限。",
-      "plan-reset": "点数重置周期",
-      "plan-reset-tip": "到达周期后自动清零套餐点数已用量。",
+      "plan-quota": "5 小时额度",
+      "plan-quota-tip": "短周期窗口额度，默认每 5 小时重置一次。套餐内覆盖的模型都会消耗这笔额度，-1 表示无限。",
+      "plan-reset": "短周期窗口",
+      "plan-reset-tip": "到达周期后自动清零短周期额度已用量。",
       "plan-reset-0": "每月",
       "plan-reset-18000": "每 5 小时",
       "plan-reset-86400": "每天",
@@ -1154,8 +1176,26 @@
       "sync": "同步上游",
       "sync-option": "同步选项",
       "sync-site": "上游地址",
-      "sync-placeholder": "请输入上游 CoAI 的 API 地址，如：https://api.chatnio.net",
-      "sync-result": "发现上游订阅规则数 {{length}} 个，涵盖模型 {{models}} 个, 是否覆盖本站点订阅规则？"
+      "sync-placeholder": "请输入上游 Prism 的 API 地址，如：https://api.chatnio.net",
+      "sync-result": "发现上游订阅规则数 {{length}} 个，涵盖模型 {{models}} 个, 是否覆盖本站点订阅规则？",
+      "mode-requests": "按次计费",
+      "mode-requests-desc": "每个模型组每月有固定请求次数上限，按模型分别记录使用量。",
+      "mode-requests-short": "按次",
+      "mode-points": "窗口额度",
+      "mode-points-desc": "模仿 5 小时 + 每周的双窗口额度，所有覆盖模型同时消耗两个窗口。",
+      "mode-points-short": "额度",
+      "plan-quota-hint": "设为 -1 表示无限；设为 0 会关闭点数模式。",
+      "items-requests-title": "模型分组与次数限制",
+      "items-requests-desc": "定义模型分组及其每月可用请求次数。",
+      "items-points-title": "可访问模型分组",
+      "items-points-desc": "此处列出的模型会同时消耗短周期额度和每周额度。",
+      "no-items": "暂无项目，点击右上角添加",
+      "no-plans": "暂无套餐配置，数据加载中…",
+      "disabled-hint": "订阅功能已关闭，启用开关后可进行套餐配置",
+      "action": "操作",
+      "weekly-quota": "每周额度",
+      "weekly-quota-tip": "长周期窗口额度，每 7 天重置一次。请求会同时检查短周期额度和每周额度。",
+      "weekly-quota-hint": "设为 -1 表示无限。0 表示禁用每周窗口。"
     },
     "channels": {
       "loading": "正在加载...",
@@ -1195,11 +1235,11 @@
       "import": "导入已有渠道",
       "joint": "对接上游",
       "joint-endpoint": "上游地址",
-      "joint-endpoint-placeholder": "请输入上游 CoAI 的 API 地址，如：https://api.chatnio.net",
+      "joint-endpoint-placeholder": "请输入上游 Prism 的 API 地址，如：https://api.chatnio.net",
       "upstream-endpoint-placeholder": "请输入上游 OpenAI 地址，如：https://api.openai.com",
       "sync-secret-placeholder": "请输入上游渠道的 API 密钥",
       "joint-secret": "API 秘钥",
-      "joint-secret-placeholder": "请输入上游 CoAI 的 API 秘钥",
+      "joint-secret-placeholder": "请输入上游 Prism 的 API 秘钥",
       "sync-failed": "同步失败",
       "sync-failed-prompt": "地址无法请求或者模型市场模型为空\n（端点：{{endpoint}}）",
       "sync-success": "同步成功",
@@ -1259,7 +1299,7 @@
       "sync-option": "同步选项",
       "sync-site": "上游地址",
       "sync-tip": "同步上游计费规则",
-      "sync-placeholder": "请输入上游 CoAI 的 API 地址，如：https://api.chatnio.net",
+      "sync-placeholder": "请输入上游 Prism 的 API 地址，如：https://api.chatnio.net",
       "sync-failed": "同步失败",
       "sync-failed-prompt": "地址无法请求或者计费规则为空\n（端点：{{endpoint}}）",
       "sync-prompt": "已从上游获取 {{length}} 个模型的规则，将影响当前 {{influence}} 个模型的规则，是否继续？",
@@ -1532,7 +1572,7 @@
       "securityRemoveIPAddress": "删除 IP 地址",
       "autoTitle": {
         "title": "自动会话标题",
-        "tip": "使用 LLM 在首轮对话后自动总结并设置会话标题。设置自定义提示词为空时，默认使用 CoAI 内默认配置的提示词",
+        "tip": "使用 LLM 在首轮对话后自动总结并设置会话标题。设置自定义提示词为空时，默认使用 Prism 内默认配置的提示词",
         "enabled": "启用自动标题",
         "model": "生成模型",
         "modelPlaceholder": "留空表示使用当前会话模型",
@@ -1611,50 +1651,7 @@
       "status-ok": "{{status}} 成功",
       "status-redirect": "{{status}} 重定向"
     },
-    "license": {
-      "title": "授权管理",
-      "description": "CoAI Pro 版本授权管理",
-      "domain": "授权域名",
-      "digest": "签名摘要",
-      "module": "模块管理",
-      "info": "授权信息",
-      "purchase": "购买授权",
-      "pro-required": "该功能为 CoAI Pro 专属，请在授权管理页面购买 CoAI Pro 授权以使用该功能",
-      "modules": {
-        "bought": "已购买",
-        "not-bought": "购买",
-        "buy-tip": "请联系您的销售代表以购买此模块",
-        "contact-for-price": "访问文档以获取报价",
-        "coai-pro": {
-          "title": "CoAI Pro",
-          "description": "CoAI Pro 商业版授权，解锁对接多种支付渠道、用户（组）倍率控制、内容审核、会话日志等全部商业功能"
-        },
-        "multiKey": {
-          "title": "多令牌管理",
-          "description": "多 API KEY 管理, 支持一单元内多令牌分发管理, 支持设置可调用模型，余额限制，调用日志，状态管理，对接指南等高级功能"
-        },
-        "stripe": {
-          "title": "Stripe 支付",
-          "description": "Stripe Hosted Checkout 高级支付模块，支持 Stripe 银行卡/Bank/Link/微信/Alipay+ 等几十余种支付对接，支持多种货币支付"
-        },
-        "paypal": {
-          "title": "PayPal 支付",
-          "description": "PayPal 高级支付模块，支持 PayPal 银行卡支付等多货币支付功能"
-        },
-        "afdian": {
-          "title": "爱发电",
-          "description": "爱发电支付 Webhook 模块，支持爱发电余额购买"
-        },
-        "bot": {
-          "title": "机器人",
-          "description": "微信/飞书/Telegram/Discord 机器人 SaaS 模块"
-        },
-        "digital": {
-          "title": "数字人",
-          "description": "数字人视频生成模块定制，采用高级动态语音技术，支持语音和面部克隆，支持私有化部署推理与多种引擎，全行业场景支持，支持高维度定制"
-        }
-      }
-    }
+    "format-only": "此格式为 Prism 独有格式"
   },
   "mask": {
     "title": "预设",
@@ -1889,13 +1886,15 @@
     "bindOpenCatTip": "点击按钮后，将会跳转至 Open Cat 并绑定预置参数 (请先在您的设备中安装 Open Cat)",
     "bindOneAPIStep1": "进入渠道管理页，点击添加渠道",
     "bindOneAPIStep2": "选择 OpenAI 类型并根据下方接入点、密钥填写对应信息",
-    "bindCoAIStep1": "进入后台的渠道管理页，点击对接上游",
-    "bindCoAIStep2": "根据下方接入点、密钥信息填写对应信息"
+    "bindPrismStep1": "进入后台的渠道管理页，点击对接上游",
+    "bindPrismStep2": "根据下方接入点、密钥信息填写对应信息"
   },
   "aff": {
     "title": "推广分成",
     "bind-desc": "绑定推广码，开始获得被邀请用户购买后的返佣收益。",
-    "placeholder": { "code": "请输入推广码" },
+    "placeholder": {
+      "code": "请输入推广码"
+    },
     "generate-code-first": "请先生成推广码",
     "get": "获取推广码",
     "get-placeholder": "点击获取推广码",

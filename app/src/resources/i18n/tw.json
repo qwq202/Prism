@@ -436,11 +436,32 @@
     "upgrade-price-label": "升級費用",
     "upgrade-price-notice": "僅供參考",
     "upgrade-price-notice-tip": "升級費用僅供參考，實際價格以伺服器精準計算為準",
-    "quota-manage": "訂閱配額",
-    "plan-points": "套餐點數",
+    "quota-manage": "額度視窗",
+    "plan-times": "套餐次數",
+    "plan-points": "5 小時額度",
     "expired-days": "您的訂閱將於 {{days}} 天後到期",
-    "refresh-days": "您的配額將於{{refresh_days}} 天後刷新",
-    "get-refresh-days": "開始使用配額以取得刷新日期"
+    "refresh-days": "您的額度視窗將於 {{refresh_days}} 天後刷新",
+    "get-refresh-days": "開始使用額度以取得刷新日期",
+    "plan-points-pool": "視窗額度",
+    "plan-points-unlimited": "無限額度",
+    "plan-points-amount": "每視窗 {{amount}} 點數",
+    "plan-points-desc": "可用於所有已覆蓋模型的週期額度",
+    "plan-points-reset": "{{period}}重置",
+    "reset-in-days": "{{days}} 天後重置",
+    "reset-in-hours": "{{hours}} 小時後重置",
+    "reset-in-minutes": "{{minutes}} 分鐘後重置",
+    "reset-in": "{{time}}後重置",
+    "reset-days": "{{days}}天",
+    "reset-hours": "{{hours}}小時",
+    "reset-minutes": "{{minutes}}分鐘",
+    "plan-points-weekly": "每週額度",
+    "plan-points-weekly-reset": "每週重置",
+    "points-remaining": "剩餘 {{pct}}%",
+    "points-unlimited": "無限",
+    "times-remaining": "剩餘 {{remaining}} 次",
+    "times-unlimited": "無限次數",
+    "blocked-by": "已被阻斷 — {{name}}已用盡",
+    "reset-at": "重置時間：{{time}}"
   },
   "cancel": "取消",
   "confirm": "確認",
@@ -795,7 +816,7 @@
     "error": "請求失敗",
     "default-password": "密碼變更提示",
     "default-password-prompt": "您的管理員密碼為預設密碼，為了您的帳戶安全，請盡快變更密碼。（前往後台管理 - 系統設定 - 變更 Root 密碼）",
-    "chatnio-format-only": "此格式為 CoAI.Dev 獨有格式",
+    "chatnio-format-only": "此格式為 Prism 獨有格式",
     "identity": {
       "normal": "一般使用者",
       "api_paid": "其他付費使用者",
@@ -828,7 +849,7 @@
       "sync-option": "同步選項",
       "sync-site": "上游地址",
       "sync-tip": "同步上游模型市場",
-      "sync-placeholder": "請輸入上游 CoAI.Dev 的 API 地址，如：https://api.chatnio.net",
+      "sync-placeholder": "請輸入上游 Prism 的 API 地址，如：https://api.chatnio.net",
       "sync-failed": "同步失敗",
       "sync-failed-prompt": "地址無法請求或者模型市場模型為空\n（端點：{{endpoint}}）",
       "sync-success": "同步成功",
@@ -867,10 +888,10 @@
       "item-name-placeholder": "請輸入實體名稱（Item Name 用於顯示在訂閱列表中的實體名稱，如：GPT-4）",
       "item-value": "額度",
       "item-value-tip": "套餐項額度，-1 表示無限",
-      "plan-quota": "套餐點數",
-      "plan-quota-tip": "套餐直接提供的共享點數，套餐內所有模型都會消耗這筆點數。0 表示沿用單項按次額度，-1 表示無限。",
-      "plan-reset": "點數重設週期",
-      "plan-reset-tip": "到達週期後自動清零套餐點數已用量。",
+      "plan-quota": "5 小時額度",
+      "plan-quota-tip": "短週期視窗額度，預設每 5 小時重置一次。套餐內覆蓋的模型都會消耗這筆額度，-1 表示無限。",
+      "plan-reset": "短週期視窗",
+      "plan-reset-tip": "到達週期後自動清零短週期額度已用量。",
       "plan-reset-0": "每月",
       "plan-reset-18000": "每 5 小時",
       "plan-reset-86400": "每天",
@@ -888,12 +909,30 @@
       "sync": "同步上游",
       "sync-option": "同步選項",
       "sync-site": "上游地址",
-      "sync-placeholder": "請輸入上游 CoAI.Dev 的 API 地址，如：https://api.chatnio.net",
+      "sync-placeholder": "請輸入上游 Prism 的 API 地址，如：https://api.chatnio.net",
       "sync-result": "發現上游訂閱規則數 {{length}} 個，涵蓋模型 {{models}} 個，是否覆蓋本站台訂閱規則？",
       "discounts": "折扣設定",
       "discounts-tip": "折扣設定(不啟用即為預設設置，半年期訂閱預設90% 一年期訂閱80%)",
       "discount-value": "折扣值",
-      "discount-off": "折扣"
+      "discount-off": "折扣",
+      "mode-requests": "按次计费",
+      "mode-requests-desc": "每个模型组每月有固定请求次数上限，按模型分别记录使用量。",
+      "mode-requests-short": "按次",
+      "mode-points": "視窗額度",
+      "mode-points-desc": "模仿 5 小時 + 每週的雙視窗額度，所有覆蓋模型同時消耗兩個視窗。",
+      "mode-points-short": "額度",
+      "plan-quota-hint": "設為 -1 表示無限；設為 0 會關閉點數模式。",
+      "items-requests-title": "模型分组与次数限制",
+      "items-requests-desc": "定义模型分组及其每月可用请求次数。",
+      "items-points-title": "可访问模型分组",
+      "items-points-desc": "此處列出的模型會同時消耗短週期額度和每週額度。",
+      "no-items": "暂无项目，点击右上角添加",
+      "no-plans": "暂无套餐配置，数据加载中…",
+      "disabled-hint": "订阅功能已关闭，启用开关后可进行套餐配置",
+      "action": "操作",
+      "weekly-quota": "每週額度",
+      "weekly-quota-tip": "長週期視窗額度，每 7 天重置一次。請求會同時檢查短週期額度和每週額度。",
+      "weekly-quota-hint": "設為 -1 表示無限。0 表示停用每週視窗。"
     },
     "channels": {
       "id": "管道 ID",
@@ -927,11 +966,11 @@
       "create": "建立管道",
       "joint": "對接上游",
       "joint-endpoint": "上游地址",
-      "joint-endpoint-placeholder": "請輸入上游 CoAI.Dev 的 API 地址，如：https://api.chatnio.net",
+      "joint-endpoint-placeholder": "請輸入上游 Prism 的 API 地址，如：https://api.chatnio.net",
       "upstream-endpoint-placeholder": "請輸入上游 OpenAI 地址，如：https://api.openai.com",
       "sync-secret-placeholder": "請輸入上游管道的 API 金鑰",
       "joint-secret": "API 金鑰",
-      "joint-secret-placeholder": "請輸入上游 CoAI.Dev 的 API 金鑰",
+      "joint-secret-placeholder": "請輸入上游 Prism 的 API 金鑰",
       "sync-failed": "同步失敗",
       "sync-failed-prompt": "地址無法請求或者模型市場模型為空\n（端點：{{endpoint}}）",
       "sync-success": "同步成功",
@@ -997,7 +1036,7 @@
       "sync-option": "同步選項",
       "sync-site": "上游地址",
       "sync-tip": "同步上游計費規則",
-      "sync-placeholder": "請輸入上游 CoAI.Dev 的 API 地址，如：https://api.chatnio.net",
+      "sync-placeholder": "請輸入上游 Prism 的 API 地址，如：https://api.chatnio.net",
       "sync-failed": "同步失敗",
       "sync-failed-prompt": "地址無法請求或者計費規則為空\n（端點：{{endpoint}}）",
       "sync-prompt": "已從上游取得 {{length}} 個模型的規則，將影響目前 {{influence}} 個模型的規則，是否繼續？",
@@ -1330,7 +1369,7 @@
         "overwrite": "覆蓋已有標題",
         "prompt": "自訂提示詞",
         "promptPlaceholder": "可使用{max_len} 作為佔位符",
-        "tip": "使用LLM 在首輪對話後自動總結並設定會話標題。設定自訂提示詞為空時，預設使用CoAI 內預設配置的提示詞"
+        "tip": "使用LLM 在首輪對話後自動總結並設定會話標題。設定自訂提示詞為空時，預設使用Prism 內預設配置的提示詞"
       },
       "storageMode_r2": "R2",
       "storageR2AccountId": "Account ID",
@@ -1367,7 +1406,6 @@
     "custom-group": "自訂分組",
     "custom-group-action": "設定自訂分組",
     "custom-group-action-desc": "請輸入自訂分組名稱",
-    "coai-format-only": "此格式為CoAI 獨有格式",
     "delete-broadcast": "刪除通知",
     "delete-broadcast-desc": "是否確定？此操作無法撤銷。這將永久刪除通知。",
     "pay": {
@@ -1409,50 +1447,7 @@
       "status-ok": "{{status}} 成功",
       "status-redirect": "{{status}} 重定向"
     },
-    "license": {
-      "title": "授權管理",
-      "description": "CoAI Pro 版本授權管理",
-      "domain": "授權域名：",
-      "digest": "簽名摘要",
-      "module": "模組管理",
-      "info": "授權資訊",
-      "modules": {
-        "bought": "已購買",
-        "not-bought": "購買",
-        "buy-tip": "請聯絡您的銷售代表以購買此模組",
-        "multiKey": {
-          "title": "多代幣管理",
-          "description": "多API KEY 管理, 支援一單元內多令牌分發管理, 支援設定可呼叫模型，餘額限制，呼叫日誌，狀態管理，對接指南等高階功能"
-        },
-        "stripe": {
-          "title": "Stripe 支付",
-          "description": "Stripe Hosted Checkout 高級支付模組，支援Stripe 銀行卡/Bank/Link/微信/Alipay+ 等數十餘種支付對接，支援多種貨幣支付"
-        },
-        "paypal": {
-          "title": "PayPal 支付",
-          "description": "PayPal 高級支付模組，支援PayPal 銀行卡支付等多貨幣支付功能"
-        },
-        "afdian": {
-          "title": "愛發電",
-          "description": "愛發電支付Webhook 模組，支援愛發電餘額購買"
-        },
-        "bot": {
-          "title": "機器人",
-          "description": "微信/飛書/Telegram/Discord 機器人SaaS 模組"
-        },
-        "digital": {
-          "title": "數位人",
-          "description": "數位人視訊生成模組定制，採用高級動態語音技術，支援語音和臉部克隆，支援私有化部署推理與多種引擎，全行業場景支持，支持高維度定制"
-        },
-        "contact-for-price": "訪問文件以取得報價",
-        "coai-pro": {
-          "title": "CoAI Pro",
-          "description": "CoAI Pro 商業版授權，解鎖對接多種支付管道、使用者（群組）倍率控制、內容審核、會話日誌等全部商業功能"
-        }
-      },
-      "purchase": "購買授權",
-      "pro-required": "此功能為CoAI Pro 專屬，請在授權管理頁面購買CoAI Pro 授權以使用該功能"
-    }
+    "format-only": "此格式為 Prism 獨有格式"
   },
   "mask": {
     "title": "預設設定",
@@ -1884,8 +1879,8 @@
     "bindOpenCatTip": "點擊按鈕後，將會跳轉至 Open Cat 並綁定預置參數(請先在您的裝置中安裝 Open Cat)",
     "bindOneAPIStep1": "進入頻道管理頁，點選新增頻道",
     "bindOneAPIStep2": "選擇OpenAI 類型並根據下方存取點、金鑰填寫對應訊息",
-    "bindCoAIStep1": "進入後台的頻道管理頁，點選對接上游",
-    "bindCoAIStep2": "根據下方存取點、密鑰資訊填寫對應信息"
+    "bindPrismStep1": "進入後台的頻道管理頁，點選對接上游",
+    "bindPrismStep2": "根據下方存取點、密鑰資訊填寫對應信息"
   },
   "aff": {
     "title": "推廣分成",

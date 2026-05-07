@@ -115,6 +115,7 @@ export type Plan = {
   price: number;
   quota?: number;
   reset_interval?: number;
+  weekly_quota?: number;
   items: PlanItem[];
   discounts?: Record<string, number>;
 };

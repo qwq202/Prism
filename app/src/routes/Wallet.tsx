@@ -6,6 +6,7 @@ import {
   BadgeCheck,
   BadgeMinus,
   CalendarClock,
+  Coins,
   Crown,
   ExternalLink,
   InfoIcon,
@@ -33,7 +34,7 @@ import {
   refreshSelector,
 } from "@/store/subscription.ts";
 import { subscriptionDataSelector } from "@/store/globals.ts";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 import { getPlan, getPlanName } from "@/conf/subscription.tsx";
 import { Upgrade } from "@/components/home/subscription/UpgradePlan.tsx";
@@ -51,6 +52,8 @@ type SubscriptionUsageValue = {
   reset_interval?: number;
   reset_at?: string;
 };
+
+const pointResetInterval = 5 * 60 * 60;
 
 function hasPlanPointPool(plan: Plan): boolean {
   return (plan.quota ?? 0) > 0 || plan.quota === -1;
@@ -92,6 +95,67 @@ function toSubscriptionUsage(
   return null;
 }
 
+function getPlanResetLabel(t: (key: string) => string, resetInterval?: number): string {
+  const s = resetInterval ?? 0;
+  if (s === 0) return t("admin.plan.plan-reset-18000");
+  if (s === 18000) return t("admin.plan.plan-reset-18000");
+  if (s === 86400) return t("admin.plan.plan-reset-86400");
+  if (s === 604800) return t("admin.plan.plan-reset-604800");
+  const hours = Math.round(s / 3600);
+  return `${hours}h`;
+}
+
+function normalizePointWindowUsage(usage: SubscriptionUsageValue | null, total: number): SubscriptionUsageValue {
+  const resetAt = new Date(Date.now() + pointResetInterval * 1000).toISOString();
+  if (!usage) {
+    return {
+      used: 0,
+      total,
+      unit: "points",
+      reset_interval: pointResetInterval,
+      reset_at: resetAt,
+    };
+  }
+
+  if (!usage.reset_interval || usage.reset_interval === 0 || usage.reset_interval > pointResetInterval) {
+    return {
+      ...usage,
+      reset_interval: pointResetInterval,
+      reset_at: resetAt,
+    };
+  }
+
+  return usage;
+}
+
+function getFallbackTimesUsage(usage: Record<string, number | SubscriptionUsageValue>): SubscriptionUsageValue {
+  const entries = Object.entries(usage)
+    .filter(([id]) => id !== "plan_points" && id !== "plan_points_weekly")
+    .map(([, value]) => toSubscriptionUsage(value, 0))
+    .filter((value): value is SubscriptionUsageValue => value !== null && value.unit !== "points");
+
+  if (entries.some((value) => value.total === -1)) {
+    return {
+      used: 0,
+      total: -1,
+      unit: "times",
+    };
+  }
+
+  return entries.reduce<SubscriptionUsageValue>(
+    (total, value) => ({
+      used: total.used + value.used,
+      total: total.total + value.total,
+      unit: "times",
+    }),
+    {
+      used: 0,
+      total: 0,
+      unit: "times",
+    },
+  );
+}
+
 type PlanItemProps = {
   level: number;
   isYearly: boolean;
@@ -112,28 +176,7 @@ function PlanItem({ level, isYearly }: PlanItemProps) {
     [subscriptionData, level],
   );
   const name = useMemo(() => getPlanName(level), [level]);
-
-  const containerVariants = {
-    hidden: { opacity: 0, y: 50 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.5,
-        ease: "easeOut",
-        staggerChildren: 0.1,
-      },
-    },
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, x: -20 },
-    visible: {
-      opacity: 1,
-      x: 0,
-      transition: { duration: 0.3, ease: "easeOut" },
-    },
-  };
+  const isHighlight = level === 2;
 
   const pricing = useMemo(() => {
     let discount = 1.0;
@@ -152,151 +195,148 @@ function PlanItem({ level, isYearly }: PlanItemProps) {
     return result;
   }, [plan, isYearly]);
 
+  const discountPercent = useMemo(() => {
+    const p = subscriptionData.find((p) => p.level === level);
+    if (p && p.discounts && p.discounts["12"] !== undefined) {
+      return Math.round((1 - p.discounts["12"]) * 100);
+    }
+    return isYearly ? 20 : 0;
+  }, [subscriptionData, level, isYearly]);
+
+  const iconEl = level === 1 ? <Zap /> : level === 2 ? <Rocket /> : level === 3 ? <Crown /> : <Star />;
+
   return (
     <motion.div
       ref={ref}
-      className={cn("plan relative shadow border rounded-lg mb-4", name)}
-      variants={containerVariants}
-      initial="hidden"
-      animate={inView ? "visible" : "hidden"}
+      className={cn(
+        "relative flex flex-col rounded-xl border bg-background transition-shadow",
+        isHighlight
+          ? "border-primary/50 shadow-md shadow-primary/5"
+          : "border-border/60 shadow-sm",
+      )}
+      initial={{ opacity: 0, y: 30 }}
+      animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
+      transition={{ duration: 0.4, ease: "easeOut", delay: level * 0.08 }}
     >
-      <AnimatePresence>
-        {level === 2 && (
-          <motion.div
-            className="absolute top-2 right-2 bg-primary text-primary-foreground text-xs font-bold py-1 px-2 rounded-full"
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            transition={{
-              duration: 0.3,
-              type: "spring",
-              stiffness: 500,
-              damping: 25,
-            }}
+      {isHighlight && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-[11px] font-semibold px-3 py-0.5 rounded-full whitespace-nowrap">
+          {t("sub.best-choice")}
+        </div>
+      )}
+
+      {/* Header */}
+      <div className={cn(
+        "px-5 pt-5 pb-4",
+        isHighlight && "pt-6",
+      )}>
+        <div className="flex items-center gap-2.5 mb-3">
+          <Icon
+            icon={iconEl}
+            className={cn("w-8 h-8 p-1.5 rounded-lg", {
+              "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400": level === 1,
+              "bg-primary/10 text-primary": level === 2,
+              "bg-amber-50 text-amber-500 dark:bg-amber-900/20 dark:text-amber-400": level === 3,
+              "bg-muted text-muted-foreground": level === 0,
+            })}
+          />
+          <span className="text-base font-semibold">{t(`sub.${name}`)}</span>
+        </div>
+
+        {/* Price */}
+        <div className="flex items-baseline gap-0.5">
+          <span className="text-sm font-medium text-muted-foreground">{symbol}</span>
+          <motion.span
+            className="text-3xl font-bold tracking-tight"
+            key={`${pricing}-${isYearly}`}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
           >
-            {t("sub.best-choice")}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <motion.div
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        transition={{ type: "spring", stiffness: 400, damping: 17 }}
-        className="w-fit mb-1 cursor-pointer"
-      >
-        <Icon
-          icon={
-            level === 1 ? (
-              <Zap />
-            ) : level === 2 ? (
-              <Rocket />
-            ) : level === 3 ? (
-              <Crown />
-            ) : (
-              <Star />
-            )
-          }
-          className={cn("w-10 h-10 p-2 border-2 rounded-lg", {
-            "border-gold text-gold fill-gold/20 bg-gold/5": level === 3,
-            "border-primary text-primary fill-primary/20 bg-primary/5":
-              level === 2,
-            "border-amber-600 text-amber-600 fill-amber-600/20 bg-amber-600/5":
-              level === 1,
-            "border-secondary text-secondary fill-secondary/20 bg-secondary/5":
-              level === 0,
-          })}
-        />
-      </motion.div>
-
-      <motion.div className={`font-bold text-md`} variants={itemVariants}>
-        {t(`sub.${name}`)}
-      </motion.div>
-
-      <motion.div
-        className={`price mb-2 w-full flex items-end`}
-        variants={itemVariants}
-      >
-        <span className="text-xl md:text-2xl">{symbol}</span>
-        <motion.span
-          className="text-2xl md:text-3xl font-bold mr-0.5"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-        >
-          {pricing}
-        </motion.span>
-        <span className="text-sm font-medium">/{t("sub.month")}</span>
-
-        {(() => {
-          const plan = subscriptionData.find((p) => p.level === level);
-          let discountPercent = 0;
-
-          if (plan && plan.discounts && plan.discounts["12"] !== undefined) {
-            discountPercent = Math.round((1 - plan.discounts["12"]) * 100);
-          } else if (isYearly) {
-            discountPercent = 20;
-          }
-
-          return discountPercent > 0 ? (
-            <motion.span
-              className="text-xs text-secondary ml-auto !text-[#55b467] bg-[#f4fdeb] border border-[#55b467]/20 cursor-pointer rounded-sm px-1 py-0.5"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
+            {pricing}
+          </motion.span>
+          <span className="text-sm text-muted-foreground ml-0.5">/{t("sub.month")}</span>
+          {discountPercent > 0 && (
+            <span className="ml-auto text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/40 px-1.5 py-0.5 rounded">
               {t("sub.year-earn-tip", { percent: `${discountPercent}%` })}
-            </motion.span>
-          ) : null;
-        })()}
-      </motion.div>
+            </span>
+          )}
+        </div>
+      </div>
 
-      <Upgrade level={level} current={current} isYearly={isYearly} />
+      {/* Action */}
+      <div className="px-5 pb-4">
+        <Upgrade level={level} current={current} isYearly={isYearly} />
+      </div>
 
-      <motion.div
-        className={`flex flex-col mt-4 space-y-1.5`}
-        variants={containerVariants}
-      >
-        <motion.p
-          className="text-sm text-secondary flex items-center mb-1"
-          variants={itemVariants}
-        >
-          {t("sub.including-model")}
-          <Tips content={t("sub.including-model-tip")} />
-        </motion.p>
-        {plan.items.map((item, index) => (
-          <motion.div
-            key={index}
-            className="flex items-center"
-            variants={itemVariants}
-          >
-            <div className={`mr-1.5`}>
-              <ModelAvatar
-                model={{
-                  id: item.id,
-                  name: item.name,
-                  avatar: item.icon,
-                }}
-                size={24}
-              />
+      {/* Divider */}
+      <div className="mx-5 border-t border-border/50" />
+
+      {/* Features */}
+      <div className="px-5 py-4 flex-1">
+        {hasPlanPointPool(plan) ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/40">
+              <Coins className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+              <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                {t("sub.plan-points-pool")}
+              </span>
+              <span className="text-amber-300 dark:text-amber-700 text-xs mx-0.5">/</span>
+              <span className="text-[11px] text-amber-600/70 dark:text-amber-500/70">
+                {t("sub.plan-points-reset", { period: getPlanResetLabel(t, plan.reset_interval) })}
+              </span>
             </div>
-            <p className="text-sm mr-auto">{item.name}</p>
-            <p className="text-md font-medium">
-              {item.value !== -1
-                ? t("sub.plan-item-usage", { times: item.value })
-                : t("sub.plan-item-unlimited-usage")}
-
-              {item.value !== -1 && (
-                <span className="text-xs text-secondary">
-                  /{t("sub.month")}
-                </span>
-              )}
+            <div>
+              <p className="text-xs text-muted-foreground flex items-center gap-1 mb-2">
+                {t("sub.including-model")}
+                <Tips content={t("sub.including-model-tip")} />
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {plan.items.map((item, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full border border-border/60 bg-muted/30 text-xs"
+                  >
+                    <ModelAvatar
+                      model={{ id: item.id, name: item.name, avatar: item.icon }}
+                      size={16}
+                    />
+                    <span>{item.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground flex items-center gap-1 mb-2">
+              {t("sub.including-model")}
+              <Tips content={t("sub.including-model-tip")} />
             </p>
-          </motion.div>
-        ))}
-      </motion.div>
+            {plan.items.map((item, index) => (
+              <div
+                key={index}
+                className="flex items-center py-1.5"
+              >
+                <ModelAvatar
+                  model={{ id: item.id, name: item.name, avatar: item.icon }}
+                  size={20}
+                />
+                <span className="text-sm ml-2 mr-auto truncate">{item.name}</span>
+                <span className="text-sm font-medium tabular-nums shrink-0">
+                  {item.value !== -1
+                    ? t("sub.plan-item-usage", { times: item.value })
+                    : t("sub.plan-item-unlimited-usage")}
+                  {item.value !== -1 && (
+                    <span className="text-xs text-muted-foreground font-normal">
+                      /{t("sub.month")}
+                    </span>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </motion.div>
   );
 }
@@ -329,204 +369,183 @@ function WalletPlanBox() {
     return null;
   }
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        duration: 0.1,
-        delay: 0.25,
-        when: "beforeChildren",
-        staggerChildren: 0.1,
-      },
-    },
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.5 },
-    },
-  };
-
   return (
     <motion.div
-      className={`w-full h-max mt-0 border rounded-lg p-2.5 bg-background`}
-      id={`plan`}
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
+      className="w-full mt-0 rounded-xl border bg-background overflow-hidden"
+      id="plan"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3, delay: 0.2 }}
     >
-      <motion.div variants={itemVariants}>
-        <motion.div
-          className="flex flex-col w-full p-2.5"
-          variants={itemVariants}
-        >
-          <motion.div
-            className="text-xs text-secondary mb-1"
-            variants={itemVariants}
-          >
-            {t("sub.dialog-title")}
-          </motion.div>
-          <motion.div
-            className="text-2xl font-medium mb-1 flex items-center"
-            variants={itemVariants}
-          >
-            <Icon
-              icon={isSubscribed ? <BadgeCheck /> : <BadgeMinus />}
-              className={cn(
-                "h-6 w-6 mr-1.5",
-                isSubscribed
-                  ? "text-green-500 fill-green-500/20"
-                  : "text-muted-foreground fill-muted-foreground/20",
-              )}
-            />
-            <p>{t(`sub.${planName}`)}</p>
-          </motion.div>
+      {/* Header section */}
+      <div className="px-5 pt-5 pb-4 space-y-3">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">{t("sub.dialog-title")}</p>
+            <div className="flex items-center gap-2">
+              <Icon
+                icon={isSubscribed ? <BadgeCheck /> : <BadgeMinus />}
+                className={cn(
+                  "h-5 w-5",
+                  isSubscribed
+                    ? "text-green-500 fill-green-500/20"
+                    : "text-muted-foreground fill-muted-foreground/20",
+                )}
+              />
+              <span className="text-xl font-semibold">{t(`sub.${planName}`)}</span>
+            </div>
+          </div>
+        </div>
 
+        <div className="flex flex-col gap-1 text-xs text-muted-foreground">
           {!relayPlan && (
-            <motion.div
-              className={`text-xs text-secondary mt-auto break-all whitespace-pre-wrap`}
-              variants={itemVariants}
-            >
+            <p>
               <InfoIcon className="h-3 w-3 inline-block mr-1" />
               {t("sub.plan-not-support-relay")}
-            </motion.div>
+            </p>
           )}
-          <motion.div
-            className={`text-xs text-secondary mt-auto break-all whitespace-pre-wrap`}
-            variants={itemVariants}
-          >
+          <p>
             {t("buy.plan-info")}
             <a
               href={docsEndpoint}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block text-sky-500 hover:text-sky-600"
+              className="inline-flex items-center text-sky-500 hover:text-sky-600 ml-1"
             >
-              <ExternalLink className="h-3.5 w-3.5 mr-0.5 ml-1 inline-block" />
+              <ExternalLink className="h-3 w-3 mr-0.5" />
               {t("buy.learn-more")}
             </a>
-          </motion.div>
-        </motion.div>
+          </p>
+        </div>
+      </div>
 
-        <motion.div className={`sub-wrapper px-2`} variants={itemVariants}>
-          {subscription && (
-            <Accordion
-              type="single"
-              collapsible
-              defaultValue="sub-items"
-              className={`w-full sub-row border rounded-lg mt-2 !px-0 !pt-0`}
-            >
-              <AccordionItem value="sub-items" className="border-none w-full">
-                <AccordionTrigger
-                  className={`w-full text-left justify-start pl-4 pr-6 bg-muted/25 border-b flex items-center`}
-                >
-                  <CalendarClock className="h-8 w-8 mr-2 stroke-[1.5] !rotate-0" />
-                  <div className="ml-2 mr-auto">
-                    <h3 className="text-sm mb-0.5">{t("sub.quota-manage")}</h3>
-                    <p className="text-xs text-secondary">
+      {/* Usage accordion */}
+      {subscription && (
+        <div className="px-5 pb-3">
+          <Accordion
+            type="single"
+            collapsible
+            defaultValue="sub-items"
+            className="w-full border rounded-lg overflow-hidden"
+          >
+            <AccordionItem value="sub-items" className="border-none">
+              <AccordionTrigger className="px-4 py-3 bg-muted/25 border-b hover:no-underline">
+                <div className="flex items-center gap-3 mr-auto">
+                  <CalendarClock className="h-5 w-5 stroke-[1.5] text-muted-foreground shrink-0 !rotate-0" />
+                  <div className="text-left">
+                    <h3 className="text-sm font-medium">{t("sub.quota-manage")}</h3>
+                    <p className="text-xs text-muted-foreground">
                       {t("sub.expired-days", { days: expired })}
-                    </p>
-                    <p className="text-xs text-secondary">
-                      {refresh > 0
-                        ? t("sub.refresh-days", { refresh_days: refresh })
-                        : t("sub.get-refresh-days")}
+                      {refresh > 0 && (
+                        <span className="ml-2">{t("sub.refresh-days", { refresh_days: refresh })}</span>
+                      )}
                     </p>
                   </div>
-                </AccordionTrigger>
-                <AccordionContent className="p-0 h-fit">
-                  <div
-                    className={`sub-items-wrapper p-2 px-4 pt-4 w-full h-fit grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-x-4`}
-                  >
-                    {plan.items.map((item, index) => {
-                      const itemUsage = toSubscriptionUsage(
-                        usage?.[item.id],
-                        item.value,
-                      );
-
-                      return (
-                        itemUsage && (
-                          <SubscriptionUsage
-                            name={item.name}
-                            usage={itemUsage}
-                            key={index}
-                          />
-                        )
-                      );
-                    })}
-                    {(() => {
-                      if (!hasPlanPointPool(plan)) return null;
-
-                      const planQuota = plan.quota ?? 0;
-                      return (
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="p-0">
+                <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {!hasPlanPointPool(plan) && plan.items.length === 0 && (
+                    <SubscriptionUsage
+                      name={t("sub.plan-times")}
+                      usage={getFallbackTimesUsage(usage)}
+                      fallbackResetLabel={t("admin.plan.plan-reset-0")}
+                    />
+                  )}
+                  {plan.items.map((item, index) => {
+                    const itemUsage = toSubscriptionUsage(usage?.[item.id], item.value) ?? {
+                      used: 0,
+                      total: item.value,
+                      unit: "times" as const,
+                    };
+                    return (
+                      <SubscriptionUsage
+                        name={item.name}
+                        usage={itemUsage}
+                        key={index}
+                        fallbackResetLabel={t("admin.plan.plan-reset-0")}
+                      />
+                    );
+                  })}
+                  {(() => {
+                    if (!hasPlanPointPool(plan)) return null;
+                    const planQuota = plan.quota ?? 0;
+                    const weeklyQuota = plan.weekly_quota ?? 0;
+                    const hasWeekly = weeklyQuota > 0 || plan.weekly_quota === -1;
+                    const pointUsage = normalizePointWindowUsage(toSubscriptionUsage(usage?.plan_points, planQuota), planQuota);
+                    const weeklyUsage = toSubscriptionUsage(usage?.plan_points_weekly, weeklyQuota);
+                    const weeklyName = t("sub.plan-points-weekly");
+                    const weeklyExhausted =
+                      hasWeekly &&
+                      plan.weekly_quota !== -1 &&
+                      weeklyUsage !== null &&
+                      weeklyUsage.used >= weeklyUsage.total;
+                    return (
+                      <div className="col-span-full grid grid-cols-2 gap-3">
                         <SubscriptionUsage
                           name={t("sub.plan-points")}
-                          usage={
-                            toSubscriptionUsage(
-                              usage?.plan_points,
-                              planQuota,
-                            ) ?? {
-                              used: 0,
-                              total: planQuota,
-                              unit: "points",
-                            }
-                          }
+                          usage={pointUsage}
+                          blockedBy={weeklyExhausted ? weeklyName : undefined}
+                          fallbackResetLabel={t("sub.plan-points-reset", { period: getPlanResetLabel(t, plan.reset_interval) })}
                         />
-                      );
-                    })()}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          )}
-
-          <motion.div
-            className="w-fit mx-auto mt-4 mb-2.5"
-            variants={itemVariants}
-          >
-            <Tabs
-              value={isYearly ? "yearly" : "monthly"}
-              onValueChange={(value) => setIsYearly(value === "yearly")}
-              className="w-full"
-            >
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="yearly">
-                  {t("sub.year-plan")}
-                  {(() => {
-                    const firstPlan = subscriptionData.find((p) => p.level > 0);
-                    let discountPercent = 20;
-
-                    if (
-                      firstPlan &&
-                      firstPlan.discounts &&
-                      firstPlan.discounts["12"] !== undefined
-                    ) {
-                      discountPercent = Math.round(
-                        (1 - firstPlan.discounts["12"]) * 100,
-                      );
-                    }
-
-                    return discountPercent > 0 ? (
-                      <p className="text-xs text-secondary !text-[#55b467] !bg-[#f4fdeb] !border !border-[#55b467]/20 px-1 py-0.5 rounded-sm ml-2">
-                        -{discountPercent}%
-                      </p>
-                    ) : null;
+                        {hasWeekly && (
+                          <SubscriptionUsage
+                            name={weeklyName}
+                            usage={
+                              weeklyUsage ?? {
+                                used: 0,
+                                total: weeklyQuota,
+                                unit: "points",
+                              }
+                            }
+                            absoluteReset
+                            fallbackResetLabel={t("sub.plan-points-weekly-reset")}
+                          />
+                        )}
+                      </div>
+                    );
                   })()}
-                </TabsTrigger>
-                <TabsTrigger value="monthly">{t("sub.month-plan")}</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </motion.div>
-          <motion.div className={`plan-wrapper`} variants={itemVariants}>
-            {subscriptionData.map((item, index) => (
-              <PlanItem key={index} level={item.level} isYearly={isYearly} />
-            ))}
-          </motion.div>
-        </motion.div>
-      </motion.div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </div>
+      )}
+
+      {/* Period toggle + Plans grid */}
+      <div className="px-5 pb-5">
+        <div className="flex justify-center mb-4">
+          <Tabs
+            value={isYearly ? "yearly" : "monthly"}
+            onValueChange={(value) => setIsYearly(value === "yearly")}
+          >
+            <TabsList>
+              <TabsTrigger value="monthly" className="w-[7rem] justify-center">{t("sub.month-plan")}</TabsTrigger>
+              <TabsTrigger value="yearly" className="relative w-[7rem] justify-center">
+                {t("sub.year-plan")}
+                {(() => {
+                  const firstPlan = subscriptionData.find((p) => p.level > 0);
+                  let discountPercent = 20;
+                  if (firstPlan && firstPlan.discounts && firstPlan.discounts["12"] !== undefined) {
+                    discountPercent = Math.round((1 - firstPlan.discounts["12"]) * 100);
+                  }
+                  return discountPercent > 0 ? (
+                    <span className="absolute -top-2 -right-2 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/40 px-1 py-0 rounded-full leading-5">
+                      -{discountPercent}%
+                    </span>
+                  ) : null;
+                })()}
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {subscriptionData.map((item, index) => (
+            <PlanItem key={index} level={item.level} isYearly={isYearly} />
+          ))}
+        </div>
+      </div>
     </motion.div>
   );
 }

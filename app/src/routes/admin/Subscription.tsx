@@ -18,7 +18,9 @@ import {
   Activity,
   ChevronDown,
   ChevronUp,
+  Coins,
   GripVertical,
+  Hash,
   Plus,
   RotateCw,
   Save,
@@ -62,6 +64,8 @@ const planResetPresets = [
   { value: "custom", seconds: -1 },
 ] as const;
 
+const defaultPointQuota = 1;
+
 function getPlanResetPreset(plan: Plan): string {
   const seconds = plan.reset_interval ?? 0;
   const preset = planResetPresets.find((option) => option.seconds === seconds);
@@ -72,6 +76,10 @@ function hasPlanPointPool(plan: Plan): boolean {
   return (plan.quota ?? 0) > 0 || plan.quota === -1;
 }
 
+function getFinitePointQuota(value?: number): number {
+  return value && value > 0 ? value : defaultPointQuota;
+}
+
 type PlanLevelPayload = { level: number };
 type PlanItemPayload = PlanLevelPayload & { index: number };
 
@@ -80,6 +88,7 @@ type PlanConfigAction =
   | { type: "set-enabled"; payload: boolean }
   | { type: "set-price"; payload: PlanLevelPayload & { price: number } }
   | { type: "set-plan-quota"; payload: PlanLevelPayload & { quota: number } }
+  | { type: "set-weekly-quota"; payload: PlanLevelPayload & { weeklyQuota: number } }
   | { type: "set-plan-reset-interval"; payload: PlanLevelPayload & { resetInterval: number } }
   | { type: "set-item-id"; payload: PlanItemPayload & { id: string } }
   | { type: "set-item-name"; payload: PlanItemPayload & { name: string } }
@@ -135,6 +144,13 @@ function reducer(state: PlanConfig, action: PlanConfigAction): PlanConfig {
         ...state,
         plans: state.plans.map((plan: Plan) =>
           plan.level === action.payload.level ? { ...plan, quota: action.payload.quota } : plan
+        ),
+      };
+    case "set-weekly-quota":
+      return {
+        ...state,
+        plans: state.plans.map((plan: Plan) =>
+          plan.level === action.payload.level ? { ...plan, weekly_quota: action.payload.weeklyQuota } : plan
         ),
       };
     case "set-plan-reset-interval":
@@ -280,11 +296,152 @@ function reducer(state: PlanConfig, action: PlanConfigAction): PlanConfig {
   }
 }
 
-// ─── Discount months ────────────────────────────────────────────────────────
 const DISCOUNT_MONTHS = [1, 3, 6, 12, 36];
 const DEFAULT_DISCOUNTS: Record<number, number> = { 6: 10, 12: 20, 36: 30 };
 
-// ─── Single plan tab content ─────────────────────────────────────────────────
+// ─── Billing mode selector ────────────────────────────────────────────────────
+function BillingModeSelector({
+  isPointsMode,
+  onSwitch,
+}: {
+  isPointsMode: boolean;
+  onSwitch: (mode: "requests" | "points") => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <button
+        type="button"
+        onClick={() => onSwitch("requests")}
+        className={cn(
+          "flex items-center gap-3 rounded-lg border p-3 text-left transition-all",
+          !isPointsMode
+            ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+            : "border-border hover:bg-muted/40",
+        )}
+      >
+        <Hash
+          className={cn(
+            "h-4 w-4 shrink-0",
+            !isPointsMode ? "text-primary" : "text-muted-foreground",
+          )}
+        />
+        <div className="min-w-0">
+          <p className={cn("text-sm font-medium truncate", !isPointsMode ? "text-primary" : "text-foreground")}>
+            {t("admin.plan.mode-requests")}
+          </p>
+          <p className="text-xs text-muted-foreground truncate">
+            {t("admin.plan.mode-requests-desc")}
+          </p>
+        </div>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onSwitch("points")}
+        className={cn(
+          "flex items-center gap-3 rounded-lg border p-3 text-left transition-all",
+          isPointsMode
+            ? "border-amber-500 bg-amber-50/50 dark:bg-amber-950/20 ring-1 ring-amber-500/20"
+            : "border-border hover:bg-muted/40",
+        )}
+      >
+        <Coins
+          className={cn(
+            "h-4 w-4 shrink-0",
+            isPointsMode ? "text-amber-500" : "text-muted-foreground",
+          )}
+        />
+        <div className="min-w-0">
+          <p className={cn("text-sm font-medium truncate", isPointsMode ? "text-amber-600 dark:text-amber-400" : "text-foreground")}>
+            {t("admin.plan.mode-points")}
+          </p>
+          <p className="text-xs text-muted-foreground truncate">
+            {t("admin.plan.mode-points-desc")}
+          </p>
+        </div>
+      </button>
+    </div>
+  );
+}
+
+// ─── Credits pool settings ────────────────────────────────────────────────────
+function CreditsPoolSettings({
+  plan,
+  formDispatch,
+}: {
+  plan: Plan;
+  formDispatch: React.Dispatch<PlanConfigAction>;
+}) {
+  const { t } = useTranslation();
+  const hasWeeklyPool = (plan.weekly_quota ?? 0) > 0 || plan.weekly_quota === -1;
+
+  return (
+    <div className="rounded-lg border border-amber-200/60 dark:border-amber-800/40 bg-amber-50/20 dark:bg-amber-950/10 overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-100/40 dark:bg-amber-900/20 border-b border-amber-200/40 dark:border-amber-800/30">
+        <Coins className="h-3.5 w-3.5 text-amber-500" />
+        <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
+          {t("admin.plan.mode-points")}
+        </span>
+      </div>
+
+      <div className="p-4 space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between h-5">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                {t("admin.plan.plan-quota")}
+                <Tips className="inline-block" content={t("admin.plan.plan-quota-tip")} />
+              </Label>
+            </div>
+            <NumberInput
+              value={plan.quota ?? defaultPointQuota}
+              min={-1}
+              acceptNegative={true}
+              onValueChange={(value) =>
+                formDispatch({ type: "set-plan-quota", payload: { level: plan.level, quota: value } })
+              }
+            />
+            <p className="text-xs text-muted-foreground">{t("admin.plan.plan-quota-hint")}</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between h-5">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                {t("admin.plan.weekly-quota")}
+                <Tips className="inline-block" content={t("admin.plan.weekly-quota-tip")} />
+              </Label>
+              <Switch
+                checked={hasWeeklyPool}
+                onCheckedChange={(checked) =>
+                  formDispatch({
+                    type: "set-weekly-quota",
+                    payload: { level: plan.level, weeklyQuota: checked ? getFinitePointQuota(plan.weekly_quota) : 0 },
+                  })
+                }
+              />
+            </div>
+            {hasWeeklyPool && (
+              <>
+                <NumberInput
+                  value={plan.weekly_quota ?? -1}
+                  min={-1}
+                  acceptNegative={true}
+                  onValueChange={(value) =>
+                    formDispatch({ type: "set-weekly-quota", payload: { level: plan.level, weeklyQuota: value } })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">{t("admin.plan.weekly-quota-hint")}</p>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Single plan editor ───────────────────────────────────────────────────────
 function PlanEditor({
   plan,
   availableModels,
@@ -295,99 +452,123 @@ function PlanEditor({
   formDispatch: React.Dispatch<PlanConfigAction>;
 }) {
   const { t } = useTranslation();
-  const usePointPool = hasPlanPointPool(plan);
-  const colTemplate = usePointPool
+  const isPointsMode = hasPlanPointPool(plan);
+
+  const handleModeSwitch = (mode: "requests" | "points") => {
+    if (mode === "requests") {
+      formDispatch({ type: "set-plan-quota", payload: { level: plan.level, quota: 0 } });
+      formDispatch({ type: "set-weekly-quota", payload: { level: plan.level, weeklyQuota: 0 } });
+    } else {
+      formDispatch({ type: "set-plan-quota", payload: { level: plan.level, quota: getFinitePointQuota(plan.quota) } });
+      formDispatch({ type: "set-plan-reset-interval", payload: { level: plan.level, resetInterval: 18000 } });
+      formDispatch({ type: "set-weekly-quota", payload: { level: plan.level, weeklyQuota: getFinitePointQuota(plan.weekly_quota) } });
+    }
+  };
+
+  const colTemplate = isPointsMode
     ? "1.5rem 1fr 1fr minmax(0,1.2fr) auto"
     : "1.5rem 1fr 1fr 6rem minmax(0,1.2fr) auto";
 
   return (
-    <div className="space-y-6">
-      {/* ── Plan-level settings ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-lg border bg-muted/30">
-        {/* Price */}
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground flex items-center gap-1">
-            {t("admin.plan.price")}
-            <Tips className="inline-block" content={t("admin.plan.price-tip")} />
-          </Label>
-          <NumberInput
-            value={plan.price}
-            onValueChange={(value) =>
-              formDispatch({ type: "set-price", payload: { level: plan.level, price: value } })
-            }
-          />
-        </div>
+    <div className="space-y-5">
+      {/* ── Section 1: Billing Mode ── */}
+      <BillingModeSelector isPointsMode={isPointsMode} onSwitch={handleModeSwitch} />
 
-        {/* Quota */}
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground flex items-center gap-1">
-            {t("admin.plan.plan-quota")}
-            <Tips className="inline-block" content={t("admin.plan.plan-quota-tip")} />
-          </Label>
-          <NumberInput
-            value={plan.quota ?? 0}
-            min={-1}
-            acceptNegative={true}
-            onValueChange={(value) =>
-              formDispatch({ type: "set-plan-quota", payload: { level: plan.level, quota: value } })
-            }
-          />
-        </div>
+      {/* ── Section 2: Pricing & Quotas ── */}
+      <div className="space-y-3">
+        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          {t("admin.plan.price")}
+        </h3>
 
-        {/* Reset interval */}
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground flex items-center gap-1">
-            {t("admin.plan.plan-reset")}
-            <Tips className="inline-block" content={t("admin.plan.plan-reset-tip")} />
-          </Label>
-          <Select
-            value={getPlanResetPreset(plan)}
-            onValueChange={(value) => {
-              const resetInterval =
-                value === "custom"
-                  ? Math.max(plan.reset_interval ?? 3600, 1)
-                  : Number(value);
-              formDispatch({ type: "set-plan-reset-interval", payload: { level: plan.level, resetInterval } });
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {planResetPresets.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {t(`admin.plan.plan-reset-${option.value}`)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {getPlanResetPreset(plan) === "custom" && (
-            <NumberInput
-              value={Number(((plan.reset_interval ?? 0) / 3600).toFixed(2))}
-              min={0.01}
-              step={0.5}
-              onValueChange={(value) =>
-                formDispatch({
-                  type: "set-plan-reset-interval",
-                  payload: { level: plan.level, resetInterval: Math.max(1, Math.round(value * 3600)) },
-                })
-              }
-            />
-          )}
-        </div>
+        {isPointsMode ? (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                {t("admin.plan.price")}
+                <Tips className="inline-block" content={t("admin.plan.price-tip")} />
+              </Label>
+              <NumberInput
+                value={plan.price}
+                onValueChange={(value) =>
+                  formDispatch({ type: "set-price", payload: { level: plan.level, price: value } })
+                }
+              />
+            </div>
+            <CreditsPoolSettings plan={plan} formDispatch={formDispatch} />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                {t("admin.plan.price")}
+                <Tips className="inline-block" content={t("admin.plan.price-tip")} />
+              </Label>
+              <NumberInput
+                value={plan.price}
+                onValueChange={(value) =>
+                  formDispatch({ type: "set-price", payload: { level: plan.level, price: value } })
+                }
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                {t("admin.plan.plan-reset")}
+                <Tips className="inline-block" content={t("admin.plan.plan-reset-tip")} />
+              </Label>
+              <Select
+                value={getPlanResetPreset(plan)}
+                onValueChange={(value) => {
+                  const resetInterval =
+                    value === "custom"
+                      ? Math.max(plan.reset_interval ?? 3600, 1)
+                      : Number(value);
+                  formDispatch({ type: "set-plan-reset-interval", payload: { level: plan.level, resetInterval } });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {planResetPresets.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {t(`admin.plan.plan-reset-${option.value}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {getPlanResetPreset(plan) === "custom" && (
+                <NumberInput
+                  value={Number(((plan.reset_interval ?? 0) / 3600).toFixed(2))}
+                  min={0.01}
+                  step={0.5}
+                  onValueChange={(value) =>
+                    formDispatch({
+                      type: "set-plan-reset-interval",
+                      payload: { level: plan.level, resetInterval: Math.max(1, Math.round(value * 3600)) },
+                    })
+                  }
+                />
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* ── Items table ── */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium">
-            {t("admin.plan.item-id")} / {t("admin.plan.item-name")}
-            <span className="ml-2 text-xs text-muted-foreground font-normal">
-              ({plan.items.length} 项)
-            </span>
-          </h3>
+      {/* ── Section 3: Model Groups ── */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              {isPointsMode ? t("admin.plan.items-points-title") : t("admin.plan.items-requests-title")}
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {isPointsMode ? t("admin.plan.items-points-desc") : t("admin.plan.items-requests-desc")}
+            </p>
+          </div>
           <Button
             size="sm"
+            variant="outline"
             onClick={() => formDispatch({ type: "add-item", payload: { level: plan.level } })}
           >
             <Plus className="h-3.5 w-3.5 mr-1" />
@@ -396,15 +577,14 @@ function PlanEditor({
         </div>
 
         {plan.items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 border border-dashed rounded-lg text-muted-foreground text-sm gap-2">
-            <Plus className="h-8 w-8 opacity-30" />
-            <span>暂无项目，点击右上角添加</span>
+          <div className="flex flex-col items-center justify-center py-8 border border-dashed rounded-lg text-muted-foreground text-sm gap-1.5">
+            <Plus className="h-6 w-6 opacity-30" />
+            <span>{t("admin.plan.no-items")}</span>
           </div>
         ) : (
           <div className="rounded-lg border overflow-hidden">
-            {/* Table header */}
             <div
-              className="grid items-center bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground border-b"
+              className="grid items-center bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground border-b select-none"
               style={{ gridTemplateColumns: colTemplate }}
             >
               <span />
@@ -413,7 +593,7 @@ function PlanEditor({
                 <Tips content={t("admin.plan.item-id-placeholder")} />
               </span>
               <span>{t("admin.plan.item-name")}</span>
-              {!usePointPool && (
+              {!isPointsMode && (
                 <span className="flex items-center gap-1">
                   {t("admin.plan.item-value")}
                   <Tips content={t("admin.plan.item-value-tip")} />
@@ -423,23 +603,20 @@ function PlanEditor({
                 {t("admin.plan.item-models")}
                 <Tips content={t("admin.plan.item-models-tip")} />
               </span>
-              <span className="text-right pr-1">操作</span>
+              <span className="text-right pr-1">{t("admin.action")}</span>
             </div>
 
-            {/* Table rows */}
             <div className="divide-y">
               {plan.items.map((item: PlanItem, index: number) => (
                 <div
                   key={index}
-                  className="group grid items-start gap-2 px-3 py-2.5 hover:bg-muted/20 transition-colors"
+                  className="group grid items-start gap-2 px-3 py-2 hover:bg-muted/20 transition-colors"
                   style={{ gridTemplateColumns: colTemplate }}
                 >
-                  {/* Drag handle / index */}
                   <div className="flex items-center justify-center h-9 text-muted-foreground/40">
                     <GripVertical className="h-3.5 w-3.5" />
                   </div>
 
-                  {/* ID */}
                   <Input
                     value={item.id}
                     onChange={(e) =>
@@ -449,7 +626,6 @@ function PlanEditor({
                     className="h-9 text-sm"
                   />
 
-                  {/* Name */}
                   <Input
                     value={item.name}
                     onChange={(e) =>
@@ -459,8 +635,7 @@ function PlanEditor({
                     className="h-9 text-sm"
                   />
 
-                  {/* Value (only when no point pool) */}
-                  {!usePointPool ? (
+                  {!isPointsMode && (
                     <NumberInput
                       value={item.value}
                       min={-1}
@@ -470,11 +645,8 @@ function PlanEditor({
                       }
                       className="h-9 text-sm"
                     />
-                  ) : (
-                    <div />
                   )}
 
-                  {/* Models picker */}
                   <MultiCombobox
                     align="start"
                     value={item.models}
@@ -487,12 +659,11 @@ function PlanEditor({
                     className="w-full max-w-full h-9 text-sm"
                   />
 
-                  {/* Actions */}
                   <div className="flex items-center gap-0.5 pl-1">
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
                       onClick={() => formDispatch({ type: "upward-item", payload: { level: plan.level, index } })}
                       disabled={index === 0}
                       title={t("upward")}
@@ -502,7 +673,7 @@ function PlanEditor({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
                       onClick={() => formDispatch({ type: "downward-item", payload: { level: plan.level, index } })}
                       disabled={index === plan.items.length - 1}
                       title={t("downward")}
@@ -512,7 +683,7 @@ function PlanEditor({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
+                      className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
                       onClick={() => formDispatch({ type: "remove-item", payload: { level: plan.level, index } })}
                       title={t("remove")}
                     >
@@ -526,13 +697,13 @@ function PlanEditor({
         )}
       </div>
 
-      {/* ── Discounts ── */}
-      <div>
-        <h3 className="text-sm font-medium mb-3 flex items-center gap-1.5">
+      {/* ── Section 4: Discounts ── */}
+      <div className="space-y-3">
+        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
           {t("admin.plan.discounts")}
           <Tips content={t("admin.plan.discounts-tip")} />
         </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+        <div className="grid grid-cols-5 gap-2">
           {DISCOUNT_MONTHS.map((month) => {
             const key = month.toString();
             const hasDiscount = plan.discounts?.[key] !== undefined;
@@ -543,12 +714,12 @@ function PlanEditor({
               <div
                 key={month}
                 className={cn(
-                  "rounded-lg border p-3 space-y-2 transition-colors",
-                  hasDiscount ? "border-primary/40 bg-primary/5" : "bg-muted/20"
+                  "rounded-lg border p-2.5 transition-colors",
+                  hasDiscount ? "border-primary/30 bg-primary/5" : "bg-muted/10"
                 )}
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">{t(`sub.time.${month}`)}</span>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-medium">{t(`sub.time.${month}`)}</span>
                   <Switch
                     checked={hasDiscount}
                     onCheckedChange={(checked) => {
@@ -653,7 +824,7 @@ function PlanConfig() {
         open={open}
         setOpen={setOpen}
         defaultValue={"https://api.chatnio.net"}
-        alert={t("admin.coai-format-only")}
+        alert={t("admin.format-only")}
         onSubmit={async (endpoint): Promise<boolean> => {
           const conf = await getExternalPlanConfig(endpoint);
           setConf(conf);
@@ -678,11 +849,10 @@ function PlanConfig() {
         }}
       />
 
-      <div className="space-y-4">
+      <div className="space-y-5">
         {/* ── Top toolbar ── */}
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Enable toggle */}
-          <div className="flex items-center gap-2 mr-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
             <Switch
               id="plan-enable"
               checked={form.enabled}
@@ -690,52 +860,58 @@ function PlanConfig() {
                 formDispatch({ type: "set-enabled", payload: checked })
               }
             />
-            <Label htmlFor="plan-enable" className="text-sm cursor-pointer select-none">
+            <Label htmlFor="plan-enable" className="text-sm font-medium cursor-pointer select-none">
               {t("admin.plan.enable")}
             </Label>
           </div>
 
-          <div className="flex-1" />
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+              <Activity className="h-3.5 w-3.5 mr-1.5" />
+              {t("admin.plan.sync")}
+            </Button>
 
-          <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-            <Activity className="h-3.5 w-3.5 mr-1.5" />
-            {t("admin.plan.sync")}
-          </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => refresh()}
+              title={t("admin.plan.sync")}
+            >
+              <RotateCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+            </Button>
 
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => refresh()}
-            title="刷新"
-          >
-            <RotateCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
-          </Button>
-
-          <Button size="sm" onClick={() => save()} loading={true}>
-            <Save className="h-3.5 w-3.5 mr-1.5" />
-            {t("save")}
-          </Button>
+            <Button size="sm" onClick={() => save()} loading={true}>
+              <Save className="h-3.5 w-3.5 mr-1.5" />
+              {t("save")}
+            </Button>
+          </div>
         </div>
 
         {/* ── Plan tabs ── */}
         {form.enabled && activePlans.length > 0 && (
           <Tabs defaultValue={defaultTab}>
-            <TabsList className="mb-2">
-              {activePlans.map((plan) => (
-                <TabsTrigger key={plan.level} value={plan.level.toString()} className="gap-2">
-                  <span>{t(`sub.${getPlanName(plan.level)}`)}</span>
-                  {plan.price > 0 && (
-                    <span className="text-xs text-muted-foreground font-normal">
-                      ¥{plan.price}/月
+            <TabsList>
+              {activePlans.map((plan) => {
+                const isPoints = hasPlanPointPool(plan);
+                return (
+                  <TabsTrigger key={plan.level} value={plan.level.toString()} className="gap-1.5">
+                    <span>{t(`sub.${getPlanName(plan.level)}`)}</span>
+                    <span className={cn(
+                      "text-[10px] font-normal px-1.5 py-0.5 rounded",
+                      isPoints
+                        ? "text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30"
+                        : "text-muted-foreground bg-muted",
+                    )}>
+                      {isPoints ? t("admin.plan.mode-points-short") : t("admin.plan.mode-requests-short")}
                     </span>
-                  )}
-                </TabsTrigger>
-              ))}
+                  </TabsTrigger>
+                );
+              })}
             </TabsList>
 
             {activePlans.map((plan) => (
-              <TabsContent key={plan.level} value={plan.level.toString()}>
+              <TabsContent key={plan.level} value={plan.level.toString()} className="mt-4">
                 <PlanEditor
                   plan={plan}
                   availableModels={availableModels}
@@ -747,14 +923,14 @@ function PlanConfig() {
         )}
 
         {form.enabled && activePlans.length === 0 && (
-          <div className="flex items-center justify-center py-16 text-muted-foreground text-sm border border-dashed rounded-lg">
-            暂无套餐配置，数据加载中…
+          <div className="flex items-center justify-center py-12 text-muted-foreground text-sm border border-dashed rounded-lg">
+            {t("admin.plan.no-plans")}
           </div>
         )}
 
         {!form.enabled && (
-          <div className="flex items-center justify-center py-16 text-muted-foreground text-sm border border-dashed rounded-lg">
-            订阅功能已关闭，启用开关后可进行套餐配置
+          <div className="flex items-center justify-center py-12 text-muted-foreground text-sm border border-dashed rounded-lg">
+            {t("admin.plan.disabled-hint")}
           </div>
         )}
       </div>

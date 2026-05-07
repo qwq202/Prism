@@ -24,6 +24,7 @@ type Plan struct {
 	Price         float32    `json:"price" mapstructure:"price"`
 	Quota         float32    `json:"quota,omitempty" mapstructure:"quota"`
 	ResetInterval int64      `json:"reset_interval,omitempty" mapstructure:"reset_interval"`
+	WeeklyQuota   float32    `json:"weekly_quota,omitempty" mapstructure:"weekly_quota"`
 	Items         []PlanItem `json:"items" mapstructure:"items"`
 }
 
@@ -52,7 +53,16 @@ const (
 	PlanItemUnitTimes      = "times"
 	PlanItemUnitPoints     = "points"
 	PlanSharedPointsItemID = "plan_points"
+	PlanWeeklyPointsItemID = "plan_points_weekly"
+	pointResetInterval     = int64(5 * 60 * 60)      // 18000 seconds
+	weeklyResetInterval    = int64(7 * 24 * 60 * 60) // 604800 seconds
 )
+
+type subscriptionPointUsageWindow struct {
+	key           string
+	limit         float32
+	resetInterval int64
+}
 
 func NewPlanManager() *PlanManager {
 	manager := &PlanManager{}
@@ -237,31 +247,61 @@ func getSubscriptionPointUsage(cache *redis.Client, user globals.AuthLike, t str
 }
 
 func consumeSubscriptionPointUsage(cache *redis.Client, key string, limit float32, resetInterval int64, amount float32) bool {
+	return consumeSubscriptionPointUsageWindows(cache, []subscriptionPointUsageWindow{
+		{key: key, limit: limit, resetInterval: resetInterval},
+	}, amount)
+}
+
+func consumeSubscriptionPointUsageWindows(cache *redis.Client, windows []subscriptionPointUsageWindow, amount float32) bool {
+	if amount <= 0 {
+		return true
+	}
+	if len(windows) == 0 {
+		return true
+	}
+
 	ctx := context.Background()
+	keys := make([]string, 0, len(windows))
+	for _, window := range windows {
+		keys = append(keys, window.key)
+	}
 
 	for attempts := 0; attempts < 32; attempts++ {
 		err := cache.Watch(ctx, func(tx *redis.Tx) error {
-			value, err := tx.Get(ctx, key).Result()
-			if err != nil {
-				if errors.Is(err, redis.Nil) {
-					value = ""
-				} else {
+			values := make([]string, len(windows))
+			offsets := make([]time.Time, len(windows))
+			usages := make([]float32, len(windows))
+
+			for i, window := range windows {
+				value, err := tx.Get(ctx, window.key).Result()
+				if err != nil && !errors.Is(err, redis.Nil) {
 					return err
 				}
+				if errors.Is(err, redis.Nil) {
+					value = ""
+				}
+
+				used, offset := parseSubscriptionPointUsageValue(value, window.resetInterval, time.Now())
+				used += amount
+				if used > window.limit {
+					return errPointPoolExceeded
+				}
+				values[i] = getFloatOffsetFormat(offset, used)
+				offsets[i] = offset
+				usages[i] = used
 			}
 
-			used, offset := parseSubscriptionPointUsageValue(value, resetInterval, time.Now())
-			used += amount
-			if used > limit {
-				return errPointPoolExceeded
-			}
-
-			_, err = tx.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
-				pipe.Set(ctx, key, getFloatOffsetFormat(offset, used), time.Duration(planExp)*time.Second)
+			_, err := tx.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+				for i, window := range windows {
+					if values[i] == "" {
+						values[i] = getFloatOffsetFormat(offsets[i], usages[i])
+					}
+					pipe.Set(ctx, window.key, values[i], time.Duration(planExp)*time.Second)
+				}
 				return nil
 			})
 			return err
-		}, key)
+		}, keys...)
 
 		if err == nil {
 			return true
@@ -299,12 +339,31 @@ func (p *Plan) pointUsageKey() string {
 	return fmt.Sprintf("%s:%d", PlanSharedPointsItemID, p.Level)
 }
 
+func (p *Plan) pointResetInterval() int64 {
+	if p.ResetInterval > 0 {
+		return p.ResetInterval
+	}
+	return pointResetInterval
+}
+
+func (p *Plan) weeklyUsageKey() string {
+	return fmt.Sprintf("%s:%d", PlanWeeklyPointsItemID, p.Level)
+}
+
 func (p *Plan) HasPointPool() bool {
 	return p.Quota > 0 || p.Quota == -1
 }
 
 func (p *Plan) IsPointPoolInfinity() bool {
 	return p.Quota == -1
+}
+
+func (p *Plan) HasWeeklyPool() bool {
+	return p.WeeklyQuota > 0 || p.WeeklyQuota == -1
+}
+
+func (p *Plan) IsWeeklyPoolInfinity() bool {
+	return p.WeeklyQuota == -1
 }
 
 func (p *Plan) IncludesModel(model string) bool {
@@ -318,50 +377,106 @@ func (p *Plan) IncludesModel(model string) bool {
 }
 
 func (p *Plan) GetPointResetAt(user globals.AuthLike, cache *redis.Client) time.Time {
-	_, offset := getSubscriptionPointUsage(cache, user, p.pointUsageKey(), p.ResetInterval)
-	return getNextResetAt(offset, p.ResetInterval)
+	resetInterval := p.pointResetInterval()
+	_, offset := getSubscriptionPointUsage(cache, user, p.pointUsageKey(), resetInterval)
+	return getNextResetAt(offset, resetInterval)
 }
 
 func (p *Plan) GetPointUsage(user globals.AuthLike, cache *redis.Client) float32 {
-	usage, _ := getSubscriptionPointUsage(cache, user, p.pointUsageKey(), p.ResetInterval)
+	usage, _ := getSubscriptionPointUsage(cache, user, p.pointUsageKey(), p.pointResetInterval())
 	return usage
 }
 
 func (p *Plan) GetPointUsageForm(user globals.AuthLike, cache *redis.Client) Usage {
-	used, offset := getSubscriptionPointUsage(cache, user, p.pointUsageKey(), p.ResetInterval)
+	resetInterval := p.pointResetInterval()
+	used, offset := getSubscriptionPointUsage(cache, user, p.pointUsageKey(), resetInterval)
 	return Usage{
 		Used:          used,
 		Total:         p.Quota,
 		Unit:          PlanItemUnitPoints,
-		ResetInterval: p.ResetInterval,
-		ResetAt:       getNextResetAt(offset, p.ResetInterval).Format(time.RFC3339),
+		ResetInterval: resetInterval,
+		ResetAt:       getNextResetAt(offset, resetInterval).Format(time.RFC3339),
 	}
+}
+
+func (p *Plan) GetWeeklyPointUsage(user globals.AuthLike, cache *redis.Client) float32 {
+	usage, _ := getSubscriptionPointUsage(cache, user, p.weeklyUsageKey(), weeklyResetInterval)
+	return usage
+}
+
+func (p *Plan) GetWeeklyPointUsageForm(user globals.AuthLike, cache *redis.Client) Usage {
+	used, offset := getSubscriptionPointUsage(cache, user, p.weeklyUsageKey(), weeklyResetInterval)
+	return Usage{
+		Used:          used,
+		Total:         p.WeeklyQuota,
+		Unit:          PlanItemUnitPoints,
+		ResetInterval: weeklyResetInterval,
+		ResetAt:       getNextResetAt(offset, weeklyResetInterval).Format(time.RFC3339),
+	}
+}
+
+func (p *Plan) CanUseWeeklyPool(user globals.AuthLike, cache *redis.Client, model string) bool {
+	if !p.HasWeeklyPool() || !p.IncludesModel(model) {
+		return false
+	}
+	if p.IsWeeklyPoolInfinity() {
+		return true
+	}
+	return p.GetWeeklyPointUsage(user, cache) < p.WeeklyQuota
+}
+
+func (p *Plan) ConsumeWeeklyPool(user globals.AuthLike, cache *redis.Client, model string, quota float32) bool {
+	if !p.HasWeeklyPool() || !p.IncludesModel(model) {
+		return false
+	}
+	if p.IsWeeklyPoolInfinity() {
+		return true
+	}
+	if quota <= 0 {
+		return true
+	}
+	key := globals.GetSubscriptionLimitFormat(p.weeklyUsageKey(), user.HitID())
+	return consumeSubscriptionPointUsage(cache, key, p.WeeklyQuota, weeklyResetInterval, quota)
 }
 
 func (p *Plan) CanUsePointPool(user globals.AuthLike, cache *redis.Client, model string) bool {
 	if !p.HasPointPool() || !p.IncludesModel(model) {
 		return false
 	}
-	if p.IsPointPoolInfinity() {
-		return true
+	if !p.IsPointPoolInfinity() && p.GetPointUsage(user, cache) >= p.Quota {
+		return false
 	}
-
-	return p.GetPointUsage(user, cache) < p.Quota
+	if p.HasWeeklyPool() && !p.CanUseWeeklyPool(user, cache, model) {
+		return false
+	}
+	return true
 }
 
 func (p *Plan) ConsumePointPool(user globals.AuthLike, cache *redis.Client, model string, quota float32) bool {
 	if !p.HasPointPool() || !p.IncludesModel(model) {
 		return false
 	}
-	if p.IsPointPoolInfinity() {
-		return true
-	}
 	if quota <= 0 {
 		return true
 	}
 
-	key := globals.GetSubscriptionLimitFormat(p.pointUsageKey(), user.HitID())
-	return consumeSubscriptionPointUsage(cache, key, p.Quota, p.ResetInterval, quota)
+	windows := make([]subscriptionPointUsageWindow, 0, 2)
+	if !p.IsPointPoolInfinity() {
+		windows = append(windows, subscriptionPointUsageWindow{
+			key:           globals.GetSubscriptionLimitFormat(p.pointUsageKey(), user.HitID()),
+			limit:         p.Quota,
+			resetInterval: p.pointResetInterval(),
+		})
+	}
+	if p.HasWeeklyPool() && !p.IsWeeklyPoolInfinity() {
+		windows = append(windows, subscriptionPointUsageWindow{
+			key:           globals.GetSubscriptionLimitFormat(p.weeklyUsageKey(), user.HitID()),
+			limit:         p.WeeklyQuota,
+			resetInterval: weeklyResetInterval,
+		})
+	}
+
+	return consumeSubscriptionPointUsageWindows(cache, windows, quota)
 }
 
 func increaseSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string, limit int64, resetInterval int64, amount int64) bool {
@@ -423,9 +538,13 @@ func ReleaseSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t stri
 
 func (p *Plan) GetUsage(user globals.AuthLike, db *sql.DB, cache *redis.Client) UsageMap {
 	if p.HasPointPool() {
-		return UsageMap{
+		m := UsageMap{
 			PlanSharedPointsItemID: p.GetPointUsageForm(user, cache),
 		}
+		if p.HasWeeklyPool() {
+			m[PlanWeeklyPointsItemID] = p.GetWeeklyPointUsageForm(user, cache)
+		}
+		return m
 	}
 
 	return utils.EachObject[PlanItem, Usage](p.Items, func(usage PlanItem) (string, Usage) {
@@ -535,8 +654,16 @@ func (p *Plan) ReleaseUsage(user globals.AuthLike, cache *redis.Client, model st
 func (p *Plan) ReleaseAll(user globals.AuthLike, cache *redis.Client) bool {
 	if p.HasPointPool() {
 		key := globals.GetSubscriptionLimitFormat(p.pointUsageKey(), user.HitID())
-		_, offset := getSubscriptionPointUsage(cache, user, p.pointUsageKey(), p.ResetInterval)
+		_, offset := getSubscriptionPointUsage(cache, user, p.pointUsageKey(), p.pointResetInterval())
 		if err := utils.SetCache(cache, key, getFloatOffsetFormat(offset, 0), planExp); err != nil {
+			return false
+		}
+	}
+
+	if p.HasWeeklyPool() {
+		weeklyKey := globals.GetSubscriptionLimitFormat(p.weeklyUsageKey(), user.HitID())
+		_, offset := getSubscriptionPointUsage(cache, user, p.weeklyUsageKey(), weeklyResetInterval)
+		if err := utils.SetCache(cache, weeklyKey, getFloatOffsetFormat(offset, 0), planExp); err != nil {
 			return false
 		}
 	}
