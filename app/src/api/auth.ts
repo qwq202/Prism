@@ -123,6 +123,37 @@ export type PasskeyRegistrationForm = {
   transports: string[];
 };
 
+export type PasskeyLoginOptionsForm = {
+  username: string;
+};
+
+export type PasskeyAuthenticationOptions = {
+  publicKey: {
+    challenge: string;
+    timeout: number;
+    rpId?: string;
+    allowCredentials: Array<PasskeyCredentialDescriptor & {
+      transports?: AuthenticatorTransport[];
+    }>;
+    userVerification: UserVerificationRequirement;
+  };
+};
+
+export type PasskeyLoginOptionsResponse = VerifyResponse & {
+  data?: PasskeyAuthenticationOptions;
+};
+
+export type PasskeyLoginForm = {
+  username: string;
+  id: string;
+  raw_id: string;
+  type: string;
+  authenticator_data: string;
+  client_data_json: string;
+  signature: string;
+  user_handle?: string;
+};
+
 export type UserInfo = {
   id: number;
   register_days: number;
@@ -142,6 +173,35 @@ export async function doLogin(
 ): Promise<LoginResponse> {
   const response = await axios.post("/login", data);
   return response.data as LoginResponse;
+}
+
+export async function createPasskeyLoginOptions(
+  data: PasskeyLoginOptionsForm,
+): Promise<PasskeyLoginOptionsResponse> {
+  try {
+    const response = await axios.post("/login/passkey/options", data);
+    return response.data as PasskeyLoginOptionsResponse;
+  } catch (e) {
+    return {
+      status: false,
+      error: getErrorMessage(e),
+    };
+  }
+}
+
+export async function verifyPasskeyLogin(
+  data: PasskeyLoginForm,
+): Promise<LoginResponse> {
+  try {
+    const response = await axios.post("/login/passkey/verify", data);
+    return response.data as LoginResponse;
+  } catch (e) {
+    return {
+      status: false,
+      error: getErrorMessage(e),
+      token: "",
+    };
+  }
 }
 
 export async function doState(): Promise<StateResponse> {

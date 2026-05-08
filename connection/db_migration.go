@@ -142,6 +142,20 @@ func doMysqlMigration(execer migrationExecer) error {
 		return err
 	}
 
+	if err := execSql(execer, `
+		ALTER TABLE passkey_credential
+		ADD COLUMN public_key TEXT;
+	`); err != nil {
+		return err
+	}
+
+	if err := execSql(execer, `
+		ALTER TABLE passkey_credential
+		ADD COLUMN sign_count INT DEFAULT 0;
+	`); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -203,6 +217,20 @@ func doSqliteMigration(execer migrationExecer) error {
 	if err := execSql(execer, `
 		ALTER TABLE broadcast
 		ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
+	`); err != nil {
+		return err
+	}
+
+	if err := execSql(execer, `
+		ALTER TABLE passkey_credential
+		ADD COLUMN public_key TEXT;
+	`); err != nil {
+		return err
+	}
+
+	if err := execSql(execer, `
+		ALTER TABLE passkey_credential
+		ADD COLUMN sign_count INT DEFAULT 0;
 	`); err != nil {
 		return err
 	}

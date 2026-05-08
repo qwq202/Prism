@@ -312,6 +312,8 @@ func CreatePasskeyCredentialTable(db *sql.DB) {
 		  transports VARCHAR(255),
 		  attestation_object TEXT,
 		  client_data_json TEXT,
+		  public_key TEXT,
+		  sign_count INT DEFAULT 0,
 		  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		  FOREIGN KEY (user_id) REFERENCES auth(id)
 		);

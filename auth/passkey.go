@@ -1,10 +1,12 @@
 package auth
 
 import (
+	"bytes"
 	"chat/channel"
 	"chat/globals"
 	"chat/utils"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -62,8 +64,9 @@ type passkeyAuthenticatorSelection struct {
 }
 
 type passkeyPublicKeyCredentialHint struct {
-	Type string `json:"type"`
-	ID   string `json:"id"`
+	Type       string   `json:"type"`
+	ID         string   `json:"id"`
+	Transports []string `json:"transports,omitempty"`
 }
 
 type passkeyRegistrationForm struct {
@@ -76,10 +79,48 @@ type passkeyRegistrationForm struct {
 	Transports        []string `json:"transports"`
 }
 
+type passkeyLoginOptionsForm struct {
+	Username string `json:"username" binding:"required"`
+}
+
+type passkeyAuthenticationOptions struct {
+	PublicKey passkeyPublicKeyCredentialRequestOptions `json:"publicKey"`
+}
+
+type passkeyPublicKeyCredentialRequestOptions struct {
+	Challenge        string                           `json:"challenge"`
+	Timeout          int                              `json:"timeout"`
+	RPID             string                           `json:"rpId,omitempty"`
+	AllowCredentials []passkeyPublicKeyCredentialHint `json:"allowCredentials"`
+	UserVerification string                           `json:"userVerification"`
+}
+
+type passkeyLoginForm struct {
+	Username          string `json:"username" binding:"required"`
+	ID                string `json:"id" binding:"required"`
+	RawID             string `json:"raw_id" binding:"required"`
+	Type              string `json:"type" binding:"required"`
+	AuthenticatorData string `json:"authenticator_data" binding:"required"`
+	ClientDataJSON    string `json:"client_data_json" binding:"required"`
+	Signature         string `json:"signature" binding:"required"`
+	UserHandle        string `json:"user_handle"`
+}
+
 type passkeyClientData struct {
 	Type      string `json:"type"`
 	Challenge string `json:"challenge"`
 	Origin    string `json:"origin"`
+}
+
+type passkeyStoredCredential struct {
+	ID                int64
+	UserID            int64
+	Username          string
+	CredentialID      string
+	Transports        string
+	AttestationObject string
+	PublicKey         string
+	SignCount         uint32
 }
 
 func passkeyBase64(data []byte) string {
@@ -101,6 +142,28 @@ func randomPasskeyChallenge() (string, error) {
 
 func passkeyChallengeKey(userID int64) string {
 	return fmt.Sprintf("nio:passkey:challenge:%d", userID)
+}
+
+func passkeyLoginChallengeKey(userID int64) string {
+	return fmt.Sprintf("nio:passkey:login:%d", userID)
+}
+
+func passkeyUserByUsernameOrEmail(db *sql.DB, usernameOrEmail string) (*User, error) {
+	usernameOrEmail = strings.TrimSpace(usernameOrEmail)
+	if usernameOrEmail == "" {
+		return nil, errors.New("invalid username or email")
+	}
+
+	var user User
+	if err := globals.QueryRowDb(db, `
+		SELECT id, username
+		FROM auth
+		WHERE username = ? OR email = ?
+	`, usernameOrEmail, usernameOrEmail).Scan(&user.ID, &user.Username); err != nil {
+		return nil, errors.New("user passkey not found")
+	}
+
+	return &user, nil
 }
 
 func listPasskeyCredentials(db *sql.DB, userID int64) ([]PasskeyCredentialInfo, error) {
@@ -129,7 +192,7 @@ func listPasskeyCredentials(db *sql.DB, userID int64) ([]PasskeyCredentialInfo, 
 
 func listPasskeyCredentialIDs(db *sql.DB, userID int64) ([]passkeyPublicKeyCredentialHint, error) {
 	rows, err := globals.QueryDb(db, `
-		SELECT credential_id
+		SELECT credential_id, COALESCE(transports, '')
 		FROM passkey_credential
 		WHERE user_id = ?
 	`, userID)
@@ -141,18 +204,59 @@ func listPasskeyCredentialIDs(db *sql.DB, userID int64) ([]passkeyPublicKeyCrede
 	credentials := make([]passkeyPublicKeyCredentialHint, 0)
 	for rows.Next() {
 		var credentialID string
-		if err := rows.Scan(&credentialID); err != nil {
+		var transports string
+		if err := rows.Scan(&credentialID, &transports); err != nil {
 			return nil, err
 		}
 		if credentialID = strings.TrimSpace(credentialID); credentialID != "" {
 			credentials = append(credentials, passkeyPublicKeyCredentialHint{
-				Type: "public-key",
-				ID:   credentialID,
+				Type:       "public-key",
+				ID:         credentialID,
+				Transports: splitPasskeyTransports(transports),
 			})
 		}
 	}
 
 	return credentials, rows.Err()
+}
+
+func splitPasskeyTransports(value string) []string {
+	parts := strings.Split(value, ",")
+	transports := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			transports = append(transports, part)
+		}
+	}
+
+	return transports
+}
+
+func getPasskeyStoredCredential(db *sql.DB, credentialID string, userID int64) (*passkeyStoredCredential, error) {
+	var item passkeyStoredCredential
+	err := globals.QueryRowDb(db, `
+		SELECT
+			p.id, p.user_id, a.username, p.credential_id, COALESCE(p.transports, ''),
+			COALESCE(p.attestation_object, ''), COALESCE(p.public_key, ''), COALESCE(p.sign_count, 0)
+		FROM passkey_credential p
+		JOIN auth a ON a.id = p.user_id
+		WHERE p.credential_id = ? AND (? = 0 OR p.user_id = ?)
+	`, credentialID, userID, userID).Scan(
+		&item.ID,
+		&item.UserID,
+		&item.Username,
+		&item.CredentialID,
+		&item.Transports,
+		&item.AttestationObject,
+		&item.PublicKey,
+		&item.SignCount,
+	)
+	if err != nil {
+		return nil, errors.New("user passkey not found")
+	}
+
+	return &item, nil
 }
 
 func passkeyOriginAllowed(requestOrigin, clientOrigin string) bool {
@@ -368,17 +472,43 @@ func RegisterPasskeyAPI(c *gin.Context) {
 	if credentialID == "" {
 		credentialID = strings.TrimSpace(form.ID)
 	}
-	if _, err := decodePasskeyBase64(credentialID); err != nil {
+	credentialIDBytes, err := decodePasskeyBase64(credentialID)
+	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"status": false,
 			"error":  "invalid passkey credential id",
 		})
 		return
 	}
-	if _, err := decodePasskeyBase64(form.AttestationObject); err != nil {
+
+	attestationObjectBytes, err := decodePasskeyBase64(form.AttestationObject)
+	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"status": false,
 			"error":  "invalid passkey attestation",
+		})
+		return
+	}
+
+	attestedCredential, err := parsePasskeyAttestationObject(attestationObjectBytes)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  err.Error(),
+		})
+		return
+	}
+	if !bytes.Equal(attestedCredential.CredentialID, credentialIDBytes) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "passkey credential id mismatch",
+		})
+		return
+	}
+	if !passkeyRPIDHashMatches(attestedCredential.RPIDHash, clientData.Origin) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "invalid passkey relying party",
 		})
 		return
 	}
@@ -390,9 +520,9 @@ func RegisterPasskeyAPI(c *gin.Context) {
 
 	if _, err := globals.ExecDb(db, `
 		INSERT INTO passkey_credential (
-			user_id, credential_id, name, transports, attestation_object, client_data_json
-		) VALUES (?, ?, ?, ?, ?, ?)
-	`, userID, credentialID, utils.Extract(name, 255, ""), strings.Join(form.Transports, ","), form.AttestationObject, form.ClientDataJSON); err != nil {
+			user_id, credential_id, name, transports, attestation_object, client_data_json, public_key, sign_count
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, userID, credentialID, utils.Extract(name, 255, ""), strings.Join(form.Transports, ","), form.AttestationObject, form.ClientDataJSON, passkeyBase64(attestedCredential.CredentialPublicKey), attestedCredential.SignCount); err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"status": false,
 			"error":  err.Error(),
@@ -432,4 +562,303 @@ func DeletePasskeyAPI(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": true})
+}
+
+func CreatePasskeyLoginOptionsAPI(c *gin.Context) {
+	if useDeeptrain() {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "this api is not available for deeptrain mode",
+		})
+		return
+	}
+	if err := passkeyDisabledError(); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	var form passkeyLoginOptionsForm
+	if err := c.ShouldBindJSON(&form); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "bad request",
+		})
+		return
+	}
+
+	db := utils.GetDBFromContext(c)
+	user, err := passkeyUserByUsernameOrEmail(db, form.Username)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	allowCredentials, err := listPasskeyCredentialIDs(db, user.ID)
+	if err != nil || len(allowCredentials) == 0 {
+		if err == nil {
+			err = errors.New("user passkey not found")
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	challenge, err := randomPasskeyChallenge()
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	cache := utils.GetCacheFromContext(c)
+	cache.Set(c, passkeyLoginChallengeKey(user.ID), challenge, 5*time.Minute)
+
+	options := passkeyAuthenticationOptions{
+		PublicKey: passkeyPublicKeyCredentialRequestOptions{
+			Challenge:        challenge,
+			Timeout:          60000,
+			RPID:             channel.SystemInstance.GetPasskeyRPID(),
+			AllowCredentials: allowCredentials,
+			UserVerification: channel.SystemInstance.GetPasskeyUserVerification(),
+		},
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": true,
+		"data":   options,
+	})
+}
+
+func resolvePasskeyPublicKey(db *sql.DB, credential *passkeyStoredCredential) ([]byte, error) {
+	if strings.TrimSpace(credential.PublicKey) != "" {
+		return decodePasskeyBase64(credential.PublicKey)
+	}
+
+	attestationObjectBytes, err := decodePasskeyBase64(credential.AttestationObject)
+	if err != nil {
+		return nil, err
+	}
+	attestedCredential, err := parsePasskeyAttestationObject(attestationObjectBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	publicKey := passkeyBase64(attestedCredential.CredentialPublicKey)
+	if _, err := globals.ExecDb(db, `
+		UPDATE passkey_credential
+		SET public_key = ?, sign_count = ?
+		WHERE id = ?
+	`, publicKey, attestedCredential.SignCount, credential.ID); err != nil {
+		return nil, err
+	}
+
+	credential.PublicKey = publicKey
+	credential.SignCount = attestedCredential.SignCount
+	return attestedCredential.CredentialPublicKey, nil
+}
+
+func VerifyPasskeyLoginAPI(c *gin.Context) {
+	if useDeeptrain() {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "this api is not available for deeptrain mode",
+		})
+		return
+	}
+	if err := passkeyDisabledError(); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	var form passkeyLoginForm
+	if err := c.ShouldBindJSON(&form); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "bad request",
+		})
+		return
+	}
+	if form.Type != "public-key" {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "invalid passkey credential type",
+		})
+		return
+	}
+
+	db := utils.GetDBFromContext(c)
+	user, err := passkeyUserByUsernameOrEmail(db, form.Username)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	credentialID := strings.TrimSpace(form.RawID)
+	if credentialID == "" {
+		credentialID = strings.TrimSpace(form.ID)
+	}
+	if _, err := decodePasskeyBase64(credentialID); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "invalid passkey credential id",
+		})
+		return
+	}
+
+	storedCredential, err := getPasskeyStoredCredential(db, credentialID, user.ID)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	clientDataBytes, err := decodePasskeyBase64(form.ClientDataJSON)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "invalid passkey client data",
+		})
+		return
+	}
+
+	var clientData passkeyClientData
+	if err := json.Unmarshal(clientDataBytes, &clientData); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "invalid passkey client data",
+		})
+		return
+	}
+
+	cache := utils.GetCacheFromContext(c)
+	challenge, err := cache.Get(c, passkeyLoginChallengeKey(user.ID)).Result()
+	if err != nil || challenge == "" || challenge != clientData.Challenge {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "invalid passkey challenge",
+		})
+		return
+	}
+	if clientData.Type != "webauthn.get" || !passkeyOriginAllowed(c.GetHeader("Origin"), clientData.Origin) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "invalid passkey origin",
+		})
+		return
+	}
+
+	authenticatorDataBytes, err := decodePasskeyBase64(form.AuthenticatorData)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "invalid passkey authenticator data",
+		})
+		return
+	}
+	assertion, err := parsePasskeyAssertionData(authenticatorDataBytes)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  err.Error(),
+		})
+		return
+	}
+	if assertion.Flags&passkeyFlagUserPresent == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "passkey user presence is required",
+		})
+		return
+	}
+	if channel.SystemInstance.GetPasskeyUserVerification() == "required" && assertion.Flags&passkeyFlagUserVerified == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "passkey user verification is required",
+		})
+		return
+	}
+	if !passkeyRPIDHashMatches(assertion.RPIDHash, clientData.Origin) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "invalid passkey relying party",
+		})
+		return
+	}
+
+	signatureBytes, err := decodePasskeyBase64(form.Signature)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "invalid passkey signature",
+		})
+		return
+	}
+
+	publicKeyBytes, err := resolvePasskeyPublicKey(db, storedCredential)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	clientDataHash := sha256.Sum256(clientDataBytes)
+	signatureBase := append(append([]byte(nil), authenticatorDataBytes...), clientDataHash[:]...)
+	if err := passkeyVerifySignature(publicKeyBytes, signatureBase, signatureBytes); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	if assertion.SignCount > storedCredential.SignCount {
+		_, _ = globals.ExecDb(db, `
+			UPDATE passkey_credential
+			SET sign_count = ?
+			WHERE id = ?
+		`, assertion.SignCount, storedCredential.ID)
+	}
+
+	cache.Del(c, passkeyLoginChallengeKey(user.ID))
+	if user.IsBanned(db) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "current user is banned",
+		})
+		return
+	}
+
+	token, err := (&User{ID: storedCredential.UserID, Username: storedCredential.Username}).GenerateTokenSafe(db)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": true,
+		"token":  token,
+	})
 }

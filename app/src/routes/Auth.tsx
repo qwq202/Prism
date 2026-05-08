@@ -17,10 +17,43 @@ import { Input } from "@/components/ui/input.tsx";
 import Require, { LengthRangeRequired } from "@/components/Require.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { formReducer, isTextInRange } from "@/utils/form.ts";
-import { doLogin, LoginForm } from "@/api/auth.ts";
+import {
+  createPasskeyLoginOptions,
+  doLogin,
+  LoginForm,
+  verifyPasskeyLogin,
+} from "@/api/auth.ts";
 import { getErrorMessage, isEnter } from "@/utils/base.ts";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import { toast } from "sonner";
+import { Fingerprint } from "lucide-react";
+
+function base64urlToBuffer(value: string): ArrayBuffer {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(
+    normalized.length + ((4 - (normalized.length % 4)) % 4),
+    "=",
+  );
+  const binary = window.atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+function bufferToBase64url(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return window
+    .btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
 
 function DeepAuth() {
   const { t } = useTranslation();
@@ -136,6 +169,84 @@ function Login() {
     }
   }, [form, globalDispatch, t]);
 
+  const onPasskeyLogin = useCallback(async () => {
+    const username = form.username.trim();
+    if (!isTextInRange(username, 1, 255)) {
+      toast.warning(t("login-failed"), {
+        description: t("auth.passkey-username-required"),
+      });
+      return;
+    }
+
+    if (!window.PublicKeyCredential || !navigator.credentials?.get) {
+      toast.warning(t("login-failed"), {
+        description: t("auth.passkey-unsupported"),
+      });
+      return;
+    }
+
+    try {
+      const optionsResp = await createPasskeyLoginOptions({ username });
+      if (!optionsResp.status || !optionsResp.data) {
+        toast.warning(t("login-failed"), {
+          description: t("login-failed-prompt", { reason: optionsResp.error }),
+        });
+        return;
+      }
+
+      const options = optionsResp.data.publicKey;
+      const credential = (await navigator.credentials.get({
+        publicKey: {
+          ...options,
+          challenge: base64urlToBuffer(options.challenge),
+          allowCredentials: options.allowCredentials.map((item) => ({
+            type: item.type,
+            id: base64urlToBuffer(item.id),
+            transports: item.transports,
+          })),
+        },
+      })) as PublicKeyCredential | null;
+
+      if (!credential) {
+        return;
+      }
+
+      const response = credential.response as AuthenticatorAssertionResponse;
+      const resp = await verifyPasskeyLogin({
+        username,
+        id: credential.id,
+        raw_id: bufferToBase64url(credential.rawId),
+        type: credential.type,
+        authenticator_data: bufferToBase64url(response.authenticatorData),
+        client_data_json: bufferToBase64url(response.clientDataJSON),
+        signature: bufferToBase64url(response.signature),
+        user_handle: response.userHandle
+          ? bufferToBase64url(response.userHandle)
+          : undefined,
+      });
+
+      if (!resp.status) {
+        toast.warning(t("login-failed"), {
+          description: t("login-failed-prompt", { reason: resp.error }),
+        });
+        return;
+      }
+
+      toast.success(t("login-success"), {
+        description: t("login-success-prompt"),
+      });
+
+      validateToken(globalDispatch, resp.token, async () => {
+        await router.navigate("/");
+      });
+    } catch (err) {
+      console.debug(err);
+      toast.error(t("server-error"), {
+        description: `${t("server-error-prompt")}\n${getErrorMessage(err)}`,
+      });
+    }
+  }, [form.username, globalDispatch, t]);
+
   useEffect(() => {
     // listen to enter key and auto submit
     const listener = async (e: KeyboardEvent) => {
@@ -205,6 +316,16 @@ function Login() {
                 loading={true}
               >
                 {t("login")}
+              </Button>
+              <Button
+                tapScale={0.975}
+                onClick={onPasskeyLogin}
+                className={`w-full`}
+                variant={`outline`}
+                loading={true}
+              >
+                <Fingerprint className={`mr-2 h-4 w-4`} />
+                {t("auth.passkey-login")}
               </Button>
             </div>
           </CardContent>
