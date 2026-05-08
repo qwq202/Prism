@@ -27,9 +27,30 @@
   a:active, a:hover {
     color: #0d64fd;
   }
-  img {
+  .logo-image {
     width: 64px;
     height: 64px;
+  }
+  .prism-logo {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    margin: 0 auto;
+    line-height: 64px;
+    color: #111827;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 52px;
+    font-weight: 700;
+    letter-spacing: -2px;
+  }
+  .prism-dot {
+    position: absolute;
+    right: 8px;
+    bottom: 9px;
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    background: #3b82f6;
   }
   .code {
     color: #58a6ff;
@@ -38,7 +59,14 @@
 </style>
 <body>
 <div class="main">
-  <div class="column"><img src="{{.Logo}}" alt=""><h1>{{.Title}}</h1></div>
+  <div class="column">
+    {{if .Logo}}
+    <img class="logo-image" src="{{.Logo}}" alt="{{.Title}}">
+    {{else}}
+    <div class="prism-logo" aria-label="Prism">P<span class="prism-dot"></span></div>
+    {{end}}
+    <h1>{{.Title}}</h1>
+  </div>
   <div class="column"><p>Your One-Time Password is <strong class="code">{{.Code}}</strong></p></div>
   <div class="column" style="color:gray">
     <span>The code will expire in <strong>10 minutes</strong>.</span><br>
