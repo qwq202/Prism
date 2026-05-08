@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button.tsx";
 import {
   ChevronDown,
   MessageCircle,
+  PieChart,
   Shield,
   Sparkles,
   Wallet,
@@ -121,7 +122,7 @@ function ToolBar() {
       {/* <BarItem icon={<Compass />} path={`/preset`} name={"preset"} /> */}
       <BarItem icon={<Wallet />} path={`/wallet`} name={"wallet"} />
       {/* <BarItem icon={<DraftingCompass />} path={`/key`} name={"key"} /> */}
-      {/* <BarItem icon={<PieChart />} path={`/log`} name={"log"} /> */}
+      <BarItem icon={<PieChart />} path={`/log`} name={"log"} />
       <BarItem icon={<User />} path={`/account`} name={"account"} />
       {admin && <BarItem icon={<Shield />} path={`/admin`} name={"admin"} />}
     </div>

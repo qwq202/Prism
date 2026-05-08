@@ -1570,6 +1570,7 @@
     "output-tokens": "Экспорт",
     "quota": "Вихри",
     "duration": "Прошло времени",
+    "prompt": "Prompt",
     "detail": "Примечания",
     "types": {
       "system": "Система",

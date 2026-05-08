@@ -20,6 +20,11 @@ type RecordQueryForm struct {
 	Model       string `json:"model"`
 	Type        string `json:"type"`
 	ShowChannel bool   `json:"show_channel"`
+	Self        bool   `json:"self"`
+}
+
+type RecordStatsForm struct {
+	Self bool `json:"self"`
 }
 
 func RecordViewAPI(c *gin.Context) {
@@ -46,6 +51,7 @@ func RecordViewAPI(c *gin.Context) {
 		Model:       form.Model,
 		Type:        form.Type,
 		ShowChannel: form.ShowChannel,
+		Self:        form.Self,
 	})
 
 	if err != nil {
@@ -71,15 +77,37 @@ func RecordStatsAPI(c *gin.Context) {
 	db := utils.GetDBFromContext(c)
 	cache := connection.Cache
 	isAdmin := user.IsAdmin(db)
+	userId := auth.GetId(db, user)
+
+	var form RecordStatsForm
+	_ = c.ShouldBindJSON(&form)
 
 	var rpm, tpm int64
-	if isAdmin {
+	if isAdmin && !form.Self {
 		rpm = analysis.GetRpmToday(cache, "root")
 		tpm = analysis.GetTpmToday(cache, "root")
 	} else {
 		username := utils.GetUserFromContext(c)
 		rpm = analysis.GetRpmToday(cache, username)
 		tpm = analysis.GetTpmToday(cache, username)
+	}
+
+	if !isAdmin || form.Self {
+		stats, err := GetUserRecordStats(db, userId)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"status":  false,
+				"message": err.Error(),
+			})
+			return
+		}
+		stats.Rpm = rpm
+		stats.Tpm = tpm
+		c.JSON(http.StatusOK, gin.H{
+			"status": true,
+			"data":   stats,
+		})
+		return
 	}
 
 	requestData := analysis.GetRequestData(cache)

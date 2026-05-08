@@ -706,6 +706,7 @@
     "output-tokens": "输出",
     "quota": "点数",
     "duration": "用时",
+    "prompt": "Prompt",
     "detail": "备注",
     "rpm-tips": "当前 RPM (每分钟请求数)",
     "tpm-tips": "当前 TPM (每分钟 Token 数)",

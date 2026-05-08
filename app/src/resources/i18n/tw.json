@@ -1692,6 +1692,7 @@
     "output-tokens": "輸出",
     "quota": "點數",
     "duration": "用時",
+    "prompt": "Prompt",
     "detail": "備註：",
     "rpm-tips": "當前RPM (每分鐘請求數)",
     "tpm-tips": "目前TPM (每分鐘Token 數)",

@@ -1598,6 +1598,7 @@
     "output-tokens": "Output",
     "quota": "Credits",
     "duration": "Used time",
+    "prompt": "Prompt",
     "detail": "Remarks",
     "types": {
       "system": "System",

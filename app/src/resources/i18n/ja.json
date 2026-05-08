@@ -1570,6 +1570,7 @@
     "output-tokens": "出力",
     "quota": "Whirlies",
     "duration": "経過時間",
+    "prompt": "Prompt",
     "detail": "備考",
     "types": {
       "system": "システム",
