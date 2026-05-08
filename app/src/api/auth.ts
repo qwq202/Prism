@@ -70,6 +70,59 @@ export type AccountPasswordForm = {
   password: string;
 };
 
+export type PasskeyCredentialInfo = {
+  id: number;
+  name: string;
+  created_at: string;
+};
+
+export type PasskeyCredentialDescriptor = {
+  type: "public-key";
+  id: string;
+};
+
+export type PasskeyRegistrationOptions = {
+  publicKey: {
+    challenge: string;
+    rp: {
+      name: string;
+      id?: string;
+    };
+    user: {
+      id: string;
+      name: string;
+      displayName: string;
+    };
+    pubKeyCredParams: PublicKeyCredentialParameters[];
+    timeout: number;
+    authenticatorSelection: {
+      authenticatorAttachment?: AuthenticatorAttachment;
+      userVerification: UserVerificationRequirement;
+    };
+    attestation: AttestationConveyancePreference;
+    excludeCredentials: PasskeyCredentialDescriptor[];
+  };
+};
+
+export type PasskeyListResponse = VerifyResponse & {
+  enabled: boolean;
+  credentials: PasskeyCredentialInfo[];
+};
+
+export type PasskeyRegistrationOptionsResponse = VerifyResponse & {
+  data?: PasskeyRegistrationOptions;
+};
+
+export type PasskeyRegistrationForm = {
+  name?: string;
+  id: string;
+  raw_id: string;
+  type: string;
+  client_data_json: string;
+  attestation_object: string;
+  transports: string[];
+};
+
 export type UserInfo = {
   id: number;
   register_days: number;
@@ -160,6 +213,58 @@ export async function updateAccountPassword(
 ): Promise<VerifyResponse> {
   try {
     const response = await axios.post("/account/password", data);
+    return response.data as VerifyResponse;
+  } catch (e) {
+    return {
+      status: false,
+      error: getErrorMessage(e),
+    };
+  }
+}
+
+export async function listPasskeys(): Promise<PasskeyListResponse> {
+  try {
+    const response = await axios.get("/account/passkeys");
+    return response.data as PasskeyListResponse;
+  } catch (e) {
+    return {
+      status: false,
+      error: getErrorMessage(e),
+      enabled: false,
+      credentials: [],
+    };
+  }
+}
+
+export async function createPasskeyRegistrationOptions(): Promise<PasskeyRegistrationOptionsResponse> {
+  try {
+    const response = await axios.post("/account/passkeys/options");
+    return response.data as PasskeyRegistrationOptionsResponse;
+  } catch (e) {
+    return {
+      status: false,
+      error: getErrorMessage(e),
+    };
+  }
+}
+
+export async function registerPasskey(
+  data: PasskeyRegistrationForm,
+): Promise<VerifyResponse> {
+  try {
+    const response = await axios.post("/account/passkeys/register", data);
+    return response.data as VerifyResponse;
+  } catch (e) {
+    return {
+      status: false,
+      error: getErrorMessage(e),
+    };
+  }
+}
+
+export async function deletePasskey(id: number): Promise<VerifyResponse> {
+  try {
+    const response = await axios.delete(`/account/passkeys/${id}`);
     return response.data as VerifyResponse;
   } catch (e) {
     return {

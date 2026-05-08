@@ -496,3 +496,55 @@ func (c *SystemConfig) AcceptImageStore() bool {
 func (c *SystemConfig) SupportRelayPlan() bool {
 	return c.Site.RelayPlan
 }
+
+func (c *SystemConfig) IsPasskeyEnabled() bool {
+	return c.Auth.Passkey.Enabled
+}
+
+func (c *SystemConfig) GetPasskeyRPDisplayName() string {
+	name := strings.TrimSpace(c.Auth.Passkey.RPDisplayName)
+	if name == "" {
+		return c.GetAppName()
+	}
+
+	return name
+}
+
+func (c *SystemConfig) GetPasskeyRPID() string {
+	return strings.TrimSpace(c.Auth.Passkey.RPID)
+}
+
+func (c *SystemConfig) GetPasskeyUserVerification() string {
+	switch strings.TrimSpace(c.Auth.Passkey.UserVerification) {
+	case "required", "preferred", "discouraged":
+		return c.Auth.Passkey.UserVerification
+	default:
+		return "preferred"
+	}
+}
+
+func (c *SystemConfig) GetPasskeyAuthenticatorAttachment() string {
+	switch strings.TrimSpace(c.Auth.Passkey.AuthenticatorAttachment) {
+	case "platform", "cross-platform":
+		return c.Auth.Passkey.AuthenticatorAttachment
+	default:
+		return "any"
+	}
+}
+
+func (c *SystemConfig) AllowPasskeyInsecureOrigin() bool {
+	return c.Auth.Passkey.AllowInsecureOrigin
+}
+
+func (c *SystemConfig) GetPasskeyOrigins() []string {
+	raw := strings.ReplaceAll(c.Auth.Passkey.Origins, ",", "\n")
+	lines := strings.Split(raw, "\n")
+	origins := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if origin := strings.TrimSpace(line); origin != "" {
+			origins = append(origins, strings.TrimSuffix(origin, "/"))
+		}
+	}
+
+	return origins
+}

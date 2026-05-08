@@ -22,6 +22,7 @@ import {
   CloudRain,
   Copy,
   ExternalLink,
+  Fingerprint,
   HandIcon,
   HelpCircle,
   KeyRound,
@@ -40,6 +41,11 @@ import { useEffectAsync } from "@/utils/hook.ts";
 import {
   getUserInfo,
   initialUserInfo,
+  createPasskeyRegistrationOptions,
+  deletePasskey,
+  listPasskeys,
+  PasskeyCredentialInfo,
+  registerPasskey,
   sendCode,
   updateAccountEmail,
   updateAccountPassword,
@@ -144,6 +150,33 @@ function AccountCard({
 type ShareContentProps = {
   data: SharingPreviewForm[];
 };
+
+function base64urlToBuffer(value: string): ArrayBuffer {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(
+    normalized.length + ((4 - (normalized.length % 4)) % 4),
+    "=",
+  );
+  const binary = window.atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+function bufferToBase64url(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return window
+    .btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
 
 function ShareContent({ data }: ShareContentProps) {
   const { t } = useTranslation();
@@ -325,6 +358,25 @@ function Account() {
     password: "",
     repassword: "",
   });
+  const [passkeyEnabled, setPasskeyEnabled] = useState(false);
+  const [passkeys, setPasskeys] = useState<PasskeyCredentialInfo[]>([]);
+
+  const refreshPasskeys = async () => {
+    if (!auth) {
+      setPasskeyEnabled(false);
+      setPasskeys([]);
+      return;
+    }
+
+    const resp = await listPasskeys();
+    if (resp.status) {
+      setPasskeyEnabled(resp.enabled);
+      setPasskeys(resp.credentials ?? []);
+    } else {
+      withNotify(t, resp);
+    }
+  };
+  useEffectAsync(refreshPasskeys, [auth]);
 
   async function sendEmailChangeCode() {
     const email = emailForm.email.trim();
@@ -402,6 +454,74 @@ function Account() {
     if (resp.status) {
       setPasswordDialogOpen(false);
       setPasswordForm({ code: "", password: "", repassword: "" });
+    }
+  }
+
+  async function bindPasskey() {
+    if (!window.PublicKeyCredential || !navigator.credentials?.create) {
+      toast.error(t("error"), {
+        description: t("account.passkey-unsupported"),
+      });
+      return;
+    }
+
+    const resp = await createPasskeyRegistrationOptions();
+    if (!resp.status || !resp.data) {
+      withNotify(t, resp);
+      return;
+    }
+
+    const options = resp.data.publicKey;
+    const authenticatorSelection = {
+      ...options.authenticatorSelection,
+    } as AuthenticatorSelectionCriteria;
+
+    if (!authenticatorSelection.authenticatorAttachment) {
+      delete authenticatorSelection.authenticatorAttachment;
+    }
+
+    const credential = (await navigator.credentials.create({
+      publicKey: {
+        ...options,
+        challenge: base64urlToBuffer(options.challenge),
+        user: {
+          ...options.user,
+          id: base64urlToBuffer(options.user.id),
+        },
+        excludeCredentials: options.excludeCredentials.map((item) => ({
+          type: item.type,
+          id: base64urlToBuffer(item.id),
+        })),
+        authenticatorSelection,
+      },
+    })) as PublicKeyCredential | null;
+
+    if (!credential) {
+      return;
+    }
+
+    const response = credential.response as AuthenticatorAttestationResponse;
+    const registerResp = await registerPasskey({
+      name: t("account.passkey-default-name"),
+      id: credential.id,
+      raw_id: bufferToBase64url(credential.rawId),
+      type: credential.type,
+      client_data_json: bufferToBase64url(response.clientDataJSON),
+      attestation_object: bufferToBase64url(response.attestationObject),
+      transports: response.getTransports?.() ?? [],
+    });
+
+    withNotify(t, registerResp, true, t("account.passkey-bound"));
+    if (registerResp.status) {
+      await refreshPasskeys();
+    }
+  }
+
+  async function removePasskey(id: number) {
+    const resp = await deletePasskey(id);
+    withNotify(t, resp, true, t("account.passkey-removed"));
+    if (resp.status) {
+      await refreshPasskeys();
     }
   }
 
@@ -808,6 +928,98 @@ function Account() {
                   </a>
                 </Button>
               </div>
+            </motion.div>
+          </AccountCard>
+        </motion.div>
+        <motion.div variants={cardVariants}>
+          <AccountCard
+            title={"account.security"}
+            description={t("account.security-description")}
+            icon={<Fingerprint />}
+          >
+            <motion.div className="space-y-3" variants={contentVariants}>
+              <div className="flex flex-col gap-3 rounded-lg border bg-muted/10 p-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex min-w-0 items-start gap-3">
+                  <Fingerprint className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">
+                      {t("account.passkey")}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {passkeyEnabled
+                        ? t("account.passkey-description")
+                        : t("account.passkey-disabled")}
+                    </p>
+                  </div>
+                </div>
+                {auth ? (
+                  <Button
+                    className="shrink-0"
+                    size="default-sm"
+                    loading
+                    disabled={!passkeyEnabled}
+                    onClick={bindPasskey}
+                  >
+                    <Fingerprint className="mr-1.5 h-3.5 w-3.5" />
+                    {t("account.bind-passkey")}
+                  </Button>
+                ) : (
+                  <Button className="shrink-0" size="default-sm" onClick={goAuth}>
+                    <HandIcon className="mr-1.5 h-3.5 w-3.5" />
+                    {t("login")}
+                  </Button>
+                )}
+              </div>
+              {auth && passkeys.length > 0 && (
+                <div className="space-y-2">
+                  {passkeys.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          {item.name || t("account.passkey")}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {t("account.passkey-created-at", {
+                            time: item.created_at || "-",
+                          })}
+                        </p>
+                      </div>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="light-destructive"
+                            size="icon-sm"
+                            className="shrink-0"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              {t("account.remove-passkey")}
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {t("account.remove-passkey-description")}
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => removePasskey(item.id)}
+                            >
+                              {t("confirm")}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  ))}
+                </div>
+              )}
             </motion.div>
           </AccountCard>
         </motion.div>

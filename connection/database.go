@@ -90,6 +90,7 @@ func ConnectDatabase() *sql.DB {
 	CreateQuotaTable(db)
 	CreateSubscriptionTable(db)
 	CreateApiKeyTable(db)
+	CreatePasskeyCredentialTable(db)
 	CreateInvitationTable(db)
 	CreateRedeemTable(db)
 	CreateBroadcastTable(db)
@@ -292,6 +293,25 @@ func CreateApiKeyTable(db *sql.DB) {
 		  id INT PRIMARY KEY AUTO_INCREMENT,
 		  user_id INT UNIQUE,
 		  api_key VARCHAR(255) UNIQUE,
+		  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		  FOREIGN KEY (user_id) REFERENCES auth(id)
+		);
+	`)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+func CreatePasskeyCredentialTable(db *sql.DB) {
+	_, err := globals.ExecDb(db, `
+		CREATE TABLE IF NOT EXISTS passkey_credential (
+		  id INT PRIMARY KEY AUTO_INCREMENT,
+		  user_id INT NOT NULL,
+		  credential_id VARCHAR(512) NOT NULL UNIQUE,
+		  name VARCHAR(255),
+		  transports VARCHAR(255),
+		  attestation_object TEXT,
+		  client_data_json TEXT,
 		  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		  FOREIGN KEY (user_id) REFERENCES auth(id)
 		);
