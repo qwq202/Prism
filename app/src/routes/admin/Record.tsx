@@ -35,7 +35,15 @@ import {
 } from "@/components/ui/select.tsx";
 import { PaginationAction } from "@/components/ui/pagination.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
-import { RotateCw, Search, Activity, DollarSign, Zap, Clock } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import {
+  RotateCw,
+  Search,
+  Activity,
+  DollarSign,
+  Zap,
+  Clock,
+} from "lucide-react";
 import { mobile } from "@/utils/device.ts";
 import { cn } from "@/components/ui/lib/utils.ts";
 
@@ -81,7 +89,9 @@ function StatCard({
 
 function RecordTypeLabel({ type }: { type: string }) {
   const { t } = useTranslation();
-  const variants: { [key: string]: "default" | "secondary" | "destructive" | "outline" } = {
+  const variants: {
+    [key: string]: "default" | "secondary" | "destructive" | "outline";
+  } = {
     consume: "destructive",
     topup: "default",
     system: "secondary",
@@ -90,6 +100,50 @@ function RecordTypeLabel({ type }: { type: string }) {
     <Badge variant={variants[type] ?? "outline"}>
       {t(`record.types.${type}`) || type}
     </Badge>
+  );
+}
+
+function RecordTableSkeleton() {
+  return (
+    <>
+      {Array.from({ length: 12 }).map((_, index) => (
+        <TableRow
+          key={index}
+          className="pointer-events-none hover:bg-transparent"
+        >
+          <TableCell>
+            <Skeleton className="h-5 w-24" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-7 w-16 rounded-full" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-5 w-36" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-5 w-16" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-5 w-14" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-5 w-14" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-5 w-16" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-5 w-12" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-5 w-16" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-5 w-36" />
+          </TableCell>
+        </TableRow>
+      ))}
+    </>
   );
 }
 
@@ -149,6 +203,8 @@ function RecordTable() {
     await handleSearch();
   };
 
+  const initialLoading = loading && records.length === 0;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2 items-end">
@@ -174,7 +230,9 @@ function RecordTable() {
           className="w-36"
         />
         <div className="flex flex-col gap-0.5">
-          <span className="text-xs text-muted-foreground px-1">{t("record.cond.start_time")}</span>
+          <span className="text-xs text-muted-foreground px-1">
+            {t("record.cond.start_time")}
+          </span>
           <Input
             type="date"
             value={input.start_time}
@@ -184,7 +242,9 @@ function RecordTable() {
           />
         </div>
         <div className="flex flex-col gap-0.5">
-          <span className="text-xs text-muted-foreground px-1">{t("record.cond.end_time")}</span>
+          <span className="text-xs text-muted-foreground px-1">
+            {t("record.cond.end_time")}
+          </span>
           <Input
             type="date"
             value={input.end_time}
@@ -195,9 +255,7 @@ function RecordTable() {
         </div>
         <Select
           value={input.type}
-          onValueChange={(v) =>
-            setInput({ ...input, type: v as RecordType })
-          }
+          onValueChange={(v) => setInput({ ...input, type: v as RecordType })}
         >
           <SelectTrigger className="w-28">
             <SelectValue />
@@ -240,9 +298,13 @@ function RecordTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
+            {initialLoading && <RecordTableSkeleton />}
             {records.length === 0 && !loading && (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                <TableCell
+                  colSpan={10}
+                  className="text-center text-muted-foreground py-8"
+                >
                   —
                 </TableCell>
               </TableRow>
@@ -253,8 +315,12 @@ function RecordTable() {
                 <TableCell>
                   <RecordTypeLabel type={r.type} />
                 </TableCell>
-                <TableCell className="max-w-[120px] truncate">{r.model}</TableCell>
-                <TableCell className="max-w-[80px] truncate">{r.token_name}</TableCell>
+                <TableCell className="max-w-[120px] truncate">
+                  {r.model}
+                </TableCell>
+                <TableCell className="max-w-[80px] truncate">
+                  {r.token_name}
+                </TableCell>
                 <TableCell>{r.input_tokens}</TableCell>
                 <TableCell>{r.output_tokens}</TableCell>
                 <TableCell>{r.quota.toFixed(4)}</TableCell>
