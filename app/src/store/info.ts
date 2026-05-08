@@ -46,6 +46,7 @@ export const infoSlice = createSlice({
     announcement: getMemory("announcement"),
     buy_link: getMemory("buy_link"),
     hide_key_docs: getBooleanMemory("hide_key_docs", false),
+    close_relay: getBooleanMemory("close_relay", false),
     backend: getMemory("backend"),
     group_pricing: {},
 
@@ -77,6 +78,7 @@ export const infoSlice = createSlice({
       state.announcement = form.announcement ?? "";
       state.buy_link = form.buy_link ?? "";
       state.hide_key_docs = form.hide_key_docs ?? false;
+      state.close_relay = form.close_relay ?? false;
       state.backend = form.backend ?? state.backend;
       state.payment_aggregation = form.payment_aggregation ?? false;
       state.broadcast = form.broadcast ?? {
@@ -89,6 +91,7 @@ export const infoSlice = createSlice({
       setMemory("announcement", state.announcement);
       setMemory("buy_link", state.buy_link);
       setBooleanMemory("hide_key_docs", state.hide_key_docs);
+      setBooleanMemory("close_relay", state.close_relay);
       if (state.backend) setMemory("backend", state.backend);
       setMemory("currency", state.currency);
       setBooleanMemory("mail", state.mail);
@@ -132,6 +135,8 @@ export const infoAnnouncementSelector = (state: RootState): string =>
   state.info.announcement;
 export const infoHideKeyDocsSelector = (state: RootState): boolean =>
   state.info.hide_key_docs ?? false;
+export const infoCloseRelaySelector = (state: RootState): boolean =>
+  state.info.close_relay ?? false;
 export const infoBackendSelector = (state: RootState): string | undefined =>
   state.info.backend;
 export const infoBroadcastSelector = (state: RootState): BroadcastEvent =>

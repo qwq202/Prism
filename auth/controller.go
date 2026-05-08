@@ -383,6 +383,14 @@ func IndexAPI(c *gin.Context) {
 }
 
 func KeyAPI(c *gin.Context) {
+	if globals.CloseRelay {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "relay api is disabled",
+		})
+		return
+	}
+
 	user := GetUser(c)
 	if user == nil {
 		c.JSON(http.StatusOK, gin.H{
@@ -399,6 +407,14 @@ func KeyAPI(c *gin.Context) {
 }
 
 func ResetKeyAPI(c *gin.Context) {
+	if globals.CloseRelay {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "relay api is disabled",
+		})
+		return
+	}
+
 	user := GetUser(c)
 	if user == nil {
 		c.JSON(http.StatusOK, gin.H{

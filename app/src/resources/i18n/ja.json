@@ -1720,6 +1720,7 @@
     "deeptrain-description": "PrismはDeepTrainの製品です。DeepTrainのユニファイドアカウント管理システムは、ユーザーにユニファイドアカウント管理サービスを提供します。このページでは、アカウント情報、サードパーティのアカウントリンク、2 FA設定、ウォレット設定、認証情報などを表示できます。Deeptrainユニファイドアカウント管理は、Prism、Fystart、LightNotesなどの製品で一般的に使用されています。",
     "my-account-description": "お客様のアカウント情報、第三者のアカウントリンク情報など",
     "api-description": "グローバルアカウントAPI情報",
+    "api-disabled-description": "管理者がリレー API を無効にしているため、アカウント API 設定は使用できません。",
     "share-description": "履歴の会話の表示と管理",
     "share-delete": "シェアを削除",
     "share-delete-description": "この共有を削除してもよろしいですか？",

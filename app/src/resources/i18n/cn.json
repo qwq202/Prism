@@ -1837,6 +1837,7 @@
     "remove-passkey": "移除通行密钥",
     "remove-passkey-description": "确定要移除此通行密钥吗？移除后该设备将无法再用于后续通行密钥登录。",
     "api-description": "您的全局账号 API 信息 ",
+    "api-disabled-description": "管理员已关闭中转 API，当前账号 API 设置不可用。",
     "deeptrain-description": "您的 DeepTrain 统一账号绑定信息",
     "registerDays": "注册 {{days}} 天",
     "current-quota": "当前点数",

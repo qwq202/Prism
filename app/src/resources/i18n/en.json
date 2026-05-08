@@ -1748,6 +1748,7 @@
     "deeptrain-description": "Prism is a product of DeepTrain. DeepTrain's unified account management system provides users with unified account management services. You can view your account information, third-party account linking, 2FA settings, wallet settings, authentication information, and more on this page. Deeptrain Unified Account Management is commonly used in Prism, Fystart, LightNotes and other products.",
     "my-account-description": "Your account information, third-party account linking information, etc.",
     "api-description": "Your global account API information",
+    "api-disabled-description": "The relay API is disabled by the administrator, so account API settings are unavailable.",
     "share-description": "View and manage your history conversations",
     "share-delete": "Remove share",
     "share-delete-description": "Are you sure you want to delete this share?",

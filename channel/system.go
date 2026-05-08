@@ -22,6 +22,7 @@ type ApiInfo struct {
 	Mail         bool     `json:"mail"`
 	Article      []string `json:"article"`
 	Generation   []string `json:"generation"`
+	CloseRelay   bool     `json:"close_relay"`
 	RelayPlan    bool     `json:"relay_plan"`
 	WebSearch    bool     `json:"web_search"`
 	HasTaskModel bool     `json:"has_task_model"`
@@ -210,6 +211,7 @@ func (c *SystemConfig) AsInfo() ApiInfo {
 		Mail:         c.IsMailValid(),
 		Article:      c.Common.Article,
 		Generation:   c.Common.Generation,
+		CloseRelay:   c.Site.CloseRelay,
 		RelayPlan:    c.Site.RelayPlan,
 		WebSearch:    strings.TrimSpace(globals.SearchApiKey) != "",
 		HasTaskModel: globals.GetTaskModel() != "",

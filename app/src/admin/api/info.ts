@@ -22,6 +22,7 @@ export type SiteInfo = {
   footer: string;
   auth_footer: boolean;
   hide_key_docs?: boolean;
+  close_relay?: boolean;
   relay_plan: boolean;
   web_search?: boolean;
   has_task_model?: boolean;
@@ -49,6 +50,7 @@ export async function getSiteInfo(): Promise<SiteInfo> {
       footer: "",
       auth_footer: false,
       hide_key_docs: false,
+      close_relay: false,
       mail: false,
       relay_plan: false,
       web_search: false,

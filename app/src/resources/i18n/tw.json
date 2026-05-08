@@ -1833,6 +1833,7 @@
     "remove-passkey": "移除通行密鑰",
     "remove-passkey-description": "確定要移除此通行密鑰嗎？移除後該裝置將無法再用於後續通行密鑰登入。",
     "api-description": "您的全域帳號API 訊息",
+    "api-disabled-description": "管理員已關閉中轉 API，目前帳號 API 設定不可用。",
     "deeptrain-description": "您的DeepTrain 統一帳號綁定訊息",
     "registerDays": "註冊 {{days}} 天",
     "current-quota": "目前點數",

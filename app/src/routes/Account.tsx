@@ -88,6 +88,7 @@ import { toast } from "sonner";
 import Emoji from "@/components/Emoji";
 import { motion } from "framer-motion";
 import { isEmailValid, isTextInRange } from "@/utils/form.ts";
+import { infoCloseRelaySelector } from "@/store/info.ts";
 
 type AccountCardProps = {
   title: string;
@@ -256,6 +257,7 @@ function Account() {
   const group = useGroup(true);
 
   const apiKey = useSelector(keySelector);
+  const closeRelay = useSelector(infoCloseRelaySelector);
   const [loadingApiKey, setLoadingApiKey] = useState(false);
   const [openResetApiKey, setOpenResetApiKey] = useState(false);
 
@@ -292,16 +294,18 @@ function Account() {
   };
 
   const getSystemKey = async () => {
-    if (!init) return;
+    if (!init || closeRelay) return;
 
     setLoadingApiKey(true);
     await getApiKey(dispatch);
     setLoadingApiKey(false);
   };
 
-  useEffectAsync(getSystemKey, [init]);
+  useEffectAsync(getSystemKey, [init, closeRelay]);
 
   async function copySystemKey() {
+    if (closeRelay) return;
+
     await copyClipboard(apiKey);
     toast.success(t("api.copied"), {
       description: t("api.copied-description"),
@@ -309,6 +313,8 @@ function Account() {
   }
 
   async function resetSystemKey() {
+    if (closeRelay) return;
+
     const resp = await regenerateApiKey(dispatch);
     withNotify(t, resp as CommonResponse, true);
 
@@ -827,16 +833,27 @@ function Account() {
         <motion.div variants={cardVariants}>
           <AccountCard
             title={"api.title"}
-            description={t("account.api-description")}
+            description={
+              closeRelay
+                ? t("account.api-disabled-description")
+                : t("account.api-description")
+            }
             icon={<Plug />}
           >
-            <motion.div className={`api-dialog`} variants={contentVariants}>
+            <motion.div
+              className={cn(
+                "api-dialog",
+                closeRelay && "pointer-events-none opacity-50",
+              )}
+              variants={contentVariants}
+            >
               <div className={`api-wrapper flex flex-row space-x-1`}>
                 <Button
                   variant={`outline`}
                   size={`icon-sm`}
                   className={`shrink-0`}
                   onClick={getSystemKey}
+                  disabled={closeRelay}
                 >
                   <RotateCw
                     className={cn("h-3.5 w-3.5", loadingApiKey && "animate-spin")}
@@ -844,8 +861,9 @@ function Account() {
                 </Button>
                 <Input
                   type={`password`}
-                  value={apiKey}
+                  value={closeRelay ? "" : apiKey}
                   readOnly={true}
+                  disabled={closeRelay}
                   classNameWrapper={`grow`}
                   className={`text-xs h-8`}
                 />
@@ -854,6 +872,7 @@ function Account() {
                   className={`shrink-0`}
                   size={`icon-sm`}
                   onClick={copySystemKey}
+                  disabled={closeRelay}
                 >
                   <Copy className={`h-3.5 w-3.5`} />
                 </Button>
@@ -868,6 +887,7 @@ function Account() {
                       variant={`destructive`}
                       size={`default-sm`}
                       className={`text-xs mr-2`}
+                      disabled={closeRelay}
                     >
                       <Power className={`h-3.5 w-3.5 mr-2`} />
                       {t("api.reset")}
