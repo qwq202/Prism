@@ -12,7 +12,7 @@ import (
 	"github.com/go-redis/redis/v8"
 )
 
-const extractPrompt = "You are a search keyword extraction task model. Extract the single most useful internet search query from the user's message. When the user mentions relative time such as today, yesterday, tomorrow, this week, this month, recently, latest, or current, convert it into an explicit date or date range using the provided current date and time, and keep that time information in the query. Preserve the user's topic and important entities. Prefer a search-ready query, not a vague summary phrase. Return only one concise search query in plain text. Do not explain, do not add quotes, markdown, numbering, or extra commentary."
+const extractPrompt = "You are a search keyword extraction task model. Extract the single most useful internet search query from the user's recent message context. When the user mentions relative time such as today, yesterday, tomorrow, this week, this month, recently, latest, or current, convert it into an explicit date or date range using the provided current date and time, and keep that time information in the query. Preserve the user's topic and important entities. Prefer a search-ready query, not a vague summary phrase. Return only one concise search query in plain text. Do not explain, do not add quotes, markdown, numbering, or extra commentary."
 
 func normalizeExtractedQuery(query string) string {
 	query = strings.TrimSpace(query)

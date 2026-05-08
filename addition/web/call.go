@@ -5,6 +5,7 @@ import (
 	"chat/manager/conversation"
 	"chat/utils"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -12,8 +13,51 @@ import (
 
 type Hook func(message []globals.Message, token int) (string, error)
 
+func recentUserSearchContext(message []globals.Message, limit int) string {
+	if limit <= 0 {
+		limit = 1
+	}
+
+	items := make([]string, 0, limit)
+	for i := len(message) - 1; i >= 0 && len(items) < limit; i-- {
+		if message[i].Role != globals.User {
+			continue
+		}
+
+		content := strings.TrimSpace(message[i].Content)
+		if content == "" {
+			continue
+		}
+
+		items = append(items, content)
+	}
+
+	if len(items) == 0 {
+		if len(message) == 0 {
+			return ""
+		}
+		return strings.TrimSpace(message[len(message)-1].Content)
+	}
+
+	for i, j := 0, len(items)-1; i < j; i, j = i+1, j-1 {
+		items[i], items[j] = items[j], items[i]
+	}
+
+	if len(items) == 1 {
+		return items[0]
+	}
+
+	lines := make([]string, 0, len(items)+1)
+	lines = append(lines, "Recent user messages:")
+	for i, item := range items {
+		lines = append(lines, fmt.Sprintf("%d. %s", i+1, item))
+	}
+
+	return strings.Join(lines, "\n")
+}
+
 func toWebSearchingMessage(message []globals.Message, group string, cache *redis.Client) []globals.Message {
-	query := message[len(message)-1].Content
+	query := recentUserSearchContext(message, 3)
 	extracted := ExtractSearchQuery(group, query, cache)
 	data, _ := GenerateSearchResult(extracted)
 
