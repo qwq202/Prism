@@ -482,7 +482,7 @@ function Account() {
                           />
                           <Button
                             variant="outline"
-                            className="shrink-0"
+                            className="shrink-0 min-w-20 whitespace-nowrap"
                             loading
                             onClick={sendEmailChangeCode}
                           >
@@ -541,7 +541,7 @@ function Account() {
                           />
                           <Button
                             variant="outline"
-                            className="shrink-0"
+                            className="shrink-0 min-w-20 whitespace-nowrap"
                             loading
                             onClick={sendPasswordChangeCode}
                           >
