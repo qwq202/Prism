@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useSelector } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
 import { selectAdmin, selectAuthenticated, selectInit } from "@/store/auth.ts";
+import { AdminShellSkeleton } from "@/components/admin/AdminSkeleton.tsx";
 
 export function AuthRequired({ children }: { children: React.ReactNode }) {
   const init = useSelector(selectInit);
@@ -44,6 +45,9 @@ export function AdminRequired({ children }: { children: React.ReactNode }) {
       navigate("/", { state: { from: location.pathname } });
     }
   }, [init, admin, location.pathname, navigate]);
+
+  if (!init) return <AdminShellSkeleton />;
+  if (!admin) return null;
 
   return <>{children}</>;
 }

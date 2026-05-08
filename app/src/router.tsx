@@ -13,6 +13,10 @@ import {
   AuthForbidden,
   AuthRequired,
 } from "@/routes/RouteGuards.tsx";
+import {
+  AdminContentSkeleton,
+  AdminShellSkeleton,
+} from "@/components/admin/AdminSkeleton.tsx";
 
 const modelRoute = lazyFactor(() => import("@/routes/Model.tsx"));
 const personalizationRoute = lazyFactor(
@@ -48,8 +52,15 @@ const adminRecordRoute = lazyFactor(() => import("@/routes/admin/Record.tsx"));
 const adminPaymentRoute = lazyFactor(() => import("@/routes/admin/Payment.tsx"));
 const adminWarmupRoute = lazyFactor(() => import("@/routes/admin/Warmup.tsx"));
 
-const withSuspense = (component: React.ComponentType) =>
-  React.createElement(Suspense, null, React.createElement(component));
+const withSuspense = (
+  component: React.ComponentType,
+  fallback: React.ReactNode = null,
+) =>
+  React.createElement(
+    Suspense,
+    { fallback },
+    React.createElement(component),
+  );
 
 const router = createBrowserRouter([
   {
@@ -130,74 +141,77 @@ const router = createBrowserRouter([
         path: "/admin",
         element: (
           <AdminRequired>
-            {withSuspense(adminPageRoute)}
+            {withSuspense(adminPageRoute, <AdminShellSkeleton />)}
           </AdminRequired>
         ),
         children: [
           {
             id: "admin-dashboard",
             path: "",
-            element: withSuspense(adminDashboardRoute),
+            element: withSuspense(adminDashboardRoute, <AdminContentSkeleton />),
           },
           {
             id: "admin-users",
             path: "users",
-            element: withSuspense(adminUsersRoute),
+            element: withSuspense(adminUsersRoute, <AdminContentSkeleton />),
           },
           {
             id: "admin-market",
             path: "market",
-            element: withSuspense(adminMarketRoute),
+            element: withSuspense(adminMarketRoute, <AdminContentSkeleton />),
           },
           {
             id: "admin-channel",
             path: "channel",
-            element: withSuspense(adminChannelRoute),
+            element: withSuspense(adminChannelRoute, <AdminContentSkeleton />),
           },
           {
             id: "admin-system",
             path: "system",
-            element: withSuspense(adminSystemRoute),
+            element: withSuspense(adminSystemRoute, <AdminContentSkeleton />),
           },
           {
             id: "admin-attachment",
             path: "attachment",
-            element: withSuspense(adminAttachmentRoute),
+            element: withSuspense(adminAttachmentRoute, <AdminContentSkeleton />),
           },
           {
             id: "admin-warm-up",
             path: "warmup",
-            element: withSuspense(adminWarmupRoute),
+            element: withSuspense(adminWarmupRoute, <AdminContentSkeleton />),
           },
           {
             id: "admin-charge",
             path: "charge",
-            element: withSuspense(adminChargeRoute),
+            element: withSuspense(adminChargeRoute, <AdminContentSkeleton />),
           },
           {
             id: "admin-broadcast",
             path: "broadcast",
-            element: withSuspense(adminBroadcastRoute),
+            element: withSuspense(adminBroadcastRoute, <AdminContentSkeleton />),
           },
           {
             id: "admin-subscription",
             path: "subscription",
-            element: withSuspense(adminSubscriptionRoute),
+            element: withSuspense(
+              adminSubscriptionRoute,
+              <AdminContentSkeleton />,
+            ),
           },
           {
             id: "admin-record",
             path: "record",
-            element: withSuspense(adminRecordRoute),
+            element: withSuspense(adminRecordRoute, <AdminContentSkeleton />),
           },
           {
             id: "admin-payment",
             path: "pay",
-            element: withSuspense(adminPaymentRoute),
+            element: withSuspense(adminPaymentRoute, <AdminContentSkeleton />),
           },
           {
             id: "admin-logger",
             path: "logger",
-            element: withSuspense(adminLoggerRoute),
+            element: withSuspense(adminLoggerRoute, <AdminContentSkeleton />),
           },
         ],
         ErrorBoundary: NotFound,
