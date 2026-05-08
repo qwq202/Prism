@@ -36,6 +36,16 @@ func TestGetHeaderUsesTokenPlanAPIKey(t *testing.T) {
 	}
 }
 
+func TestGetHeaderAddsBearerForCustomEndpoint(t *testing.T) {
+	headers := NewChatInstance("https://api.example.com", "sk-test").GetHeader()
+	if got := headers["api-key"]; got != "sk-test" {
+		t.Fatalf("expected api-key header, got %q", got)
+	}
+	if got := headers["Authorization"]; got != "Bearer sk-test" {
+		t.Fatalf("expected bearer authorization for custom endpoint, got %q", got)
+	}
+}
+
 func TestGetChatBodyPreservesXiaomiReasoningContent(t *testing.T) {
 	maxTokens := 1024
 	thinking := map[string]string{"type": "disabled"}
