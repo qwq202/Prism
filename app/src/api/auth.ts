@@ -66,7 +66,7 @@ export type AccountEmailForm = {
 };
 
 export type AccountPasswordForm = {
-  code: string;
+  old_password: string;
   password: string;
 };
 

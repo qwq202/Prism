@@ -43,8 +43,8 @@ type AccountEmailForm struct {
 }
 
 type AccountPasswordForm struct {
-	Code     string `form:"code" binding:"required"`
-	Password string `form:"password" binding:"required"`
+	OldPassword string `form:"old_password" json:"old_password" binding:"required"`
+	Password    string `form:"password" json:"password" binding:"required"`
 }
 
 type BuyForm struct {
@@ -325,12 +325,11 @@ func UpdateAccountPasswordAPI(c *gin.Context) {
 		return
 	}
 
-	if err := user.UpdatePasswordWithEmailCode(
-		c,
+	if err := user.UpdatePasswordWithOldPassword(
 		utils.GetDBFromContext(c),
 		utils.GetCacheFromContext(c),
+		form.OldPassword,
 		form.Password,
-		form.Code,
 	); err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"status": false,

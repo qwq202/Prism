@@ -354,7 +354,7 @@ function Account() {
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [emailForm, setEmailForm] = useState({ email: "", code: "" });
   const [passwordForm, setPasswordForm] = useState({
-    code: "",
+    oldPassword: "",
     password: "",
     repassword: "",
   });
@@ -388,18 +388,6 @@ function Account() {
     await sendCode(t, email, true);
   }
 
-  async function sendPasswordChangeCode() {
-    const email = info.email.trim();
-    if (!isEmailValid(email)) {
-      toast.error(t("error"), {
-        description: t("account.email-not-bound"),
-      });
-      return;
-    }
-
-    await sendCode(t, email);
-  }
-
   async function submitEmailChange() {
     const email = emailForm.email.trim();
     const code = emailForm.code.trim();
@@ -425,12 +413,14 @@ function Account() {
   }
 
   async function submitPasswordChange() {
-    const code = passwordForm.code.trim();
+    const oldPassword = passwordForm.oldPassword.trim();
     const password = passwordForm.password.trim();
     const repassword = passwordForm.repassword.trim();
 
-    if (code.length === 0) {
-      toast.error(t("error"), { description: t("account.code-required") });
+    if (!isTextInRange(oldPassword, 6, 36)) {
+      toast.error(t("error"), {
+        description: t("account.old-password-invalid"),
+      });
       return;
     }
 
@@ -448,12 +438,15 @@ function Account() {
       return;
     }
 
-    const resp = await updateAccountPassword({ code, password });
+    const resp = await updateAccountPassword({
+      old_password: oldPassword,
+      password,
+    });
     withNotify(t, resp, true, t("account.password-updated"));
 
     if (resp.status) {
       setPasswordDialogOpen(false);
-      setPasswordForm({ code: "", password: "", repassword: "" });
+      setPasswordForm({ oldPassword: "", password: "", repassword: "" });
     }
   }
 
@@ -642,32 +635,17 @@ function Account() {
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
-                        <div className="rounded-lg border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                          {t("account.send-code-to-current-email")}:{" "}
-                          <span className="text-foreground">
-                            {info.email || "-"}
-                          </span>
-                        </div>
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder={t("account.verification-code")}
-                            value={passwordForm.code}
-                            onChange={(e) =>
-                              setPasswordForm((prev) => ({
-                                ...prev,
-                                code: e.target.value,
-                              }))
-                            }
-                          />
-                          <Button
-                            variant="outline"
-                            className="shrink-0 min-w-20 whitespace-nowrap"
-                            loading
-                            onClick={sendPasswordChangeCode}
-                          >
-                            {t("auth.send-code")}
-                          </Button>
-                        </div>
+                        <Input
+                          type="password"
+                          placeholder={t("account.old-password")}
+                          value={passwordForm.oldPassword}
+                          onChange={(e) =>
+                            setPasswordForm((prev) => ({
+                              ...prev,
+                              oldPassword: e.target.value,
+                            }))
+                          }
+                        />
                         <Input
                           type="password"
                           placeholder={t("account.new-password")}

@@ -404,6 +404,29 @@ func (u *User) UpdatePasswordWithEmailCode(c *gin.Context, db *sql.DB, cache *re
 	return u.UpdatePassword(db, cache, password)
 }
 
+func (u *User) UpdatePasswordWithOldPassword(db *sql.DB, cache *redis.Client, oldPassword, password string) error {
+	oldPassword = strings.TrimSpace(oldPassword)
+	password = strings.TrimSpace(password)
+
+	if !utils.All(
+		validatePassword(oldPassword),
+		validatePassword(password),
+	) {
+		return errors.New("invalid password format")
+	}
+
+	var stored string
+	if err := globals.QueryRowDb(db, "SELECT password FROM auth WHERE id = ?", u.GetID(db)).Scan(&stored); err != nil {
+		return errors.New("invalid old password")
+	}
+
+	if ok, _ := utils.VerifyPassword(oldPassword, stored); !ok {
+		return errors.New("invalid old password")
+	}
+
+	return u.UpdatePassword(db, cache, password)
+}
+
 func (u *User) Validate(c *gin.Context) bool {
 	if u.Username == "" {
 		return false
