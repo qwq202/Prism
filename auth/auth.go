@@ -338,13 +338,70 @@ func (u *User) UpdatePassword(db *sql.DB, cache *redis.Client, password string) 
 
 	if _, err := globals.ExecDb(db, `
 			UPDATE auth SET password = ? WHERE id = ?
-			`, hash, u.ID); err != nil {
+			`, hash, u.GetID(db)); err != nil {
 		return err
 	}
 
 	cache.Del(context.Background(), fmt.Sprintf("nio:user:%s", u.Username))
 
 	return nil
+}
+
+func (u *User) UpdateEmail(c *gin.Context, db *sql.DB, cache *redis.Client, email, code string) error {
+	email = strings.TrimSpace(email)
+	code = strings.TrimSpace(code)
+
+	if !utils.All(
+		validateEmail(email),
+		validateCode(code),
+	) {
+		return errors.New("invalid email/code format")
+	}
+
+	if err := channel.SystemInstance.IsValidMail(email); err != nil {
+		return err
+	}
+
+	if strings.EqualFold(email, strings.TrimSpace(u.GetEmail(db))) {
+		return errors.New("new email is the same as current email")
+	}
+
+	if IsEmailExist(db, email) {
+		return errors.New("email is already taken")
+	}
+
+	if !checkCode(c, cache, email, code) {
+		return errors.New("invalid email verification code")
+	}
+
+	if _, err := globals.ExecDb(db, `
+			UPDATE auth SET email = ? WHERE id = ?
+			`, email, u.GetID(db)); err != nil {
+		return err
+	}
+
+	u.Email = email
+	return nil
+}
+
+func (u *User) UpdatePasswordWithEmailCode(c *gin.Context, db *sql.DB, cache *redis.Client, password, code string) error {
+	password = strings.TrimSpace(password)
+	code = strings.TrimSpace(code)
+	email := strings.TrimSpace(u.GetEmail(db))
+
+	if !utils.All(
+		validateEmail(email),
+		validateCode(code),
+		validatePassword(password),
+	) {
+		return errors.New("invalid email/code/password format")
+	}
+
+	if !checkCode(c, cache, email, code) {
+		return errors.New("invalid email verification code")
+	}
+
+	return u.UpdatePassword(db, cache, password)
 }
 
 func (u *User) Validate(c *gin.Context) bool {

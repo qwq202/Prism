@@ -6,6 +6,8 @@ func Register(app *gin.RouterGroup) {
 	app.Any("/", IndexAPI)
 	app.POST("/verify", VerifyAPI)
 	app.POST("/reset", ResetAPI)
+	app.POST("/account/email", UpdateAccountEmailAPI)
+	app.POST("/account/password", UpdateAccountPasswordAPI)
 	app.POST("/register", RegisterAPI)
 	app.POST("/login", LoginAPI)
 	app.POST("/state", StateAPI)

@@ -24,6 +24,8 @@ import {
   ExternalLink,
   HandIcon,
   HelpCircle,
+  KeyRound,
+  Mail,
   Plug,
   Power,
   RotateCw,
@@ -38,6 +40,9 @@ import { useEffectAsync } from "@/utils/hook.ts";
 import {
   getUserInfo,
   initialUserInfo,
+  sendCode,
+  updateAccountEmail,
+  updateAccountPassword,
   UserInfo,
 } from "@/api/auth.ts";
 import { CommonResponse, withNotify } from "@/api/common.ts";
@@ -62,9 +67,21 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog.tsx";
+import {
+  Dialog,
+  DialogAction,
+  DialogCancel,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog.tsx";
 import { toast } from "sonner";
 import Emoji from "@/components/Emoji";
 import { motion } from "framer-motion";
+import { isEmailValid, isTextInRange } from "@/utils/form.ts";
 
 type AccountCardProps = {
   title: string;
@@ -300,6 +317,94 @@ function Account() {
   };
   useEffectAsync(updateUserInfo, [auth]);
 
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [emailForm, setEmailForm] = useState({ email: "", code: "" });
+  const [passwordForm, setPasswordForm] = useState({
+    code: "",
+    password: "",
+    repassword: "",
+  });
+
+  async function sendEmailChangeCode() {
+    const email = emailForm.email.trim();
+    if (!isEmailValid(email)) {
+      toast.error(t("error"), { description: t("auth.invalid-email") });
+      return;
+    }
+
+    await sendCode(t, email, true);
+  }
+
+  async function sendPasswordChangeCode() {
+    const email = info.email.trim();
+    if (!isEmailValid(email)) {
+      toast.error(t("error"), {
+        description: t("account.email-not-bound"),
+      });
+      return;
+    }
+
+    await sendCode(t, email);
+  }
+
+  async function submitEmailChange() {
+    const email = emailForm.email.trim();
+    const code = emailForm.code.trim();
+
+    if (!isEmailValid(email)) {
+      toast.error(t("error"), { description: t("auth.invalid-email") });
+      return;
+    }
+
+    if (code.length === 0) {
+      toast.error(t("error"), { description: t("account.code-required") });
+      return;
+    }
+
+    const resp = await updateAccountEmail({ email, code });
+    withNotify(t, resp, true, t("account.email-updated"));
+
+    if (resp.status) {
+      setEmailDialogOpen(false);
+      setEmailForm({ email: "", code: "" });
+      await updateUserInfo();
+    }
+  }
+
+  async function submitPasswordChange() {
+    const code = passwordForm.code.trim();
+    const password = passwordForm.password.trim();
+    const repassword = passwordForm.repassword.trim();
+
+    if (code.length === 0) {
+      toast.error(t("error"), { description: t("account.code-required") });
+      return;
+    }
+
+    if (!isTextInRange(password, 6, 36)) {
+      toast.error(t("error"), {
+        description: t("account.password-invalid"),
+      });
+      return;
+    }
+
+    if (password !== repassword) {
+      toast.error(t("error"), {
+        description: t("account.password-mismatch"),
+      });
+      return;
+    }
+
+    const resp = await updateAccountPassword({ code, password });
+    withNotify(t, resp, true, t("account.password-updated"));
+
+    if (resp.status) {
+      setPasswordDialogOpen(false);
+      setPasswordForm({ code: "", password: "", repassword: "" });
+    }
+  }
+
   return (
     <ScrollArea
       className={`relative w-full h-full flex flex-col bg-background`}
@@ -326,14 +431,165 @@ function Account() {
                   {t("login")}
                 </Button>
               ) : (
-                <Button
-                  classNameWrapper={`ml-auto`}
-                  className={`flex flex-row items-center`}
-                  onClick={() => dispatch(logout())}
-                >
-                  <Undo2 className={`h-4 w-4 mr-1.5`} />
-                  {t("logout")}
-                </Button>
+                <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+                  <Dialog
+                    open={emailDialogOpen}
+                    onOpenChange={setEmailDialogOpen}
+                  >
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="default-sm"
+                        className="flex flex-row items-center"
+                      >
+                        <Mail className="h-4 w-4 mr-1.5" />
+                        {t("account.change-email")}
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>{t("account.change-email")}</DialogTitle>
+                        <DialogDescription>
+                          {t("account.change-email-description")}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="rounded-lg border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                          {t("account.current-email")}:{" "}
+                          <span className="text-foreground">
+                            {info.email || "-"}
+                          </span>
+                        </div>
+                        <Input
+                          placeholder={t("account.new-email")}
+                          value={emailForm.email}
+                          onChange={(e) =>
+                            setEmailForm((prev) => ({
+                              ...prev,
+                              email: e.target.value,
+                            }))
+                          }
+                        />
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder={t("account.verification-code")}
+                            value={emailForm.code}
+                            onChange={(e) =>
+                              setEmailForm((prev) => ({
+                                ...prev,
+                                code: e.target.value,
+                              }))
+                            }
+                          />
+                          <Button
+                            variant="outline"
+                            className="shrink-0"
+                            loading
+                            onClick={sendEmailChangeCode}
+                          >
+                            {t("auth.send-code")}
+                          </Button>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <DialogCancel>{t("cancel")}</DialogCancel>
+                        <DialogAction loading onClick={submitEmailChange}>
+                          {t("confirm")}
+                        </DialogAction>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Dialog
+                    open={passwordDialogOpen}
+                    onOpenChange={setPasswordDialogOpen}
+                  >
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="default-sm"
+                        className="flex flex-row items-center"
+                      >
+                        <KeyRound className="h-4 w-4 mr-1.5" />
+                        {t("account.change-password")}
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>
+                          {t("account.change-password")}
+                        </DialogTitle>
+                        <DialogDescription>
+                          {t("account.change-password-description")}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="rounded-lg border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                          {t("account.send-code-to-current-email")}:{" "}
+                          <span className="text-foreground">
+                            {info.email || "-"}
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder={t("account.verification-code")}
+                            value={passwordForm.code}
+                            onChange={(e) =>
+                              setPasswordForm((prev) => ({
+                                ...prev,
+                                code: e.target.value,
+                              }))
+                            }
+                          />
+                          <Button
+                            variant="outline"
+                            className="shrink-0"
+                            loading
+                            onClick={sendPasswordChangeCode}
+                          >
+                            {t("auth.send-code")}
+                          </Button>
+                        </div>
+                        <Input
+                          type="password"
+                          placeholder={t("account.new-password")}
+                          value={passwordForm.password}
+                          onChange={(e) =>
+                            setPasswordForm((prev) => ({
+                              ...prev,
+                              password: e.target.value,
+                            }))
+                          }
+                        />
+                        <Input
+                          type="password"
+                          placeholder={t("account.confirm-new-password")}
+                          value={passwordForm.repassword}
+                          onChange={(e) =>
+                            setPasswordForm((prev) => ({
+                              ...prev,
+                              repassword: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <DialogFooter>
+                        <DialogCancel>{t("cancel")}</DialogCancel>
+                        <DialogAction loading onClick={submitPasswordChange}>
+                          {t("confirm")}
+                        </DialogAction>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Button
+                    className={`flex flex-row items-center`}
+                    onClick={() => dispatch(logout())}
+                  >
+                    <Undo2 className={`h-4 w-4 mr-1.5`} />
+                    {t("logout")}
+                  </Button>
+                </div>
               )
             }
           >

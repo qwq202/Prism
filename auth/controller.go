@@ -37,6 +37,16 @@ type ResetForm struct {
 	Password string `form:"password" binding:"required"`
 }
 
+type AccountEmailForm struct {
+	Email string `form:"email" binding:"required"`
+	Code  string `form:"code" binding:"required"`
+}
+
+type AccountPasswordForm struct {
+	Code     string `form:"code" binding:"required"`
+	Password string `form:"password" binding:"required"`
+}
+
 type BuyForm struct {
 	Quota int `json:"quota" binding:"required"`
 }
@@ -254,6 +264,74 @@ func ResetAPI(c *gin.Context) {
 	}
 
 	if err := Reset(c, form); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": true,
+	})
+}
+
+func UpdateAccountEmailAPI(c *gin.Context) {
+	user := RequireAuth(c)
+	if user == nil {
+		return
+	}
+
+	var form AccountEmailForm
+	if err := c.ShouldBind(&form); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "bad request",
+		})
+		return
+	}
+
+	if err := user.UpdateEmail(
+		c,
+		utils.GetDBFromContext(c),
+		utils.GetCacheFromContext(c),
+		form.Email,
+		form.Code,
+	); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": true,
+	})
+}
+
+func UpdateAccountPasswordAPI(c *gin.Context) {
+	user := RequireAuth(c)
+	if user == nil {
+		return
+	}
+
+	var form AccountPasswordForm
+	if err := c.ShouldBind(&form); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "bad request",
+		})
+		return
+	}
+
+	if err := user.UpdatePasswordWithEmailCode(
+		c,
+		utils.GetDBFromContext(c),
+		utils.GetCacheFromContext(c),
+		form.Password,
+		form.Code,
+	); err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"status": false,
 			"error":  err.Error(),

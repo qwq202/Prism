@@ -60,6 +60,16 @@ export type ResetResponse = {
   error: string;
 };
 
+export type AccountEmailForm = {
+  email: string;
+  code: string;
+};
+
+export type AccountPasswordForm = {
+  code: string;
+  password: string;
+};
+
 export type UserInfo = {
   id: number;
   register_days: number;
@@ -123,6 +133,34 @@ export async function doReset(data: ResetForm): Promise<ResetResponse> {
   try {
     const response = await axios.post("/reset", data);
     return response.data as ResetResponse;
+  } catch (e) {
+    return {
+      status: false,
+      error: getErrorMessage(e),
+    };
+  }
+}
+
+export async function updateAccountEmail(
+  data: AccountEmailForm,
+): Promise<VerifyResponse> {
+  try {
+    const response = await axios.post("/account/email", data);
+    return response.data as VerifyResponse;
+  } catch (e) {
+    return {
+      status: false,
+      error: getErrorMessage(e),
+    };
+  }
+}
+
+export async function updateAccountPassword(
+  data: AccountPasswordForm,
+): Promise<VerifyResponse> {
+  try {
+    const response = await axios.post("/account/password", data);
+    return response.data as VerifyResponse;
   } catch (e) {
     return {
       status: false,
