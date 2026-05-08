@@ -55,6 +55,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { DialogClose } from "@radix-ui/react-dialog";
 import { ChannelTypeAvatar } from "@/components/ModelAvatar.tsx";
 import type { ChannelDispatch } from "@/components/admin/ChannelSettings.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
 
 type ChannelTableProps = {
   display: boolean;
@@ -120,7 +121,10 @@ function HealthBadge({ stat }: { stat: ChannelStat | undefined }) {
 
   return (
     <span
-      className={cn("inline-flex items-center gap-1 text-xs select-none whitespace-nowrap", color)}
+      className={cn(
+        "inline-flex items-center gap-1 text-xs select-none whitespace-nowrap",
+        color,
+      )}
       title={`今日 ${total} 次请求，${stat.errors} 次错误`}
     >
       <Circle className="h-2 w-2 fill-current shrink-0" />
@@ -142,15 +146,25 @@ function HealthSummaryBar({
 }) {
   const active = channels.filter((c) => c.state);
   const withData = active.filter(
-    (c) => statsMap.has(c.id) && (statsMap.get(c.id)!.requests + statsMap.get(c.id)!.errors) > 0,
+    (c) =>
+      statsMap.has(c.id) &&
+      statsMap.get(c.id)!.requests + statsMap.get(c.id)!.errors > 0,
   );
-  const healthy = withData.filter((c) => (statsMap.get(c.id)?.error_rate ?? 0) === 0);
+  const healthy = withData.filter(
+    (c) => (statsMap.get(c.id)?.error_rate ?? 0) === 0,
+  );
   const warn = withData.filter((c) => {
     const r = statsMap.get(c.id)?.error_rate ?? 0;
     return r > 0 && r < 0.1;
   });
-  const critical = withData.filter((c) => (statsMap.get(c.id)?.error_rate ?? 0) >= 0.1);
-  const idle = active.filter((c) => !statsMap.has(c.id) || (statsMap.get(c.id)!.requests + statsMap.get(c.id)!.errors) === 0);
+  const critical = withData.filter(
+    (c) => (statsMap.get(c.id)?.error_rate ?? 0) >= 0.1,
+  );
+  const idle = active.filter(
+    (c) =>
+      !statsMap.has(c.id) ||
+      statsMap.get(c.id)!.requests + statsMap.get(c.id)!.errors === 0,
+  );
 
   if (active.length === 0) return null;
 
@@ -185,10 +199,101 @@ function HealthSummaryBar({
               无流量 {idle.length}
             </span>
           )}
-          <span className="ml-auto opacity-50">共 {active.length} 个启用渠道</span>
+          <span className="ml-auto opacity-50">
+            共 {active.length} 个启用渠道
+          </span>
         </>
       )}
     </div>
+  );
+}
+
+function ChannelTableSkeleton({
+  merge,
+}: {
+  merge: (key: string, ...classNames: string[]) => string;
+}) {
+  const rows = Array.from({ length: 4 });
+
+  return (
+    <>
+      {rows.map((_, index) => (
+        <TableRow
+          key={index}
+          className="pointer-events-none hover:bg-transparent"
+        >
+          <TableCell className={merge("id", "channel-id")}>
+            <Skeleton className="h-5 w-10" />
+          </TableCell>
+          <TableCell className={merge("name")}>
+            <Skeleton className="h-5 w-24" />
+          </TableCell>
+          <TableCell className={merge("type")}>
+            <Skeleton className="h-7 w-32 rounded-full" />
+          </TableCell>
+          <TableCell className={merge("priority")}>
+            <Skeleton className="h-5 w-8" />
+          </TableCell>
+          <TableCell className={merge("weight")}>
+            <Skeleton className="h-5 w-8" />
+          </TableCell>
+          <TableCell className={merge("secret-number")}>
+            <Skeleton className="h-5 w-8" />
+          </TableCell>
+          <TableCell className={merge("retry-name")}>
+            <Skeleton className="h-5 w-8" />
+          </TableCell>
+          <TableCell className={merge("health")}>
+            <Skeleton className="h-5 w-24" />
+          </TableCell>
+          <TableCell className={merge("state")}>
+            <Skeleton className="h-5 w-5 rounded-full" />
+          </TableCell>
+          <TableCell className={merge("action")}>
+            <div className="flex flex-row flex-wrap gap-2">
+              <Skeleton className="h-9 w-9" />
+              <Skeleton className="h-9 w-9" />
+              <Skeleton className="h-9 w-9" />
+            </div>
+          </TableCell>
+        </TableRow>
+      ))}
+    </>
+  );
+}
+
+function ChannelCardSkeleton() {
+  return (
+    <>
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div
+          key={index}
+          className="flex flex-col rounded-md border p-4 select-none"
+        >
+          <div className="flex flex-row items-center">
+            <Skeleton className="mr-2 h-3 w-3 rounded-full" />
+            <Skeleton className="h-5 w-28" />
+            <Skeleton className="ml-2 h-5 w-12" />
+            <Skeleton className="ml-auto h-6 w-24 rounded-full" />
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <Skeleton className="h-5 w-28" />
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="h-5 w-24" />
+          </div>
+          <div className="mt-3 border-t pt-3">
+            <Skeleton className="h-5 w-28" />
+          </div>
+          <div className="mt-3 flex flex-row items-center gap-2">
+            <Skeleton className="h-9 w-9" />
+            <Skeleton className="h-9 w-9" />
+            <Skeleton className="h-9 w-9" />
+            <Skeleton className="ml-auto h-7 w-7 rounded-md" />
+          </div>
+        </div>
+      ))}
+    </>
   );
 }
 
@@ -362,6 +467,7 @@ function ChannelTable({
       );
     });
   }, [search, data]);
+  const initialLoading = loading && (data || []).length === 0;
 
   return (
     display && (
@@ -470,40 +576,162 @@ function ChannelTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {channels.map((chan, idx) => (
-                <TableRow key={idx}>
-                  <TableCell className={merge("id", `channel-id select-none`)}>
-                    #{chan.id}
-                  </TableCell>
-                  <TableCell className={merge("name")}>{chan.name}</TableCell>
-                  <TableCell className={merge("type")}>
-                    <TypeBadge type={chan.type} />
-                  </TableCell>
-                  <TableCell className={merge("priority")}>
-                    {chan.priority}
-                  </TableCell>
-                  <TableCell className={merge("weight")}>
-                    {chan.weight}
-                  </TableCell>
-                  <TableCell className={merge("secret-number")}>
-                    {chan.secret.split("\n").filter((x) => x).length}
-                  </TableCell>
-                  <TableCell className={merge("retry-name")}>
-                    {chan.retry}
-                  </TableCell>
-                  <TableCell className={merge("health")}>
+              {initialLoading ? (
+                <ChannelTableSkeleton merge={merge} />
+              ) : (
+                channels.map((chan, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell
+                      className={merge("id", `channel-id select-none`)}
+                    >
+                      #{chan.id}
+                    </TableCell>
+                    <TableCell className={merge("name")}>{chan.name}</TableCell>
+                    <TableCell className={merge("type")}>
+                      <TypeBadge type={chan.type} />
+                    </TableCell>
+                    <TableCell className={merge("priority")}>
+                      {chan.priority}
+                    </TableCell>
+                    <TableCell className={merge("weight")}>
+                      {chan.weight}
+                    </TableCell>
+                    <TableCell className={merge("secret-number")}>
+                      {chan.secret.split("\n").filter((x) => x).length}
+                    </TableCell>
+                    <TableCell className={merge("retry-name")}>
+                      {chan.retry}
+                    </TableCell>
+                    <TableCell className={merge("health")}>
+                      <HealthBadge stat={statsMap.get(chan.id)} />
+                    </TableCell>
+                    <TableCell className={merge("state")}>
+                      {chan.state ? (
+                        <Check className={`h-4 w-4 text-green-500`} />
+                      ) : (
+                        <X className={`h-4 w-4 text-destructive`} />
+                      )}
+                    </TableCell>
+                    <TableCell
+                      className={merge(
+                        "action",
+                        `flex flex-row flex-wrap gap-2`,
+                      )}
+                    >
+                      <OperationAction
+                        tooltip={t("admin.channels.edit")}
+                        onClick={() => {
+                          setEnabled(true);
+                          setId(chan.id);
+                        }}
+                      >
+                        <Settings2 className={`h-4 w-4`} />
+                      </OperationAction>
+                      {chan.state ? (
+                        <OperationAction
+                          tooltip={t("admin.channels.disable")}
+                          variant={`destructive`}
+                          onClick={async () => {
+                            const resp = await deactivateChannel(chan.id);
+                            withNotify(t, resp, true);
+                            await refresh();
+                          }}
+                        >
+                          <X className={`h-4 w-4`} />
+                        </OperationAction>
+                      ) : (
+                        <OperationAction
+                          tooltip={t("admin.channels.enable")}
+                          onClick={async () => {
+                            const resp = await activateChannel(chan.id);
+                            withNotify(t, resp, true);
+                            await refresh();
+                          }}
+                        >
+                          <Check className={`h-4 w-4`} />
+                        </OperationAction>
+                      )}
+                      <OperationAction
+                        tooltip={t("admin.channels.delete")}
+                        variant={`destructive`}
+                        onClick={async () => {
+                          const resp = await deleteChannel(chan.id);
+                          withNotify(t, resp, true);
+                          await refresh();
+                        }}
+                      >
+                        <Trash className={`h-4 w-4`} />
+                      </OperationAction>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        ) : (
+          <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 mt-4`}>
+            {initialLoading ? (
+              <ChannelCardSkeleton />
+            ) : (
+              channels.map((chan, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => {
+                    setEnabled(true);
+                    setId(chan.id);
+                  }}
+                  className={`flex flex-col p-4 border rounded-md cursor-pointer select-none hover:bg-background-hover transition`}
+                >
+                  <div className={`flex flex-row items-center w-full`}>
+                    <Circle
+                      className={cn(
+                        `h-3 w-3 stroke-[3.5] mr-1.5`,
+                        chan.state ? `text-green-500` : `text-destructive`,
+                      )}
+                    />
+                    <span className={`mr-1`}>{chan.name}</span>
+                    <Badge variant={`outline`} className={`select-none`}>
+                      #{chan.id}
+                    </Badge>
+                    <TypeBadge type={chan.type} className={`ml-auto`} />
+                  </div>
+                  <div className={`mt-1 grid grid-cols-2 gap-1`}>
+                    <div className={`flex flex-row items-center`}>
+                      <ArrowDown10 className={`h-3.5 w-3.5`} />
+                      <Label className={`whitespace-nowrap ml-1 mr-2`}>
+                        {t("admin.channels.priority")}
+                      </Label>
+                      <span className={`font-bold`}>{chan.priority}</span>
+                    </div>
+                    <div className={`flex flex-row items-center`}>
+                      <Weight className={`h-3.5 w-3.5`} />
+                      <Label className={`whitespace-nowrap ml-1 mr-2`}>
+                        {t("admin.channels.weight")}
+                      </Label>
+                      <span className={`font-bold`}>{chan.weight}</span>
+                    </div>
+                    <div className={`flex flex-row items-center`}>
+                      <SquareAsterisk className={`h-3.5 w-3.5`} />
+                      <Label className={`whitespace-nowrap ml-1 mr-2`}>
+                        {t("admin.channels.secret-number")}
+                      </Label>
+                      <span className={`font-bold`}>
+                        {chan.secret.split("\n").filter((x) => x).length}
+                      </span>
+                    </div>
+                    <div className={`flex flex-row items-center`}>
+                      <Workflow className={`h-3.5 w-3.5`} />
+                      <Label className={`whitespace-nowrap ml-1 mr-2`}>
+                        {t("admin.channels.retry-name")}
+                      </Label>
+                      <span className={`font-bold`}>{chan.retry}</span>
+                    </div>
+                  </div>
+                  {/* Health row in card view */}
+                  <div className="mt-2 pt-2 border-t">
                     <HealthBadge stat={statsMap.get(chan.id)} />
-                  </TableCell>
-                  <TableCell className={merge("state")}>
-                    {chan.state ? (
-                      <Check className={`h-4 w-4 text-green-500`} />
-                    ) : (
-                      <X className={`h-4 w-4 text-destructive`} />
-                    )}
-                  </TableCell>
-                  <TableCell
-                    className={merge("action", `flex flex-row flex-wrap gap-2`)}
-                  >
+                  </div>
+                  <div className={`flex flex-row items-center space-x-1 mt-2`}>
                     <OperationAction
                       tooltip={t("admin.channels.edit")}
                       onClick={() => {
@@ -548,121 +776,12 @@ function ChannelTable({
                     >
                       <Trash className={`h-4 w-4`} />
                     </OperationAction>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        ) : (
-          <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 mt-4`}>
-            {channels.map((chan, idx) => (
-              <div
-                key={idx}
-                onClick={() => {
-                  setEnabled(true);
-                  setId(chan.id);
-                }}
-                className={`flex flex-col p-4 border rounded-md cursor-pointer select-none hover:bg-background-hover transition`}
-              >
-                <div className={`flex flex-row items-center w-full`}>
-                  <Circle
-                    className={cn(
-                      `h-3 w-3 stroke-[3.5] mr-1.5`,
-                      chan.state ? `text-green-500` : `text-destructive`,
-                    )}
-                  />
-                  <span className={`mr-1`}>{chan.name}</span>
-                  <Badge variant={`outline`} className={`select-none`}>
-                    #{chan.id}
-                  </Badge>
-                  <TypeBadge type={chan.type} className={`ml-auto`} />
-                </div>
-                <div className={`mt-1 grid grid-cols-2 gap-1`}>
-                  <div className={`flex flex-row items-center`}>
-                    <ArrowDown10 className={`h-3.5 w-3.5`} />
-                    <Label className={`whitespace-nowrap ml-1 mr-2`}>
-                      {t("admin.channels.priority")}
-                    </Label>
-                    <span className={`font-bold`}>{chan.priority}</span>
-                  </div>
-                  <div className={`flex flex-row items-center`}>
-                    <Weight className={`h-3.5 w-3.5`} />
-                    <Label className={`whitespace-nowrap ml-1 mr-2`}>
-                      {t("admin.channels.weight")}
-                    </Label>
-                    <span className={`font-bold`}>{chan.weight}</span>
-                  </div>
-                  <div className={`flex flex-row items-center`}>
-                    <SquareAsterisk className={`h-3.5 w-3.5`} />
-                    <Label className={`whitespace-nowrap ml-1 mr-2`}>
-                      {t("admin.channels.secret-number")}
-                    </Label>
-                    <span className={`font-bold`}>
-                      {chan.secret.split("\n").filter((x) => x).length}
-                    </span>
-                  </div>
-                  <div className={`flex flex-row items-center`}>
-                    <Workflow className={`h-3.5 w-3.5`} />
-                    <Label className={`whitespace-nowrap ml-1 mr-2`}>
-                      {t("admin.channels.retry-name")}
-                    </Label>
-                    <span className={`font-bold`}>{chan.retry}</span>
+                    <div className={`grow`} />
+                    <ChannelTypeAvatar type={chan.type} size={28} />
                   </div>
                 </div>
-                {/* Health row in card view */}
-                <div className="mt-2 pt-2 border-t">
-                  <HealthBadge stat={statsMap.get(chan.id)} />
-                </div>
-                <div className={`flex flex-row items-center space-x-1 mt-2`}>
-                  <OperationAction
-                    tooltip={t("admin.channels.edit")}
-                    onClick={() => {
-                      setEnabled(true);
-                      setId(chan.id);
-                    }}
-                  >
-                    <Settings2 className={`h-4 w-4`} />
-                  </OperationAction>
-                  {chan.state ? (
-                    <OperationAction
-                      tooltip={t("admin.channels.disable")}
-                      variant={`destructive`}
-                      onClick={async () => {
-                        const resp = await deactivateChannel(chan.id);
-                        withNotify(t, resp, true);
-                        await refresh();
-                      }}
-                    >
-                      <X className={`h-4 w-4`} />
-                    </OperationAction>
-                  ) : (
-                    <OperationAction
-                      tooltip={t("admin.channels.enable")}
-                      onClick={async () => {
-                        const resp = await activateChannel(chan.id);
-                        withNotify(t, resp, true);
-                        await refresh();
-                      }}
-                    >
-                      <Check className={`h-4 w-4`} />
-                    </OperationAction>
-                  )}
-                  <OperationAction
-                    tooltip={t("admin.channels.delete")}
-                    variant={`destructive`}
-                    onClick={async () => {
-                      const resp = await deleteChannel(chan.id);
-                      withNotify(t, resp, true);
-                      await refresh();
-                    }}
-                  >
-                    <Trash className={`h-4 w-4`} />
-                  </OperationAction>
-                  <div className={`grow`} />
-                  <ChannelTypeAvatar type={chan.type} size={28} />
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         )}
       </div>
