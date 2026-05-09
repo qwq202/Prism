@@ -13,6 +13,9 @@ declare global {
 
   interface Tauri {
     window?: {
+      getCurrentWindow?: () => {
+        theme?: () => Promise<"dark" | "light" | null>;
+      };
       appWindow?: {
         theme?: () => Promise<"dark" | "light" | null>;
       };

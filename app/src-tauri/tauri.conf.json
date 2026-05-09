@@ -3,75 +3,78 @@
   "build": {
     "beforeBuildCommand": "VITE_DESKTOP_BACKEND_ENDPOINT=https://prism.qunqin.org pnpm build",
     "beforeDevCommand": "VITE_DESKTOP_BACKEND_ENDPOINT=https://prism.qunqin.org pnpm exec vite --host localhost --port 1420 --strictPort",
-    "devPath": "http://localhost:1420",
-    "distDir": "../dist",
-    "withGlobalTauri": true
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420"
   },
-  "package": {
-    "productName": "Prism",
-    "version": "0.1.2"
-  },
-  "tauri": {
-    "allowlist": {
-      "all": false
+  "bundle": {
+    "active": true,
+    "category": "DeveloperTool",
+    "copyright": "",
+    "targets": "all",
+    "externalBin": [],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
     },
-    "bundle": {
-      "active": true,
-      "category": "DeveloperTool",
-      "copyright": "",
-      "deb": {
-        "depends": []
-      },
-      "externalBin": [],
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
-      ],
-      "identifier": "com.prism.app",
-      "longDescription": "",
-      "macOS": {
-        "entitlements": null,
-        "exceptionDomain": "",
-        "frameworks": [],
-        "providerShortName": null,
-        "signingIdentity": null
-      },
-      "resources": [],
-      "shortDescription": "",
-      "targets": "all",
-      "windows": {
-        "certificateThumbprint": null,
-        "digestAlgorithm": "sha256",
-        "timestampUrl": ""
+    "longDescription": "",
+    "macOS": {
+      "entitlements": null,
+      "exceptionDomain": "",
+      "frameworks": [],
+      "providerShortName": null,
+      "signingIdentity": null,
+      "dmg": {
+        "background": "icons/dmg-background.png",
+        "windowSize": {
+          "width": 760,
+          "height": 440
+        },
+        "appPosition": {
+          "x": 190,
+          "y": 230
+        },
+        "applicationFolderPosition": {
+          "x": 570,
+          "y": 230
+        }
       }
     },
-    "security": {
-      "csp": null
-    },
-    "updater": {
-      "active": false,
-      "endpoints": [
-        "https://github.com/qwq202/Prism/releases/latest/download/latest.json"
-      ],
-      "dialog": false,
-      "windows": {
-        "installMode": "passive"
-      },
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDExREFBNEEwODA0MzIwOTYKUldTV0lFT0FvS1RhRWJSc1VTMFluOVl6VGFVNThyaVhyLyt4TnhrbTlBUHYyRWZWRXgzSDYrWGEK"
-    },
+    "resources": [],
+    "shortDescription": "",
+    "linux": {
+      "deb": {
+        "depends": []
+      }
+    }
+  },
+  "productName": "Prism",
+  "mainBinaryName": "Prism",
+  "version": "0.1.2",
+  "identifier": "org.qunqin.prism",
+  "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "fullscreen": false,
         "height": 600,
         "resizable": true,
         "title": "Prism",
-        "width": 1000
+        "width": 1000,
+        "useHttpsScheme": true
       }
     ],
-    "systemTray": {
+    "security": {
+      "csp": null
+    },
+    "trayIcon": {
       "iconPath": "icons/icon.png",
       "iconAsTemplate": true
     }

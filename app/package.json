@@ -89,7 +89,7 @@
   },
   "devDependencies": {
     "@tailwindcss/forms": "^0.5.7",
-    "@tauri-apps/cli": "^1.5.6",
+    "@tauri-apps/cli": "^2.11.1",
     "@types/node": "^20.5.9",
     "@types/react": "^18.2.15",
     "@types/react-beautiful-dnd": "^13.1.8",

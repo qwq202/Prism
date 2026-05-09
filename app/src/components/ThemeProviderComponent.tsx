@@ -40,7 +40,10 @@ export function ThemeProvider({
 
     const resolveSystemTheme = async (): Promise<ResolvedTheme> => {
       try {
-        const tauriTheme = await window.__TAURI__?.window?.appWindow?.theme?.();
+        const currentWindow =
+          window.__TAURI__?.window?.getCurrentWindow?.() ||
+          window.__TAURI__?.window?.appWindow;
+        const tauriTheme = await currentWindow?.theme?.();
         if (tauriTheme === "dark" || tauriTheme === "light") {
           return tauriTheme;
         }
