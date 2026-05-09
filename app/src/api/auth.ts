@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getErrorMessage } from "@/utils/base.ts";
+import { localizeError } from "@/utils/error.ts";
 import { isEmailValid } from "@/utils/form.ts";
 import { toast } from "sonner";
 import type { TFunction } from "i18next";
@@ -344,7 +345,9 @@ export async function sendCode(
   const res = await doVerify(email, checkout);
   if (!res.status)
     toast.error(t("auth.send-code-failed"), {
-      description: t("auth.send-code-failed-prompt", { reason: res.error }),
+      description: t("auth.send-code-failed-prompt", {
+        reason: localizeError(t, res.error),
+      }),
     });
   else
     toast.info(t("auth.send-code-success"), {

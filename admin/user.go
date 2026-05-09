@@ -265,6 +265,85 @@ func banUser(db *sql.DB, id int64, isBanned bool) error {
 	return err
 }
 
+func clearDeletedUserCache(cache *redis.Client, id int64) error {
+	if cache == nil {
+		return nil
+	}
+
+	ctx := context.Background()
+	if err := clearUserCache(cache); err != nil {
+		return err
+	}
+
+	iter := cache.Scan(ctx, 0, fmt.Sprintf("usage-*:%d", id), 100).Iterator()
+	for iter.Next(ctx) {
+		if err := cache.Del(ctx, iter.Val()).Err(); err != nil {
+			return fmt.Errorf("failed to delete cache key %s: %v", iter.Val(), err)
+		}
+	}
+	return iter.Err()
+}
+
+func deleteUser(db *sql.DB, cache *redis.Client, id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("invalid user id")
+	}
+
+	var exists int64
+	if err := globals.QueryRowDb(db, "SELECT COUNT(*) FROM auth WHERE id = ?", id).Scan(&exists); err != nil {
+		return err
+	}
+	if exists == 0 {
+		return fmt.Errorf("user not found")
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	queries := []string{
+		"UPDATE invitation SET used = ?, used_id = NULL WHERE used_id = ?",
+		"DELETE FROM package WHERE user_id = ?",
+		"DELETE FROM quota WHERE user_id = ?",
+		"DELETE FROM sharing WHERE user_id = ?",
+		"DELETE FROM conversation WHERE user_id = ?",
+		"DELETE FROM memories WHERE user_id = ?",
+		"DELETE FROM mask WHERE user_id = ?",
+		"DELETE FROM subscription WHERE user_id = ?",
+		"DELETE FROM apikey WHERE user_id = ?",
+		"DELETE FROM passkey_credential WHERE user_id = ?",
+		"DELETE FROM broadcast WHERE poster_id = ?",
+		"DELETE FROM billing WHERE user_id = ?",
+		"DELETE FROM payment_orders WHERE user_id = ?",
+		"DELETE FROM auth WHERE id = ?",
+	}
+
+	for idx, query := range queries {
+		if idx == 0 {
+			_, err = tx.Exec(globals.PreflightSql(query), false, id)
+		} else {
+			_, err = tx.Exec(globals.PreflightSql(query), id)
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
+
+	return clearDeletedUserCache(cache, id)
+}
+
 func batchUsers(db *sql.DB, ids []int64, action string, value float32) error {
 	switch action {
 	case "ban", "unban", "add_quota":

@@ -3,15 +3,18 @@ import { Moon, Sun, Monitor } from "lucide-react";
 
 import { Button } from "./ui/button";
 import {
-  activeTheme,
   getNextTheme,
   getTheme,
   Theme,
   ThemeProviderContext,
   useTheme,
 } from "@/components/ThemeProviderState.ts";
+import { setMemory } from "@/utils/memory.ts";
+import { themeEvent } from "@/events/theme.ts";
 
 export type { Theme } from "@/components/ThemeProviderState.ts";
+
+type ResolvedTheme = "dark" | "light";
 
 type ThemeProviderProps = {
   children?: ReactNode;
@@ -28,31 +31,77 @@ export function ThemeProvider({
 
   useEffect(() => {
     const root = window.document.documentElement;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    let disposed = false;
+    let appliedTheme: ResolvedTheme | null = null;
 
-    root.classList.remove("light", "dark");
+    const browserSystemTheme = (): ResolvedTheme =>
+      media.matches ? "dark" : "light";
 
-    if (theme === "system") {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
-        .matches
-        ? "dark"
-        : "light";
+    const resolveSystemTheme = async (): Promise<ResolvedTheme> => {
+      try {
+        const tauriTheme = await window.__TAURI__?.window?.appWindow?.theme?.();
+        if (tauriTheme === "dark" || tauriTheme === "light") {
+          return tauriTheme;
+        }
+      } catch {
+        // Browser mode and older WebViews fall back to matchMedia.
+      }
 
-      root.classList.add(systemTheme);
-      return;
+      return browserSystemTheme();
+    };
+
+    const applyTheme = async () => {
+      const resolvedTheme =
+        theme === "system" ? await resolveSystemTheme() : theme;
+
+      if (disposed) return;
+      if (appliedTheme === resolvedTheme) return;
+
+      root.classList.remove("light", "dark");
+      root.classList.add(resolvedTheme);
+      appliedTheme = resolvedTheme;
+      themeEvent.emit(resolvedTheme);
+    };
+
+    void applyTheme();
+
+    if (theme !== "system") {
+      return () => {
+        disposed = true;
+      };
     }
 
-    root.classList.add(theme);
+    const handleSystemThemeChange = () => {
+      void applyTheme();
+    };
+
+    media.addEventListener?.("change", handleSystemThemeChange);
+    media.addListener?.(handleSystemThemeChange);
+    window.addEventListener("focus", handleSystemThemeChange);
+    document.addEventListener("visibilitychange", handleSystemThemeChange);
+
+    const timer = window.setInterval(handleSystemThemeChange, 1500);
+
+    return () => {
+      disposed = true;
+      media.removeEventListener?.("change", handleSystemThemeChange);
+      media.removeListener?.(handleSystemThemeChange);
+      window.removeEventListener("focus", handleSystemThemeChange);
+      document.removeEventListener("visibilitychange", handleSystemThemeChange);
+      window.clearInterval(timer);
+    };
   }, [theme]);
 
   const value = {
     theme,
     setTheme: (newTheme: Theme) => {
-      activeTheme(newTheme);
+      setMemory("theme", newTheme);
       setTheme(newTheme);
     },
     toggleTheme: () => {
       const nextTheme: Theme = getNextTheme(theme);
-      activeTheme(nextTheme);
+      setMemory("theme", nextTheme);
       setTheme(nextTheme);
     },
   };

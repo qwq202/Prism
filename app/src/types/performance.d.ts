@@ -11,8 +11,16 @@ declare global {
     memory: PerformanceMemory;
   }
 
+  interface Tauri {
+    window?: {
+      appWindow?: {
+        theme?: () => Promise<"dark" | "light" | null>;
+      };
+    };
+  }
+
   interface Window {
-    __TAURI__: Tauri;
+    __TAURI__?: Tauri;
   }
 }
 

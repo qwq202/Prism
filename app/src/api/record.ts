@@ -2,6 +2,8 @@ import { CommonResponse } from "@/api/common.ts";
 import axios from "axios";
 
 export type Record = {
+  id: number;
+  user_id: number;
   username: string;
   type: string;
   token_name: string;
@@ -40,6 +42,7 @@ export type RecordQuery = {
   model?: string;
   type?: RecordType;
   show_channel?: boolean;
+  self?: boolean;
 };
 
 type ListRecordsResponse = CommonResponse & {
@@ -83,9 +86,11 @@ export async function listRecords(
   }
 }
 
-export async function getRecordStats(): Promise<RecordStatsResponse> {
+export async function getRecordStats(
+  options?: Pick<RecordQuery, "self">,
+): Promise<RecordStatsResponse> {
   try {
-    const resp = await axios.post(`/record/stats`);
+    const resp = await axios.post(`/record/stats`, options ?? {});
     return resp.data as RecordStatsResponse;
   } catch (e) {
     return {

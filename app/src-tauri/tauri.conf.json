@@ -1,14 +1,15 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "build": {
-    "beforeBuildCommand": "pnpm build --mode deeptrain",
-    "beforeDevCommand": "pnpm dev",
-    "devPath": "http://localhost:5173",
-    "distDir": "../dist"
+    "beforeBuildCommand": "pnpm build",
+    "beforeDevCommand": "pnpm exec vite --host localhost --port 1420 --strictPort",
+    "devPath": "http://localhost:1420",
+    "distDir": "../dist",
+    "withGlobalTauri": true
   },
   "package": {
     "productName": "Prism",
-    "version": "4.0.0"
+    "version": "0.1.1"
   },
   "tauri": {
     "allowlist": {
@@ -51,9 +52,9 @@
       "csp": null
     },
     "updater": {
-      "active": true,
+      "active": false,
       "endpoints": [
-        "https://github.com/coaidev/coai/releases/latest/download/latest.json"
+        "https://github.com/qwq202/Prism/releases/latest/download/latest.json"
       ],
       "dialog": false,
       "windows": {

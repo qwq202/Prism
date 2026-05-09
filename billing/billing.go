@@ -52,6 +52,7 @@ type RecordQuery struct {
 	Model       string `json:"model"`
 	Type        string `json:"type"`
 	ShowChannel bool   `json:"show_channel"`
+	Self        bool   `json:"self"`
 }
 
 type RecordData struct {
@@ -141,9 +142,9 @@ func recordLikeFilter(value string) string {
 }
 
 func buildRecordFilterArgs(isAdmin bool, userId int64, query RecordQuery) ([]interface{}, error) {
-	userScopeEnabled := !isAdmin
-	adminUserEnabled := isAdmin && query.UserId > 0
-	usernameEnabled := isAdmin && query.UserId <= 0 && query.Username != ""
+	userScopeEnabled := !isAdmin || query.Self
+	adminUserEnabled := isAdmin && !query.Self && query.UserId > 0
+	usernameEnabled := isAdmin && !query.Self && query.UserId <= 0 && query.Username != ""
 
 	startEnabled := query.StartTime != ""
 	startTime := ""
@@ -187,6 +188,39 @@ func buildRecordFilterArgs(isAdmin bool, userId int64, query RecordQuery) ([]int
 		sqlFlag(modelEnabled), recordLikeFilter(query.Model),
 		sqlFlag(typeEnabled), query.Type,
 	}, nil
+}
+
+func GetUserRecordStats(db *sql.DB, userId int64) (RecordStats, error) {
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	month := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+
+	var stats RecordStats
+	err := globals.QueryRowDb(db, `
+		SELECT
+			COALESCE(SUM(CASE WHEN type = 'consume' AND created_at >= ? THEN quota ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN type = 'consume' AND created_at >= ? THEN quota ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN type = 'consume' AND created_at >= ? THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN type = 'consume' AND created_at >= ? THEN 1 ELSE 0 END), 0)
+		FROM billing
+		WHERE user_id = ?
+	`,
+		today.Format("2006-01-02 15:04:05"),
+		month.Format("2006-01-02 15:04:05"),
+		today.Format("2006-01-02 15:04:05"),
+		month.Format("2006-01-02 15:04:05"),
+		userId,
+	).Scan(
+		&stats.BillingToday,
+		&stats.BillingMonth,
+		&stats.RequestToday,
+		&stats.RequestMonth,
+	)
+	if err != nil {
+		return RecordStats{}, err
+	}
+
+	return stats, nil
 }
 
 func ListRecords(db *sql.DB, isAdmin bool, userId int64, page int64, query RecordQuery) (RecordData, error) {

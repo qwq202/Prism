@@ -81,7 +81,7 @@ func OriginIsAllowed(uri string) bool {
 		return false
 	}
 
-	if instance.Hostname() == "localhost" || instance.Scheme == "file" {
+	if isLocalOriginHostname(instance.Hostname()) || instance.Scheme == "file" {
 		return true
 	}
 
@@ -94,6 +94,11 @@ func OriginIsAllowed(uri string) bool {
 	}
 
 	return in(instance.Host, AllowedOrigins)
+}
+
+func isLocalOriginHostname(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	return host == "localhost" || host == "127.0.0.1" || host == "::1"
 }
 
 func OriginIsOpen(c *gin.Context) bool {

@@ -11,6 +11,7 @@ import {
   BatchUserAction,
   batchUserOperation,
   createUserOperation,
+  deleteUserOperation,
   getUserList,
   initialUserFilter,
   quotaOperation,
@@ -60,6 +61,7 @@ import {
   Search,
   Shield,
   ShieldMinus,
+  Trash2,
 } from "lucide-react";
 import { Input } from "@/components/ui/input.tsx";
 import PopupDialog, { popupTypes } from "@/components/PopupDialog.tsx";
@@ -140,6 +142,7 @@ function OperationMenu({ user, onRefresh }: OperationMenuProps) {
   const [releaseWeekOpen, setReleaseWeekOpen] = useState<boolean>(false);
   const [banOpen, setBanOpen] = useState<boolean>(false);
   const [adminOpen, setAdminOpen] = useState<boolean>(false);
+  const [deleteOpen, setDeleteOpen] = useState<boolean>(false);
 
   const handleReleaseUsage = async (type: ReleaseUsageType) => {
     const resp = await releaseUsageOperation(user.id, type);
@@ -233,7 +236,10 @@ function OperationMenu({ user, onRefresh }: OperationMenuProps) {
         description={t("admin.subscription-action-desc", {
           username: user.username,
         })}
-        defaultValue={user.expired_at || new Date().toISOString().slice(0, 19).replace('T', ' ')}
+        defaultValue={
+          user.expired_at ||
+          new Date().toISOString().slice(0, 19).replace("T", " ")
+        }
         open={subscriptionOpen}
         setOpen={setSubscriptionOpen}
         onSubmit={async (value) => {
@@ -326,6 +332,25 @@ function OperationMenu({ user, onRefresh }: OperationMenuProps) {
           return resp.status;
         }}
       />
+      <PopupDialog
+        disabled={username === user.username}
+        destructive={true}
+        type={popupTypes.Empty}
+        title={t("admin.delete-user-action")}
+        description={t("admin.delete-user-action-desc", {
+          username: user.username,
+        })}
+        confirmLabel={t("admin.delete-user-confirm")}
+        open={deleteOpen}
+        setOpen={setDeleteOpen}
+        onSubmit={async () => {
+          const resp = await deleteUserOperation(user.id);
+          doToast(t, resp);
+
+          if (resp.status) onRefresh?.();
+          return resp.status;
+        }}
+      />
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -388,6 +413,14 @@ function OperationMenu({ user, onRefresh }: OperationMenuProps) {
             <CalendarRange className={`h-4 w-4 mr-2`} />
             {t("admin.reset-weekly-limit-action")}
           </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={username === user.username}
+            className="text-destructive focus:text-destructive"
+            onClick={() => setDeleteOpen(true)}
+          >
+            <Trash2 className={`h-4 w-4 mr-2`} />
+            {t("admin.delete-user-action")}
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </>
@@ -448,7 +481,8 @@ function UserTable() {
     }
   }
 
-  const allChecked = data.data.length > 0 && data.data.every((u) => selected.has(u.id));
+  const allChecked =
+    data.data.length > 0 && data.data.every((u) => selected.has(u.id));
   const batchActionClass = "h-10 w-24 px-3 text-sm shrink-0";
   const batchQuotaInputClass = "h-10 w-24 text-sm shrink-0";
 
@@ -493,11 +527,7 @@ function UserTable() {
       return;
     }
 
-    const resp = await createUserOperation(
-      username,
-      email,
-      password,
-    );
+    const resp = await createUserOperation(username, email, password);
     doToast(t, resp);
 
     if (resp.status) {
@@ -697,10 +727,7 @@ function UserTable() {
             <TableHeader>
               <TableRow className={`select-none whitespace-nowrap`}>
                 <TableHead className="w-10">
-                  <Checkbox
-                    checked={allChecked}
-                    onCheckedChange={toggleAll}
-                  />
+                  <Checkbox checked={allChecked} onCheckedChange={toggleAll} />
                 </TableHead>
                 <TableHead>ID</TableHead>
                 <TableHead>{t("admin.username")}</TableHead>
@@ -718,7 +745,10 @@ function UserTable() {
             </TableHeader>
             <TableBody>
               {(data.data || []).map((user, idx) => (
-                <TableRow key={idx} className={selected.has(user.id) ? "bg-muted/50" : ""}>
+                <TableRow
+                  key={idx}
+                  className={selected.has(user.id) ? "bg-muted/50" : ""}
+                >
                   <TableCell>
                     <Checkbox
                       checked={selected.has(user.id)}

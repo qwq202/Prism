@@ -314,6 +314,15 @@ export async function banUserOperation(
   }
 }
 
+export async function deleteUserOperation(id: number): Promise<CommonResponse> {
+  try {
+    const response = await axios.post("/admin/user/delete", { id });
+    return response.data as CommonResponse;
+  } catch (e) {
+    return { status: false, message: getErrorMessage(e) };
+  }
+}
+
 export async function setAdminOperation(
   id: number,
   admin: boolean,
@@ -363,7 +372,11 @@ export async function batchUserOperation(
   value?: number,
 ): Promise<CommonResponse> {
   try {
-    const response = await axios.post("/admin/user/batch", { ids, action, value });
+    const response = await axios.post("/admin/user/batch", {
+      ids,
+      action,
+      value,
+    });
     return response.data as CommonResponse;
   } catch (e) {
     return { status: false, message: getErrorMessage(e) };

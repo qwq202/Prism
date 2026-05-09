@@ -2,6 +2,7 @@ package admin
 
 import (
 	"chat/admin/analysis"
+	"chat/auth"
 	"chat/channel"
 	"chat/utils"
 	"net/http"
@@ -52,6 +53,10 @@ type SetAdminForm struct {
 type BanForm struct {
 	Id  int64 `json:"id"`
 	Ban bool  `json:"ban"`
+}
+
+type DeleteUserForm struct {
+	Id int64 `json:"id" binding:"required"`
 }
 
 type QuotaOperationForm struct {
@@ -429,6 +434,44 @@ func BanAPI(c *gin.Context) {
 
 	err := banUser(db, form.Id, form.Ban)
 	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": true,
+	})
+}
+
+func DeleteUserAPI(c *gin.Context) {
+	db := utils.GetDBFromContext(c)
+	cache := utils.GetCacheFromContext(c)
+
+	var form DeleteUserForm
+	if err := c.ShouldBindJSON(&form); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	current := auth.GetUserByCtx(c)
+	if current == nil {
+		return
+	}
+	if auth.GetId(db, current) == form.Id {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": "cannot delete current user",
+		})
+		return
+	}
+
+	if err := deleteUser(db, cache, form.Id); err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  false,
 			"message": err.Error(),

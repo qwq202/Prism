@@ -20,6 +20,7 @@ import React from "react";
 import {
   LibraryBig,
   MessageCircle,
+  PieChart,
   Shield,
   User,
   Wallet,
@@ -72,7 +73,7 @@ function MenuBar({ children, className }: MenuBarProps) {
             <BarItem icon={<Wallet />} path={`/wallet`} name={"wallet"} />
             {/* <BarItem icon={<DraftingCompass />} path={`/key`} name={"key"} /> */}
             <BarItem icon={<User />} path={`/account`} name={"account"} />
-            {/* <BarItem icon={<PieChart />} path={`/log`} name={"log"} /> */}
+            <BarItem icon={<PieChart />} path={`/log`} name={"log"} />
             {admin && (
               <BarItem icon={<Shield />} path={`/admin`} name={"admin"} />
             )}

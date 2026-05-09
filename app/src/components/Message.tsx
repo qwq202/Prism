@@ -288,7 +288,7 @@ function MessageContent({
   };
   const useModelAvatar = !isUser && !selected;
 
-  const parsedContent = message.content.length
+  const parsedContent = isAssistant && message.content.length
     ? parseThinkContent(message.content)
     : null;
 

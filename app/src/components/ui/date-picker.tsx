@@ -18,19 +18,21 @@ type DatePickerProps = Omit<
   "mode" | "selected" | "onSelect"
 > & {
   classNameTrigger?: string;
+  classNameContent?: string;
   value?: string;
   onValueChange?: (value: string) => void;
 };
 
-function parseDate(value?: string, init?: boolean): Date | undefined {
+function parseDate(value?: string): Date | undefined {
   try {
-    if (!value) return init ? undefined : new Date();
+    if (!value) return undefined;
     if (value.includes(" ")) value = value.split(" ")[0]; // Remove time
     const [year, month, day] = value.split("-").map(Number);
+    if (!year || !month || !day) return undefined;
     return new Date(year, month - 1, day);
   } catch (e) {
     console.warn("Invalid date format", value, e);
-    return new Date();
+    return undefined;
   }
 }
 
@@ -38,43 +40,51 @@ const DatePicker = ({
   value,
   onValueChange,
   classNameTrigger,
+  classNameContent,
   ...props
 }: DatePickerProps) => {
   const { t } = useTranslation();
-  const [date, setDate] = React.useState<Date | undefined>(
-    parseDate(value, true),
+  const [open, setOpen] = React.useState(false);
+  const date = React.useMemo(() => parseDate(value), [value]);
+
+  const updateDate = React.useCallback(
+    (next?: Date) => {
+      onValueChange?.(next ? format(next, "yyyy-MM-dd") : "");
+      if (next) setOpen(false);
+    },
+    [onValueChange],
   );
-
-  React.useEffect(() => {
-    const v = date ? format(date, "yyyy-MM-dd") : "";
-    onValueChange && onValueChange(v);
-    console.debug(`[calendar] value changed: [${v}]`);
-  }, [date, onValueChange]);
-
-  React.useEffect(() => {
-    const date = parseDate(value);
-    if (!date || date.getTime() === date.getTime()) return;
-    setDate(date);
-  }, [value]);
 
   const addYear = () => {
     const current = date || new Date();
-    setDate(new Date(current.setFullYear(current.getFullYear() + 1)));
+    updateDate(
+      new Date(
+        current.getFullYear() + 1,
+        current.getMonth(),
+        current.getDate(),
+      ),
+    );
   };
 
   const subYear = () => {
     const current = date || new Date();
-    setDate(new Date(current.setFullYear(current.getFullYear() - 1)));
+    updateDate(
+      new Date(
+        current.getFullYear() - 1,
+        current.getMonth(),
+        current.getDate(),
+      ),
+    );
   };
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           unClickable
           variant={"outline"}
           className={cn(
-            "w-[240px] justify-start text-left font-normal",
+            "h-12 w-[240px] justify-start text-left font-normal",
             !date && "text-muted-foreground",
             classNameTrigger,
           )}
@@ -87,36 +97,73 @@ const DatePicker = ({
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent
+        className={cn(
+          "w-[292px] max-w-[calc(100vw-2rem)] rounded-lg p-0 shadow-lg",
+          classNameContent,
+        )}
+        align="start"
+        sideOffset={8}
+      >
         <Calendar
           mode="single"
           selected={date}
-          onSelect={(date) => date && setDate(date)}
+          onSelect={(date) => updateDate(date)}
           initialFocus
+          className="p-3.5 pb-1"
+          classNames={{
+            months: "flex w-full flex-col",
+            month: "w-full space-y-2",
+            caption:
+              "relative flex h-8 items-center justify-center px-10 text-center",
+            caption_label: "text-lg font-semibold leading-none",
+            nav: "absolute inset-x-0 top-0 flex h-8 items-center justify-between",
+            nav_button:
+              "flex h-8 w-8 items-center justify-center rounded-md border bg-background p-0 text-muted-foreground opacity-100 shadow-sm transition-colors hover:bg-muted hover:text-foreground",
+            nav_button_previous: "absolute left-0 top-0",
+            nav_button_next: "absolute right-0 top-0",
+            table: "w-full border-collapse",
+            head_row: "grid grid-cols-7",
+            head_cell:
+              "flex h-7 items-center justify-center text-sm font-normal text-muted-foreground",
+            row: "grid grid-cols-7",
+            cell: "flex h-10 items-center justify-center p-0 text-center",
+            day: "h-8 w-8 rounded-md p-0 text-sm font-normal transition-colors hover:bg-muted",
+            day_selected:
+              "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+            day_today: "bg-muted text-foreground",
+            day_outside:
+              "text-muted-foreground/50 opacity-100 aria-selected:bg-primary aria-selected:text-primary-foreground",
+            day_disabled: "text-muted-foreground/40 opacity-100",
+            day_hidden: "invisible",
+          }}
           {...props}
         />
-        <div className={cn("p-3 pt-0 flex flex-row items-center")}>
+        <div className={cn("flex items-center gap-5 px-4 pb-3 pt-1")}>
           <Button
+            unClickable
             variant="ghost"
             size="icon"
-            className={`mr-2`}
+            className="h-8 w-8 rounded-md"
             onClick={addYear}
           >
             <Plus className="h-4 w-4" />
           </Button>
           <Button
+            unClickable
             variant="ghost"
             size="icon"
-            className={`mr-2`}
+            className="h-8 w-8 rounded-md"
             onClick={subYear}
           >
             <Minus className="h-4 w-4" />
           </Button>
           <Button
+            unClickable
             variant="outline"
             size="icon"
-            className={`ml-auto`}
-            onClick={() => setDate(undefined)}
+            className="h-8 w-10 rounded-md"
+            onClick={() => updateDate(undefined)}
           >
             <Eraser className="h-4 w-4" />
           </Button>

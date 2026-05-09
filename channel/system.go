@@ -299,7 +299,7 @@ func (c *SystemConfig) SendVerifyMail(email string, code string) error {
 
 	return c.GetMail().RenderMail(
 		"code.html",
-		Temp{Title: c.GetAppName(), Logo: c.GetAppLogo(), Code: code},
+		Temp{Title: c.GetAppName(), Logo: strings.TrimSpace(c.General.Logo), Code: code},
 		email,
 		fmt.Sprintf("%s | OTP Verification", c.GetAppName()),
 	)
@@ -357,7 +357,7 @@ func (c *SystemConfig) GetAppName() string {
 func (c *SystemConfig) GetAppLogo() string {
 	logo := strings.TrimSpace(c.General.Logo)
 	if len(logo) == 0 {
-		return "https://chatnio.net/favicon.ico"
+		return ""
 	}
 
 	return logo

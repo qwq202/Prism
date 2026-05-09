@@ -200,6 +200,24 @@ docker pull qunqin45/prism:latest
 ```
 预览版请改为 `docker pull qunqin45/prism:preview`。拉取完成后按上方 `docker run` 命令重新启动容器。
 
+### 🖥️ 桌面端打包
+桌面端基于 Tauri，只打包现有前端界面，运行时连接已部署的 Prism 服务端。
+
+```shell
+cd app
+pnpm install
+VITE_DESKTOP_BACKEND_ENDPOINT=http://localhost:8000/api pnpm tauri:build
+```
+
+开发调试可使用：
+
+```shell
+cd app
+VITE_DESKTOP_BACKEND_ENDPOINT=http://localhost:8000/api pnpm tauri:dev
+```
+
+`VITE_DESKTOP_BACKEND_ENDPOINT` 需要填写你的 Prism 后端 API 地址。Docker Compose 默认地址通常是 `http://localhost:8000/api`；如果你的后端使用前后端分离且 `SERVE_STATIC=false`，则填写后端服务根地址，例如 `https://api.example.com`。桌面端启动后也可以在设置中的“服务端地址”里修改，保存后会自动重新载入。
+
 ## ❓ 常见问题 Q&A
 1. **为什么我部署后的站点可以访问页面, 可以登录注册, 但是无法使用聊天 (一直在转圈)？**
    - 聊天等此类功能通过 websocket 进行通信, 请确保你的服务支持 websocket。 (Tip: 中转通过 Http 实现, 无需 websocket 支持)
