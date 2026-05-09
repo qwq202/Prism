@@ -1,15 +1,15 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "build": {
-    "beforeBuildCommand": "pnpm build",
-    "beforeDevCommand": "pnpm exec vite --host localhost --port 1420 --strictPort",
+    "beforeBuildCommand": "VITE_DESKTOP_BACKEND_ENDPOINT=https://prism.qunqin.org pnpm build",
+    "beforeDevCommand": "VITE_DESKTOP_BACKEND_ENDPOINT=https://prism.qunqin.org pnpm exec vite --host localhost --port 1420 --strictPort",
     "devPath": "http://localhost:1420",
     "distDir": "../dist",
     "withGlobalTauri": true
   },
   "package": {
     "productName": "Prism",
-    "version": "0.1.1"
+    "version": "0.1.2"
   },
   "tauri": {
     "allowlist": {

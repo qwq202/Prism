@@ -3,10 +3,11 @@ import { getMemory, setMemory } from "@/utils/memory.ts";
 
 export const desktopBackendMemoryKey = "desktop_backend_endpoint";
 const legacyDesktopBackendEndpoint = "http://localhost:8000/api";
+const officialDesktopBackendEndpoint = "https://prism.qunqin.org";
 export const defaultDesktopBackendEndpoint =
   import.meta.env.VITE_DESKTOP_BACKEND_ENDPOINT ||
   import.meta.env.VITE_BACKEND_ENDPOINT ||
-  legacyDesktopBackendEndpoint;
+  officialDesktopBackendEndpoint;
 
 export let appName =
   localStorage.getItem("app_name") || import.meta.env.VITE_APP_NAME || "Prism";
@@ -48,6 +49,11 @@ export function normalizeBackendEndpoint(endpoint: string): string {
   return normalized || defaultDesktopBackendEndpoint;
 }
 
+function resolveApiEndpoint(endpoint: string): string {
+  const normalized = normalizeBackendEndpoint(endpoint);
+  return normalized.endsWith("/api") ? normalized : `${normalized}/api`;
+}
+
 export function getBackendEndpoint(): string {
   if (isDesktopRuntime()) {
     const storedEndpoint = getMemory(desktopBackendMemoryKey);
@@ -82,7 +88,8 @@ export function getRestApi(deploy: boolean): string {
   /**
    * return the REST API address
    */
-  return !deploy ? "http://localhost:8094" : backendEndpoint;
+  if (!deploy) return "http://localhost:8094";
+  return isDesktopRuntime() ? resolveApiEndpoint(backendEndpoint) : backendEndpoint;
 }
 
 export function getWebsocketApi(deploy: boolean): string {
@@ -91,15 +98,18 @@ export function getWebsocketApi(deploy: boolean): string {
    */
   if (!deploy) return "ws://localhost:8094";
 
-  if (backendEndpoint.startsWith("http://"))
-    return `ws://${backendEndpoint.slice(7)}`;
-  if (backendEndpoint.startsWith("https://"))
-    return `wss://${backendEndpoint.slice(8)}`;
-  if (backendEndpoint.startsWith("/"))
+  const apiEndpoint = isDesktopRuntime()
+    ? resolveApiEndpoint(backendEndpoint)
+    : backendEndpoint;
+  if (apiEndpoint.startsWith("http://"))
+    return `ws://${apiEndpoint.slice(7)}`;
+  if (apiEndpoint.startsWith("https://"))
+    return `wss://${apiEndpoint.slice(8)}`;
+  if (apiEndpoint.startsWith("/"))
     return location.protocol === "https:"
-      ? `wss://${location.host}${backendEndpoint}`
-      : `ws://${location.host}${backendEndpoint}`;
-  return backendEndpoint;
+      ? `wss://${location.host}${apiEndpoint}`
+      : `ws://${location.host}${apiEndpoint}`;
+  return apiEndpoint;
 }
 
 export function getTokenField(deploy: boolean): string {
