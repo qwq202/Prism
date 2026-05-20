@@ -1,6 +1,9 @@
 package memory
 
-import "testing"
+import (
+	"chat/globals"
+	"testing"
+)
 
 func TestParseToolInput(t *testing.T) {
 	input, err := parseToolInput(`{"action":"create","category":"preference","content":"用户喜欢玩原神游戏","reason":"用户明确表示自己爱玩原神，这是一个稳定的游戏偏好"}`)
@@ -22,5 +25,11 @@ func TestParseToolInput(t *testing.T) {
 
 	if input.Reason != "用户明确表示自己爱玩原神，这是一个稳定的游戏偏好" {
 		t.Fatalf("unexpected reason: %q", input.Reason)
+	}
+}
+
+func TestWritableToolChannelsIncludeXiaomiTokenPlan(t *testing.T) {
+	if _, ok := writableToolChannelTypes[globals.XiaomiTokenPlanCNChannelType]; !ok {
+		t.Fatalf("expected xiaomi token plan channel to allow tool definitions")
 	}
 }

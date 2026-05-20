@@ -56,7 +56,7 @@ func BuildToolDefinition() *globals.FunctionTools {
 			Type: "function",
 			Function: globals.ToolFunction{
 				Name:        ToolName,
-				Description: "Fetch the readable text content of a public http/https webpage. Use this when the user asks you to open, read, summarize, analyze, or answer questions about a URL.",
+				Description: "Fetch the readable text content of a provided public http/https URL. This tool cannot search the web or discover URLs. If the user asks to fetch a webpage but has not provided a URL, ask them for the URL instead of inventing a search call.",
 				Parameters: globals.ToolParameters{
 					Type: "object",
 					Properties: globals.ToolProperties{

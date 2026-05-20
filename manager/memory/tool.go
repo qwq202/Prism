@@ -21,6 +21,7 @@ var writableToolChannelTypes = map[string]struct{}{
 	globals.ClaudeChannelType:             {},
 	globals.GLMCodingPlanCNChannelType:    {},
 	globals.MiniMaxTokenPlanCNChannelType: {},
+	globals.XiaomiTokenPlanCNChannelType:  {},
 	globals.PalmChannelType:               {},
 	globals.DeepseekChannelType:           {},
 	globals.XAIChannelType:                {},
