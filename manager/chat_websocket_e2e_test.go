@@ -155,7 +155,16 @@ func waitForConversationMessages(t *testing.T, db *sql.DB, userID int64, convers
 	return nil
 }
 
-func TestChatAPIWebsocketStopAndRestartPersistedHistory(t *testing.T) {
+type websocketChatTestEnv struct {
+	db           *sql.DB
+	rootID       int64
+	server       *httptest.Server
+	requestCount *int32
+}
+
+func newWebsocketChatTestEnv(t *testing.T) *websocketChatTestEnv {
+	t.Helper()
+
 	gin.SetMode(gin.TestMode)
 
 	db := openWebsocketTestDB(t)
@@ -163,7 +172,7 @@ func TestChatAPIWebsocketStopAndRestartPersistedHistory(t *testing.T) {
 	rootID := insertRootAPIKey(t, db, "sk-ws-test")
 
 	upstream, requestCount := newSlowStreamingUpstream()
-	defer upstream.Close()
+	t.Cleanup(upstream.Close)
 
 	previousConduit := channel.ConduitInstance
 	previousCharge := channel.ChargeInstance
@@ -218,21 +227,40 @@ func TestChatAPIWebsocketStopAndRestartPersistedHistory(t *testing.T) {
 	Register(managerGroup)
 
 	server := httptest.NewServer(router)
-	defer server.Close()
+	t.Cleanup(server.Close)
 
-	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/chat"
+	return &websocketChatTestEnv{
+		db:           db,
+		rootID:       rootID,
+		server:       server,
+		requestCount: requestCount,
+	}
+}
+
+func (e *websocketChatTestEnv) dial(t *testing.T, conversationID int64) *websocket.Conn {
+	t.Helper()
+
+	wsURL := "ws" + strings.TrimPrefix(e.server.URL, "http") + "/chat"
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("dial websocket: %v", err)
 	}
-	defer conn.Close()
 
 	if err := conn.WriteJSON(WebsocketAuthForm{
 		Token: "sk-ws-test",
-		Id:    -1,
+		Id:    conversationID,
 	}); err != nil {
 		t.Fatalf("send websocket auth: %v", err)
 	}
+
+	return conn
+}
+
+func TestChatAPIWebsocketStopAndRestartPersistedHistory(t *testing.T) {
+	env := newWebsocketChatTestEnv(t)
+
+	conn := env.dial(t, -1)
+	defer conn.Close()
 
 	if err := conn.WriteJSON(conversation.FormMessage{
 		Type:    ChatType,
@@ -268,7 +296,7 @@ func TestChatAPIWebsocketStopAndRestartPersistedHistory(t *testing.T) {
 		t.Fatalf("expected server to assign a conversation id")
 	}
 
-	afterStop := waitForConversationMessages(t, db, rootID, conversationID, 2)
+	afterStop := waitForConversationMessages(t, env.db, env.rootID, conversationID, 2)
 	if afterStop.GetMessage()[0].Role != globals.User || afterStop.GetMessage()[0].Content != "hello from websocket" {
 		t.Fatalf("unexpected persisted user message after stop: %#v", afterStop.GetMessage()[0])
 	}
@@ -298,7 +326,7 @@ func TestChatAPIWebsocketStopAndRestartPersistedHistory(t *testing.T) {
 		}
 	}
 
-	afterRestart := waitForConversationMessages(t, db, rootID, conversationID, 3)
+	afterRestart := waitForConversationMessages(t, env.db, env.rootID, conversationID, 3)
 	restartedAssistant := afterRestart.GetMessage()[2]
 	if restartedAssistant.Role != globals.Assistant {
 		t.Fatalf("expected restarted assistant response, got %#v", restartedAssistant)
@@ -315,7 +343,67 @@ func TestChatAPIWebsocketStopAndRestartPersistedHistory(t *testing.T) {
 		t.Fatalf("unexpected restarted tool payload: %#v", call)
 	}
 
-	if got := atomic.LoadInt32(requestCount); got < 2 {
+	if got := atomic.LoadInt32(env.requestCount); got < 2 {
 		t.Fatalf("expected stop + restart to issue two upstream requests, got %d", got)
+	}
+}
+
+func TestChatAPIWebsocketCloseContinuesAndPersistsFullResponse(t *testing.T) {
+	env := newWebsocketChatTestEnv(t)
+
+	conn := env.dial(t, -1)
+
+	if err := conn.WriteJSON(conversation.FormMessage{
+		Type:    ChatType,
+		Message: "close while streaming",
+		Model:   websocketTestModel,
+	}); err != nil {
+		t.Fatalf("send chat message: %v", err)
+	}
+
+	var conversationID int64
+	for {
+		response := readWebsocketResponse(t, conn)
+		if response.Conversation != 0 {
+			conversationID = response.Conversation
+			continue
+		}
+
+		if response.Message == "first chunk" {
+			break
+		}
+	}
+
+	if conversationID == 0 {
+		t.Fatalf("expected server to assign a conversation id")
+	}
+
+	if err := conn.Close(); err != nil {
+		t.Fatalf("close websocket: %v", err)
+	}
+
+	afterClose := waitForConversationMessages(t, env.db, env.rootID, conversationID, 2)
+	if afterClose.GetMessage()[0].Role != globals.User || afterClose.GetMessage()[0].Content != "close while streaming" {
+		t.Fatalf("unexpected persisted user message after close: %#v", afterClose.GetMessage()[0])
+	}
+
+	assistant := afterClose.GetMessage()[1]
+	if assistant.Role != globals.Assistant {
+		t.Fatalf("expected assistant response after close, got %#v", assistant)
+	}
+	if assistant.Content != "first chunk" {
+		t.Fatalf("expected streamed assistant text to persist, got %q", assistant.Content)
+	}
+	if assistant.ToolCalls == nil || len(*assistant.ToolCalls) != 1 {
+		t.Fatalf("expected close to keep full assistant payloads, got %#v", assistant.ToolCalls)
+	}
+
+	call := (*assistant.ToolCalls)[0]
+	if call.Function.Name != "lookup_weather" || call.Function.Arguments != "{\"city\":\"Shanghai\"}" {
+		t.Fatalf("unexpected assistant tool payload after close: %#v", call)
+	}
+
+	if got := atomic.LoadInt32(env.requestCount); got != 1 {
+		t.Fatalf("expected close to keep the original upstream request only, got %d", got)
 	}
 }

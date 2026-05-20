@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
+	"sync/atomic"
 )
 
 const (
@@ -23,10 +24,11 @@ const (
 type Stack chan *conversation.FormMessage
 
 type Connection struct {
-	conn  *utils.WebSocket
-	stack Stack
-	auth  bool
-	hash  string
+	conn          *utils.WebSocket
+	stack         Stack
+	auth          bool
+	hash          string
+	clientOffline atomic.Bool
 }
 
 func NewConnection(conn *utils.WebSocket, auth bool, hash string, bufferSize int) *Connection {
@@ -53,11 +55,13 @@ func (c *Connection) GetStack() Stack {
 func (c *Connection) ReadWorker() {
 	for {
 		if c.IsClosed() {
+			c.MarkClientOffline()
 			break
 		}
 
 		form, err := utils.ReadForm[conversation.FormMessage](c.conn)
 		if err != nil {
+			c.MarkClientOffline()
 			break
 		}
 
@@ -80,6 +84,14 @@ func (c *Connection) Write(data *conversation.FormMessage) {
 
 func (c *Connection) IsClosed() bool {
 	return c.conn.IsClosed()
+}
+
+func (c *Connection) MarkClientOffline() bool {
+	return c.clientOffline.CompareAndSwap(false, true)
+}
+
+func (c *Connection) IsClientOffline() bool {
+	return c.clientOffline.Load()
 }
 
 func (c *Connection) Stop() {
@@ -151,6 +163,19 @@ func (c *Connection) Send(message globals.ChatSegmentResponse) {
 
 func (c *Connection) SendClient(message globals.ChatSegmentResponse) error {
 	return c.conn.SendJSON(message)
+}
+
+func (c *Connection) TrySendClient(message globals.ChatSegmentResponse) bool {
+	if c.IsClientOffline() {
+		return false
+	}
+
+	if err := c.SendClient(message); err != nil {
+		c.MarkClientOffline()
+		return false
+	}
+
+	return true
 }
 
 func (c *Connection) Process(handler func(*conversation.FormMessage) error) {

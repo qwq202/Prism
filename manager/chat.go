@@ -160,14 +160,12 @@ func sendToolCallEvents(conn *Connection, calls *globals.ToolCalls, status strin
 			continue
 		}
 
-		if err := conn.SendClient(globals.ChatSegmentResponse{
+		conn.TrySendClient(globals.ChatSegmentResponse{
 			Quota:    quota,
 			ToolCall: event,
 			End:      false,
 			Plan:     plan,
-		}); err != nil {
-			return err
-		}
+		})
 	}
 
 	return nil
@@ -203,14 +201,12 @@ func sendToolResultEvents(conn *Connection, calls *globals.ToolCalls, toolMessag
 			continue
 		}
 
-		if err := conn.SendClient(globals.ChatSegmentResponse{
+		conn.TrySendClient(globals.ChatSegmentResponse{
 			Quota:    quota,
 			ToolCall: event,
 			End:      false,
 			Plan:     plan,
-		}); err != nil {
-			return err
-		}
+		})
 	}
 
 	return nil
@@ -481,16 +477,13 @@ func createRoundTask(
 					}
 				}
 
-				if err := conn.SendClient(globals.ChatSegmentResponse{
+				if !conn.TrySendClient(globals.ChatSegmentResponse{
 					Message: content,
 					Quota:   streamBuffer.GetQuota(),
 					End:     false,
 					Plan:    plan,
-				}); err != nil {
-					globals.Warn(fmt.Sprintf("failed to send message to client: %s", err.Error()))
-					signalInterrupt(interruptSignal, err)
-					waitForRoundTaskEnd(chunkChan)
-					return hit, nil, true
+				}) {
+					continue
 				}
 			}
 		case signal := <-stopSignal:
@@ -1025,16 +1018,13 @@ func createChatTask(
 			}
 
 			message := buffer.WriteChunk(data.Chunk)
-			if err := conn.SendClient(globals.ChatSegmentResponse{
+			if !conn.TrySendClient(globals.ChatSegmentResponse{
 				Message: message,
 				Quota:   buffer.GetQuota(),
 				End:     false,
 				Plan:    plan,
-			}); err != nil {
-				globals.Warn(fmt.Sprintf("failed to send message to client: %s", err.Error()))
-				signalInterrupt(interruptSignal, err)
-				waitForRoundTaskEnd(chunkChan)
-				return hit, nil, true
+			}) {
+				continue
 			}
 
 		case signal := <-stopSignal:
