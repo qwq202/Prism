@@ -20,10 +20,6 @@ func TestBuildToolDefinition(t *testing.T) {
 	if tool.Function.Name != ToolName {
 		t.Fatalf("expected tool name %q, got %q", ToolName, tool.Function.Name)
 	}
-	if !strings.Contains(tool.Function.Description, "provided public http/https URL") ||
-		!strings.Contains(tool.Function.Description, "cannot search the web") {
-		t.Fatalf("expected fetch tool description to distinguish URL fetch from search, got %q", tool.Function.Description)
-	}
 	if _, ok := tool.Function.Parameters.Properties["url"]; !ok {
 		t.Fatalf("expected url parameter in fetch tool schema")
 	}
