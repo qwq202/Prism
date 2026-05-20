@@ -8,7 +8,6 @@ const errorKeyMap: Record<string, string> = {
   "deeptrain mode is disabled": "errors.deeptrain-disabled",
   "cannot validate access token": "errors.invalid-access-token",
   "this site is not open for registration": "errors.registration-closed",
-  "relay api is disabled": "errors.relay-api-disabled",
 };
 
 export function localizeError(t: TFunction, error?: string | null) {

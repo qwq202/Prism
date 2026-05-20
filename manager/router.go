@@ -15,10 +15,7 @@ func Register(app *gin.RouterGroup) {
 	app.POST("/attachment/upload", UploadAttachmentAPI)
 	app.GET("/dashboard/billing/usage", GetBillingUsage)
 	app.GET("/dashboard/billing/subscription", GetSubscription)
-	app.POST("/v1/chat/completions", ChatRelayAPI)
-	app.POST("/v1/images/generations", ImagesRelayAPI)
-	app.POST("/v1/videos", VideosRelayAPI)
-	app.GET("/v1/videos/:id/content", VideosContentRelayAPI)
+	app.GET("/videos/:id/content", VideoContentAPI)
 
 	broadcast.Register(app)
 }

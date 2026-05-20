@@ -80,16 +80,6 @@ func ParseToken(c *gin.Context, token string) *User {
 	return nil
 }
 
-func ParseApiKey(c *gin.Context, key string) *User {
-	db := utils.GetDBFromContext(c)
-
-	if len(key) == 0 {
-		return nil
-	}
-
-	return ParseApiKeyByHash(db, key)
-}
-
 func getCode(c *gin.Context, cache *redis.Client, email string) string {
 	code, err := cache.Get(c, fmt.Sprintf("nio:otp:%s", email)).Result()
 	if err != nil {

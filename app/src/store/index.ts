@@ -7,7 +7,6 @@ import chatReducer from "./chat";
 import quotaReducer from "./quota";
 import packageReducer from "./package";
 import subscriptionReducer from "./subscription";
-import apiReducer from "./api";
 import sharingReducer from "./sharing";
 import settingsReducer from "./settings";
 import recordReducer from "./record";
@@ -27,7 +26,6 @@ const store = configureStore({
     quota: quotaReducer,
     package: packageReducer,
     subscription: subscriptionReducer,
-    api: apiReducer,
     sharing: sharingReducer,
     settings: settingsReducer,
     record: recordReducer,

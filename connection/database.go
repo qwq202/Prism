@@ -89,7 +89,6 @@ func ConnectDatabase() *sql.DB {
 	CreatePackageTable(db)
 	CreateQuotaTable(db)
 	CreateSubscriptionTable(db)
-	CreateApiKeyTable(db)
 	CreatePasskeyCredentialTable(db)
 	CreateInvitationTable(db)
 	CreateRedeemTable(db)
@@ -279,21 +278,6 @@ func CreateSubscriptionTable(db *sql.DB) {
 		  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		  total_month INT DEFAULT 0,
 		  enterprise BOOLEAN DEFAULT FALSE,
-		  FOREIGN KEY (user_id) REFERENCES auth(id)
-		);
-	`)
-	if err != nil {
-		fmt.Println(err)
-	}
-}
-
-func CreateApiKeyTable(db *sql.DB) {
-	_, err := globals.ExecDb(db, `
-		CREATE TABLE IF NOT EXISTS apikey (
-		  id INT PRIMARY KEY AUTO_INCREMENT,
-		  user_id INT UNIQUE,
-		  api_key VARCHAR(255) UNIQUE,
-		  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		  FOREIGN KEY (user_id) REFERENCES auth(id)
 		);
 	`)

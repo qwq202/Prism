@@ -40,7 +40,6 @@ func openAuthSecurityTestDB(t *testing.T) *sql.DB {
 	})
 
 	connection.CreateUserTable(db)
-	connection.CreateApiKeyTable(db)
 	connection.CreateQuotaTable(db)
 
 	return db
@@ -155,59 +154,6 @@ func TestConstantTimeStringEqualRequiresSameValueAndLength(t *testing.T) {
 	}
 	if constantTimeStringEqual("123456", "0123456") {
 		t.Fatalf("expected equal hash comparison to still require same original length")
-	}
-}
-
-func TestCreateApiKeyStoresHash(t *testing.T) {
-	db := openAuthSecurityTestDB(t)
-	user := GetUserByName(db, "root")
-	if user == nil {
-		t.Fatalf("expected root user")
-	}
-
-	key := user.CreateApiKey(db)
-	if !strings.HasPrefix(key, "sk-") {
-		t.Fatalf("expected raw api key to be returned once, got %q", key)
-	}
-
-	var stored string
-	if err := globals.QueryRowDb(db, "SELECT api_key FROM apikey WHERE user_id = ?", user.GetID(db)).Scan(&stored); err != nil {
-		t.Fatalf("query stored api key: %v", err)
-	}
-	if stored == key {
-		t.Fatalf("expected api key to be stored as hash")
-	}
-	if !isHashedApiKey(stored) {
-		t.Fatalf("expected stored api key hash prefix, got %q", stored)
-	}
-
-	if got := ParseApiKeyByHash(db, key); got == nil || got.Username != user.Username {
-		t.Fatalf("expected hashed api key lookup to find user, got %#v", got)
-	}
-}
-
-func TestParseApiKeyMigratesLegacyPlaintextKey(t *testing.T) {
-	db := openAuthSecurityTestDB(t)
-	user := GetUserByName(db, "root")
-	if user == nil {
-		t.Fatalf("expected root user")
-	}
-
-	const legacyKey = "sk-legacy-plaintext"
-	if _, err := globals.ExecDb(db, "INSERT INTO apikey (user_id, api_key) VALUES (?, ?)", user.GetID(db), legacyKey); err != nil {
-		t.Fatalf("insert legacy api key: %v", err)
-	}
-
-	if got := ParseApiKeyByHash(db, legacyKey); got == nil || got.Username != user.Username {
-		t.Fatalf("expected legacy api key lookup to find user, got %#v", got)
-	}
-
-	var stored string
-	if err := globals.QueryRowDb(db, "SELECT api_key FROM apikey WHERE user_id = ?", user.GetID(db)).Scan(&stored); err != nil {
-		t.Fatalf("query migrated api key: %v", err)
-	}
-	if stored == legacyKey || !isHashedApiKey(stored) {
-		t.Fatalf("expected legacy api key to migrate to hash, got %q", stored)
 	}
 }
 

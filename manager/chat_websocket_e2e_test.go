@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"chat/auth"
 	"chat/channel"
 	"chat/connection"
 	"chat/globals"
@@ -48,7 +49,6 @@ func openWebsocketTestDB(t *testing.T) *sql.DB {
 	connection.CreateConversationTable(db)
 	connection.CreateQuotaTable(db)
 	connection.CreateSubscriptionTable(db)
-	connection.CreateApiKeyTable(db)
 	connection.CreateBillingTable(db)
 
 	return db
@@ -75,19 +75,20 @@ func openWebsocketTestCache(t *testing.T) (*miniredis.Miniredis, *redis.Client) 
 	return server, cache
 }
 
-func insertRootAPIKey(t *testing.T, db *sql.DB, apiKey string) int64 {
+func rootToken(t *testing.T, db *sql.DB) (int64, string) {
 	t.Helper()
 
-	var rootID int64
-	if err := globals.QueryRowDb(db, "SELECT id FROM auth WHERE username = ?", "root").Scan(&rootID); err != nil {
-		t.Fatalf("query root id: %v", err)
+	user := auth.GetUserByName(db, "root")
+	if user == nil {
+		t.Fatalf("expected root user")
 	}
 
-	if _, err := globals.ExecDb(db, "INSERT INTO apikey (user_id, api_key) VALUES (?, ?)", rootID, apiKey); err != nil {
-		t.Fatalf("insert api key: %v", err)
+	token, err := user.GenerateToken()
+	if err != nil {
+		t.Fatalf("generate root token: %v", err)
 	}
 
-	return rootID
+	return user.GetID(db), token
 }
 
 func newSlowStreamingUpstream() (*httptest.Server, *int32) {
@@ -158,6 +159,7 @@ func waitForConversationMessages(t *testing.T, db *sql.DB, userID int64, convers
 type websocketChatTestEnv struct {
 	db           *sql.DB
 	rootID       int64
+	token        string
 	server       *httptest.Server
 	requestCount *int32
 }
@@ -169,7 +171,7 @@ func newWebsocketChatTestEnv(t *testing.T) *websocketChatTestEnv {
 
 	db := openWebsocketTestDB(t)
 	_, cache := openWebsocketTestCache(t)
-	rootID := insertRootAPIKey(t, db, "sk-ws-test")
+	rootID, token := rootToken(t, db)
 
 	upstream, requestCount := newSlowStreamingUpstream()
 	t.Cleanup(upstream.Close)
@@ -232,6 +234,7 @@ func newWebsocketChatTestEnv(t *testing.T) *websocketChatTestEnv {
 	return &websocketChatTestEnv{
 		db:           db,
 		rootID:       rootID,
+		token:        token,
 		server:       server,
 		requestCount: requestCount,
 	}
@@ -247,7 +250,7 @@ func (e *websocketChatTestEnv) dial(t *testing.T, conversationID int64) *websock
 	}
 
 	if err := conn.WriteJSON(WebsocketAuthForm{
-		Token: "sk-ws-test",
+		Token: e.token,
 		Id:    conversationID,
 	}); err != nil {
 		t.Fatalf("send websocket auth: %v", err)

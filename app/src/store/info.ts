@@ -35,7 +35,6 @@ export const infoSlice = createSlice({
     contact: getMemory("contact"),
     footer: getMemory("footer"),
     auth_footer: getBooleanMemory("auth_footer", false),
-    relay_plan: getBooleanMemory("relay_plan", false),
     web_search: getBooleanMemory("web_search", false),
     has_task_model: getBooleanMemory("has_task_model", false),
     payment: getArrayMemory("payment"),
@@ -46,7 +45,6 @@ export const infoSlice = createSlice({
     announcement: getMemory("announcement"),
     buy_link: getMemory("buy_link"),
     hide_key_docs: getBooleanMemory("hide_key_docs", false),
-    close_relay: getBooleanMemory("close_relay", false),
     backend: getMemory("backend"),
     group_pricing: {},
 
@@ -68,7 +66,6 @@ export const infoSlice = createSlice({
       state.contact = form.contact ?? "";
       state.footer = form.footer ?? "";
       state.auth_footer = form.auth_footer ?? false;
-      state.relay_plan = form.relay_plan ?? false;
       state.web_search = form.web_search ?? false;
       state.has_task_model = form.has_task_model ?? false;
       state.payment = form.payment ?? [];
@@ -78,7 +75,6 @@ export const infoSlice = createSlice({
       state.announcement = form.announcement ?? "";
       state.buy_link = form.buy_link ?? "";
       state.hide_key_docs = form.hide_key_docs ?? false;
-      state.close_relay = form.close_relay ?? false;
       state.backend = form.backend ?? state.backend;
       state.payment_aggregation = form.payment_aggregation ?? false;
       state.broadcast = form.broadcast ?? {
@@ -91,14 +87,12 @@ export const infoSlice = createSlice({
       setMemory("announcement", state.announcement);
       setMemory("buy_link", state.buy_link);
       setBooleanMemory("hide_key_docs", state.hide_key_docs);
-      setBooleanMemory("close_relay", state.close_relay);
       if (state.backend) setMemory("backend", state.backend);
       setMemory("currency", state.currency);
       setBooleanMemory("mail", state.mail);
       setMemory("contact", state.contact);
       setMemory("footer", state.footer);
       setBooleanMemory("auth_footer", state.auth_footer);
-      setBooleanMemory("relay_plan", state.relay_plan);
       setBooleanMemory("web_search", state.web_search);
       setBooleanMemory("has_task_model", state.has_task_model);
       setArrayMemory("payment", state.payment);
@@ -119,8 +113,6 @@ export const infoFooterSelector = (state: RootState): string =>
   state.info.footer;
 export const infoAuthFooterSelector = (state: RootState): boolean =>
   state.info.auth_footer;
-export const infoRelayPlanSelector = (state: RootState): boolean =>
-  state.info.relay_plan;
 export const infoWebSearchSelector = (state: RootState): boolean =>
   state.info.web_search ?? false;
 export const infoHasTaskModelSelector = (state: RootState): boolean =>
@@ -135,8 +127,6 @@ export const infoAnnouncementSelector = (state: RootState): string =>
   state.info.announcement;
 export const infoHideKeyDocsSelector = (state: RootState): boolean =>
   state.info.hide_key_docs ?? false;
-export const infoCloseRelaySelector = (state: RootState): boolean =>
-  state.info.close_relay ?? false;
 export const infoBackendSelector = (state: RootState): string | undefined =>
   state.info.backend;
 export const infoBroadcastSelector = (state: RootState): BroadcastEvent =>

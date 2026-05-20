@@ -1,10 +1,5 @@
 import axios from "axios";
-import {
-  setAppLogo,
-  setAppName,
-  setBuyLink,
-  setDocsUrl,
-} from "@/conf/env.ts";
+import { setAppLogo, setAppName, setBuyLink, setDocsUrl } from "@/conf/env.ts";
 import { infoEvent } from "@/events/info.ts";
 import { initGoogleAnalytics } from "@/utils/analytics.ts";
 import { BroadcastEvent, getBroadcast } from "@/api/broadcast";
@@ -29,8 +24,6 @@ export type SiteInfo = {
   footer: string;
   auth_footer: boolean;
   hide_key_docs?: boolean;
-  close_relay?: boolean;
-  relay_plan: boolean;
   web_search?: boolean;
   has_task_model?: boolean;
   payment: string[];
@@ -62,9 +55,7 @@ export async function getSiteInfo(): Promise<SiteInfo> {
       footer: "",
       auth_footer: false,
       hide_key_docs: false,
-      close_relay: false,
       mail: false,
-      relay_plan: false,
       web_search: false,
       has_task_model: false,
       payment: [],

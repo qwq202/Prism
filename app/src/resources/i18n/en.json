@@ -26,8 +26,7 @@
     "invalid-username-or-password-format": "Invalid username or password format",
     "deeptrain-disabled": "DeepTrain login mode is disabled",
     "invalid-access-token": "Unable to validate access token",
-    "registration-closed": "Registration is closed for this site",
-    "relay-api-disabled": "Relay API is disabled"
+    "registration-closed": "Registration is closed for this site"
   },
   "success": "Request successful",
   "request-success": "Your operation has been successfully executed.",
@@ -355,7 +354,6 @@
     "plan-tip": "Callable Model",
     "disable": "This site's subscription feature has been turned off",
     "plan-unlimited-usage": "{{name}} has unlimited uses",
-    "plan-not-support-relay": "Site subscription quota does not cover relay API. Please use flexible billing credits for relay API.",
     "failed-quota-prompt": "Subscription failed. Your balance is insufficient ({{quota}} credits)",
     "sub-migrate-failed-prompt": "Your subscription change failed: {{reason}}",
     "month": "Month",
@@ -443,14 +441,6 @@
     "success-prompt": "Project generated successfully! Please select the download format.",
     "empty": "Generating...",
     "download": "Download {{name}} format"
-  },
-  "api": {
-    "title": "API Key",
-    "copied": "Copied",
-    "copied-description": "API key has been copied to clipboard",
-    "learn-more": "Learn more",
-    "reset": "Reset Secret Key",
-    "reset-description": "Are you sure? This action cannot be undone. This will permanently reset the API key and the existing API key will expire."
   },
   "service": {
     "title": "New Version Available",
@@ -947,8 +937,6 @@
       "footer": "Footer Infor",
       "footerPlaceholder": "Please enter footer information (Markdown/HTML format supported)",
       "authFooter": "Hide footer after login",
-      "relayPlan": "Subscription Quota Support Staging API",
-      "relayPlanTip": "Subscription quota supports the transit API, after opening the transit API billing will give priority to the use of user subscription quota\n(Tip: Subscription is a quota of times, the model of billing for tokens may affect the cost)",
       "searchQueryTip": "Maximum number of search results, default is 5",
       "searchPlaceholder": "SearXNG Service Access Point (e.g. http://ip: 7980)",
       "image_store": "Picture storage",
@@ -980,8 +968,6 @@
       "storagePublicBaseUrlTip": "Public access prefix such as an r2.dev URL or custom domain; do not use the S3 API endpoint here",
       "storageForcePathStyle": "Force Path Style",
       "storageForcePathStyleTip": "Enable this if your S3-compatible service requires path-style access",
-      "closeRelay": "Turn off Staging API",
-      "closeRelayTip": "Turn off the staging API, the staging API will not be available after turning off",
       "debugMode": "debugging mode",
       "debugModeTip": "Debug mode, after turning on, the log will output detailed request parameters and other logs for troubleshooting",
       "operation": "Operational Settings",
@@ -1769,8 +1755,6 @@
     "deeptrain": "DeepTrain Unified Account Management",
     "deeptrain-description": "Prism is a product of DeepTrain. DeepTrain's unified account management system provides users with unified account management services. You can view your account information, third-party account linking, 2FA settings, wallet settings, authentication information, and more on this page. Deeptrain Unified Account Management is commonly used in Prism, Fystart, LightNotes and other products.",
     "my-account-description": "Your account information, third-party account linking information, etc.",
-    "api-description": "Your global account API information",
-    "api-disabled-description": "The relay API is disabled by the administrator, so account API settings are unavailable.",
     "share-description": "View and manage your history conversations",
     "share-delete": "Remove share",
     "share-delete-description": "Are you sure you want to delete this share?",

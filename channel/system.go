@@ -22,8 +22,6 @@ type ApiInfo struct {
 	Mail         bool     `json:"mail"`
 	Article      []string `json:"article"`
 	Generation   []string `json:"generation"`
-	CloseRelay   bool     `json:"close_relay"`
-	RelayPlan    bool     `json:"relay_plan"`
 	WebSearch    bool     `json:"web_search"`
 	HasTaskModel bool     `json:"has_task_model"`
 }
@@ -40,8 +38,6 @@ type generalState struct {
 
 type siteState struct {
 	CloseRegister bool    `json:"close_register" mapstructure:"closeregister"`
-	CloseRelay    bool    `json:"close_relay" mapstructure:"closerelay"`
-	RelayPlan     bool    `json:"relay_plan" mapstructure:"relayplan"`
 	Quota         float64 `json:"quota" mapstructure:"quota"`
 	BuyLink       string  `json:"buy_link" mapstructure:"buylink"`
 	Announcement  string  `json:"announcement" mapstructure:"announcement"`
@@ -152,7 +148,6 @@ func (c *SystemConfig) Load() {
 	globals.DebugMode = c.General.DebugMode
 
 	globals.CloseRegistration = c.Site.CloseRegister
-	globals.CloseRelay = c.Site.CloseRelay
 
 	globals.ArticlePermissionGroup = c.Common.Article
 	globals.GenerationPermissionGroup = c.Common.Generation
@@ -211,8 +206,6 @@ func (c *SystemConfig) AsInfo() ApiInfo {
 		Mail:         c.IsMailValid(),
 		Article:      c.Common.Article,
 		Generation:   c.Common.Generation,
-		CloseRelay:   c.Site.CloseRelay,
-		RelayPlan:    c.Site.RelayPlan,
 		WebSearch:    strings.TrimSpace(globals.SearchApiKey) != "",
 		HasTaskModel: globals.GetTaskModel() != "",
 	}
@@ -493,10 +486,6 @@ func (c *SystemConfig) AcceptImageStore() bool {
 	}
 
 	return len(strings.TrimSpace(globals.NotifyUrl)) > 0
-}
-
-func (c *SystemConfig) SupportRelayPlan() bool {
-	return c.Site.RelayPlan
 }
 
 func (c *SystemConfig) IsPasskeyEnabled() bool {

@@ -9,7 +9,6 @@ import {
   Coins,
   Crown,
   ExternalLink,
-  InfoIcon,
   Star,
   Rocket,
   Zap,
@@ -25,7 +24,7 @@ import { docsEndpoint } from "@/conf/env.ts";
 import { cn } from "@/components/ui/lib/utils.ts";
 import { useMemo, useState } from "react";
 import { useSelector } from "react-redux";
-import { infoRelayPlanSelector, useCurrency } from "@/store/info.ts";
+import { useCurrency } from "@/store/info.ts";
 import {
   expiredSelector,
   isSubscribedSelector,
@@ -391,7 +390,6 @@ function WalletPlanBox() {
   const usage = useSelector(usageSelector);
   const [isYearly, setIsYearly] = useState(false);
   const subscriptionData = useSelector(subscriptionDataSelector);
-  const relayPlan = useSelector(infoRelayPlanSelector);
 
   const plan = useMemo(
     () => getPlan(subscriptionData, level),
@@ -448,12 +446,6 @@ function WalletPlanBox() {
         </div>
 
         <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-          {!relayPlan && (
-            <p>
-              <InfoIcon className="h-3 w-3 inline-block mr-1" />
-              {t("sub.plan-not-support-relay")}
-            </p>
-          )}
           <p>
             {t("buy.plan-info")}
             <a

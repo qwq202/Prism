@@ -28,10 +28,6 @@ func ParseAuth(c *gin.Context, token string) *auth.User {
 		token = token[7:]
 	}
 
-	if strings.HasPrefix(token, "sk-") {
-		return auth.ParseApiKey(c, token)
-	}
-
 	return auth.ParseToken(c, token)
 }
 

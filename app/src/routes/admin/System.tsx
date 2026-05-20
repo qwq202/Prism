@@ -414,7 +414,9 @@ function Mail({ data, dispatch, onChange }: CompProps<MailState>) {
               value: e.target.value,
             })
           }
-          placeholder={`${t("admin.system.mailFrom")} <${data.username}@${location.hostname}>`}
+          placeholder={`${t("admin.system.mailFrom")} <${data.username}@${
+            location.hostname
+          }>`}
           className={cn("transition-all duration-300")}
         />
       </ParagraphItem>
@@ -529,36 +531,6 @@ function Site({ data, dispatch, onChange }: CompProps<SiteState>) {
           checked={data.close_register}
           onCheckedChange={(value) => {
             dispatch({ type: "update:site.close_register", value });
-          }}
-        />
-      </ParagraphItem>
-      <ParagraphItem>
-        <Label>
-          {t("admin.system.closeRelay")}
-          <Tips
-            className={`inline-block`}
-            content={t("admin.system.closeRelayTip")}
-          />
-        </Label>
-        <Switch
-          checked={data.close_relay}
-          onCheckedChange={(value) => {
-            dispatch({ type: "update:site.close_relay", value });
-          }}
-        />
-      </ParagraphItem>
-      <ParagraphItem>
-        <Label>
-          {t("admin.system.relayPlan")}
-          <Tips
-            className={`inline-block`}
-            content={t("admin.system.relayPlanTip")}
-          />
-        </Label>
-        <Switch
-          checked={data.relay_plan}
-          onCheckedChange={(value) => {
-            dispatch({ type: "update:site.relay_plan", value });
           }}
         />
       </ParagraphItem>
@@ -1021,9 +993,15 @@ function StorageSettings({
             />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="local">{t("admin.system.storageMode_local")}</SelectItem>
-            <SelectItem value="s3">{t("admin.system.storageMode_s3")}</SelectItem>
-            <SelectItem value="r2">{t("admin.system.storageMode_r2")}</SelectItem>
+            <SelectItem value="local">
+              {t("admin.system.storageMode_local")}
+            </SelectItem>
+            <SelectItem value="s3">
+              {t("admin.system.storageMode_s3")}
+            </SelectItem>
+            <SelectItem value="r2">
+              {t("admin.system.storageMode_r2")}
+            </SelectItem>
           </SelectContent>
         </Select>
       </ParagraphItem>

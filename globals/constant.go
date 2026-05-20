@@ -45,6 +45,5 @@ const (
 
 const (
 	WebTokenType = "web"
-	ApiTokenType = "api"
 	SystemToken  = "system"
 )

@@ -25,8 +25,6 @@ var limits = map[string]Limiter{
 	"/register":     {Duration: 120, Count: 10},
 	"/verify":       {Duration: 120, Count: 10},
 	"/reset":        {Duration: 120, Count: 10},
-	"/apikey":       {Duration: 1, Count: 2},
-	"/resetkey":     {Duration: 3600, Count: 3},
 	"/package":      {Duration: 1, Count: 2},
 	"/quota":        {Duration: 1, Count: 2},
 	"/buy":          {Duration: 1, Count: 2},

@@ -23,33 +23,6 @@ func ProcessToken(c *gin.Context, token string) *auth.User {
 	return nil
 }
 
-func ProcessKey(c *gin.Context, key string) *auth.User {
-	addr := requestRemoteIP(c)
-	cache := utils.GetCacheFromContext(c)
-
-	if utils.IsInBlackList(cache, addr) {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-			"code":    403,
-			"message": "ip in black list",
-		})
-		return nil
-	}
-
-	if user := auth.ParseApiKey(c, key); user != nil {
-		c.Set("auth", true)
-		c.Set("user", user.Username)
-		c.Set("agent", "api")
-		return user
-	}
-
-	utils.IncrIP(cache, addr)
-	c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-		"code":    401,
-		"message": "Access denied. Please provide correct api key.",
-	})
-	return nil
-}
-
 func ProcessAuthorization(c *gin.Context) *auth.User {
 	k := strings.TrimSpace(c.GetHeader("Authorization"))
 	if k != "" {
@@ -57,13 +30,7 @@ func ProcessAuthorization(c *gin.Context) *auth.User {
 			k = strings.TrimPrefix(k, "Bearer ")
 		}
 
-		if strings.HasPrefix(k, "sk-") {
-			// api agent
-			return ProcessKey(c, k)
-		} else {
-			// token agent
-			return ProcessToken(c, k)
-		}
+		return ProcessToken(c, k)
 	}
 
 	c.Set("auth", false)

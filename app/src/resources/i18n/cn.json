@@ -39,8 +39,7 @@
     "invalid-username-or-password-format": "用户名或密码格式不正确",
     "deeptrain-disabled": "DeepTrain 登录模式未启用",
     "invalid-access-token": "无法验证访问令牌",
-    "registration-closed": "当前站点未开放注册",
-    "relay-api-disabled": "中转 API 已关闭"
+    "registration-closed": "当前站点未开放注册"
   },
   "success": "请求成功",
   "request-success": "您的操作已成功执行。",
@@ -533,7 +532,6 @@
     "title": "订阅",
     "disable": "本站订阅功能已被关闭",
     "quota-link": "寻求弹性计费？购买点数",
-    "plan-not-support-relay": "站点订阅配额不涵盖中转 API , 中转 API 请使用弹性计费点数",
     "subscription-link": "寻求固定计费？订阅计划",
     "dialog-title": "订阅计划",
     "month": "月",
@@ -668,14 +666,6 @@
     "success-prompt": "成功生成项目！请选择下载格式。",
     "empty": "生成中...",
     "download": "下载 {{name}} 格式"
-  },
-  "api": {
-    "title": "API 设置",
-    "copied": "复制成功",
-    "copied-description": "API 密钥已复制到剪贴板",
-    "learn-more": "了解更多",
-    "reset": "重置密钥",
-    "reset-description": "是否确定？此操作无法撤消。这将永久重置 API 密钥，已有 API 密钥将会失效。"
   },
   "service": {
     "title": "发现新版本",
@@ -1490,10 +1480,6 @@
       "displayCurrency": "显示货币",
       "displayCurrencyTip": "网站显示货币单位",
       "closeRegistrationTip": "暂停注册，关闭后新用户将无法注册",
-      "closeRelay": "关闭中转 API",
-      "closeRelayTip": "关闭中转 API，关闭后中转 API 将无法使用",
-      "relayPlan": "订阅配额支持中转 API",
-      "relayPlanTip": "订阅配额支持中转 API，开启后中转 API 计费会优先考虑使用用户订阅配额\n（提示：订阅为次数配额，对 Token 计费的模型可能会影响成本）",
       "preDeductQuota": "启用预扣费",
       "preDeductQuotaTip": "开启后将在请求开始时预扣费用，关闭后将在请求结束时扣费",
       "quota": "用户初始点数",
@@ -1858,8 +1844,6 @@
     "passkey-created-at": "创建时间：{{time}}",
     "remove-passkey": "移除通行密钥",
     "remove-passkey-description": "确定要移除此通行密钥吗？移除后该设备将无法再用于后续通行密钥登录。",
-    "api-description": "您的全局账号 API 信息 ",
-    "api-disabled-description": "管理员已关闭中转 API，当前账号 API 设置不可用。",
     "deeptrain-description": "您的 DeepTrain 统一账号绑定信息",
     "registerDays": "注册 {{days}} 天",
     "current-quota": "当前点数",

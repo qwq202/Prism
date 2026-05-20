@@ -4,14 +4,9 @@ import React, { useState } from "react";
 import { cn } from "@/components/ui/lib/utils.ts";
 import Avatar from "@/components/Avatar.tsx";
 import { useDispatch, useSelector } from "react-redux";
-import {
-  logout,
-  selectAuthenticated,
-  selectInit,
-  selectUsername,
-} from "@/store/auth.ts";
+import { logout, selectAuthenticated, selectUsername } from "@/store/auth.ts";
 import { Badge } from "@/components/ui/badge.tsx";
-import { copyClipboard, useClipboard } from "@/utils/dom.ts";
+import { useClipboard } from "@/utils/dom.ts";
 import { useGroup } from "@/utils/groups.ts";
 import { useTranslation } from "react-i18next";
 import Icon from "@/components/utils/Icon.tsx";
@@ -20,16 +15,12 @@ import {
   Clock,
   Cloud,
   CloudRain,
-  Copy,
   ExternalLink,
   Fingerprint,
   HandIcon,
   HelpCircle,
   KeyRound,
   Mail,
-  Plug,
-  Power,
-  RotateCw,
   Share2,
   Trash2,
   Undo2,
@@ -52,7 +43,7 @@ import {
   updateAccountPassword,
   UserInfo,
 } from "@/api/auth.ts";
-import { CommonResponse, withNotify } from "@/api/common.ts";
+import { withNotify } from "@/api/common.ts";
 import { goAuth } from "@/utils/app.ts";
 import { quotaSelector } from "@/store/quota.ts";
 import Tips from "@/components/Tips.tsx";
@@ -60,8 +51,7 @@ import { getSharedLink, SharingPreviewForm } from "@/api/sharing.ts";
 import { openWindow } from "@/utils/device.ts";
 import { dataSelector, deleteData, syncData } from "@/store/sharing.ts";
 import { DeeptrainOnly } from "@/conf/deeptrain.tsx";
-import { deeptrainEndpoint, docsEndpoint } from "@/conf/env.ts";
-import { getApiKey, keySelector, regenerateApiKey } from "@/store/api.ts";
+import { deeptrainEndpoint } from "@/conf/env.ts";
 import { Input } from "@/components/ui/input.tsx";
 import {
   AlertDialog,
@@ -89,7 +79,6 @@ import { toast } from "sonner";
 import Emoji from "@/components/Emoji";
 import { motion } from "framer-motion";
 import { isEmailValid, isTextInRange } from "@/utils/form.ts";
-import { infoCloseRelaySelector } from "@/store/info.ts";
 
 type AccountCardProps = {
   title: string;
@@ -137,9 +126,7 @@ function AccountCard({
           )}
         </div>
       </div>
-      <div className={cn("p-4", className)}>
-        {children}
-      </div>
+      <div className={cn("p-4", className)}>{children}</div>
       {footer && (
         <div className={`flex flex-row items-center px-4 pb-4 pt-2`}>
           {footer}
@@ -250,17 +237,11 @@ function ShareContent({ data }: ShareContentProps) {
 function Account() {
   const { t } = useTranslation();
   const dispatch = useDispatch();
-  const init = useSelector(selectInit);
   const username = useSelector(selectUsername);
   const auth = useSelector(selectAuthenticated);
   const quota = useSelector(quotaSelector);
   const copy = useClipboard();
   const group = useGroup(true);
-
-  const apiKey = useSelector(keySelector);
-  const closeRelay = useSelector(infoCloseRelaySelector);
-  const [loadingApiKey, setLoadingApiKey] = useState(false);
-  const [openResetApiKey, setOpenResetApiKey] = useState(false);
 
   const pageVariants = {
     hidden: { opacity: 0, y: 18 },
@@ -293,36 +274,6 @@ function Account() {
       transition: { duration: 0.3, ease: "easeOut" },
     },
   };
-
-  const getSystemKey = async () => {
-    if (!init || closeRelay) return;
-
-    setLoadingApiKey(true);
-    await getApiKey(dispatch);
-    setLoadingApiKey(false);
-  };
-
-  useEffectAsync(getSystemKey, [init, closeRelay]);
-
-  async function copySystemKey() {
-    if (closeRelay) return;
-
-    await copyClipboard(apiKey);
-    toast.success(t("api.copied"), {
-      description: t("api.copied-description"),
-    });
-  }
-
-  async function resetSystemKey() {
-    if (closeRelay) return;
-
-    const resp = await regenerateApiKey(dispatch);
-    withNotify(t, resp as CommonResponse, true);
-
-    if (resp.status) {
-      setOpenResetApiKey(false);
-    }
-  }
 
   const [info, setInfo] = React.useState<UserInfo>({
     ...initialUserInfo,
@@ -725,7 +676,10 @@ function Account() {
                 </div>
               </motion.div>
 
-              <motion.div className="flex flex-wrap gap-2" variants={contentVariants}>
+              <motion.div
+                className="flex flex-wrap gap-2"
+                variants={contentVariants}
+              >
                 <Badge className="px-3 py-1 text-sm font-medium">
                   {t(`admin.channels.groups.${group}`)}
                 </Badge>
@@ -829,7 +783,9 @@ function Account() {
                   onClick={() => openWindow(`${deeptrainEndpoint}/home`)}
                 />
                 <div className={`inline-flex flex-col`}>
-                  <p className={`text-common text-sm font-bold`}>DeepTrain SSO</p>
+                  <p className={`text-common text-sm font-bold`}>
+                    DeepTrain SSO
+                  </p>
                   <p className={`text-secondary text-xs`}>
                     {t("account.deeptrain-description")}
                   </p>
@@ -838,105 +794,6 @@ function Account() {
             </AccountCard>
           </motion.div>
         </DeeptrainOnly>
-        <motion.div variants={cardVariants}>
-          <AccountCard
-            title={"api.title"}
-            description={
-              closeRelay
-                ? t("account.api-disabled-description")
-                : t("account.api-description")
-            }
-            icon={<Plug />}
-          >
-            <motion.div
-              className={cn(
-                "api-dialog",
-                closeRelay && "pointer-events-none opacity-50",
-              )}
-              variants={contentVariants}
-            >
-              <div className={`api-wrapper flex flex-row space-x-1`}>
-                <Button
-                  variant={`outline`}
-                  size={`icon-sm`}
-                  className={`shrink-0`}
-                  onClick={getSystemKey}
-                  disabled={closeRelay}
-                >
-                  <RotateCw
-                    className={cn("h-3.5 w-3.5", loadingApiKey && "animate-spin")}
-                  />
-                </Button>
-                <Input
-                  type={`password`}
-                  value={closeRelay ? "" : apiKey}
-                  readOnly={true}
-                  disabled={closeRelay}
-                  classNameWrapper={`grow`}
-                  className={`text-xs h-8`}
-                />
-                <Button
-                  variant={`default`}
-                  className={`shrink-0`}
-                  size={`icon-sm`}
-                  onClick={copySystemKey}
-                  disabled={closeRelay}
-                >
-                  <Copy className={`h-3.5 w-3.5`} />
-                </Button>
-              </div>
-              <div className={`flex flex-row mt-2 items-center justify-center`}>
-                <AlertDialog
-                  open={openResetApiKey}
-                  onOpenChange={setOpenResetApiKey}
-                >
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant={`destructive`}
-                      size={`default-sm`}
-                      className={`text-xs mr-2`}
-                      disabled={closeRelay}
-                    >
-                      <Power className={`h-3.5 w-3.5 mr-2`} />
-                      {t("api.reset")}
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>{t("api.reset")}</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        {t("api.reset-description")}
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <Button
-                        variant={`destructive`}
-                        loading={true}
-                        onClick={resetSystemKey}
-                        unClickable
-                      >
-                        {t("confirm")}
-                      </Button>
-                      <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-
-                <Button
-                  variant={`outline`}
-                  size={`default-sm`}
-                  className={`text-xs`}
-                  asChild
-                >
-                  <a href={docsEndpoint} target={`_blank`}>
-                    <ExternalLink className={`h-3.5 w-3.5 mr-2`} />
-                    {t("api.learn-more")}
-                  </a>
-                </Button>
-              </div>
-            </motion.div>
-          </AccountCard>
-        </motion.div>
         <motion.div variants={cardVariants}>
           <AccountCard
             title={"account.security"}
@@ -970,7 +827,11 @@ function Account() {
                     {t("account.bind-passkey")}
                   </Button>
                 ) : (
-                  <Button className="shrink-0" size="default-sm" onClick={goAuth}>
+                  <Button
+                    className="shrink-0"
+                    size="default-sm"
+                    onClick={goAuth}
+                  >
                     <HandIcon className="mr-1.5 h-3.5 w-3.5" />
                     {t("login")}
                   </Button>

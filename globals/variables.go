@@ -43,7 +43,6 @@ var StorageR2PublicBaseURL string
 var OrphanCleanupEnabled bool
 var OrphanCleanupInterval int64
 var CloseRegistration bool
-var CloseRelay bool
 
 var SearchApiKey string
 var SearchCrop bool

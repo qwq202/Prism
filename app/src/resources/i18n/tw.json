@@ -28,8 +28,7 @@
     "invalid-username-or-password-format": "使用者名稱或密碼格式不正確",
     "deeptrain-disabled": "DeepTrain 登入模式未啟用",
     "invalid-access-token": "無法驗證存取權杖",
-    "registration-closed": "目前站點未開放註冊",
-    "relay-api-disabled": "中轉 API 已關閉"
+    "registration-closed": "目前站點未開放註冊"
   },
   "success": "請求成功",
   "request-success": "您的操作已成功執行。",
@@ -385,7 +384,6 @@
     "title": "訂閱",
     "disable": "本站訂閱功能已被關閉",
     "quota-link": "想要彈性計費？購買點數",
-    "plan-not-support-relay": "站台訂閱額度不涵蓋中繼 API，中繼 API 請使用彈性計費點數",
     "subscription-link": "想要固定計費？訂閱方案",
     "dialog-title": "訂閱方案",
     "free": "免費版",
@@ -520,14 +518,6 @@
     "success-prompt": "成功產生專案！請選擇下載格式。",
     "empty": "產生中...",
     "download": "下載 {{name}} 格式"
-  },
-  "api": {
-    "title": "API 設定",
-    "copied": "複製成功",
-    "copied-description": "API 金鑰已複製到剪貼簿",
-    "learn-more": "了解更多",
-    "reset": "重設金鑰",
-    "reset-description": "是否確定？此操作無法復原。這將永久重設 API 金鑰，已有的 API 金鑰將會失效。"
   },
   "service": {
     "title": "發現新版本",
@@ -1188,10 +1178,6 @@
       "searchPlaceholder": "SearXNG 服務接入點（例如 http://ip:7980）",
       "closeRegistration": "暫停註冊",
       "closeRegistrationTip": "暫停註冊，關閉後新使用者將無法註冊",
-      "closeRelay": "關閉中繼 API",
-      "closeRelayTip": "關閉中繼 API，關閉後中繼 API 將無法使用",
-      "relayPlan": "訂閱額度支援中繼 API",
-      "relayPlanTip": "訂閱額度支援中繼 API，開啟後中繼 API 計費會優先考慮使用使用者訂閱額度\n（提示：訂閱為次數額度，對 Token 計費的模型可能會影響成本）",
       "quota": "使用者初始點數",
       "quotaTip": "使用者註冊後贈送的點數",
       "buyLink": "購買連結",
@@ -1854,8 +1840,6 @@
     "passkey-created-at": "建立時間：{{time}}",
     "remove-passkey": "移除通行密鑰",
     "remove-passkey-description": "確定要移除此通行密鑰嗎？移除後該裝置將無法再用於後續通行密鑰登入。",
-    "api-description": "您的全域帳號API 訊息",
-    "api-disabled-description": "管理員已關閉中轉 API，目前帳號 API 設定不可用。",
     "deeptrain-description": "您的DeepTrain 統一帳號綁定訊息",
     "registerDays": "註冊 {{days}} 天",
     "current-quota": "目前點數",

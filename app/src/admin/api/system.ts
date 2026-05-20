@@ -55,10 +55,7 @@ export type TaskState = {
   model: string;
 };
 
-export type PasskeyUserVerification =
-  | "required"
-  | "preferred"
-  | "discouraged";
+export type PasskeyUserVerification = "required" | "preferred" | "discouraged";
 
 export type PasskeyAuthenticatorAttachment =
   | "any"
@@ -91,7 +88,7 @@ export type SecurityState = {
 
   custom_endpoint: string;
   custom_audit_token: string;
-  
+
   blacklist_ips: string[];
   whitelist_ips: string[];
 };
@@ -139,8 +136,6 @@ export type PaymentState = {
 export type SiteState = {
   close_register: boolean;
   currency: string;
-  close_relay: boolean;
-  relay_plan: boolean;
   quota: number;
   buy_link: string;
   announcement: string;
@@ -246,8 +241,6 @@ export const initialSystemState: SystemProps = {
   site: {
     close_register: false,
     currency: "cny",
-    close_relay: false,
-    relay_plan: false,
     quota: 0,
     buy_link: "",
     announcement: "",
@@ -474,8 +467,8 @@ export async function getConfig(): Promise<SystemResponse> {
         data.data.common.storage_mode === "s3"
           ? "s3"
           : data.data.common.storage_mode === "r2"
-            ? "r2"
-            : "local";
+          ? "r2"
+          : "local";
       const s3 = (data.data.common.s3 = data.data.common.s3 || {
         endpoint: "",
         region: "",
@@ -506,7 +499,8 @@ export async function getConfig(): Promise<SystemResponse> {
       r2.access_key = r2.access_key || "";
       r2.secret_key = r2.secret_key || "";
       r2.public_base_url = r2.public_base_url || "";
-      data.data.common.orphan_cleanup_enabled = !!data.data.common.orphan_cleanup_enabled;
+      data.data.common.orphan_cleanup_enabled =
+        !!data.data.common.orphan_cleanup_enabled;
       data.data.common.orphan_cleanup_interval =
         typeof data.data.common.orphan_cleanup_interval === "number" &&
         data.data.common.orphan_cleanup_interval > 0
@@ -551,11 +545,18 @@ export async function getConfig(): Promise<SystemResponse> {
         };
       }
 
-      const rt = (data.data.general.realtime = data.data.general.realtime || {});
+      const rt = (data.data.general.realtime =
+        data.data.general.realtime || {});
       const ws = (rt.ws = rt.ws || {});
-      ws.buffer_size = typeof ws.buffer_size === "number" && ws.buffer_size > 0 ? ws.buffer_size : 1;
+      ws.buffer_size =
+        typeof ws.buffer_size === "number" && ws.buffer_size > 0
+          ? ws.buffer_size
+          : 1;
       ws.aggregate = typeof ws.aggregate === "boolean" ? ws.aggregate : true;
-      ws.aggregate_window_ms = typeof ws.aggregate_window_ms === "number" && ws.aggregate_window_ms > 0 ? ws.aggregate_window_ms : 20;
+      ws.aggregate_window_ms =
+        typeof ws.aggregate_window_ms === "number" && ws.aggregate_window_ms > 0
+          ? ws.aggregate_window_ms
+          : 20;
 
       const at = (data.data.auto_title = data.data.auto_title || {
         enabled: false,
@@ -567,8 +568,10 @@ export async function getConfig(): Promise<SystemResponse> {
       });
       at.enabled = !!at.enabled;
       at.model = at.model || "";
-      at.max_len = typeof at.max_len === "number" && at.max_len > 0 ? at.max_len : 50;
-      at.min_msgs = typeof at.min_msgs === "number" && at.min_msgs > 0 ? at.min_msgs : 6;
+      at.max_len =
+        typeof at.max_len === "number" && at.max_len > 0 ? at.max_len : 50;
+      at.min_msgs =
+        typeof at.min_msgs === "number" && at.min_msgs > 0 ? at.min_msgs : 6;
       at.overwrite = !!at.overwrite;
       at.prompt = at.prompt || "";
     }

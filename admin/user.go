@@ -317,7 +317,6 @@ func deleteUser(db *sql.DB, cache *redis.Client, id int64) error {
 		"DELETE FROM memories WHERE user_id = ?",
 		"DELETE FROM mask WHERE user_id = ?",
 		"DELETE FROM subscription WHERE user_id = ?",
-		"DELETE FROM apikey WHERE user_id = ?",
 		"DELETE FROM passkey_credential WHERE user_id = ?",
 		"DELETE FROM broadcast WHERE poster_id = ?",
 		"DELETE FROM billing WHERE user_id = ?",

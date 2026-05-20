@@ -1,6 +1,4 @@
 import axios from "axios";
-import { getErrorMessage } from "@/utils/base.ts";
-
 type QuotaResponse = {
   status: boolean;
   error: string;
@@ -36,17 +34,6 @@ type SubscriptionResponse = {
 
 type BuySubscriptionResponse = {
   status: boolean;
-  error: string;
-};
-
-type ApiKeyResponse = {
-  status: boolean;
-  key: string;
-};
-
-type ResetApiKeyResponse = {
-  status: boolean;
-  key: string;
   error: string;
 };
 
@@ -112,31 +99,5 @@ export async function buySubscription(
   } catch (e) {
     console.debug(e);
     return { status: false, error: "network error" };
-  }
-}
-
-export async function getKey(): Promise<ApiKeyResponse> {
-  try {
-    const resp = await axios.get(`/apikey`);
-    if (resp.data.status === false) {
-      return { status: false, key: "" };
-    }
-    return {
-      status: resp.data.status,
-      key: resp.data.key,
-    };
-  } catch (e) {
-    console.debug(e);
-    return { status: false, key: "" };
-  }
-}
-
-export async function regenerateKey(): Promise<ResetApiKeyResponse> {
-  try {
-    const resp = await axios.post(`/resetkey`);
-    return resp.data as ResetApiKeyResponse;
-  } catch (e) {
-    console.debug(e);
-    return { status: false, key: "", error: getErrorMessage(e) };
   }
 }

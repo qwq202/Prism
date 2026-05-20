@@ -55,12 +55,6 @@ spec:
     4. 深度求索 DeepSeek AI (👉 OpenAI)
     5. LocalAI / Ollama (👉 OpenAI)
 
-    ## 👻 中转 OpenAI 兼容 API
-       - [x] Chat Completions _(/v1/chat/completions)_
-       - [x] Image Generation _(/v1/images)_
-       - [x] Model List _(/v1/models)_
-       - [x] Dashboard Billing _(/v1/billing)_
-
     ## 🧪 部署
     1. 填入你想要绑定的域名，并点击部署。
     2. 部署成功后，默认管理用户名为 `root`，管理密码为 `chatnio123456`，请根据提示尽快更换初始密码。
@@ -262,12 +256,6 @@ localization:
       3. Google Gemini & PaLM2 *(✅ Vision)*
       4. 深度求索 DeepSeek AI (👉 OpenAI)
       5. LocalAI / Ollama (👉 OpenAI)
-
-      ## 👻 中转 OpenAI 兼容 API
-         - [x] Chat Completions _(/v1/chat/completions)_
-         - [x] Image Generation _(/v1/images)_
-         - [x] Model List _(/v1/models)_
-         - [x] Dashboard Billing _(/v1/billing)_
 
       ## 🧪 部署
       1. 填入你想要绑定的域名，并点击部署。

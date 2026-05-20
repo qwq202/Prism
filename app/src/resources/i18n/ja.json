@@ -26,8 +26,7 @@
     "invalid-username-or-password-format": "ユーザー名またはパスワードの形式が正しくありません",
     "deeptrain-disabled": "DeepTrain ログインモードは無効です",
     "invalid-access-token": "アクセストークンを検証できません",
-    "registration-closed": "このサイトでは現在登録を受け付けていません",
-    "relay-api-disabled": "リレー API は無効です"
+    "registration-closed": "このサイトでは現在登録を受け付けていません"
   },
   "success": "リクエストに成功しました",
   "request-success": "アクションは正常に実行されました。",
@@ -355,7 +354,6 @@
     "plan-tip": "呼び出し可能なモデル",
     "disable": "このサイトのサブスクリプション機能はオフになっています",
     "plan-unlimited-usage": "{{name}}は無制限に使用できます",
-    "plan-not-support-relay": "サイトサブスクリプションクォータはステージングAPIをカバーしていません。ステージングAPIに柔軟な請求クレジットを使用してください",
     "failed-quota-prompt": "サブスクリプションに失敗しました。残高が不足しています（{{ quota}}クレジット）",
     "sub-migrate-failed-prompt": "サブスクリプションの変更が{{reason}}で失敗しました",
     "month": "月",
@@ -443,14 +441,6 @@
     "success-prompt": "プロジェクトが正常に生成されました！ダウンロード形式を選択してください。",
     "empty": "生成しています...",
     "download": "{{name}}形式をダウンロード"
-  },
-  "api": {
-    "title": "API設定",
-    "copied": "コピー成功",
-    "copied-description": "APIキーをクリップボードにコピーしました",
-    "learn-more": "詳細はこちら",
-    "reset": "キーをリセット",
-    "reset-description": "本当によろしいですか？この操作は元に戻せません。これにより、APIキーが完全にリセットされ、既存のAPIキーが期限切れになります。"
   },
   "service": {
     "title": "新しいバージョンを発見する",
@@ -928,8 +918,6 @@
       "footer": "フッター情報",
       "footerPlaceholder": "フッター情報を入力してください（ Markdown/HTML形式に対応）",
       "authFooter": "ログイン後にフッターを非表示にする",
-      "relayPlan": "サブスクリプションクォータサポートステージングAPI",
-      "relayPlanTip": "サブスクリプションクォータはトランジットAPIをサポートしています。トランジットAPI請求を開いた後、ユーザーサブスクリプションクォータの使用が優先されます\n（ヒント：サブスクリプションは時間のクォータであり、トークンの請求モデルはコストに影響する可能性があります）",
       "searchQueryTip": "検索結果の最大数、デフォルトは5です",
       "searchPlaceholder": "SearXNGサービスアクセスポイント（例： http :// ip: 7980 ）",
       "image_store": "画像ストレージ",
@@ -953,8 +941,6 @@
       "storagePublicBaseUrl": "Public Base URL",
       "storageForcePathStyle": "Force Path Style",
       "storageForcePathStyleTip": "S3 互換サービスで path-style アクセスが必要な場合に有効化してください",
-      "closeRelay": "ステージングAPIをオフにする",
-      "closeRelayTip": "ステージングAPIをオフにすると、オフにするとステージングAPIは使用できなくなります",
       "debugMode": "試験調整モード",
       "debugModeTip": "デバッグモード、オンにすると、ログは詳細な要求パラメータとトラブルシューティングのための他のログを出力します",
       "operation": "操作設定",
@@ -1741,8 +1727,6 @@
     "deeptrain": "DeepTrainユニファイドアカウント管理",
     "deeptrain-description": "PrismはDeepTrainの製品です。DeepTrainのユニファイドアカウント管理システムは、ユーザーにユニファイドアカウント管理サービスを提供します。このページでは、アカウント情報、サードパーティのアカウントリンク、2 FA設定、ウォレット設定、認証情報などを表示できます。Deeptrainユニファイドアカウント管理は、Prism、Fystart、LightNotesなどの製品で一般的に使用されています。",
     "my-account-description": "お客様のアカウント情報、第三者のアカウントリンク情報など",
-    "api-description": "グローバルアカウントAPI情報",
-    "api-disabled-description": "管理者がリレー API を無効にしているため、アカウント API 設定は使用できません。",
     "share-description": "履歴の会話の表示と管理",
     "share-delete": "シェアを削除",
     "share-delete-description": "この共有を削除してもよろしいですか？",

@@ -895,10 +895,10 @@ func createChatTask(
 						if strings.HasPrefix(data.Content, "{") && strings.Contains(data.Content, "\"id\"") && strings.Contains(data.Content, "\"status\"") {
 							finalJobJson = data.Content
 
-							job, err := utils.UnmarshalString[RelayVideoJob](data.Content)
+							job, err := utils.UnmarshalString[VideoJob](data.Content)
 							if err == nil && job.Id != "" && job.Status == "completed" {
 								backendUrl := channel.SystemInstance.GetBackend()
-								videoUrl := fmt.Sprintf("%s/v1/videos/%s/content", backendUrl, job.Id)
+								videoUrl := fmt.Sprintf("%s/videos/%s/content", backendUrl, job.Id)
 								videoMarkdown := utils.GetVideoMarkdown(videoUrl, "video")
 
 								chunkChan <- partialChunk{Chunk: &globals.Chunk{Content: videoMarkdown}, End: false, Hit: false, Error: nil}
@@ -913,7 +913,7 @@ func createChatTask(
 			)
 
 			if instance != nil && finalJobJson != "" {
-				job, err := utils.UnmarshalString[RelayVideoJob](finalJobJson)
+				job, err := utils.UnmarshalString[VideoJob](finalJobJson)
 				if err != nil {
 					globals.Warn(fmt.Sprintf("[video] failed to parse job JSON: %s, finalJobJson: %s", err.Error(), finalJobJson))
 				} else if job.Id == "" {

@@ -382,61 +382,6 @@ func IndexAPI(c *gin.Context) {
 	})
 }
 
-func KeyAPI(c *gin.Context) {
-	if globals.CloseRelay {
-		c.JSON(http.StatusOK, gin.H{
-			"status": false,
-			"error":  "relay api is disabled",
-		})
-		return
-	}
-
-	user := GetUser(c)
-	if user == nil {
-		c.JSON(http.StatusOK, gin.H{
-			"status": false,
-			"error":  "user not found",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status": true,
-		"key":    user.GetApiKey(utils.GetDBFromContext(c)),
-	})
-}
-
-func ResetKeyAPI(c *gin.Context) {
-	if globals.CloseRelay {
-		c.JSON(http.StatusOK, gin.H{
-			"status": false,
-			"error":  "relay api is disabled",
-		})
-		return
-	}
-
-	user := GetUser(c)
-	if user == nil {
-		c.JSON(http.StatusOK, gin.H{
-			"status": false,
-			"error":  "user not found",
-		})
-		return
-	}
-
-	if key, err := user.ResetApiKey(utils.GetDBFromContext(c)); err != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"status": false,
-			"error":  err.Error(),
-		})
-	} else {
-		c.JSON(http.StatusOK, gin.H{
-			"status": true,
-			"key":    key,
-		})
-	}
-}
-
 func PackageAPI(c *gin.Context) {
 	user := GetUserByCtx(c)
 	if user == nil {
