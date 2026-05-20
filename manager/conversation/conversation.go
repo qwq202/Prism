@@ -35,6 +35,7 @@ type Conversation struct {
 	Shared                   bool              `json:"shared"`
 	Context                  int               `json:"context"`
 	CustomInstruction        string            `json:"custom_instruction,omitempty"`
+	LearningMode             bool              `json:"learning_mode"`
 	MemoryEnabled            bool              `json:"memory_enabled"`
 	MemoryHistoryEnabled     bool              `json:"memory_history_enabled"`
 
@@ -64,6 +65,7 @@ type FormMessage struct {
 	IgnoreContext           bool   `json:"ignore_context"`
 	Context                 int    `json:"context"`
 	CustomInstruction       string `json:"custom_instruction,omitempty"`
+	LearningMode            bool   `json:"learning_mode"`
 	MemoryEnabled           bool   `json:"memory_enabled"`
 	MemoryHistoryEnabled    bool   `json:"memory_history_enabled"`
 
@@ -299,6 +301,14 @@ func (c *Conversation) SetCustomInstruction(customInstruction string) {
 	c.CustomInstruction = strings.TrimSpace(customInstruction)
 }
 
+func (c *Conversation) IsLearningModeEnabled() bool {
+	return c.LearningMode
+}
+
+func (c *Conversation) SetLearningMode(enabled bool) {
+	c.LearningMode = enabled
+}
+
 func (c *Conversation) IsMemoryEnabled() bool {
 	return c.MemoryEnabled
 }
@@ -527,6 +537,7 @@ func (c *Conversation) ApplyParam(form *FormMessage) {
 	c.SetOpenAIReasoningSummary(form.OpenAIReasoningSummary)
 	c.SetContextLength(form.Context, form.IgnoreContext)
 	c.SetCustomInstruction(form.CustomInstruction)
+	c.SetLearningMode(form.LearningMode)
 	c.SetMemoryEnabled(form.MemoryEnabled)
 	c.SetMemoryHistoryEnabled(form.MemoryHistoryEnabled)
 

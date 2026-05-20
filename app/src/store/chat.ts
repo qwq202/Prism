@@ -128,6 +128,7 @@ type initialStateType = {
   xai_x_search: boolean;
   openai_responses_web_search: boolean;
   fetch: boolean;
+  learning_mode: boolean;
   gemini_thinking_budget: number;
   deepseek_thinking_enabled_by_model: Record<string, boolean>;
   deepseek_reasoning_effort_by_model: Record<string, string>;
@@ -619,6 +620,7 @@ const chatSlice = createSlice({
       false,
     ),
     fetch: getBooleanMemory("fetch", false),
+    learning_mode: getBooleanMemory("learning_mode", false),
     gemini_thinking_budget: getNumberMemory("gemini_thinking_budget", 0),
     deepseek_thinking_enabled_by_model:
       getInitialDeepSeekThinkingEnabledByModel(initialModel),
@@ -873,6 +875,10 @@ const chatSlice = createSlice({
       setMemory("fetch", action.payload ? "true" : "false");
       state.fetch = action.payload as boolean;
     },
+    setLearningMode: (state, action) => {
+      setMemory("learning_mode", action.payload ? "true" : "false");
+      state.learning_mode = action.payload as boolean;
+    },
     setGeminiThinkingBudget: (state, action) => {
       setNumberMemory("gemini_thinking_budget", action.payload as number);
       state.gemini_thinking_budget = action.payload as number;
@@ -989,6 +995,7 @@ export const {
   setXAIXSearch,
   setOpenAIResponsesWebSearch,
   setFetch,
+  setLearningMode,
   setGeminiThinkingBudget,
   setDeepSeekThinkingEnabled,
   setDeepSeekReasoningEffort,
@@ -1033,6 +1040,8 @@ export const selectXAIXSearch = (state: RootState): boolean =>
 export const selectOpenAIResponsesWebSearch = (state: RootState): boolean =>
   state.chat.openai_responses_web_search;
 export const selectFetch = (state: RootState): boolean => state.chat.fetch;
+export const selectLearningMode = (state: RootState): boolean =>
+  state.chat.learning_mode;
 export const selectGeminiThinkingBudget = (state: RootState): number =>
   state.chat.gemini_thinking_budget;
 export const selectDeepSeekThinkingEnabled = (state: RootState): boolean =>
@@ -1240,6 +1249,7 @@ export function useMessageActions() {
     selectOpenAIResponsesWebSearch,
   );
   const fetch = useSelector(selectFetch);
+  const learning_mode = useSelector(selectLearningMode);
   const gemini_thinking_budget = useSelector(selectGeminiThinkingBudget);
   const deepseek_thinking_enabled_by_model = useSelector(
     selectDeepSeekThinkingEnabledByModel,
@@ -1348,6 +1358,7 @@ export function useMessageActions() {
         url_context: enableGeminiNativeWeb ? gemini_url_context : false,
         x_search: enableXAINativeWeb ? xai_x_search : false,
         fetch,
+        learning_mode,
         gemini_thinking_budget: supportsGeminiThinkingBudgetControl(targetModel)
           ? gemini_thinking_budget
           : undefined,
@@ -1445,6 +1456,7 @@ export function useMessageActions() {
         url_context: enableGeminiNativeWeb ? gemini_url_context : false,
         x_search: enableXAINativeWeb ? xai_x_search : false,
         fetch,
+        learning_mode,
         gemini_thinking_budget: supportsGeminiThinkingBudgetControl(model)
           ? gemini_thinking_budget
           : undefined,

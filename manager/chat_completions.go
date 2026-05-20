@@ -117,6 +117,7 @@ func getChatProps(form RelayForm, messages []globals.Message, buffer *utils.Buff
 	return adaptercommon.CreateChatProps(&adaptercommon.ChatProps{
 		Model:                form.Model,
 		Message:              messages,
+		LearningMode:         form.LearningMode,
 		EnableWeb:            enableWeb,
 		EnableWebSearch:      webSearch,
 		EnableURLContext:     urlContext,

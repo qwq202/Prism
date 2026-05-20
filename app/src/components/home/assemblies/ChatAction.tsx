@@ -5,6 +5,7 @@ import {
   isOpenAIResponsesNativeWebModel,
   isXAIModelId,
   selectFetch,
+  selectLearningMode,
   selectDeepSeekReasoningEffort,
   selectDeepSeekThinkingEnabled,
   selectOpenAIReasoningEffort,
@@ -22,6 +23,7 @@ import {
   setOpenAIReasoningSummary,
   setOpenAIResponsesWebSearch,
   setFetch,
+  setLearningMode,
   setDeepSeekReasoningEffort,
   setDeepSeekThinkingEnabled,
   setGeminiThinkingBudget,
@@ -37,6 +39,7 @@ import {
 import { infoWebSearchSelector } from "@/store/info.ts";
 import {
   Brain,
+  GraduationCap,
   Globe,
   Info,
   Link,
@@ -429,6 +432,49 @@ export function FetchAction() {
             <div className="flex items-start">
               <Icon icon={<Info />} className="h-3 w-3 mr-1 mt-0.5 shrink-0" />
               {t("chat.fetch-tip")}
+            </div>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+export function LearningModeAction() {
+  const { t } = useTranslation();
+  const dispatch = useDispatch();
+  const learningMode = useSelector(selectLearningMode);
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <div>
+          <ChatAction active={learningMode} text={t("chat.learning-mode")}>
+            <GraduationCap
+              className={cn("h-4 w-4", learningMode && "enable")}
+            />
+          </ChatAction>
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-3" side="top" align="start">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="learning-mode-toggle" className="text-sm">
+              {t("chat.learning-mode-enable")}
+            </Label>
+            <Switch
+              id="learning-mode-toggle"
+              checked={learningMode}
+              onCheckedChange={(state) => {
+                dispatch(setLearningMode(state));
+              }}
+            />
+          </div>
+
+          <div className="rounded-md bg-muted p-2 text-xs">
+            <div className="flex items-start">
+              <Icon icon={<Info />} className="h-3 w-3 mr-1 mt-0.5 shrink-0" />
+              {t("chat.learning-mode-tip")}
             </div>
           </div>
         </div>

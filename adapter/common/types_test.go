@@ -126,6 +126,50 @@ func TestCreateChatPropsAvoidsDuplicatePersonalizationInjection(t *testing.T) {
 	}
 }
 
+func TestCreateChatPropsInjectsLearningModeGuidance(t *testing.T) {
+	props := CreateChatProps(&ChatProps{
+		Model:        "gpt-5.4",
+		LearningMode: true,
+		Message: []globals.Message{
+			{Role: globals.User, Content: "What is the answer?"},
+		},
+	}, nil)
+
+	if len(props.Message) != 2 {
+		t.Fatalf("expected injected system message, got %d messages", len(props.Message))
+	}
+
+	content := props.Message[0].Content
+	if !strings.Contains(content, learningModePromptPrefix) {
+		t.Fatalf("expected learning mode prompt prefix, got %q", content)
+	}
+	if !strings.Contains(content, "Do not give the final answer immediately") {
+		t.Fatalf("expected guided learning instruction, got %q", content)
+	}
+	if !strings.Contains(content, "questions, hints, checkpoints") {
+		t.Fatalf("expected Socratic guidance, got %q", content)
+	}
+}
+
+func TestCreateChatPropsAvoidsDuplicateLearningModeGuidance(t *testing.T) {
+	props := CreateChatProps(&ChatProps{
+		Model:        "gpt-5.4",
+		LearningMode: true,
+		Message: []globals.Message{
+			{
+				Role: globals.System,
+				Content: currentDateTimePromptPrefix + " 2026-04-20 23:30:00 (Asia/Shanghai).\n\n" +
+					learningModePromptPrefix + "\n- Learning mode is enabled for this turn.",
+			},
+			{Role: globals.User, Content: "Help me learn."},
+		},
+	}, nil)
+
+	if strings.Count(props.Message[0].Content, learningModePromptPrefix) != 1 {
+		t.Fatalf("expected learning mode prompt prefix to appear once, got %q", props.Message[0].Content)
+	}
+}
+
 func TestCreateChatPropsInjectsMemoryCapabilityState(t *testing.T) {
 	props := CreateChatProps(&ChatProps{
 		Model:                "grok-4-1-fast-reasoning",

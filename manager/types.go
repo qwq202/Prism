@@ -56,6 +56,7 @@ type RelayForm struct {
 	URLContext           bool `json:"url_context"`
 	XSearch              bool `json:"x_search"`
 	Fetch                bool `json:"fetch"`
+	LearningMode         bool `json:"learning_mode"`
 	GeminiThinkingBudget int  `json:"gemini_thinking_budget"`
 	Official             bool `json:"official"`
 }

@@ -364,6 +364,7 @@ func buildChatProps(
 		OriginalModel:        model,
 		Message:              segment,
 		CustomInstruction:    instance.GetCustomInstruction(),
+		LearningMode:         instance.IsLearningModeEnabled(),
 		MemoryPrompt:         memoryPrompt,
 		RecentChatsPrompt:    recentChatsPrompt,
 		MemoryEnabled:        instance.IsMemoryEnabled(),

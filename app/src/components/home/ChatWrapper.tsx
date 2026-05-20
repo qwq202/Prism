@@ -31,6 +31,7 @@ import {
   DeepSeekThinkingAction,
   FetchAction,
   GeminiThinkingAction,
+  LearningModeAction,
   NewConversationAction,
   OpenAIReasoningAction,
   WebAction,
@@ -229,11 +230,20 @@ function ChatWrapper() {
                 <FetchAction />
               </motion.div>
               <motion.div
-                key="gemini-thinking-action"
+                key="learning-mode-action"
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
                 transition={{ duration: 0.3, delay: 0.2 }}
+              >
+                <LearningModeAction />
+              </motion.div>
+              <motion.div
+                key="gemini-thinking-action"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: 0.3, delay: 0.25 }}
               >
                 <GeminiThinkingAction />
               </motion.div>
@@ -242,7 +252,7 @@ function ChatWrapper() {
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ duration: 0.3, delay: 0.25 }}
+                transition={{ duration: 0.3, delay: 0.3 }}
               >
                 <OpenAIReasoningAction />
               </motion.div>
@@ -251,7 +261,7 @@ function ChatWrapper() {
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ duration: 0.3, delay: 0.3 }}
+                transition={{ duration: 0.3, delay: 0.35 }}
               >
                 <DeepSeekThinkingAction />
               </motion.div>
@@ -260,7 +270,7 @@ function ChatWrapper() {
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ duration: 0.3, delay: 0.3 }}
+                transition={{ duration: 0.3, delay: 0.4 }}
               >
                 <FileAction files={files} dispatch={fileDispatch} />
               </motion.div>
@@ -269,7 +279,7 @@ function ChatWrapper() {
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ duration: 0.3, delay: 0.4 }}
+                transition={{ duration: 0.3, delay: 0.45 }}
               >
                 <VoiceAction
                   value={input}

@@ -37,6 +37,7 @@ type ChatProps struct {
 
 	Message              []globals.Message      `json:"messages,omitempty"`
 	CustomInstruction    string                 `json:"custom_instruction,omitempty"`
+	LearningMode         bool                   `json:"learning_mode,omitempty"`
 	MemoryPrompt         string                 `json:"memory_prompt,omitempty"`
 	RecentChatsPrompt    string                 `json:"recent_chats_prompt,omitempty"`
 	MemoryEnabled        bool                   `json:"memory_enabled,omitempty"`
@@ -75,6 +76,7 @@ type ChatProps struct {
 const currentDateTimePromptPrefix = "Current date and time reference:"
 const clientContextPromptPrefix = "Current client device reference:"
 const personalizationPromptPrefix = "User personalization preferences:"
+const learningModePromptPrefix = "Learning mode guidance:"
 const memoryCapabilityPromptPrefix = "Memory capability state:"
 const currentModelPromptPrefix = "Current conversation model reference:"
 const memoryPromptPrefix = "Saved user memories:"
@@ -151,6 +153,47 @@ func injectPersonalization(messages []globals.Message, customInstruction string)
 
 		content := strings.TrimSpace(cloned[i].Content)
 		if strings.Contains(content, personalizationPromptPrefix) {
+			return cloned
+		}
+
+		if content == "" {
+			cloned[i].Content = prompt
+		} else {
+			cloned[i].Content = fmt.Sprintf("%s\n\n%s", content, prompt)
+		}
+		return cloned
+	}
+
+	return append([]globals.Message{
+		{
+			Role:    globals.System,
+			Content: prompt,
+		},
+	}, cloned...)
+}
+
+func buildLearningModePrompt() string {
+	return fmt.Sprintf(
+		"%s\n- Learning mode is enabled for this turn.\n- Do not give the final answer immediately unless the user explicitly asks for it after trying, or safety/urgent correctness requires it.\n- Guide the user with short questions, hints, checkpoints, and step-by-step reasoning prompts so they can discover the answer themselves.\n- Ask what they have tried or what they think the next step is when useful.\n- If the user gets stuck, provide the smallest helpful hint first; then gradually reveal more.\n- When the user reaches the answer or asks to wrap up, summarize the method and key lesson clearly.",
+		learningModePromptPrefix,
+	)
+}
+
+func injectLearningMode(messages []globals.Message, enabled bool) []globals.Message {
+	if !enabled {
+		return messages
+	}
+
+	cloned := utils.DeepCopy[[]globals.Message](messages)
+	prompt := buildLearningModePrompt()
+
+	for i := range cloned {
+		if cloned[i].Role != globals.System {
+			continue
+		}
+
+		content := strings.TrimSpace(cloned[i].Content)
+		if strings.Contains(content, learningModePromptPrefix) {
 			return cloned
 		}
 
@@ -354,6 +397,7 @@ func injectReferencePrompts(messages []globals.Message, memoryPrompt string, rec
 func (c *ChatProps) SetupBuffer(buf *utils.Buffer) {
 	c.Message = injectCurrentDateTime(c.Message, c.ClientContext)
 	c.Message = injectPersonalization(c.Message, c.CustomInstruction)
+	c.Message = injectLearningMode(c.Message, c.LearningMode)
 	c.Message = injectMemoryCapabilities(c.Message, c.MemoryEnabled, c.MemoryHistoryEnabled)
 	currentModel := strings.TrimSpace(c.OriginalModel)
 	if currentModel == "" {

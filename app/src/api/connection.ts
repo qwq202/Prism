@@ -58,6 +58,7 @@ export type ChatProps = {
   url_context?: boolean;
   x_search?: boolean;
   fetch?: boolean;
+  learning_mode?: boolean;
   gemini_thinking_budget?: number;
   deepseek_thinking_enabled?: boolean;
   deepseek_reasoning_effort?: string;
