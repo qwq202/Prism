@@ -15,8 +15,9 @@ import (
 	"unicode/utf8"
 )
 
-var writableToolChannelTypes = map[string]struct{}{
+var toolCallChannelTypes = map[string]struct{}{
 	globals.OpenAIChannelType:             {},
+	globals.OpenAIResponsesChannelType:    {},
 	globals.AzureOpenAIChannelType:        {},
 	globals.ClaudeChannelType:             {},
 	globals.GLMCodingPlanCNChannelType:    {},
@@ -26,6 +27,8 @@ var writableToolChannelTypes = map[string]struct{}{
 	globals.DeepseekChannelType:           {},
 	globals.XAIChannelType:                {},
 }
+
+var writableToolChannelTypes = toolCallChannelTypes
 
 func BuildToolDefinition() *globals.FunctionTools {
 	required := []string{"action", "reason"}
@@ -75,7 +78,7 @@ func BuildAutoToolChoice() *interface{} {
 	return &choice
 }
 
-func CanUseWritableTools(model, group string) bool {
+func canUseChannelTools(model, group string, allowed map[string]struct{}) bool {
 	ticker := channel.ConduitInstance.GetTicker(model, group)
 	if ticker == nil || ticker.IsEmpty() {
 		return false
@@ -86,12 +89,20 @@ func CanUseWritableTools(model, group string) bool {
 			continue
 		}
 
-		if _, ok := writableToolChannelTypes[item.Type]; !ok {
+		if _, ok := allowed[item.Type]; !ok {
 			return false
 		}
 	}
 
 	return true
+}
+
+func CanUseToolCalls(model, group string) bool {
+	return canUseChannelTools(model, group, toolCallChannelTypes)
+}
+
+func CanUseWritableTools(model, group string) bool {
+	return canUseChannelTools(model, group, writableToolChannelTypes)
 }
 
 func containsSensitiveContent(content string) bool {

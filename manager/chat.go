@@ -1138,7 +1138,7 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 		hit, err, interrupted = createChatTask(conn, user, buffer, db, cache, model, instance, segment, plan)
 	} else {
 		memCtx := buildMemoryContext(db, user, instance, model, group)
-		fetchToolEnabled := instance.IsEnableFetch() && memory.CanUseWritableTools(model, group)
+		fetchToolEnabled := instance.IsEnableFetch() && memory.CanUseToolCalls(model, group)
 		tools := buildAvailableToolDefinitions(fetchToolEnabled, memCtx.Writable)
 		toolEnabled = tools != nil
 		if tools != nil {

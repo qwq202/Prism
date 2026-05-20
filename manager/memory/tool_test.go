@@ -33,3 +33,24 @@ func TestWritableToolChannelsIncludeXiaomiTokenPlan(t *testing.T) {
 		t.Fatalf("expected xiaomi token plan channel to allow tool definitions")
 	}
 }
+
+func TestToolCallChannelsIncludeFunctionToolCapableAdapters(t *testing.T) {
+	expected := []string{
+		globals.OpenAIChannelType,
+		globals.OpenAIResponsesChannelType,
+		globals.AzureOpenAIChannelType,
+		globals.ClaudeChannelType,
+		globals.GLMCodingPlanCNChannelType,
+		globals.MiniMaxTokenPlanCNChannelType,
+		globals.XiaomiTokenPlanCNChannelType,
+		globals.PalmChannelType,
+		globals.DeepseekChannelType,
+		globals.XAIChannelType,
+	}
+
+	for _, channelType := range expected {
+		if _, ok := toolCallChannelTypes[channelType]; !ok {
+			t.Fatalf("expected %s channel to allow function tool calls", channelType)
+		}
+	}
+}
