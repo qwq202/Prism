@@ -18,6 +18,8 @@ var (
 	textToolCallGapPattern   = regexp.MustCompile(`[ \t]*\n[ \t]*\n[ \t]*`)
 )
 
+const maxTextToolBufferBytes = 64 * 1024
+
 func formatMessages(props *adaptercommon.ChatProps) interface{} {
 	return utils.Each[globals.Message, Message](props.Message, func(message globals.Message) Message {
 		content := interface{}(message.Content)
@@ -99,6 +101,11 @@ func cleanExtractedText(content string) *string {
 	return &cleaned
 }
 
+func cleanTextToolVisibleText(content string) *string {
+	cleaned := textToolCallGapPattern.ReplaceAllString(content, "\n")
+	return cleanExtractedText(cleaned)
+}
+
 func parseTextToolCalls(content string, startIndex int) (*string, *globals.ToolCalls, int) {
 	if !strings.Contains(content, "<tool_call>") {
 		return &content, nil, startIndex
@@ -160,6 +167,54 @@ func parseTextToolCalls(content string, startIndex int) (*string, *globals.ToolC
 	return cleanExtractedText(cleaned), &calls, startIndex
 }
 
+func parseTextToolCallBlock(block string, startIndex int) (*globals.ToolCalls, int, bool) {
+	_, calls, nextIndex := parseTextToolCalls(block, startIndex)
+	return calls, nextIndex, calls != nil && len(*calls) > 0
+}
+
+func parseStreamingTextToolCalls(content string, pending string, startIndex int) (*string, *globals.ToolCalls, int, string) {
+	if pending == "" && !strings.Contains(content, "<tool_call>") {
+		return &content, nil, startIndex, ""
+	}
+
+	source := pending + content
+	if len(source) > maxTextToolBufferBytes {
+		return &source, nil, startIndex, ""
+	}
+
+	var visible strings.Builder
+	var calls *globals.ToolCalls
+	cursor := 0
+	for {
+		startRelative := strings.Index(source[cursor:], "<tool_call>")
+		if startRelative < 0 {
+			visible.WriteString(source[cursor:])
+			break
+		}
+
+		start := cursor + startRelative
+		visible.WriteString(source[cursor:start])
+
+		endRelative := strings.Index(source[start:], "</tool_call>")
+		if endRelative < 0 {
+			return cleanTextToolVisibleText(visible.String()), calls, startIndex, source[start:]
+		}
+
+		end := start + endRelative + len("</tool_call>")
+		block := source[start:end]
+		blockCalls, nextIndex, ok := parseTextToolCallBlock(block, startIndex)
+		if !ok {
+			visible.WriteString(block)
+		} else {
+			calls = mergeToolCalls(calls, blockCalls)
+			startIndex = nextIndex
+		}
+		cursor = end
+	}
+
+	return cleanTextToolVisibleText(visible.String()), calls, startIndex, ""
+}
+
 func mergeToolCalls(left *globals.ToolCalls, right *globals.ToolCalls) *globals.ToolCalls {
 	if left == nil {
 		return right
@@ -179,8 +234,9 @@ func (c *ChatInstance) extractTextToolCalls(content *string) (*string, *globals.
 		return nil, nil
 	}
 
-	cleaned, calls, nextIndex := parseTextToolCalls(*content, c.textToolCallSeq)
+	cleaned, calls, nextIndex, pending := parseStreamingTextToolCalls(*content, c.textToolBuffer, c.textToolCallSeq)
 	c.textToolCallSeq = nextIndex
+	c.textToolBuffer = pending
 	return cleaned, calls
 }
 

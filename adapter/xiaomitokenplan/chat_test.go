@@ -202,6 +202,49 @@ func TestProcessLineStripsTextToolCallFromMixedReasoningContent(t *testing.T) {
 	}
 }
 
+func TestProcessLineBuffersSplitTextToolCallFromReasoningContent(t *testing.T) {
+	instance := NewChatInstance("", "tp-test")
+
+	lines := []string{
+		`{"choices":[{"delta":{"reasoning_content":"<tool_call>\n"},"index":0}]}`,
+		`{"choices":[{"delta":{"reasoning_content":"<function=search>\n<parameter=query>江门 今天 天气 2026年5月20日</parameter>\n"},"index":0}]}`,
+		`{"choices":[{"delta":{"reasoning_content":"<parameter=type>web</parameter>\n</function>\n</tool_call>"},"index":0}]}`,
+	}
+
+	for i, line := range lines[:2] {
+		chunk, err := instance.ProcessLine(line)
+		if err != nil {
+			t.Fatalf("unexpected split text tool chunk %d error: %v", i, err)
+		}
+		if chunk.Content != "" || chunk.ReasoningContent != nil || chunk.ToolCall != nil {
+			t.Fatalf("expected split text tool chunk %d to be buffered, got %#v", i, chunk)
+		}
+	}
+
+	chunk, err := instance.ProcessLine(lines[2])
+	if err != nil {
+		t.Fatalf("unexpected final split text tool chunk error: %v", err)
+	}
+	if chunk.Content != "" {
+		t.Fatalf("expected split text tool markup to stay hidden, got %q", chunk.Content)
+	}
+	if chunk.ReasoningContent != nil {
+		t.Fatalf("expected split text tool markup to be stripped from reasoning, got %#v", chunk.ReasoningContent)
+	}
+
+	call := requireSingleToolCall(t, chunk.ToolCall)
+	if call.Function.Name != "search" {
+		t.Fatalf("expected search tool name, got %q", call.Function.Name)
+	}
+	args := requireToolArguments(t, call)
+	if args["query"] != "江门 今天 天气 2026年5月20日" {
+		t.Fatalf("unexpected query argument: %#v", args)
+	}
+	if args["type"] != "web" {
+		t.Fatalf("unexpected type argument: %#v", args)
+	}
+}
+
 func TestCollectResponseExtractsTextToolCallFromReasoningContent(t *testing.T) {
 	reasoning := "<tool_call>\n<function=fetch_webpage>\n<parameter=url>https://example.com</parameter>\n</function>\n</tool_call>"
 	chunk, err := collectResponse(ChatStreamResponse{

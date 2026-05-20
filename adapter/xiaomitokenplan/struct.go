@@ -15,6 +15,7 @@ type ChatInstance struct {
 	isReasonOver     bool
 	toolCalls        map[int]globals.ToolCall
 	textToolCallSeq  int
+	textToolBuffer   string
 }
 
 func normalizeEndpoint(endpoint string) string {

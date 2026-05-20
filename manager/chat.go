@@ -561,6 +561,53 @@ func unsupportedToolResult(call globals.ToolCall) globals.Message {
 	}
 }
 
+type searchToolInput struct {
+	Query string `json:"query"`
+	Type  string `json:"type,omitempty"`
+}
+
+func executeSearchToolCall(call globals.ToolCall) globals.Message {
+	result := map[string]string{
+		"status": "error",
+		"action": call.Function.Name,
+	}
+
+	input, err := utils.UnmarshalString[searchToolInput](call.Function.Arguments)
+	if err != nil {
+		result["error"] = "invalid tool arguments"
+		return globals.Message{
+			Role:       globals.Tool,
+			Content:    utils.Marshal(result),
+			ToolCallId: utils.ToPtr(call.Id),
+		}
+	}
+
+	query := strings.TrimSpace(input.Query)
+	if query == "" {
+		result["error"] = "query is required"
+		return globals.Message{
+			Role:       globals.Tool,
+			Content:    utils.Marshal(result),
+			ToolCallId: utils.ToPtr(call.Id),
+		}
+	}
+
+	content, err := web.GenerateSearchResult(query)
+	if err != nil {
+		result["error"] = err.Error()
+	} else {
+		result["status"] = "success"
+		result["query"] = query
+		result["content"] = content
+	}
+
+	return globals.Message{
+		Role:       globals.Tool,
+		Content:    utils.Marshal(result),
+		ToolCallId: utils.ToPtr(call.Id),
+	}
+}
+
 func executeAvailableToolCall(db *sql.DB, user *auth.User, call globals.ToolCall) globals.Message {
 	switch call.Function.Name {
 	case memory.MemoryToolName:
@@ -570,6 +617,8 @@ func executeAvailableToolCall(db *sql.DB, user *auth.User, call globals.ToolCall
 		}
 	case fetch.ToolName:
 		return fetch.ExecuteToolCall(call)
+	case "search":
+		return executeSearchToolCall(call)
 	}
 
 	return unsupportedToolResult(call)

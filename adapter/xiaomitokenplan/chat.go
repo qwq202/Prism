@@ -46,6 +46,7 @@ func (c *ChatInstance) resetStreamState() {
 	c.isReasonOver = false
 	c.toolCalls = make(map[int]globals.ToolCall)
 	c.textToolCallSeq = 0
+	c.textToolBuffer = ""
 }
 
 func (c *ChatInstance) CreateStreamChatRequest(props *adaptercommon.ChatProps, callback globals.Hook) error {
