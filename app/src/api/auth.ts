@@ -115,6 +115,8 @@ export type PasskeyRegistrationOptions = {
     authenticatorSelection: {
       authenticatorAttachment?: AuthenticatorAttachment;
       userVerification: UserVerificationRequirement;
+      residentKey?: ResidentKeyRequirement;
+      requireResidentKey?: boolean;
     };
     attestation: AttestationConveyancePreference;
     excludeCredentials: PasskeyCredentialDescriptor[];
@@ -140,18 +142,18 @@ export type PasskeyRegistrationForm = {
   transports: string[];
 };
 
-export type PasskeyLoginOptionsForm = {
-  username: string;
-};
+export type PasskeyLoginOptionsForm = Record<string, never>;
 
 export type PasskeyAuthenticationOptions = {
   publicKey: {
     challenge: string;
     timeout: number;
     rpId?: string;
-    allowCredentials: Array<PasskeyCredentialDescriptor & {
-      transports?: AuthenticatorTransport[];
-    }>;
+    allowCredentials?: Array<
+      PasskeyCredentialDescriptor & {
+        transports?: AuthenticatorTransport[];
+      }
+    >;
     userVerification: UserVerificationRequirement;
   };
 };
@@ -161,7 +163,6 @@ export type PasskeyLoginOptionsResponse = VerifyResponse & {
 };
 
 export type PasskeyLoginForm = {
-  username: string;
   id: string;
   raw_id: string;
   type: string;
@@ -193,7 +194,7 @@ export async function doLogin(
 }
 
 export async function createPasskeyLoginOptions(
-  data: PasskeyLoginOptionsForm,
+  data: PasskeyLoginOptionsForm = {},
 ): Promise<PasskeyLoginOptionsResponse> {
   try {
     const response = await axios.post("/login/passkey/options", data);

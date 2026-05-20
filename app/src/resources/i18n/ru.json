@@ -1481,6 +1481,7 @@
     "login": "Войти",
     "passkey-login": "Войти с passkey",
     "passkey-username-required": "Сначала введите имя пользователя или адрес электронной почты, привязанные к passkey.",
+    "passkey-login-unavailable": "Доступный passkey не найден или операция была отменена. Войдите с паролем и привяжите passkey заново.",
     "passkey-unsupported": "Этот браузер не поддерживает passkey.",
     "passkey-desktop-unsupported": "Вход с passkey пока не поддерживается в настольном приложении. Используйте браузер для входа с passkey.",
     "next-step": "Cледующий шаг",

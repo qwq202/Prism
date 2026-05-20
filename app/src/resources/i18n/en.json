@@ -1509,6 +1509,7 @@
     "login": "Login Now",
     "passkey-login": "Sign in with passkey",
     "passkey-username-required": "Enter the username or email bound to a passkey first.",
+    "passkey-login-unavailable": "No available passkey was found, or the operation was canceled. Sign in with your password and bind a new passkey.",
     "passkey-unsupported": "This browser does not support passkeys.",
     "passkey-desktop-unsupported": "Passkey sign-in is not supported in the desktop app yet. Please use a browser for passkey sign-in.",
     "next-step": "Next",

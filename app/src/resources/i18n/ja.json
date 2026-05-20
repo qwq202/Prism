@@ -1481,6 +1481,7 @@
     "login": "ログインしました。",
     "passkey-login": "パスキーでログイン",
     "passkey-username-required": "パスキーを登録したユーザー名またはメールアドレスを先に入力してください。",
+    "passkey-login-unavailable": "利用可能なパスキーが見つからないか、操作がキャンセルされました。パスワードでログインしてからパスキーを再登録してください。",
     "passkey-unsupported": "現在のブラウザはパスキーに対応していません。",
     "passkey-desktop-unsupported": "デスクトップアプリはまだパスキーでのログインに対応していません。ブラウザでパスキーをご利用ください。",
     "next-step": "次へ",

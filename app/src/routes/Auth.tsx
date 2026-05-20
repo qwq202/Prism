@@ -8,7 +8,12 @@ import router from "@/router.tsx";
 import { useTranslation } from "react-i18next";
 import { getQueryParam } from "@/utils/path.ts";
 import { setMemory } from "@/utils/memory.ts";
-import { appLogo, appName, isDesktopRuntime, useDeeptrain } from "@/conf/env.ts";
+import {
+  appLogo,
+  appName,
+  isDesktopRuntime,
+  useDeeptrain,
+} from "@/conf/env.ts";
 import PrismLogo from "@/components/PrismLogo.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { goAuth } from "@/utils/app.ts";
@@ -183,14 +188,6 @@ function Login() {
       return;
     }
 
-    const username = form.username.trim();
-    if (!isTextInRange(username, 1, 255)) {
-      toast.warning(t("login-failed"), {
-        description: t("auth.passkey-username-required"),
-      });
-      return;
-    }
-
     if (!window.PublicKeyCredential || !navigator.credentials?.get) {
       toast.warning(t("login-failed"), {
         description: t("auth.passkey-unsupported"),
@@ -199,7 +196,7 @@ function Login() {
     }
 
     try {
-      const optionsResp = await createPasskeyLoginOptions({ username });
+      const optionsResp = await createPasskeyLoginOptions();
       if (!optionsResp.status || !optionsResp.data) {
         toast.warning(t("login-failed"), {
           description: t("login-failed-prompt", {
@@ -210,25 +207,32 @@ function Login() {
       }
 
       const options = optionsResp.data.publicKey;
+      const publicKey: PublicKeyCredentialRequestOptions = {
+        ...options,
+        challenge: base64urlToBuffer(options.challenge),
+        allowCredentials: options.allowCredentials?.map((item) => ({
+          type: item.type,
+          id: base64urlToBuffer(item.id),
+          transports: item.transports,
+        })),
+      };
+      if (!publicKey.allowCredentials?.length) {
+        delete publicKey.allowCredentials;
+      }
+
       const credential = (await navigator.credentials.get({
-        publicKey: {
-          ...options,
-          challenge: base64urlToBuffer(options.challenge),
-          allowCredentials: options.allowCredentials.map((item) => ({
-            type: item.type,
-            id: base64urlToBuffer(item.id),
-            transports: item.transports,
-          })),
-        },
+        publicKey,
       })) as PublicKeyCredential | null;
 
       if (!credential) {
+        toast.warning(t("login-failed"), {
+          description: t("auth.passkey-login-unavailable"),
+        });
         return;
       }
 
       const response = credential.response as AuthenticatorAssertionResponse;
       const resp = await verifyPasskeyLogin({
-        username,
         id: credential.id,
         raw_id: bufferToBase64url(credential.rawId),
         type: credential.type,
@@ -258,11 +262,18 @@ function Login() {
       });
     } catch (err) {
       console.debug(err);
+      if (err instanceof DOMException && err.name === "NotAllowedError") {
+        toast.warning(t("login-failed"), {
+          description: t("auth.passkey-login-unavailable"),
+        });
+        return;
+      }
+
       toast.error(t("server-error"), {
         description: `${t("server-error-prompt")}\n${getErrorMessage(err)}`,
       });
     }
-  }, [form.username, globalDispatch, passkeyDesktopUnsupported, t]);
+  }, [globalDispatch, passkeyDesktopUnsupported, t]);
 
   useEffect(() => {
     // listen to enter key and auto submit

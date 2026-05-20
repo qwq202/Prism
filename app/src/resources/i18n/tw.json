@@ -87,6 +87,7 @@
     "login": "立即登入",
     "passkey-login": "使用通行密鑰登入",
     "passkey-username-required": "請先輸入已綁定通行密鑰的使用者名稱或電子郵件。",
+    "passkey-login-unavailable": "沒有找到可用的通行密鑰，或操作已取消。請使用密碼登入後重新綁定通行密鑰。",
     "passkey-unsupported": "目前瀏覽器不支援通行密鑰。",
     "passkey-desktop-unsupported": "桌面端暫不支援通行密鑰，請在瀏覽器中使用通行密鑰登入。",
     "next-step": "下一步",

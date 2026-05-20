@@ -61,6 +61,8 @@ type passkeyCredentialParameter struct {
 type passkeyAuthenticatorSelection struct {
 	AuthenticatorAttachment string `json:"authenticatorAttachment,omitempty"`
 	UserVerification        string `json:"userVerification"`
+	ResidentKey             string `json:"residentKey,omitempty"`
+	RequireResidentKey      bool   `json:"requireResidentKey,omitempty"`
 }
 
 type passkeyPublicKeyCredentialHint struct {
@@ -79,10 +81,6 @@ type passkeyRegistrationForm struct {
 	Transports        []string `json:"transports"`
 }
 
-type passkeyLoginOptionsForm struct {
-	Username string `json:"username" binding:"required"`
-}
-
 type passkeyAuthenticationOptions struct {
 	PublicKey passkeyPublicKeyCredentialRequestOptions `json:"publicKey"`
 }
@@ -91,12 +89,11 @@ type passkeyPublicKeyCredentialRequestOptions struct {
 	Challenge        string                           `json:"challenge"`
 	Timeout          int                              `json:"timeout"`
 	RPID             string                           `json:"rpId,omitempty"`
-	AllowCredentials []passkeyPublicKeyCredentialHint `json:"allowCredentials"`
+	AllowCredentials []passkeyPublicKeyCredentialHint `json:"allowCredentials,omitempty"`
 	UserVerification string                           `json:"userVerification"`
 }
 
 type passkeyLoginForm struct {
-	Username          string `json:"username" binding:"required"`
 	ID                string `json:"id" binding:"required"`
 	RawID             string `json:"raw_id" binding:"required"`
 	Type              string `json:"type" binding:"required"`
@@ -144,26 +141,8 @@ func passkeyChallengeKey(userID int64) string {
 	return fmt.Sprintf("nio:passkey:challenge:%d", userID)
 }
 
-func passkeyLoginChallengeKey(userID int64) string {
-	return fmt.Sprintf("nio:passkey:login:%d", userID)
-}
-
-func passkeyUserByUsernameOrEmail(db *sql.DB, usernameOrEmail string) (*User, error) {
-	usernameOrEmail = strings.TrimSpace(usernameOrEmail)
-	if usernameOrEmail == "" {
-		return nil, errors.New("invalid username or email")
-	}
-
-	var user User
-	if err := globals.QueryRowDb(db, `
-		SELECT id, username
-		FROM auth
-		WHERE username = ? OR email = ?
-	`, usernameOrEmail, usernameOrEmail).Scan(&user.ID, &user.Username); err != nil {
-		return nil, errors.New("user passkey not found")
-	}
-
-	return &user, nil
+func passkeyLoginChallengeLookupKey(challenge string) string {
+	return fmt.Sprintf("nio:passkey:login:challenge:%s", challenge)
 }
 
 func listPasskeyCredentials(db *sql.DB, userID int64) ([]PasskeyCredentialInfo, error) {
@@ -388,6 +367,8 @@ func CreatePasskeyRegistrationOptionsAPI(c *gin.Context) {
 			AuthenticatorSelection: passkeyAuthenticatorSelection{
 				AuthenticatorAttachment: attachment,
 				UserVerification:        channel.SystemInstance.GetPasskeyUserVerification(),
+				ResidentKey:             "required",
+				RequireResidentKey:      true,
 			},
 			Attestation:        "none",
 			ExcludeCredentials: excludeCredentials,
@@ -580,37 +561,6 @@ func CreatePasskeyLoginOptionsAPI(c *gin.Context) {
 		return
 	}
 
-	var form passkeyLoginOptionsForm
-	if err := c.ShouldBindJSON(&form); err != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"status": false,
-			"error":  "bad request",
-		})
-		return
-	}
-
-	db := utils.GetDBFromContext(c)
-	user, err := passkeyUserByUsernameOrEmail(db, form.Username)
-	if err != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"status": false,
-			"error":  err.Error(),
-		})
-		return
-	}
-
-	allowCredentials, err := listPasskeyCredentialIDs(db, user.ID)
-	if err != nil || len(allowCredentials) == 0 {
-		if err == nil {
-			err = errors.New("user passkey not found")
-		}
-		c.JSON(http.StatusOK, gin.H{
-			"status": false,
-			"error":  err.Error(),
-		})
-		return
-	}
-
 	challenge, err := randomPasskeyChallenge()
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
@@ -621,14 +571,13 @@ func CreatePasskeyLoginOptionsAPI(c *gin.Context) {
 	}
 
 	cache := utils.GetCacheFromContext(c)
-	cache.Set(c, passkeyLoginChallengeKey(user.ID), challenge, 5*time.Minute)
+	cache.Set(c, passkeyLoginChallengeLookupKey(challenge), "1", 5*time.Minute)
 
 	options := passkeyAuthenticationOptions{
 		PublicKey: passkeyPublicKeyCredentialRequestOptions{
 			Challenge:        challenge,
 			Timeout:          60000,
 			RPID:             channel.SystemInstance.GetPasskeyRPID(),
-			AllowCredentials: allowCredentials,
 			UserVerification: channel.SystemInstance.GetPasskeyUserVerification(),
 		},
 	}
@@ -699,16 +648,6 @@ func VerifyPasskeyLoginAPI(c *gin.Context) {
 		return
 	}
 
-	db := utils.GetDBFromContext(c)
-	user, err := passkeyUserByUsernameOrEmail(db, form.Username)
-	if err != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"status": false,
-			"error":  err.Error(),
-		})
-		return
-	}
-
 	credentialID := strings.TrimSpace(form.RawID)
 	if credentialID == "" {
 		credentialID = strings.TrimSpace(form.ID)
@@ -717,15 +656,6 @@ func VerifyPasskeyLoginAPI(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status": false,
 			"error":  "invalid passkey credential id",
-		})
-		return
-	}
-
-	storedCredential, err := getPasskeyStoredCredential(db, credentialID, user.ID)
-	if err != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"status": false,
-			"error":  err.Error(),
 		})
 		return
 	}
@@ -748,9 +678,21 @@ func VerifyPasskeyLoginAPI(c *gin.Context) {
 		return
 	}
 
+	db := utils.GetDBFromContext(c)
+	storedCredential, err := getPasskeyStoredCredential(db, credentialID, 0)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  err.Error(),
+		})
+		return
+	}
+	user := &User{ID: storedCredential.UserID, Username: storedCredential.Username}
+
 	cache := utils.GetCacheFromContext(c)
-	challenge, err := cache.Get(c, passkeyLoginChallengeKey(user.ID)).Result()
-	if err != nil || challenge == "" || challenge != clientData.Challenge {
+	loginChallengeKey := passkeyLoginChallengeLookupKey(clientData.Challenge)
+	loginChallengeValue, err := cache.Get(c, loginChallengeKey).Result()
+	if err != nil || loginChallengeValue == "" {
 		c.JSON(http.StatusOK, gin.H{
 			"status": false,
 			"error":  "invalid passkey challenge",
@@ -839,7 +781,7 @@ func VerifyPasskeyLoginAPI(c *gin.Context) {
 		`, assertion.SignCount, storedCredential.ID)
 	}
 
-	cache.Del(c, passkeyLoginChallengeKey(user.ID))
+	cache.Del(c, loginChallengeKey)
 	if user.IsBanned(db) {
 		c.JSON(http.StatusOK, gin.H{
 			"status": false,
@@ -848,7 +790,7 @@ func VerifyPasskeyLoginAPI(c *gin.Context) {
 		return
 	}
 
-	token, err := (&User{ID: storedCredential.UserID, Username: storedCredential.Username}).GenerateTokenSafe(db)
+	token, err := user.GenerateTokenSafe(db)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"status": false,

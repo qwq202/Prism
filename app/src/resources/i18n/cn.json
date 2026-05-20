@@ -150,6 +150,7 @@
     "login": "现在登录",
     "passkey-login": "使用通行密钥登录",
     "passkey-username-required": "请先输入已绑定通行密钥的用户名或邮箱。",
+    "passkey-login-unavailable": "没有找到可用的通行密钥，或操作已取消。请使用密码登录后重新绑定通行密钥。",
     "passkey-unsupported": "当前浏览器不支持通行密钥。",
     "passkey-desktop-unsupported": "桌面端暂不支持通行密钥，请在浏览器中使用通行密钥登录。",
     "next-step": "下一步",
