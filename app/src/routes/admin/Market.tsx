@@ -77,6 +77,7 @@ type Model = RawModel & {
 type MarketForm = Model[];
 type MarketTemplatePayload = { id: string; name: string };
 type MarketIndexedPayload = { idx: number };
+type MarketRemovePayload = { seed: string; id?: string };
 type MarketFlagPayload = MarketIndexedPayload & { default: boolean };
 type MarketAction =
   | { type: "set"; payload: RawModel[] }
@@ -85,7 +86,7 @@ type MarketAction =
   | { type: "new" }
   | { type: "new-template"; payload: MarketTemplatePayload }
   | { type: "batch-new-template"; payload: MarketTemplatePayload[] }
-  | { type: "remove"; payload: MarketIndexedPayload }
+  | { type: "remove"; payload: MarketRemovePayload }
   | { type: "update"; payload: { index: number; data: Model } }
   | { type: "update-id"; payload: MarketIndexedPayload & { id: string } }
   | { type: "update-name"; payload: MarketIndexedPayload & { name: string } }
@@ -217,8 +218,7 @@ function reducer(state: MarketForm, action: MarketAction): MarketForm {
         ...state,
       ];
     case "remove": {
-      const { idx } = action.payload;
-      return [...state.slice(0, idx), ...state.slice(idx + 1)];
+      return state.filter((model) => model.seed !== action.payload.seed);
     }
     case "update": {
       const { index, data } = action.payload;
@@ -614,7 +614,10 @@ function MarketItem({
         onClick={() =>
           dispatch({
             type: "remove",
-            payload: { idx: index },
+            payload: {
+              seed: model.seed as string,
+              id: model.id,
+            },
           })
         }
       >
@@ -1211,7 +1214,7 @@ function Market() {
   const marketDispatch = useCallback(
     (action: MarketAction) => {
       if (action.type === "remove") {
-        const removedModelId = form[action.payload.idx]?.id.trim();
+        const removedModelId = action.payload.id?.trim();
         if (removedModelId) {
           setHiddenUnusedModels((prev) => {
             const next = new Set(prev);
@@ -1240,7 +1243,7 @@ function Market() {
 
       dispatch(action);
     },
-    [form],
+    [],
   );
 
   const loading = stepSupport || stepAll;
