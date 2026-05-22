@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button.tsx";
 import DatePicker from "@/components/ui/date-picker.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { PaginationAction } from "@/components/ui/pagination.tsx";
+import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import {
   Select,
   SelectContent,
@@ -415,7 +416,10 @@ function Log() {
   };
 
   return (
-    <div className="no-scrollbar h-full w-full overflow-y-auto bg-muted/25">
+    <ScrollArea
+      className="log-page h-full w-full bg-muted/25"
+      classNameViewport="no-scrollbar"
+    >
       <motion.div
         className="mx-auto flex w-full max-w-none flex-col gap-3 px-3 py-3 sm:gap-5 sm:px-5 sm:py-5"
         variants={logContainerVariants}
@@ -566,7 +570,7 @@ function Log() {
           </motion.div>
 
           <motion.div
-            className="hidden overflow-x-auto border-t px-5 md:block"
+            className="no-scrollbar hidden overflow-x-auto border-t px-5 md:block"
             variants={logItemVariants}
           >
             <Table>
@@ -688,7 +692,7 @@ function Log() {
           </motion.div>
         </motion.div>
       </motion.div>
-    </div>
+    </ScrollArea>
   );
 }
 
