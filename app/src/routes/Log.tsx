@@ -112,7 +112,7 @@ function MetricCard({
   children,
 }: MetricCardProps) {
   return (
-    <div className="rounded-md border bg-card px-5 py-4 shadow-sm">
+    <div className="rounded-md border bg-card px-4 py-4 shadow-sm sm:px-5">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm font-medium text-foreground">{title}</p>
@@ -130,6 +130,96 @@ function MetricCard({
         <div className="mt-1 text-foreground [&_svg]:h-6 [&_svg]:w-6 [&_svg]:stroke-[1.8]">
           {icon}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function MobileRecordDetail({
+  label,
+  value,
+}: {
+  label: ReactNode;
+  value: ReactNode;
+}) {
+  return (
+    <div className="min-w-0 rounded-md bg-muted/35 px-3 py-2">
+      <p className="truncate text-[11px] font-medium text-muted-foreground">
+        {label}
+      </p>
+      <div className="mt-1 truncate text-sm font-semibold text-foreground">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function MobileLogSkeleton() {
+  return (
+    <>
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className="border-b p-4 last:border-b-0">
+          <div className="flex items-center justify-between gap-3">
+            <Skeleton className="h-5 w-36" />
+            <Skeleton className="h-7 w-16 rounded-full" />
+          </div>
+          <div className="mt-4 space-y-2">
+            <Skeleton className="h-5 w-44" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Skeleton className="h-14 rounded-md" />
+            <Skeleton className="h-14 rounded-md" />
+            <Skeleton className="h-14 rounded-md" />
+            <Skeleton className="h-14 rounded-md" />
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function MobileLogRecord({ record }: { record: BillingRecord }) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="border-b p-4 last:border-b-0">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium">
+            {formatDateTime(record.created_at)}
+          </p>
+          <p className="mt-1 truncate text-xs text-muted-foreground">
+            {record.token_name || "—"}
+          </p>
+        </div>
+        <RecordTypeLabel type={record.type} />
+      </div>
+
+      <div className="mt-4 flex min-w-0 items-center gap-2">
+        <Box className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <p className="min-w-0 truncate text-base font-semibold">
+          {record.model || "—"}
+        </p>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <MobileRecordDetail
+          label={t("record.input-tokens")}
+          value={record.input_tokens}
+        />
+        <MobileRecordDetail
+          label={t("record.output-tokens")}
+          value={record.output_tokens}
+        />
+        <MobileRecordDetail
+          label={t("record.duration")}
+          value={`${record.duration.toFixed(1)}s`}
+        />
+        <MobileRecordDetail
+          label={t("record.quota")}
+          value={formatQuota(record.quota)}
+        />
       </div>
     </div>
   );
@@ -291,8 +381,8 @@ function Log() {
 
   return (
     <ScrollArea className="h-full w-full bg-muted/25">
-      <div className="mx-auto flex w-full max-w-none flex-col gap-5 px-5 py-5">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="mx-auto flex w-full max-w-none flex-col gap-3 px-3 py-3 sm:gap-5 sm:px-5 sm:py-5">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-4">
           <MetricCard
             title={t("record.billing-today")}
             value={stats.billing_today.toFixed(2)}
@@ -329,7 +419,7 @@ function Log() {
         </div>
 
         <div className="overflow-hidden rounded-md border bg-card shadow-sm">
-          <div className="grid gap-x-4 gap-y-3 px-5 py-5 lg:grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)]">
+          <div className="grid gap-x-4 gap-y-3 px-4 py-4 sm:px-5 sm:py-5 lg:grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)]">
             <FieldLabel icon={<FileText />}>{t("record.cond.type")}</FieldLabel>
             <Select
               value={filters.type}
@@ -397,7 +487,7 @@ function Log() {
 
             <div className="lg:col-span-4">
               <Button
-                className="px-5"
+                className="w-full px-5 sm:w-auto"
                 disabled={loading}
                 onClick={handleSearch}
                 unClickable
@@ -408,7 +498,19 @@ function Log() {
             </div>
           </div>
 
-          <div className="overflow-x-auto border-t px-5">
+          <div className="border-t md:hidden">
+            {initialLoading && <MobileLogSkeleton />}
+            {records.length === 0 && !loading && (
+              <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+                —
+              </div>
+            )}
+            {records.map((record) => (
+              <MobileLogRecord key={record.id} record={record} />
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto border-t px-5 md:block">
             <Table>
               <TableHeader>
                 <TableRow className="select-none whitespace-nowrap">
