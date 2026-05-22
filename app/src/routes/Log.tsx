@@ -299,7 +299,7 @@ function Log() {
 
   return (
     <ScrollArea className="h-full w-full bg-muted/25">
-      <div className="mx-auto flex w-full max-w-none flex-col gap-5 px-5 py-5">
+      <div className="mx-auto flex w-full max-w-none flex-col gap-5 px-4 py-5 sm:px-6 lg:px-8 xl:px-10">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard
             title={t("record.billing-today")}
