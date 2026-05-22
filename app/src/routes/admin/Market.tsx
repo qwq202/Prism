@@ -13,6 +13,7 @@ import React, {
   useReducer,
   useState,
 } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Model as RawModel } from "@/api/types.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import {
@@ -960,43 +961,54 @@ function MarketAlert({
   onImportAll,
 }: MarketAlertProps) {
   const { t } = useTranslation();
+  const visible = open && models.length > 0;
 
   return (
-    open &&
-    models.length > 0 && (
-      <div className={`market-alert`}>
-        <div
-          className={`flex w-full flex-row items-center justify-between gap-3 mb-2 select-none`}
+    <AnimatePresence initial={false}>
+      {visible && (
+        <motion.div
+          key="market-alert"
+          layout
+          className={`market-alert`}
+          initial={{ height: 0, opacity: 0, marginBottom: 0 }}
+          animate={{ height: "auto", opacity: 1, marginBottom: 16 }}
+          exit={{ height: 0, opacity: 0, marginBottom: 0 }}
+          transition={{ duration: 0.22, ease: "easeOut" }}
+          style={{ overflow: "hidden" }}
         >
-          <div className={`flex flex-row items-center whitespace-nowrap`}>
-            <AlertCircle className={`h-4 w-4 mr-2 translate-y-[1px]`} />
-            <span>{t("admin.market.not-use")}</span>
-          </div>
-          <Button
-            variant={`outline`}
-            size={`sm`}
-            className={`whitespace-nowrap`}
-            onClick={onImportAll}
+          <div
+            className={`flex w-full flex-row items-center justify-between gap-3 mb-2 select-none`}
           >
-            <Import className={`h-4 w-4 mr-2`} />
-            {t("admin.market.import-all")}
-          </Button>
-        </div>
-        <div className={`market-alert-wrapper`}>
-          {models.map((model) => (
+            <div className={`flex flex-row items-center whitespace-nowrap`}>
+              <AlertCircle className={`h-4 w-4 mr-2 translate-y-[1px]`} />
+              <span>{t("admin.market.not-use")}</span>
+            </div>
             <Button
-              key={model}
               variant={`outline`}
               size={`sm`}
-              className={`text-sm`}
-              onClick={() => onImport(model)}
+              className={`whitespace-nowrap`}
+              onClick={onImportAll}
             >
-              {model}
+              <Import className={`h-4 w-4 mr-2`} />
+              {t("admin.market.import-all")}
             </Button>
-          ))}
-        </div>
-      </div>
-    )
+          </div>
+          <div className={`market-alert-wrapper`}>
+            {models.map((model) => (
+              <Button
+                key={model}
+                variant={`outline`}
+                size={`sm`}
+                className={`text-sm`}
+                onClick={() => onImport(model)}
+              >
+                {model}
+              </Button>
+            ))}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
