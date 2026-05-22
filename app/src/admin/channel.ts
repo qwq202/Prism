@@ -269,8 +269,6 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "gemini-2.5-pro",
       "gemini-2.5-flash-preview-09-2025",
       "gemini-2.5-flash-lite-preview-09-2025",
-      "gemini-2.0-flash-001",
-      "gemini-2.0-flash-lite-001",
       "gemini-3-flash",
       "gemini-3-flash-preview",
       "gemini-3-pro-preview",
