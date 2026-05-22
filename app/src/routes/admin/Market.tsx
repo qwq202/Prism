@@ -801,7 +801,6 @@ function MarketGroup({
     >
       {(provided) => (
         <MarketItem
-          key={index}
           model={model}
           form={form}
           stacked={stacked}
@@ -981,9 +980,9 @@ function MarketAlert({
           </Button>
         </div>
         <div className={`market-alert-wrapper`}>
-          {models.map((model, index) => (
+          {models.map((model) => (
             <Button
-              key={index}
+              key={model}
               variant={`outline`}
               size={`sm`}
               className={`text-sm`}
@@ -1161,11 +1160,15 @@ function Market() {
 
   const [form, dispatch] = useReducer(reducer, []);
   const [open, setOpen] = useState<boolean>(false);
+  const [hiddenUnusedModels, setHiddenUnusedModels] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   const { supportModels, update: updateSuppportModels } = useSupportModels(
     (state, data) => {
       setStepSupport(!state);
       if (state && data) {
+        setHiddenUnusedModels(new Set());
         dispatch({ type: "set", payload: data });
       }
     },
@@ -1177,10 +1180,67 @@ function Market() {
     update: updateAllModels,
   } = useChannelModels((state) => setStepAll(!state));
 
+  const formModelIds = useMemo(
+    () => new Set(form.map((model) => model.id)),
+    [form],
+  );
+
   const unusedModels = useMemo(
     (): string[] =>
-      allModels.filter((model) => !form.map((m) => m.id).includes(model)),
-    [form, allModels],
+      allModels.filter((model) => !formModelIds.has(model)),
+    [formModelIds, allModels],
+  );
+
+  const visibleUnusedModels = useMemo(
+    (): string[] =>
+      unusedModels.filter((model) => !hiddenUnusedModels.has(model)),
+    [hiddenUnusedModels, unusedModels],
+  );
+
+  useEffect(() => {
+    setHiddenUnusedModels((prev) => {
+      if (prev.size === 0) return prev;
+
+      const next = new Set(
+        Array.from(prev).filter((model) => !formModelIds.has(model)),
+      );
+      return next.size === prev.size ? prev : next;
+    });
+  }, [formModelIds]);
+
+  const marketDispatch = useCallback(
+    (action: MarketAction) => {
+      if (action.type === "remove") {
+        const removedModelId = form[action.payload.idx]?.id.trim();
+        if (removedModelId) {
+          setHiddenUnusedModels((prev) => {
+            const next = new Set(prev);
+            next.add(removedModelId);
+            return next;
+          });
+        }
+      }
+
+      if (action.type === "new-template") {
+        setHiddenUnusedModels((prev) => {
+          if (!prev.has(action.payload.id)) return prev;
+          const next = new Set(prev);
+          next.delete(action.payload.id);
+          return next;
+        });
+      }
+
+      if (action.type === "batch-new-template") {
+        setHiddenUnusedModels((prev) => {
+          const next = new Set(prev);
+          for (const model of action.payload) next.delete(model.id);
+          return next.size === prev.size ? prev : next;
+        });
+      }
+
+      dispatch(action);
+    },
+    [form],
   );
 
   const loading = stepSupport || stepAll;
@@ -1241,7 +1301,7 @@ function Market() {
 
   const migrate = async (data: RawModel[]): Promise<void> => {
     if (data.length === 0) return;
-    dispatch({ type: "add-multiple", payload: [...data] });
+    marketDispatch({ type: "add-multiple", payload: [...data] });
   };
 
   return (
@@ -1319,9 +1379,9 @@ function Market() {
           </div>
           <MarketAlert
             open={!loading}
-            models={unusedModels}
+            models={visibleUnusedModels}
             onImport={(model: string) => {
-              dispatch({
+              marketDispatch({
                 type: "new-template",
                 payload: {
                   id: model,
@@ -1330,9 +1390,9 @@ function Market() {
               });
             }}
             onImportAll={() => {
-              dispatch({
+              marketDispatch({
                 type: "batch-new-template",
-                payload: unusedModels.map((model) => ({
+                payload: visibleUnusedModels.map((model) => ({
                   id: model,
                   name: getModelName(model),
                 })),
@@ -1351,14 +1411,14 @@ function Market() {
                     grouped ? (
                       <GroupedMarketView
                         form={form}
-                        dispatch={dispatch}
+                        dispatch={marketDispatch}
                         stacked={stacked}
                         channelModels={channelModels}
                       />
                     ) : (
                       <MarketGroup
                         form={form}
-                        dispatch={dispatch}
+                        dispatch={marketDispatch}
                         stacked={stacked}
                         channelModels={channelModels}
                       />
@@ -1378,7 +1438,7 @@ function Market() {
               size={`sm`}
               variant={`outline`}
               className={`mr-2`}
-              onClick={() => dispatch({ type: "new" })}
+              onClick={() => marketDispatch({ type: "new" })}
             >
               <Plus className={`h-4 w-4 mr-2`} />
               {t("admin.market.new-model")}
