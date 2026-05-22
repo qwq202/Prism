@@ -59,3 +59,17 @@ func TestGeminiNoThinkingModelDisablesThinkingControls(t *testing.T) {
 		t.Fatalf("expected thinking-budget support to be disabled for %q", model)
 	}
 }
+
+func TestGemini35FlashCapabilities(t *testing.T) {
+	if !IsVisionModel(Gemini35Flash) {
+		t.Fatalf("expected %q to support vision inputs", Gemini35Flash)
+	}
+
+	if !SupportGeminiThinkingLevel(Gemini35Flash) {
+		t.Fatalf("expected %q to use gemini thinkingLevel control", Gemini35Flash)
+	}
+
+	if SupportGeminiThinkingBudget(Gemini35Flash) {
+		t.Fatalf("expected %q to not use gemini thinkingBudget control", Gemini35Flash)
+	}
+}

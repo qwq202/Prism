@@ -576,6 +576,8 @@ export function supportsGeminiThinkingBudgetControl(
     model === "gemini-2.5-pro" ||
     model.startsWith("gemini-2.5-pro-preview-") ||
     model.startsWith("gemini-2.5-pro-exp-") ||
+    model === "gemini-3.5-flash" ||
+    model.startsWith("gemini-3.5-flash-") ||
     model === "gemini-3-flash-preview" ||
     model.startsWith("gemini-3-flash-preview-") ||
     model === "gemini-3.1-flash-lite-preview" ||
