@@ -13,7 +13,9 @@ export type GetChannelResponse = CommonResponse & {
 
 export async function listChannel(): Promise<ChannelListResponse> {
   try {
-    const response = await axios.get("/admin/channel/list");
+    const response = await axios.get("/admin/channel/list", {
+      prismCache: false,
+    });
     return response.data as ChannelListResponse;
   } catch (e) {
     return { status: false, error: getErrorMessage(e), data: [] };
@@ -22,7 +24,9 @@ export async function listChannel(): Promise<ChannelListResponse> {
 
 export async function getChannel(id: number): Promise<GetChannelResponse> {
   try {
-    const response = await axios.get(`/admin/channel/get/${id}`);
+    const response = await axios.get(`/admin/channel/get/${id}`, {
+      prismCache: false,
+    });
     return response.data as GetChannelResponse;
   } catch (e) {
     return { status: false, error: getErrorMessage(e) };
