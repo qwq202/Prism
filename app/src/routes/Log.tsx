@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
+import { motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import {
   Activity,
@@ -73,6 +74,35 @@ const emptyStats: RecordStats = {
   tpm: 0,
 };
 
+const logContainerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      duration: 0.1,
+      when: "beforeChildren",
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const logItemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.5 },
+  },
+};
+
+const logRowVariants = {
+  hidden: { opacity: 0, y: 12 },
+  visible: {
+    opacity: 1,
+    y: 0,
+  },
+};
+
 function toDateInputValue(date: Date) {
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
@@ -112,7 +142,10 @@ function MetricCard({
   children,
 }: MetricCardProps) {
   return (
-    <div className="rounded-md border bg-card px-4 py-4 shadow-sm sm:px-5">
+    <motion.div
+      className="rounded-md border bg-card px-4 py-4 shadow-sm sm:px-5"
+      variants={logItemVariants}
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm font-medium text-foreground">{title}</p>
@@ -131,7 +164,7 @@ function MetricCard({
           {icon}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -183,7 +216,10 @@ function MobileLogRecord({ record }: { record: BillingRecord }) {
   const { t } = useTranslation();
 
   return (
-    <div className="border-b p-4 last:border-b-0">
+    <motion.div
+      className="border-b p-4 last:border-b-0"
+      variants={logRowVariants}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">
@@ -221,7 +257,7 @@ function MobileLogRecord({ record }: { record: BillingRecord }) {
           value={formatQuota(record.quota)}
         />
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -381,8 +417,16 @@ function Log() {
 
   return (
     <ScrollArea className="h-full w-full bg-muted/25">
-      <div className="mx-auto flex w-full max-w-none flex-col gap-3 px-3 py-3 sm:gap-5 sm:px-5 sm:py-5">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-4">
+      <motion.div
+        className="mx-auto flex w-full max-w-none flex-col gap-3 px-3 py-3 sm:gap-5 sm:px-5 sm:py-5"
+        variants={logContainerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        <motion.div
+          className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-4"
+          variants={logContainerVariants}
+        >
           <MetricCard
             title={t("record.billing-today")}
             value={stats.billing_today.toFixed(2)}
@@ -416,10 +460,16 @@ function Log() {
           >
             <Clock3 className="h-3.5 w-3.5 stroke-[1.8]" />
           </MetricCard>
-        </div>
+        </motion.div>
 
-        <div className="overflow-hidden rounded-md border bg-card shadow-sm">
-          <div className="grid gap-x-4 gap-y-3 px-4 py-4 sm:px-5 sm:py-5 lg:grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)]">
+        <motion.div
+          className="overflow-hidden rounded-md border bg-card shadow-sm"
+          variants={logItemVariants}
+        >
+          <motion.div
+            className="grid gap-x-4 gap-y-3 px-4 py-4 sm:px-5 sm:py-5 lg:grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)]"
+            variants={logItemVariants}
+          >
             <FieldLabel icon={<FileText />}>{t("record.cond.type")}</FieldLabel>
             <Select
               value={filters.type}
@@ -496,21 +546,30 @@ function Log() {
                 {t("record.query")}
               </Button>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="border-t md:hidden">
+          <motion.div
+            className="border-t md:hidden"
+            variants={logContainerVariants}
+          >
             {initialLoading && <MobileLogSkeleton />}
             {records.length === 0 && !loading && (
-              <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+              <motion.div
+                className="px-4 py-10 text-center text-sm text-muted-foreground"
+                variants={logItemVariants}
+              >
                 —
-              </div>
+              </motion.div>
             )}
             {records.map((record) => (
               <MobileLogRecord key={record.id} record={record} />
             ))}
-          </div>
+          </motion.div>
 
-          <div className="hidden overflow-x-auto border-t px-5 md:block">
+          <motion.div
+            className="hidden overflow-x-auto border-t px-5 md:block"
+            variants={logItemVariants}
+          >
             <Table>
               <TableHeader>
                 <TableRow className="select-none whitespace-nowrap">
@@ -569,17 +628,34 @@ function Log() {
               <TableBody>
                 {initialLoading && <LogTableSkeleton />}
                 {records.length === 0 && !loading && (
-                  <TableRow>
+                  <motion.tr
+                    className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
+                    variants={logRowVariants}
+                    initial="hidden"
+                    animate="visible"
+                    transition={{ duration: 0.35, ease: "easeOut" }}
+                  >
                     <TableCell
                       colSpan={8}
                       className="h-24 text-center text-muted-foreground"
                     >
                       —
                     </TableCell>
-                  </TableRow>
+                  </motion.tr>
                 )}
-                {records.map((record) => (
-                  <TableRow key={record.id}>
+                {records.map((record, index) => (
+                  <motion.tr
+                    key={record.id}
+                    className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
+                    variants={logRowVariants}
+                    initial="hidden"
+                    animate="visible"
+                    transition={{
+                      duration: 0.35,
+                      ease: "easeOut",
+                      delay: index * 0.035,
+                    }}
+                  >
                     <TableCell className="whitespace-nowrap text-muted-foreground">
                       {formatDateTime(record.created_at)}
                     </TableCell>
@@ -596,21 +672,23 @@ function Log() {
                     <TableCell>{record.output_tokens}</TableCell>
                     <TableCell>{record.duration.toFixed(1)}s</TableCell>
                     <TableCell>{formatQuota(record.quota)}</TableCell>
-                  </TableRow>
+                  </motion.tr>
                 ))}
               </TableBody>
             </Table>
-          </div>
+          </motion.div>
 
-          <PaginationAction
-            current={page}
-            total={Math.max(total, 1)}
-            offset
-            onPageChange={setPage}
-            className={cn("border-t py-6", records.length === 0 && "pt-7")}
-          />
-        </div>
-      </div>
+          <motion.div variants={logItemVariants}>
+            <PaginationAction
+              current={page}
+              total={Math.max(total, 1)}
+              offset
+              onPageChange={setPage}
+              className={cn("border-t py-6", records.length === 0 && "pt-7")}
+            />
+          </motion.div>
+        </motion.div>
+      </motion.div>
     </ScrollArea>
   );
 }
