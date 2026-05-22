@@ -22,6 +22,7 @@ import {
   MessageCircle,
   PieChart,
   Shield,
+  Sparkles,
   User,
   Wallet,
 } from "lucide-react";
@@ -41,11 +42,12 @@ type MenuBarItemProps = {
 const BarItem = ({ icon, path, name }: MenuBarItemProps) => {
   const { t } = useTranslation();
   const navigate = () => router.navigate(path);
+  const label = t(`bar.${name}-full`, { defaultValue: t(`bar.${name}`) });
 
   return (
     <DropdownMenuItem onClick={navigate}>
       <Icon icon={icon} className={`w-4 h-4 mr-1.5`} />
-      {t(`bar.${name}-full`)}
+      {label}
     </DropdownMenuItem>
   );
 };
@@ -68,6 +70,11 @@ function MenuBar({ children, className }: MenuBarProps) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <BarItem icon={<MessageCircle />} path={`/`} name={"chat"} />
+            <BarItem
+              icon={<Sparkles />}
+              path={`/personalization`}
+              name={"personalization"}
+            />
             <BarItem icon={<LibraryBig />} path={`/model`} name={"model"} />
             {/* <BarItem icon={<Compass />} path={`/preset`} name={"preset"} /> */}
             <BarItem icon={<Wallet />} path={`/wallet`} name={"wallet"} />

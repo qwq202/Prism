@@ -6,6 +6,17 @@
   height: calc(100% - var(--navbar-height));
   overflow: hidden;
 
+  &.mobile-nav-collapsed {
+    .toolbar {
+      display: none;
+    }
+
+    .home-page {
+      width: 100%;
+      height: 100%;
+    }
+  }
+
   @media (orientation: portrait) {
     flex-direction: column-reverse;
 

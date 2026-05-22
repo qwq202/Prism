@@ -98,7 +98,10 @@ function BarItem({ icon, path, name }: BarItemProps) {
 function ToolBar() {
   const admin = useSelector(selectAdmin);
   const hideToolbar = useSelector(hideToolbarSelector);
+  const mobile = useMobile();
   const [stacked, setStacked] = React.useState(hideToolbar || isMobile());
+
+  if (mobile) return null;
 
   return (
     <div className={cn("toolbar", stacked && "stacked")}>
@@ -130,10 +133,12 @@ function ToolBar() {
 }
 
 function Home() {
+  const mobile = useMobile();
+
   return (
     <ErrorBoundary>
       <NavBar />
-      <div className={`main relative`}>
+      <div className={cn("main relative", mobile && "mobile-nav-collapsed")}>
         <ToolBar />
         <Outlet />
       </div>
