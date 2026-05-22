@@ -35,28 +35,12 @@ export function ThemeProvider({
     let disposed = false;
     let appliedTheme: ResolvedTheme | null = null;
 
-    const browserSystemTheme = (): ResolvedTheme =>
+    const resolveSystemTheme = (): ResolvedTheme =>
       media.matches ? "dark" : "light";
-
-    const resolveSystemTheme = async (): Promise<ResolvedTheme> => {
-      try {
-        const currentWindow =
-          window.__TAURI__?.window?.getCurrentWindow?.() ||
-          window.__TAURI__?.window?.appWindow;
-        const tauriTheme = await currentWindow?.theme?.();
-        if (tauriTheme === "dark" || tauriTheme === "light") {
-          return tauriTheme;
-        }
-      } catch {
-        // Browser mode and older WebViews fall back to matchMedia.
-      }
-
-      return browserSystemTheme();
-    };
 
     const applyTheme = async () => {
       const resolvedTheme =
-        theme === "system" ? await resolveSystemTheme() : theme;
+        theme === "system" ? resolveSystemTheme() : theme;
 
       if (disposed) return;
       if (appliedTheme === resolvedTheme) return;

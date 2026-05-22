@@ -8,12 +8,7 @@ import router from "@/router.tsx";
 import { useTranslation } from "react-i18next";
 import { getQueryParam } from "@/utils/path.ts";
 import { setMemory } from "@/utils/memory.ts";
-import {
-  appLogo,
-  appName,
-  isDesktopRuntime,
-  useDeeptrain,
-} from "@/conf/env.ts";
+import { appLogo, appName, useDeeptrain } from "@/conf/env.ts";
 import PrismLogo from "@/components/PrismLogo.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { goAuth } from "@/utils/app.ts";
@@ -126,7 +121,6 @@ function DeepAuth() {
 function Login() {
   const { t } = useTranslation();
   const globalDispatch = useDispatch();
-  const passkeyDesktopUnsupported = isDesktopRuntime();
   const [form, dispatch] = useReducer(formReducer<LoginForm>(), {
     username: "",
     password: "",
@@ -181,13 +175,6 @@ function Login() {
   }, [form, globalDispatch, t]);
 
   const onPasskeyLogin = useCallback(async () => {
-    if (passkeyDesktopUnsupported) {
-      toast.warning(t("login-failed"), {
-        description: t("auth.passkey-desktop-unsupported"),
-      });
-      return;
-    }
-
     if (!window.PublicKeyCredential || !navigator.credentials?.get) {
       toast.warning(t("login-failed"), {
         description: t("auth.passkey-unsupported"),
@@ -273,7 +260,7 @@ function Login() {
         description: `${t("server-error-prompt")}\n${getErrorMessage(err)}`,
       });
     }
-  }, [globalDispatch, passkeyDesktopUnsupported, t]);
+  }, [globalDispatch, t]);
 
   useEffect(() => {
     // listen to enter key and auto submit
@@ -345,18 +332,16 @@ function Login() {
               >
                 {t("login")}
               </Button>
-              {!passkeyDesktopUnsupported && (
-                <Button
-                  tapScale={0.975}
-                  onClick={onPasskeyLogin}
-                  className={`w-full`}
-                  variant={`outline`}
-                  loading={true}
-                >
-                  <Fingerprint className={`mr-2 h-4 w-4`} />
-                  {t("auth.passkey-login")}
-                </Button>
-              )}
+              <Button
+                tapScale={0.975}
+                onClick={onPasskeyLogin}
+                className={`w-full`}
+                variant={`outline`}
+                loading={true}
+              >
+                <Fingerprint className={`mr-2 h-4 w-4`} />
+                {t("auth.passkey-login")}
+              </Button>
             </div>
           </CardContent>
         </Card>

@@ -96,8 +96,6 @@ func detectBrowser(userAgent string) string {
 		return "Alipay"
 	case strings.Contains(ua, "electron/"):
 		return "Electron"
-	case strings.Contains(ua, "tauri"):
-		return "Tauri WebView"
 	case strings.Contains(ua, "edg/"):
 		return "Microsoft Edge"
 	case containsAny(ua, "opr/", "opera"):

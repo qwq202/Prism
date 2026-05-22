@@ -1,13 +1,5 @@
 import { updateDocumentTitle, updateFavicon } from "@/utils/dom.ts";
-import { getMemory, setMemory } from "@/utils/memory.ts";
-
-export const desktopBackendMemoryKey = "desktop_backend_endpoint";
-const legacyDesktopBackendEndpoint = "http://localhost:8000/api";
-const officialDesktopBackendEndpoint = "https://prism.qunqin.org";
-export const defaultDesktopBackendEndpoint =
-  import.meta.env.VITE_DESKTOP_BACKEND_ENDPOINT ||
-  import.meta.env.VITE_BACKEND_ENDPOINT ||
-  officialDesktopBackendEndpoint;
+import { setMemory } from "@/utils/memory.ts";
 
 export let appName =
   localStorage.getItem("app_name") || import.meta.env.VITE_APP_NAME || "Prism";
@@ -23,7 +15,9 @@ export let buyLink =
   localStorage.getItem("buy_link") || import.meta.env.VITE_BUY_LINK || "";
 
 export const useDeeptrain = !!import.meta.env.VITE_USE_DEEPTRAIN;
-export const backendEndpoint = getBackendEndpoint();
+export const backendEndpoint = normalizeBackendEndpoint(
+  import.meta.env.VITE_BACKEND_ENDPOINT || "/api",
+);
 export const deeptrainEndpoint =
   import.meta.env.VITE_DEEPTRAIN_ENDPOINT || "https://deeptrain.net";
 export const deeptrainAppName = import.meta.env.VITE_DEEPTRAIN_APP || "prism";
@@ -40,48 +34,9 @@ export function getDev(): boolean {
   return window.location.hostname === "localhost";
 }
 
-export function isDesktopRuntime(): boolean {
-  return typeof window !== "undefined" && window.__TAURI__ !== undefined;
-}
-
-export function normalizeBackendEndpoint(endpoint: string): string {
+function normalizeBackendEndpoint(endpoint: string): string {
   const normalized = endpoint.trim().replace(/\/+$/, "");
-  return normalized || defaultDesktopBackendEndpoint;
-}
-
-function resolveApiEndpoint(endpoint: string): string {
-  const normalized = normalizeBackendEndpoint(endpoint);
-  return normalized.endsWith("/api") ? normalized : `${normalized}/api`;
-}
-
-export function getBackendEndpoint(): string {
-  if (isDesktopRuntime()) {
-    const storedEndpoint = getMemory(desktopBackendMemoryKey);
-    const normalizedDefault = normalizeBackendEndpoint(
-      defaultDesktopBackendEndpoint,
-    );
-    const normalizedStored = normalizeBackendEndpoint(storedEndpoint);
-
-    if (
-      storedEndpoint &&
-      !(
-        normalizedDefault !== legacyDesktopBackendEndpoint &&
-        normalizedStored === legacyDesktopBackendEndpoint
-      )
-    ) {
-      return normalizedStored;
-    }
-
-    return normalizedDefault;
-  }
-
-  return normalizeBackendEndpoint(
-    import.meta.env.VITE_BACKEND_ENDPOINT || "/api",
-  );
-}
-
-export function setDesktopBackendEndpoint(endpoint: string): void {
-  setMemory(desktopBackendMemoryKey, normalizeBackendEndpoint(endpoint));
+  return normalized || "/api";
 }
 
 export function getRestApi(deploy: boolean): string {
@@ -89,7 +44,7 @@ export function getRestApi(deploy: boolean): string {
    * return the REST API address
    */
   if (!deploy) return "http://localhost:8094";
-  return isDesktopRuntime() ? resolveApiEndpoint(backendEndpoint) : backendEndpoint;
+  return backendEndpoint;
 }
 
 export function getWebsocketApi(deploy: boolean): string {
@@ -98,9 +53,7 @@ export function getWebsocketApi(deploy: boolean): string {
    */
   if (!deploy) return "ws://localhost:8094";
 
-  const apiEndpoint = isDesktopRuntime()
-    ? resolveApiEndpoint(backendEndpoint)
-    : backendEndpoint;
+  const apiEndpoint = backendEndpoint;
   if (apiEndpoint.startsWith("http://"))
     return `ws://${apiEndpoint.slice(7)}`;
   if (apiEndpoint.startsWith("https://"))

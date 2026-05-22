@@ -39,20 +39,13 @@ import {
 } from "@/components/ui/alert-dialog.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import Github from "@/components/ui/icons/Github.tsx";
-import { isTauri } from "@/utils/desktop.ts";
-import {
-  defaultDesktopBackendEndpoint,
-  getBackendEndpoint,
-  setDesktopBackendEndpoint,
-  useDeeptrain,
-} from "@/conf/env.ts";
+import { useDeeptrain } from "@/conf/env.ts";
 import ThemeToggle from "@/components/ThemeProvider.tsx";
 import {
   getLatestAvailableRelease,
   isPreviewVersion,
   type GitHubRelease,
 } from "@/utils/releases.ts";
-import { Input } from "@/components/ui/input.tsx";
 
 function SettingsDialog() {
   const { t, i18n } = useTranslation();
@@ -80,11 +73,7 @@ function SettingsDialog() {
   const [latestRelease, setLatestRelease] = useState<GitHubRelease | null>(
     null,
   );
-  const [desktopBackendValue, setDesktopBackendValue] = useState(
-    getBackendEndpoint(),
-  );
 
-  const desktop = isTauri();
   const previewVersion = isPreviewVersion(version);
 
   useEffect(() => {
@@ -157,50 +146,6 @@ function SettingsDialog() {
                       )}
                     </div>
                   </div>
-                  {desktop && (
-                    <div className={`item`}>
-                      <div className={`name`}>
-                        {t("settings.desktop-backend")}
-                        <Tips content={t("settings.desktop-backend-tip")} />
-                      </div>
-                      <div className={`grow`} />
-                      <div
-                        className={`value flex flex-row items-center gap-2 min-w-0`}
-                      >
-                        <Input
-                          classNameWrapper={`w-72 max-w-[42vw]`}
-                          className={`h-8 text-xs`}
-                          value={desktopBackendValue}
-                          placeholder={t(
-                            "settings.desktop-backend-placeholder",
-                          )}
-                          onChange={(event) =>
-                            setDesktopBackendValue(event.target.value)
-                          }
-                        />
-                        <Button
-                          size={`sm`}
-                          variant={`outline`}
-                          onClick={() =>
-                            setDesktopBackendValue(
-                              defaultDesktopBackendEndpoint,
-                            )
-                          }
-                        >
-                          {t("reset")}
-                        </Button>
-                        <Button
-                          size={`sm`}
-                          onClick={() => {
-                            setDesktopBackendEndpoint(desktopBackendValue);
-                            window.location.reload();
-                          }}
-                        >
-                          {t("settings.desktop-backend-save")}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
                   <div className={`item`}>
                     <div className={`name`}>{t("settings.theme")}</div>
                     <div className={`grow`} />
@@ -536,7 +481,6 @@ function SettingsDialog() {
                 >
                   <Github className={`inline-block h-4 w-4 mr-1.5`} />
                   Prism v{version}
-                  {desktop && <Badge className={`ml-1`}>App</Badge>}
                 </a>
               </div>
             </div>

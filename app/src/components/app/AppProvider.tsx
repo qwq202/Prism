@@ -14,7 +14,7 @@ import { infoEvent } from "@/events/info.ts";
 import { setForm } from "@/store/info.ts";
 import { themeEvent } from "@/events/theme.ts";
 import { useEffect } from "react";
-import { getDesktopCache, setDesktopCache } from "@/utils/desktop-cache.ts";
+import { getClientCache, setClientCache } from "@/utils/client-cache.ts";
 import type { Model, Plan } from "@/api/types.tsx";
 import { apiEndpoint } from "@/conf/bootstrap.ts";
 
@@ -36,8 +36,8 @@ function AppProvider({ children }: { children?: React.ReactNode }) {
 
   useEffectAsync(async () => {
     const [cachedMarket, cachedPlans] = await Promise.all([
-      getDesktopCache<Model[]>(marketCacheKey),
-      getDesktopCache<Plan[]>(plansCacheKey),
+      getClientCache<Model[]>(marketCacheKey),
+      getClientCache<Plan[]>(plansCacheKey),
     ]);
 
     if (cachedMarket?.length) updateSupportModels(dispatch, cachedMarket);
@@ -46,11 +46,11 @@ function AppProvider({ children }: { children?: React.ReactNode }) {
     const [market, plans] = await Promise.all([bindMarket(), getApiPlans()]);
     if (market.length) {
       updateSupportModels(dispatch, market);
-      void setDesktopCache(marketCacheKey, market);
+      void setClientCache(marketCacheKey, market);
     }
     if (plans.length) {
       dispatchSubscriptionData(dispatch, plans);
-      void setDesktopCache(plansCacheKey, plans);
+      void setClientCache(plansCacheKey, plans);
     }
 
     await updateMasks(dispatch);

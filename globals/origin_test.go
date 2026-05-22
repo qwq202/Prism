@@ -19,10 +19,10 @@ func TestOriginIsAllowedRejectsExternalOriginWhenAllowListEmpty(t *testing.T) {
 		t.Fatalf("expected localhost to remain allowed for local development")
 	}
 	if !OriginIsAllowed("http://127.0.0.1:1420") {
-		t.Fatalf("expected 127.0.0.1 to remain allowed for local desktop development")
+		t.Fatalf("expected 127.0.0.1 to remain allowed for local development")
 	}
 	if !OriginIsAllowed("http://[::1]:1420") {
-		t.Fatalf("expected ::1 to remain allowed for local desktop development")
+		t.Fatalf("expected ::1 to remain allowed for local development")
 	}
 	if !OriginIsAllowed("file://local-app") {
 		t.Fatalf("expected file origins to remain allowed")

@@ -57,7 +57,7 @@ import { toast } from "sonner";
 import { useChannelModels, useSupportModels } from "@/admin/hook.tsx";
 import { useDispatch as useReduxDispatch } from "react-redux";
 import { updateSupportModels } from "@/store/chat.ts";
-import { setDesktopCache } from "@/utils/desktop-cache.ts";
+import { setClientCache } from "@/utils/client-cache.ts";
 import { apiEndpoint } from "@/conf/bootstrap.ts";
 import Icon from "@/components/utils/Icon.tsx";
 import {
@@ -1234,7 +1234,7 @@ function Market() {
     const market = await bindMarket();
     if (market.length) {
       updateSupportModels(reduxDispatch, market);
-      void setDesktopCache(`market:${apiEndpoint}`, market);
+      void setClientCache(`market:${apiEndpoint}`, market);
     }
     await sync();
   };

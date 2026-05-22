@@ -10,21 +10,6 @@ declare global {
   interface Performance {
     memory: PerformanceMemory;
   }
-
-  interface Tauri {
-    window?: {
-      getCurrentWindow?: () => {
-        theme?: () => Promise<"dark" | "light" | null>;
-      };
-      appWindow?: {
-        theme?: () => Promise<"dark" | "light" | null>;
-      };
-    };
-  }
-
-  interface Window {
-    __TAURI__?: Tauri;
-  }
 }
 
 export declare function getMemoryPerformance(): number;

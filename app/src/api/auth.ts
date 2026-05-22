@@ -4,7 +4,7 @@ import { localizeError } from "@/utils/error.ts";
 import { isEmailValid } from "@/utils/form.ts";
 import { toast } from "sonner";
 import type { TFunction } from "i18next";
-import { getDesktopCache, setDesktopCache } from "@/utils/desktop-cache.ts";
+import { getClientCache, setClientCache } from "@/utils/client-cache.ts";
 
 const userInfoCacheKey = "user-info";
 
@@ -386,7 +386,7 @@ export async function getUserInfo(): Promise<UserInfoResponse> {
   try {
     const response = await axios.get("/userinfo");
     const data = response.data as UserInfoResponse;
-    if (data.status) void setDesktopCache(getUserInfoCacheKey(), data.data);
+    if (data.status) void setClientCache(getUserInfoCacheKey(), data.data);
     return data;
   } catch (e) {
     const cached = await getCachedUserInfo();
@@ -399,5 +399,5 @@ export async function getUserInfo(): Promise<UserInfoResponse> {
 }
 
 export async function getCachedUserInfo(): Promise<UserInfo | undefined> {
-  return await getDesktopCache<UserInfo>(getUserInfoCacheKey());
+  return await getClientCache<UserInfo>(getUserInfoCacheKey());
 }

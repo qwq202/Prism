@@ -4,7 +4,7 @@ import axios, {
   AxiosResponse,
   InternalAxiosRequestConfig,
 } from "axios";
-import { getDesktopCache, setDesktopCache } from "@/utils/desktop-cache.ts";
+import { getClientCache, setClientCache } from "@/utils/client-cache.ts";
 import { getMemory } from "@/utils/memory.ts";
 
 type ApiCacheOptions = {
@@ -213,7 +213,7 @@ function refreshCache(config: InternalAxiosRequestConfig, key: string): void {
     })
     .then((response) => {
       if (shouldStoreResponse(response)) {
-        void setDesktopCache(key, toCachedResponse(response));
+        void setClientCache(key, toCachedResponse(response));
       }
       window.dispatchEvent(
         new CustomEvent("prism-api-cache-updated", {
@@ -247,7 +247,7 @@ export function installApiCache(nextOptions: ApiCacheOptions): void {
     const key = getCacheKey(config);
     if (servedCacheKeys.has(key)) return config;
 
-    const cached = await getDesktopCache<CachedAxiosResponse>(key);
+    const cached = await getClientCache<CachedAxiosResponse>(key);
     if (!cached) return config;
 
     servedCacheKeys.add(key);
@@ -262,7 +262,7 @@ export function installApiCache(nextOptions: ApiCacheOptions): void {
   axios.interceptors.response.use(
     (response) => {
       if (shouldStoreResponse(response)) {
-        void setDesktopCache(
+        void setClientCache(
           getCacheKey(response.config as InternalAxiosRequestConfig),
           toCachedResponse(response),
         );
@@ -283,7 +283,7 @@ export function installApiCache(nextOptions: ApiCacheOptions): void {
         | undefined;
       if (!config || !isCacheable(config)) return Promise.reject(error);
 
-      const cached = await getDesktopCache<CachedAxiosResponse>(
+      const cached = await getClientCache<CachedAxiosResponse>(
         getCacheKey(config),
       );
       if (cached) return toAxiosResponse(config, cached);

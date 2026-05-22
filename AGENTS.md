@@ -1,7 +1,7 @@
 # 仓库规范指南
 
 ## 仓库结构与模块组织
-本仓库是 Go 后端 + 独立 React 客户端（`app/`）的组合。后端入口为 `main.go`，主要领域模块包括 `adapter/`（模型适配）、`admin/`、`auth/`、`channel/`、`manager/`、`middleware/`、`utils/`。前端源码位于 `app/src/`，按功能划分为 `components/`、`routes/`、`store/`、`admin/`、`assets/` 等目录。Tauri 桌面端打包位于 `app/src-tauri/`。部署相关文件在仓库根目录，包括 `Dockerfile`、`docker-compose*.yaml`、`nginx.conf`、`config.example.yaml`。
+本仓库是 Go 后端 + 独立 React 客户端（`app/`）的组合。后端入口为 `main.go`，主要领域模块包括 `adapter/`（模型适配）、`admin/`、`auth/`、`channel/`、`manager/`、`middleware/`、`utils/`。前端源码位于 `app/src/`，按功能划分为 `components/`、`routes/`、`store/`、`admin/`、`assets/` 等目录。部署相关文件在仓库根目录，包括 `Dockerfile`、`docker-compose*.yaml`、`nginx.conf`、`config.example.yaml`。
 
 ## 构建、测试与开发命令
 - `go build .`：在仓库根目录构建后端可执行文件。
