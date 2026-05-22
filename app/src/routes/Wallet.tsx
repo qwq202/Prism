@@ -57,6 +57,26 @@ type SubscriptionUsageValue = {
 };
 
 const pointResetInterval = 5 * 60 * 60;
+const walletContainerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      duration: 0.1,
+      when: "beforeChildren",
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const walletItemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.5 },
+  },
+};
 
 function toSubscriptionUsage(
   value: unknown,
@@ -238,9 +258,9 @@ function PlanItem({ level, isYearly }: PlanItemProps) {
           ? "border-primary/50 shadow-md shadow-primary/5"
           : "border-border/60 shadow-sm",
       )}
-      initial={{ opacity: 0, y: 30 }}
-      animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
-      transition={{ duration: 0.4, ease: "easeOut", delay: level * 0.08 }}
+      variants={walletItemVariants}
+      initial="hidden"
+      animate={inView ? "visible" : "hidden"}
     >
       {isHighlight && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-[11px] font-semibold px-3 py-0.5 rounded-full whitespace-nowrap">
@@ -417,12 +437,12 @@ function WalletPlanBox() {
     <motion.div
       className="w-full mt-0 rounded-xl border bg-background overflow-hidden"
       id="plan"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.3, delay: 0.2 }}
+      variants={walletContainerVariants}
+      initial="hidden"
+      animate="visible"
     >
       {/* Header section */}
-      <div className="px-5 pt-5 pb-4 space-y-3">
+      <motion.div className="px-5 pt-5 pb-4 space-y-3" variants={walletItemVariants}>
         <div className="flex items-start justify-between">
           <div>
             <p className="text-xs text-muted-foreground mb-1">
@@ -459,11 +479,11 @@ function WalletPlanBox() {
             </a>
           </p>
         </div>
-      </div>
+      </motion.div>
 
       {/* Usage accordion */}
       {subscription && (
-        <div className="px-5 pb-3">
+        <motion.div className="px-5 pb-3" variants={walletItemVariants}>
           <Accordion
             type="single"
             collapsible
@@ -581,11 +601,11 @@ function WalletPlanBox() {
               </AccordionContent>
             </AccordionItem>
           </Accordion>
-        </div>
+        </motion.div>
       )}
 
       {/* Period toggle + Plans grid */}
-      <div className="px-5 pb-5">
+      <motion.div className="px-5 pb-5" variants={walletItemVariants}>
         {sellablePlans.length > 0 && (
           <div className="flex justify-center mb-4">
             <Tabs
@@ -629,17 +649,23 @@ function WalletPlanBox() {
         )}
 
         {sellablePlans.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <motion.div
+            className="grid grid-cols-1 md:grid-cols-3 gap-4"
+            variants={walletContainerVariants}
+          >
             {sellablePlans.map((item, index) => (
               <PlanItem key={index} level={item.level} isYearly={isYearly} />
             ))}
-          </div>
+          </motion.div>
         ) : (
-          <div className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
+          <motion.div
+            className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground"
+            variants={walletItemVariants}
+          >
             {t("sub.no-sellable-plans")}
-          </div>
+          </motion.div>
         )}
-      </div>
+      </motion.div>
     </motion.div>
   );
 }
