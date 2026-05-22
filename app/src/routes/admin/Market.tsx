@@ -51,10 +51,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog.tsx";
-import { getApiMarket, getModelName, getV1Path } from "@/api/v1.ts";
+import { bindMarket, getApiMarket, getModelName, getV1Path } from "@/api/v1.ts";
 import { updateMarket } from "@/admin/api/market.ts";
 import { toast } from "sonner";
 import { useChannelModels, useSupportModels } from "@/admin/hook.tsx";
+import { useDispatch as useReduxDispatch } from "react-redux";
+import { updateSupportModels } from "@/store/chat.ts";
+import { setDesktopCache } from "@/utils/desktop-cache.ts";
+import { apiEndpoint } from "@/conf/bootstrap.ts";
 import Icon from "@/components/utils/Icon.tsx";
 import {
   DragDropContext,
@@ -1147,6 +1151,7 @@ function GroupedMarketView({
 
 function Market() {
   const { t } = useTranslation();
+  const reduxDispatch = useReduxDispatch();
 
   const [stepSupport, setStepSupport] = useState<boolean>(false);
   const [stepAll, setStepAll] = useState<boolean>(false);
@@ -1225,6 +1230,12 @@ function Market() {
     toast(t("admin.market.update-success"), {
       description: t("admin.market.update-success-prompt"),
     });
+
+    const market = await bindMarket();
+    if (market.length) {
+      updateSupportModels(reduxDispatch, market);
+      void setDesktopCache(`market:${apiEndpoint}`, market);
+    }
     await sync();
   };
 

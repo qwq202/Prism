@@ -119,6 +119,10 @@ function isRealtimePath(path: string): boolean {
     "/quota",
     "/broadcast/view",
     "/admin/logger/console",
+    "/v1/market",
+    "/v1/models",
+    "/v1/plans",
+    "/v1/charge",
   ].some((item) => path.startsWith(item));
 }
 
