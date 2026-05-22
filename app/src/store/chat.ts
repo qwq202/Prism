@@ -1466,7 +1466,7 @@ export function useMessageActions() {
           : false,
         url_context: enableGeminiNativeWeb ? gemini_url_context : false,
         x_search: enableXAINativeWeb ? xai_x_search : false,
-        fetch,
+        fetch: enableGeminiNativeWeb ? false : fetch,
         learning_mode,
         gemini_thinking_budget: supportsGeminiThinkingBudgetControl(targetModel)
           ? gemini_thinking_budget
@@ -1564,7 +1564,7 @@ export function useMessageActions() {
           : false,
         url_context: enableGeminiNativeWeb ? gemini_url_context : false,
         x_search: enableXAINativeWeb ? xai_x_search : false,
-        fetch,
+        fetch: enableGeminiNativeWeb ? false : fetch,
         learning_mode,
         gemini_thinking_budget: supportsGeminiThinkingBudgetControl(model)
           ? gemini_thinking_budget

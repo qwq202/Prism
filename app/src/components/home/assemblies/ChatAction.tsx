@@ -403,6 +403,9 @@ export function FetchAction() {
   const { t } = useTranslation();
   const dispatch = useDispatch();
   const fetch = useSelector(selectFetch);
+  const model = useSelector(selectModel);
+
+  if (isGeminiModelId(model)) return null;
 
   return (
     <Popover>
