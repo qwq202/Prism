@@ -153,6 +153,103 @@ function resetLocalConversationState(state: initialStateType) {
   setNumberMemory("history_conversation", -1);
 }
 
+function getConversationHistoryName(
+  conversation?: ConversationSerialized,
+  fallback?: string,
+): string {
+  const fallbackName = fallback?.trim();
+  if (fallbackName) return fallbackName;
+
+  const firstUserMessage =
+    conversation?.messages.find((item) => item.role === UserRole)?.content ??
+    conversation?.messages[0]?.content ??
+    "";
+
+  return firstUserMessage.trim();
+}
+
+function buildConversationHistoryEntry(
+  id: number,
+  conversation?: ConversationSerialized,
+  fallback?: ConversationInstance,
+): ConversationInstance {
+  const entry: ConversationInstance = {
+    id,
+    name: getConversationHistoryName(conversation, fallback?.name),
+    message: fallback?.message ?? [],
+  };
+  const model = conversation?.model ?? fallback?.model;
+
+  if (model) entry.model = model;
+  if (fallback?.shared !== undefined) entry.shared = fallback.shared;
+
+  return entry;
+}
+
+function dedupeStableHistory(
+  history: ConversationInstance[],
+): ConversationInstance[] {
+  const seen = new Set<number>();
+  return history.filter((item) => {
+    if (item.id === -1) return false;
+    if (seen.has(item.id)) return false;
+
+    seen.add(item.id);
+    return true;
+  });
+}
+
+function promotePendingConversationHistory(
+  history: ConversationInstance[],
+  id: number,
+  conversation: ConversationSerialized,
+): ConversationInstance[] {
+  const pending = history.find((item) => item.id === -1);
+  const existing = history.find((item) => item.id === id);
+  const promoted = buildConversationHistoryEntry(
+    id,
+    conversation,
+    pending ?? existing,
+  );
+  const rest = history.filter((item) => item.id !== -1 && item.id !== id);
+
+  return [promoted, ...rest];
+}
+
+function reconcileConversationHistory(
+  incoming: ConversationInstance[],
+  current: number,
+  localHistory: ConversationInstance[],
+  conversations: Record<number, ConversationSerialized>,
+): ConversationInstance[] {
+  const stable = dedupeStableHistory(incoming);
+
+  if (current === -1) {
+    const pending = localHistory.find((item) => item.id === -1);
+    if (pending && conversations[-1]?.messages.length > 0) {
+      return [pending, ...stable];
+    }
+
+    return stable;
+  }
+
+  if (stable.some((item) => item.id === current)) {
+    return stable;
+  }
+
+  const activeConversation = conversations[current];
+  const existing =
+    localHistory.find((item) => item.id === current) ??
+    localHistory.find((item) => item.id === -1);
+
+  if (!activeConversation && !existing) return stable;
+
+  return [
+    buildConversationHistoryEntry(current, activeConversation, existing),
+    ...stable,
+  ];
+}
+
 export function inModel(supportModels: Model[], model: string): boolean {
   return (
     model.length > 0 &&
@@ -763,6 +860,11 @@ const chatSlice = createSlice({
 
       state.conversations[id] = conversation;
       if (state.current === -1) state.current = id;
+      state.history = promotePendingConversationHistory(
+        state.history,
+        id,
+        conversation,
+      );
 
       state.conversations[-1] = { ...defaultConversation };
     },
@@ -799,7 +901,12 @@ const chatSlice = createSlice({
       resetLocalConversationState(state);
     },
     setHistory: (state, action) => {
-      state.history = action.payload as ConversationInstance[];
+      state.history = reconcileConversationHistory(
+        action.payload as ConversationInstance[],
+        state.current,
+        state.history,
+        state.conversations,
+      );
     },
     preflightHistory: (state, action) => {
       const name = action.payload as string;

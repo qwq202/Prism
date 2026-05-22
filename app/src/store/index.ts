@@ -41,9 +41,10 @@ store.subscribe(() => {
 
   chatCacheTimer = setTimeout(() => {
     const { history, current, conversations } = store.getState().chat;
+    const cacheableHistory = history.filter((item) => item.id !== -1);
     const currentConversation = current !== -1 ? conversations[current] : null;
     const signature = JSON.stringify({
-      history: history.map((item) => ({
+      history: cacheableHistory.map((item) => ({
         id: item.id,
         name: item.name,
         model: item.model,
@@ -56,7 +57,7 @@ store.subscribe(() => {
     if (signature === lastChatCacheSignature) return;
     lastChatCacheSignature = signature;
 
-    void setCachedConversationList(history);
+    void setCachedConversationList(cacheableHistory);
     if (current !== -1 && currentConversation) {
       void setCachedConversation(current, currentConversation);
     }
