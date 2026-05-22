@@ -57,7 +57,7 @@
   },
   "productName": "Prism",
   "mainBinaryName": "Prism",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "identifier": "org.qunqin.prism",
   "app": {
     "withGlobalTauri": true,

@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.1.2"
+version = "0.1.3"
 description = "Your Next Powerful AI Chat Platform"
 authors = ["Prism Team"]
 license = "Apache-2.0"
