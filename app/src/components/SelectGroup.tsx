@@ -89,7 +89,12 @@ export function SingleGroupSelectItemBadge(props: SingleSelectItemBadgeProps) {
 
 function GroupSelectItemBadge(props: { data: SelectItemBadgeProps }) {
   return Array.isArray(props.data) ? (
-    props.data.map((badge) => <SingleGroupSelectItemBadge {...badge} />)
+    props.data.map((badge, index) => (
+      <SingleGroupSelectItemBadge
+        key={`${badge.variant}-${badge.name ?? ""}-${badge.tooltip ?? ""}-${index}`}
+        {...badge}
+      />
+    ))
   ) : (
     <SingleGroupSelectItemBadge {...props.data} />
   );
@@ -115,9 +120,9 @@ function SelectGroupDesktop(props: SelectGroupProps) {
 
   return (
     <div className={`select-group`}>
-      {display.map((select: SelectItemProps, idx: number) => (
+      {display.map((select: SelectItemProps) => (
         <div
-          key={idx}
+          key={select.name}
           onClick={() => props.onChange?.(select.name)}
           className={`select-group-item ${
             select == props.current ? "active" : ""
@@ -160,8 +165,8 @@ function SelectGroupDesktop(props: SelectGroupProps) {
               </SelectItem>
             )}
 
-            {hidden.map((select: SelectItemProps, idx: number) => (
-              <SelectItem key={idx} value={select.name}>
+            {hidden.map((select: SelectItemProps) => (
+              <SelectItem key={select.name} value={select.name}>
                 <GroupSelectItem {...select} />
               </SelectItem>
             ))}
@@ -205,10 +210,10 @@ function SelectGroupMobile(props: SelectGroupProps) {
             </SelectItem>
           )}
 
-          {props.list.map((select: SelectItemProps, idx: number) => (
+          {props.list.map((select: SelectItemProps) => (
             <SelectItem
               className={`whitespace-nowrap`}
-              key={idx}
+              key={select.name}
               value={select.name}
             >
               <GroupSelectItem {...select} />
