@@ -64,6 +64,8 @@ import Icon from "@/components/utils/Icon.tsx";
 import {
   DragDropContext,
   Draggable,
+  type DraggableProvidedDragHandleProps,
+  type DraggableProvidedDraggableProps,
   Droppable,
   DropResult,
 } from "react-beautiful-dnd";
@@ -514,16 +516,16 @@ function CustomMarketImage({ image, idx, dispatch }: MarketImageProps) {
   );
 }
 
-type MarketItemProps = React.DetailedHTMLProps<
-  React.HTMLAttributes<HTMLDivElement>,
-  HTMLDivElement
-> & {
+type MarketItemProps = {
   model: Model;
   form: MarketForm;
   dispatch: MarketDispatch;
   index: number;
   stacked: boolean;
   channelModels: string[];
+  draggableProps?: DraggableProvidedDraggableProps;
+  dragHandleProps?: DraggableProvidedDragHandleProps | null;
+  isDragging?: boolean;
   forwardRef?: React.Ref<HTMLDivElement>;
 };
 
@@ -534,10 +536,13 @@ function MarketItem({
   dispatch,
   index,
   channelModels,
+  draggableProps,
+  dragHandleProps,
+  isDragging,
   forwardRef,
-  ...props
 }: MarketItemProps) {
   const { t } = useTranslation();
+  const { style, ...itemProps } = draggableProps ?? {};
 
   const [stackedFilled, setStackedFilled] = useState<boolean>(false);
 
@@ -628,12 +633,16 @@ function MarketItem({
   );
 
   return stackedFilled ? (
-    <div
+    <motion.div
       className={cn("market-item", !checked && "error")}
-      {...props}
+      layout={isDragging ? false : "position"}
+      initial={false}
+      transition={{ duration: 0.22, ease: "easeOut" }}
+      style={style}
+      {...itemProps}
       ref={forwardRef}
     >
-      <div className={`model-wrapper`}>
+      <div className={`model-wrapper`} {...dragHandleProps}>
         <div
           className={`flex flex-col md:grid md:grid-cols-2 gap-2 md:gap-x-4`}
         >
@@ -757,14 +766,23 @@ function MarketItem({
         </div>
         <Actions />
       </div>
-    </div>
+    </motion.div>
   ) : (
-    <div
+    <motion.div
       className={cn("market-item stacked", !checked && "error")}
-      {...props}
+      layout={isDragging ? false : "position"}
+      initial={false}
+      transition={{ duration: 0.22, ease: "easeOut" }}
+      style={style}
+      {...itemProps}
       ref={forwardRef}
     >
-      <GripVertical className={`h-4 w-4 mr-2 cursor-pointer`} />
+      <span
+        className={`mr-2 cursor-grab active:cursor-grabbing`}
+        {...dragHandleProps}
+      >
+        <GripVertical className={`h-4 w-4`} />
+      </span>
       <Input
         value={model.name}
         placeholder={t("admin.market.model-name-placeholder")}
@@ -780,7 +798,7 @@ function MarketItem({
         }}
       />
       <Actions stacked={true} />
-    </div>
+    </motion.div>
   );
 }
 
@@ -803,7 +821,7 @@ function MarketGroup({
       draggableId={model.seed as string}
       index={index}
     >
-      {(provided) => (
+      {(provided, snapshot) => (
         <MarketItem
           model={model}
           form={form}
@@ -811,9 +829,10 @@ function MarketGroup({
           dispatch={dispatch}
           index={index}
           channelModels={channelModels}
+          isDragging={snapshot.isDragging}
           forwardRef={provided.innerRef}
-          {...provided.draggableProps}
-          {...provided.dragHandleProps}
+          draggableProps={provided.draggableProps}
+          dragHandleProps={provided.dragHandleProps}
         />
       )}
     </Draggable>
