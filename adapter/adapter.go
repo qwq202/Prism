@@ -16,16 +16,17 @@ import (
 )
 
 var channelFactories = map[string]adaptercommon.FactoryCreator{
-	globals.OpenAIChannelType:             openai.NewChatInstanceFromConfig,
-	globals.OpenAIResponsesChannelType:    openairesponses.NewChatInstanceFromConfig,
-	globals.XAIChannelType:                xai.NewChatInstanceFromConfig,
-	globals.AzureOpenAIChannelType:        azure.NewChatInstanceFromConfig,
-	globals.ClaudeChannelType:             claude.NewChatInstanceFromConfig,
-	globals.GLMCodingPlanCNChannelType:    claude.NewChatInstanceFromConfig, // anthropic-compatible
-	globals.MiniMaxTokenPlanCNChannelType: minimaxtokenplan.NewChatInstanceFromConfig,
-	globals.XiaomiTokenPlanCNChannelType:  xiaomitokenplan.NewChatInstanceFromConfig,
-	globals.PalmChannelType:               palm2.NewChatInstanceFromConfig,
-	globals.DeepseekChannelType:           deepseek.NewChatInstanceFromConfig,
+	globals.OpenAIChannelType:                        openai.NewChatInstanceFromConfig,
+	globals.OpenAIResponsesChannelType:               openairesponses.NewChatInstanceFromConfig,
+	globals.XAIChannelType:                           xai.NewChatInstanceFromConfig,
+	globals.AzureOpenAIChannelType:                   azure.NewChatInstanceFromConfig,
+	globals.ClaudeChannelType:                        claude.NewChatInstanceFromConfig,
+	globals.GLMCodingPlanCNChannelType:               claude.NewChatInstanceFromConfig, // anthropic-compatible
+	globals.MiniMaxTokenPlanCNChannelType:            minimaxtokenplan.NewChatInstanceFromConfig,
+	globals.XiaomiTokenPlanCNChannelType:             xiaomitokenplan.NewChatInstanceFromConfig,
+	globals.PalmChannelType:                          palm2.NewChatInstanceFromConfig,
+	globals.GeminiEnterpriseAgentPlatformChannelType: palm2.NewVertexAIExpressChatInstanceFromConfig,
+	globals.DeepseekChannelType:                      deepseek.NewChatInstanceFromConfig,
 }
 
 func createChatRequest(conf globals.ChannelConfig, props *adaptercommon.ChatProps, hook globals.Hook) error {

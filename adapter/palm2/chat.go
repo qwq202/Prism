@@ -6,10 +6,13 @@ import (
 	"chat/utils"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 )
 
 var geminiMaxImages = 16
+
+const defaultVertexAIExpressEndpoint = "https://aiplatform.googleapis.com"
 
 func getGeminiAPIVersion(model string) string {
 	if strings.Contains(model, "preview") || strings.Contains(model, "exp") || strings.Contains(model, "latest") {
@@ -19,7 +22,56 @@ func getGeminiAPIVersion(model string) string {
 	return "v1"
 }
 
+func getVertexAIExpressAPIVersion(model string) string {
+	if getGeminiAPIVersion(model) == "v1beta" {
+		return "v1beta1"
+	}
+
+	return "v1"
+}
+
+func getVertexAIExpressModelPath(model string) string {
+	model = strings.Trim(strings.TrimSpace(model), "/")
+	if strings.HasPrefix(model, "publishers/") || strings.HasPrefix(model, "projects/") {
+		return model
+	}
+
+	model = strings.TrimPrefix(model, "models/")
+	return fmt.Sprintf("publishers/google/models/%s", model)
+}
+
+func (c *ChatInstance) GetVertexAIExpressChatEndpoint(model string, stream bool) string {
+	endpoint := strings.TrimRight(strings.TrimSpace(c.Endpoint), "/")
+	if endpoint == "" {
+		endpoint = defaultVertexAIExpressEndpoint
+	}
+
+	action := "generateContent"
+	if stream {
+		action = "streamGenerateContent"
+	}
+
+	values := url.Values{}
+	if stream {
+		values.Set("alt", "sse")
+	}
+	values.Set("key", c.ApiKey)
+
+	return fmt.Sprintf(
+		"%s/%s/%s:%s?%s",
+		endpoint,
+		getVertexAIExpressAPIVersion(model),
+		getVertexAIExpressModelPath(model),
+		action,
+		values.Encode(),
+	)
+}
+
 func (c *ChatInstance) GetChatEndpoint(model string, stream bool) string {
+	if c.VertexAIExpress {
+		return c.GetVertexAIExpressChatEndpoint(model, stream)
+	}
+
 	if model == globals.ChatBison001 {
 		return fmt.Sprintf("%s/v1beta2/models/%s:generateMessage?key=%s", c.Endpoint, model, c.ApiKey)
 	}

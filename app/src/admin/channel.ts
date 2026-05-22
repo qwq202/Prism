@@ -61,6 +61,7 @@ export const ChannelTypes: Record<string, string> = {
   "minimax-token-plan-cn": "MiniMax Token Plan（CN）",
   "xiaomi-token-plan-cn": "Xiaomi Token Plan (China)",
   palm: "Google Gemini",
+  "gemini-enterprise-agent-platform": "Gemini Enterprise Agent Platform",
   deepseek: "深度求索 DeepSeek",
 };
 
@@ -74,6 +75,7 @@ export const ShortChannelTypes: Record<string, string> = {
   "minimax-token-plan-cn": "MiniMax",
   "xiaomi-token-plan-cn": "Xiaomi TP",
   palm: "Gemini",
+  "gemini-enterprise-agent-platform": "Gemini AP",
   deepseek: "DeepSeek",
 };
 
@@ -257,6 +259,33 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "> Gemini 2.5 系列使用 `thinkingBudget`，Gemini 3 系列使用官方推荐的 `thinkingLevel` 参数，系统会按模型自动选择。 \n" +
       "> 为兼容官方稳定版与预览版模型，系统会自动在 `v1` 与 `v1beta` 之间选择合适的 Gemini API 版本。 \n" +
       "> Google 对请求 IP 地域有限制，可能出现 **User Location Is Not Supported** 的错误，可通过可用地区 IP 或反代接入解决。\n",
+  },
+  "gemini-enterprise-agent-platform": {
+    endpoint: "https://aiplatform.googleapis.com",
+    format: "<express-mode-api-key>",
+    models: [
+      "gemini-2.5-flash",
+      "gemini-2.5-flash-lite",
+      "gemini-2.5-pro",
+      "gemini-2.5-flash-preview-09-2025",
+      "gemini-2.5-flash-lite-preview-09-2025",
+      "gemini-2.0-flash-001",
+      "gemini-2.0-flash-lite-001",
+      "gemini-3-flash",
+      "gemini-3-flash-preview",
+      "gemini-3-pro-preview",
+      "gemini-3-pro-image-preview",
+      "gemini-3.1-pro-preview",
+      "gemini-3.1-pro-preview-customtools",
+      "gemini-3.1-flash-lite-preview",
+      "gemini-3.1-flash-image-preview",
+    ],
+    description:
+      "> Gemini Enterprise Agent Platform 渠道基于 **Vertex AI Express Mode** 的 Gemini API，接入点填写 *https://aiplatform.googleapis.com* 或其反代地址。 \n" +
+      "> 密钥请填写 Google Cloud Express Mode API Key；系统会请求 *`/v1/publishers/google/models/{model}:generateContent`*，流式请求使用 *`streamGenerateContent?alt=sse`*。 \n" +
+      "> 预览、实验和 latest 模型会自动切换到 Agent Platform 的 *`v1beta1`* API 版本；稳定模型默认使用 *`v1`*。 \n" +
+      "> 请求体沿用官方 Gemini `contents` / `systemInstruction` / `tools` / `generationConfig` 结构，并支持当前 Gemini 思考预算、URL Context、Google Search 与 function calling。 \n" +
+      "> 该渠道不自动刷新 OAuth/ADC 访问令牌；如果要使用标准项目/区域 Vertex AI OAuth 链路，请先通过 Express Mode API Key 或反代接入。\n",
   },
   deepseek: {
     endpoint: "https://api.deepseek.com",

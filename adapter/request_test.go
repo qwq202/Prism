@@ -149,6 +149,35 @@ func TestSanitizeChatMessagesForRequestKeepsGeminiMetadataOnPalmGemini(t *testin
 	}
 }
 
+func TestSanitizeChatMessagesForRequestKeepsGeminiMetadataOnAgentPlatformGemini(t *testing.T) {
+	props := &adaptercommon.ChatProps{
+		OriginalModel: "gemini-2.5-pro",
+		Message: []globals.Message{
+			{
+				Role:    globals.Assistant,
+				Content: "",
+				GeminiHiddenMetadata: &globals.GeminiHiddenMetadata{
+					ThoughtSignatures: []string{"sig-agent-platform"},
+				},
+			},
+		},
+	}
+
+	restore := sanitizeChatMessagesForRequest(requestTestChannelConfig{
+		channelType:    globals.GeminiEnterpriseAgentPlatformChannelType,
+		reflectedModel: "gemini-2.5-pro",
+	}, props)
+
+	if props.Message[0].GeminiHiddenMetadata == nil {
+		t.Fatalf("expected gemini request metadata to be preserved on agent platform channel")
+	}
+
+	restore()
+	if props.Message[0].GeminiHiddenMetadata == nil {
+		t.Fatalf("expected metadata to remain after no-op restore")
+	}
+}
+
 func TestSanitizeChatMessagesForRequestStripsPalmNonGeminiModel(t *testing.T) {
 	props := &adaptercommon.ChatProps{
 		OriginalModel: "text-bison-001",

@@ -312,6 +312,36 @@ func TestBuildGeminiChunkSuppressesExplicitThoughtsForNoThinkingModels(t *testin
 	}
 }
 
+func TestGetVertexAIExpressChatEndpoint(t *testing.T) {
+	instance := NewVertexAIExpressChatInstance("https://aiplatform.googleapis.com/", "api key/with+chars")
+
+	endpoint := instance.GetChatEndpoint("gemini-2.5-flash", false)
+	expected := "https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-2.5-flash:generateContent?key=api+key%2Fwith%2Bchars"
+	if endpoint != expected {
+		t.Fatalf("unexpected vertex express endpoint:\nwant %s\n got %s", expected, endpoint)
+	}
+}
+
+func TestGetVertexAIExpressStreamPreviewEndpointUsesV1Beta1(t *testing.T) {
+	instance := NewVertexAIExpressChatInstance("", "test-key")
+
+	endpoint := instance.GetChatEndpoint("gemini-3-pro-preview", true)
+	expected := "https://aiplatform.googleapis.com/v1beta1/publishers/google/models/gemini-3-pro-preview:streamGenerateContent?alt=sse&key=test-key"
+	if endpoint != expected {
+		t.Fatalf("unexpected vertex express stream endpoint:\nwant %s\n got %s", expected, endpoint)
+	}
+}
+
+func TestGetVertexAIExpressChatEndpointKeepsQualifiedModelPath(t *testing.T) {
+	instance := NewVertexAIExpressChatInstance("https://aiplatform.googleapis.com", "test-key")
+
+	endpoint := instance.GetChatEndpoint("publishers/google/models/gemini-2.5-flash", false)
+	expected := "https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-2.5-flash:generateContent?key=test-key"
+	if endpoint != expected {
+		t.Fatalf("unexpected qualified model path endpoint:\nwant %s\n got %s", expected, endpoint)
+	}
+}
+
 func utilsIntPtr(value int) *int {
 	return &value
 }

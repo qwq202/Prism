@@ -9,16 +9,17 @@ const (
 )
 
 const (
-	OpenAIChannelType             = "openai"
-	OpenAIResponsesChannelType    = "openai-responses"
-	XAIChannelType                = "xai"
-	AzureOpenAIChannelType        = "azure"
-	ClaudeChannelType             = "claude"
-	GLMCodingPlanCNChannelType    = "glm-coding-plan-cn"
-	MiniMaxTokenPlanCNChannelType = "minimax-token-plan-cn"
-	XiaomiTokenPlanCNChannelType  = "xiaomi-token-plan-cn"
-	PalmChannelType               = "palm"
-	DeepseekChannelType           = "deepseek"
+	OpenAIChannelType                        = "openai"
+	OpenAIResponsesChannelType               = "openai-responses"
+	XAIChannelType                           = "xai"
+	AzureOpenAIChannelType                   = "azure"
+	ClaudeChannelType                        = "claude"
+	GLMCodingPlanCNChannelType               = "glm-coding-plan-cn"
+	MiniMaxTokenPlanCNChannelType            = "minimax-token-plan-cn"
+	XiaomiTokenPlanCNChannelType             = "xiaomi-token-plan-cn"
+	PalmChannelType                          = "palm"
+	GeminiEnterpriseAgentPlatformChannelType = "gemini-enterprise-agent-platform"
+	DeepseekChannelType                      = "deepseek"
 )
 
 const (

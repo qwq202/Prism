@@ -13,7 +13,9 @@ import (
 var visibleThinkBlockPattern = regexp.MustCompile(`(?s)<think>\s*.*?\s*</think>\s*`)
 
 func isGeminiAdapterRequest(channelType string, model string) bool {
-	return channelType == globals.PalmChannelType && globals.IsGeminiModel(model)
+	return (channelType == globals.PalmChannelType ||
+		channelType == globals.GeminiEnterpriseAgentPlatformChannelType) &&
+		globals.IsGeminiModel(model)
 }
 
 func isAnthropicAdapterRequest(channelType string) bool {

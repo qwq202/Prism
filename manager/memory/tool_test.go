@@ -44,6 +44,7 @@ func TestToolCallChannelsIncludeFunctionToolCapableAdapters(t *testing.T) {
 		globals.MiniMaxTokenPlanCNChannelType,
 		globals.XiaomiTokenPlanCNChannelType,
 		globals.PalmChannelType,
+		globals.GeminiEnterpriseAgentPlatformChannelType,
 		globals.DeepseekChannelType,
 		globals.XAIChannelType,
 	}

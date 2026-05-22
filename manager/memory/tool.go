@@ -16,16 +16,17 @@ import (
 )
 
 var toolCallChannelTypes = map[string]struct{}{
-	globals.OpenAIChannelType:             {},
-	globals.OpenAIResponsesChannelType:    {},
-	globals.AzureOpenAIChannelType:        {},
-	globals.ClaudeChannelType:             {},
-	globals.GLMCodingPlanCNChannelType:    {},
-	globals.MiniMaxTokenPlanCNChannelType: {},
-	globals.XiaomiTokenPlanCNChannelType:  {},
-	globals.PalmChannelType:               {},
-	globals.DeepseekChannelType:           {},
-	globals.XAIChannelType:                {},
+	globals.OpenAIChannelType:                        {},
+	globals.OpenAIResponsesChannelType:               {},
+	globals.AzureOpenAIChannelType:                   {},
+	globals.ClaudeChannelType:                        {},
+	globals.GLMCodingPlanCNChannelType:               {},
+	globals.MiniMaxTokenPlanCNChannelType:            {},
+	globals.XiaomiTokenPlanCNChannelType:             {},
+	globals.PalmChannelType:                          {},
+	globals.GeminiEnterpriseAgentPlatformChannelType: {},
+	globals.DeepseekChannelType:                      {},
+	globals.XAIChannelType:                           {},
 }
 
 var writableToolChannelTypes = toolCallChannelTypes
