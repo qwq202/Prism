@@ -118,6 +118,7 @@ function isRealtimePath(path: string): boolean {
     "/payment/check",
     "/quota",
     "/broadcast/view",
+    "/memory/list",
     "/admin/logger/console",
     "/v1/market",
     "/v1/models",
