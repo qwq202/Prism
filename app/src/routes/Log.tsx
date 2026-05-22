@@ -10,9 +10,7 @@ import {
   Clock3,
   Cloud,
   Compass,
-  FileBox,
   FileText,
-  Hash,
   History,
   KeySquare,
   Search,
@@ -210,12 +208,6 @@ function LogTableSkeleton() {
           </TableCell>
           <TableCell>
             <Skeleton className="h-5 w-16" />
-          </TableCell>
-          <TableCell>
-            <Skeleton className="h-5 w-28" />
-          </TableCell>
-          <TableCell>
-            <Skeleton className="h-5 w-24" />
           </TableCell>
         </TableRow>
       ))}
@@ -470,18 +462,6 @@ function Log() {
                       {t("record.quota")}
                     </span>
                   </TableHead>
-                  <TableHead className="min-w-[180px] text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5">
-                      <Hash className="h-4 w-4" />
-                      {t("record.prompt")}
-                    </span>
-                  </TableHead>
-                  <TableHead className="min-w-[140px] text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5">
-                      <FileBox className="h-4 w-4" />
-                      {t("record.detail")}
-                    </span>
-                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -489,7 +469,7 @@ function Log() {
                 {records.length === 0 && !loading && (
                   <TableRow>
                     <TableCell
-                      colSpan={10}
+                      colSpan={8}
                       className="h-24 text-center text-muted-foreground"
                     >
                       —
@@ -514,12 +494,6 @@ function Log() {
                     <TableCell>{record.output_tokens}</TableCell>
                     <TableCell>{record.duration.toFixed(1)}s</TableCell>
                     <TableCell>{formatQuota(record.quota)}</TableCell>
-                    <TableCell className="max-w-[220px] truncate">
-                      {record.prompts || "—"}
-                    </TableCell>
-                    <TableCell className="max-w-[180px] truncate text-muted-foreground">
-                      {record.detail || "—"}
-                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
