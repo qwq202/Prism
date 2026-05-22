@@ -993,19 +993,34 @@ function MarketAlert({
               {t("admin.market.import-all")}
             </Button>
           </div>
-          <div className={`market-alert-wrapper`}>
-            {models.map((model) => (
-              <Button
-                key={model}
-                variant={`outline`}
-                size={`sm`}
-                className={`text-sm`}
-                onClick={() => onImport(model)}
-              >
-                {model}
-              </Button>
-            ))}
-          </div>
+          <motion.div
+            className={`market-alert-wrapper`}
+            layout
+            transition={{ duration: 0.2, ease: "easeOut" }}
+          >
+            <AnimatePresence initial={false} mode="popLayout">
+              {models.map((model) => (
+                <motion.div
+                  key={model}
+                  layout
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.96 }}
+                  transition={{ duration: 0.16, ease: "easeOut" }}
+                  style={{ overflow: "hidden" }}
+                >
+                  <Button
+                    variant={`outline`}
+                    size={`sm`}
+                    className={`text-sm`}
+                    onClick={() => onImport(model)}
+                  >
+                    {model}
+                  </Button>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
         </motion.div>
       )}
     </AnimatePresence>
