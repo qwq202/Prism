@@ -1,9 +1,14 @@
 package conversation
 
 import (
+	"chat/connection"
 	"chat/globals"
+	"database/sql"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func TestSaveResponseSkipsMetadataOnlyAssistantReply(t *testing.T) {
@@ -159,6 +164,58 @@ func TestSaveConversationQuerySqlitePreflightUpdatesModelColumn(t *testing.T) {
 	}
 	if strings.Contains(query, "DUPLICATE KEY") {
 		t.Fatalf("expected sqlite save conversation query to remove mysql upsert syntax, got %q", query)
+	}
+}
+
+func TestNewConversationRetriesOnConversationIDCollision(t *testing.T) {
+	previous := globals.SqliteEngine
+	globals.SqliteEngine = true
+	t.Cleanup(func() {
+		globals.SqliteEngine = previous
+	})
+
+	db, err := sql.Open("sqlite3", filepath.Join(t.TempDir(), "conversation-collision.db"))
+	if err != nil {
+		t.Fatalf("open sqlite db: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+	connection.CreateConversationTable(db)
+
+	first := &Conversation{
+		UserID:  1,
+		Id:      1,
+		Name:    "first",
+		Model:   globals.GPT3Turbo,
+		Message: []globals.Message{{Role: globals.User, Content: "first"}},
+	}
+	if !first.SaveConversation(db) {
+		t.Fatalf("expected first conversation to save")
+	}
+
+	second := &Conversation{
+		UserID:  1,
+		Id:      1,
+		Name:    "second",
+		Model:   globals.GPT3Turbo,
+		Message: []globals.Message{{Role: globals.User, Content: "second"}},
+	}
+	if !second.SaveConversation(db) {
+		t.Fatalf("expected second conversation to retry and save")
+	}
+	if second.Id == first.Id {
+		t.Fatalf("expected second conversation id to change after collision")
+	}
+
+	loadedFirst := LoadConversation(db, 1, first.Id)
+	if loadedFirst == nil || loadedFirst.GetMessage()[0].Content != "first" {
+		t.Fatalf("expected first conversation to remain intact, got %#v", loadedFirst)
+	}
+
+	loadedSecond := LoadConversation(db, 1, second.Id)
+	if loadedSecond == nil || loadedSecond.GetMessage()[0].Content != "second" {
+		t.Fatalf("expected retried second conversation to persist, got %#v", loadedSecond)
 	}
 }
 

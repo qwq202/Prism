@@ -23,6 +23,7 @@ type Conversation struct {
 	Model                    string            `json:"model"`
 	TaskID                   string            `json:"task_id,omitempty"`
 	UpdatedAt                string            `json:"updated_at,omitempty"`
+	Persisted                bool              `json:"-"`
 	EnableWeb                bool              `json:"enable_web"`
 	WebSearch                bool              `json:"web_search"`
 	URLContext               bool              `json:"url_context"`

@@ -179,12 +179,13 @@ func UseSharedConversation(db *sql.DB, user *auth.User, hash string) *Conversati
 	// create new conversation
 	id := user.GetID(db)
 	return &Conversation{
-		Auth:    true,
-		Id:      GetConversationLengthByUserID(db, id) + 1,
-		UserID:  id,
-		Name:    shared.Name,
-		Model:   globals.GPT3Turbo,
-		Message: shared.Messages,
+		Auth:      true,
+		Id:        GetConversationLengthByUserID(db, id) + 1,
+		UserID:    id,
+		Name:      shared.Name,
+		Model:     globals.GPT3Turbo,
+		Message:   shared.Messages,
+		Persisted: false,
 	}
 }
 

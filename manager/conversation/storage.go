@@ -6,6 +6,7 @@ import (
 	"chat/utils"
 	"database/sql"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
@@ -22,6 +23,10 @@ const saveConversationQuery = `
 		ON DUPLICATE KEY UPDATE conversation_name = VALUES(conversation_name), data = VALUES(data), model = VALUES(model), task_id = VALUES(task_id), updated_at = CURRENT_TIMESTAMP
 	`
 
+const insertConversationQuery = `
+		INSERT INTO conversation (user_id, conversation_id, conversation_name, data, model, task_id) VALUES (?, ?, ?, ?, ?, ?)
+	`
+
 func normalizeDBString(value interface{}) string {
 	switch v := value.(type) {
 	case nil:
@@ -35,6 +40,17 @@ func normalizeDBString(value interface{}) string {
 	default:
 		return fmt.Sprint(v)
 	}
+}
+
+func isDuplicateConversationIDError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	lower := strings.ToLower(err.Error())
+	return strings.Contains(lower, "error 1062") ||
+		strings.Contains(lower, "duplicate entry") ||
+		strings.Contains(lower, "unique constraint failed")
 }
 
 func loadGlobalConversationAttachmentNames(db *sql.DB) map[string]struct{} {
@@ -151,6 +167,14 @@ func (c *Conversation) SaveConversation(db *sql.DB) bool {
 	}
 
 	data := utils.ToJson(c.GetMessage())
+	var taskID sql.NullString
+	if c.TaskID != "" {
+		taskID = sql.NullString{String: c.TaskID, Valid: true}
+	}
+
+	if !c.Persisted {
+		return c.insertNewConversation(db, data, taskID)
+	}
 
 	stmt, err := globals.PrepareDb(db, saveConversationQuery)
 	if err != nil {
@@ -163,11 +187,6 @@ func (c *Conversation) SaveConversation(db *sql.DB) bool {
 		}
 	}(stmt)
 
-	var taskID sql.NullString
-	if c.TaskID != "" {
-		taskID = sql.NullString{String: c.TaskID, Valid: true}
-	}
-
 	_, err = stmt.Exec(c.UserID, c.Id, c.Name, data, c.Model, taskID)
 	if err != nil {
 		globals.Info(fmt.Sprintf("execute error during save conversation: %s", err.Error()))
@@ -175,6 +194,36 @@ func (c *Conversation) SaveConversation(db *sql.DB) bool {
 	}
 	return true
 }
+
+func (c *Conversation) insertNewConversation(db *sql.DB, data string, taskID sql.NullString) bool {
+	for attempt := 0; attempt < 5; attempt++ {
+		stmt, err := globals.PrepareDb(db, insertConversationQuery)
+		if err != nil {
+			return false
+		}
+
+		_, err = stmt.Exec(c.UserID, c.Id, c.Name, data, c.Model, taskID)
+		if closeErr := stmt.Close(); closeErr != nil {
+			globals.Warn(closeErr)
+		}
+
+		if err == nil {
+			c.Persisted = true
+			return true
+		}
+
+		if !isDuplicateConversationIDError(err) {
+			globals.Info(fmt.Sprintf("execute error during insert conversation: %s", err.Error()))
+			return false
+		}
+
+		c.Id = GetConversationLengthByUserID(db, c.UserID) + 1
+	}
+
+	globals.Info(fmt.Sprintf("failed to allocate unique conversation id for user %d", c.UserID))
+	return false
+}
+
 func GetConversationLengthByUserID(db *sql.DB, userId int64) int64 {
 	var length int64
 	err := globals.QueryRowDb(db, "SELECT MAX(conversation_id) FROM conversation WHERE user_id = ?", userId).Scan(&length)
@@ -186,8 +235,9 @@ func GetConversationLengthByUserID(db *sql.DB, userId int64) int64 {
 
 func LoadConversation(db *sql.DB, userId int64, conversationId int64) *Conversation {
 	conversation := Conversation{
-		UserID: userId,
-		Id:     conversationId,
+		UserID:    userId,
+		Id:        conversationId,
+		Persisted: true,
 	}
 
 	var (
