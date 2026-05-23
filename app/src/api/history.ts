@@ -9,6 +9,7 @@ import { formatToolCallResult } from "@/api/plugin.ts";
 import {
   getCachedConversationList,
   setCachedConversation,
+  setCachedConversationList,
 } from "@/utils/conversation-cache.ts";
 
 export async function getConversationList(): Promise<ConversationInstance[]> {
@@ -17,6 +18,11 @@ export async function getConversationList(): Promise<ConversationInstance[]> {
     const conversations = (
       resp.data.status ? resp.data.data || [] : []
     ) as ConversationInstance[];
+    if (resp.data.status) {
+      void setCachedConversationList(
+        conversations.filter((item) => item.id !== -1),
+      );
+    }
     return conversations;
   } catch (e) {
     console.warn(e);
