@@ -291,6 +291,10 @@ function shouldReplaceConversation(
 ): boolean {
   if (!currentConversation) return true;
 
+  if (incoming.message.length < currentConversation.messages.length) {
+    return false;
+  }
+
   const currentVersion = parseConversationVersion(
     currentConversation.updated_at,
   );
