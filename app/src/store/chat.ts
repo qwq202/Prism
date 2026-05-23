@@ -166,23 +166,36 @@ function replaceWithRemoteConversationHistory(
   const stable = dedupeStableHistory(incoming);
   const remoteIds = new Set(stable.map((item) => item.id));
   const pending = state.history.find((item) => item.id === -1);
+  const currentMissing =
+    state.current !== -1 && !remoteIds.has(state.current);
+  const currentConversation = currentMissing
+    ? state.conversations[state.current]
+    : undefined;
+  const currentHistory = currentMissing
+    ? state.history.find((item) => item.id === state.current)
+    : undefined;
 
-  state.history =
+  let nextHistory =
     state.current === -1 &&
     pending &&
     state.conversations[-1]?.messages.length > 0
       ? [pending, ...stable]
       : stable;
 
-  Object.keys(state.conversations).forEach((key) => {
-    const id = Number(key);
-    if (id !== -1 && !remoteIds.has(id)) {
-      closeConversationConnection(id);
-      delete state.conversations[id];
-    }
-  });
+  if (currentMissing && currentConversation) {
+    nextHistory = [
+      buildConversationHistoryEntry(
+        state.current,
+        currentConversation,
+        currentHistory,
+      ),
+      ...nextHistory.filter((item) => item.id !== state.current),
+    ];
+  }
 
-  if (state.current !== -1 && !remoteIds.has(state.current)) {
+  state.history = nextHistory;
+
+  if (currentMissing && !currentConversation) {
     closeConversationConnection(state.current);
     state.current = -1;
     state.messages = [];
@@ -1021,6 +1034,10 @@ const chatSlice = createSlice({
         setNumberMemory("history_conversation", -1);
       }
 
+      if (getNumberMemory("history_conversation", -1) === id) {
+        setNumberMemory("history_conversation", -1);
+      }
+
       if (!state.conversations[id]) return;
 
       closeConversationConnection(id);
@@ -1054,6 +1071,28 @@ const chatSlice = createSlice({
       const { id, name } = action.payload as { id: number; name: string };
       const conversation = state.history.find((item) => item.id === id);
       if (conversation) conversation.name = name;
+    },
+    upsertHistory: (state, action) => {
+      const incoming = action.payload as ConversationInstance;
+      if (incoming.id === -1) return;
+
+      const index = state.history.findIndex((item) => item.id === incoming.id);
+      const previous = index >= 0 ? state.history[index] : undefined;
+      const next = {
+        id: incoming.id,
+        name: incoming.name || previous?.name || "",
+        message: incoming.message ?? previous?.message ?? [],
+        model: incoming.model ?? previous?.model,
+        shared: incoming.shared ?? previous?.shared,
+        updated_at: incoming.updated_at ?? previous?.updated_at,
+      };
+
+      if (index >= 0) {
+        state.history[index] = next;
+        return;
+      }
+
+      state.history = [next, ...state.history];
     },
     setModel: (state, action) => {
       const model = action.payload as string;
@@ -1230,6 +1269,7 @@ export const {
   setHistory,
   setRemoteHistory,
   renameHistory,
+  upsertHistory,
   setCurrent,
   setModel,
   setWeb,
@@ -1365,6 +1405,16 @@ export function useConversationActions() {
         id,
       }),
     );
+    dispatch(
+      upsertHistory({
+        id: data.id,
+        name: data.name,
+        message: [],
+        model: data.model,
+        shared: data.shared,
+        updated_at: data.updated_at,
+      }),
+    );
     if (activate) dispatch(setCurrent(id));
   };
 
@@ -1478,8 +1528,7 @@ export function useConversationActions() {
 
       if (
         !resp.fromCache &&
-        current !== -1 &&
-        resp.conversations.some((item) => item.id === current)
+        current !== -1
       ) {
         await refreshConversationDetail(current, conversations[current], {
           activate: false,
@@ -1513,10 +1562,7 @@ export function useConversationActions() {
           : setRemoteHistory(resp.conversations),
       );
 
-      if (
-        stored !== -1 &&
-        resp.conversations.some((item) => item.id === stored)
-      ) {
+      if (stored !== -1) {
         await showConversation(stored, { useCache: true });
       }
 
