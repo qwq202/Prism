@@ -291,14 +291,19 @@ function shouldReplaceConversation(
 ): boolean {
   if (!currentConversation) return true;
 
-  if (incoming.message.length < currentConversation.messages.length) {
-    return false;
-  }
-
   const currentVersion = parseConversationVersion(
     currentConversation.updated_at,
   );
   const incomingVersion = parseConversationVersion(incoming.updated_at);
+
+  if (incoming.message.length < currentConversation.messages.length) {
+    if (isStreamingConversation(currentConversation)) return false;
+    if (currentVersion !== undefined && incomingVersion !== undefined) {
+      return incomingVersion > currentVersion;
+    }
+
+    return false;
+  }
 
   if (currentVersion !== undefined && incomingVersion !== undefined) {
     if (incomingVersion !== currentVersion) {
@@ -307,6 +312,11 @@ function shouldReplaceConversation(
   }
 
   return incoming.message.length >= currentConversation.messages.length;
+}
+
+function isStreamingConversation(conversation: ConversationSerialized): boolean {
+  const last = conversation.messages[conversation.messages.length - 1];
+  return last?.role === AssistantRole && last.end === false;
 }
 
 function parseConversationVersion(
