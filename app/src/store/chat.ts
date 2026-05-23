@@ -1282,6 +1282,42 @@ export function useConversationActions() {
   const current = useSelector(selectCurrent);
   const mask = useSelector(selectMaskItem);
 
+  const refreshConversationDetail = async (
+    id: number,
+    currentConversation: ConversationSerialized | undefined,
+    options?: { activate?: boolean },
+  ) => {
+    if (id === -1) return;
+    const activate = options?.activate ?? true;
+
+    const result = await fetchConversation(id);
+    if (result.status === "not_found") {
+      await clearCachedConversation(id);
+      await removeCachedConversationFromList(id);
+      dispatch(deleteConversation(id));
+      return;
+    }
+    if (result.status !== "ok") return;
+
+    const data = result.conversation;
+    if (!shouldReplaceConversation(currentConversation, data)) {
+      if (activate) dispatch(setCurrent(id));
+      return;
+    }
+
+    dispatch(
+      setConversation({
+        conversation: {
+          model: data.model,
+          messages: data.message,
+          updated_at: data.updated_at,
+        },
+        id,
+      }),
+    );
+    if (activate) dispatch(setCurrent(id));
+  };
+
   const showConversation = async (
     id: number,
     options?: { refreshRemote?: boolean; useCache?: boolean },
@@ -1327,32 +1363,9 @@ export function useConversationActions() {
 
     if (!refreshRemote) return;
 
-    const result = await fetchConversation(id);
-    if (result.status === "not_found") {
-      await clearCachedConversation(id);
-      await removeCachedConversationFromList(id);
-      dispatch(deleteConversation(id));
-      return;
-    }
-    if (result.status !== "ok") return;
-
-    const data = result.conversation;
-    if (!shouldReplaceConversation(restoredConversation, data)) {
-      dispatch(setCurrent(id));
-      return;
-    }
-
-    dispatch(
-      setConversation({
-        conversation: {
-          model: data.model,
-          messages: data.message,
-          updated_at: data.updated_at,
-        },
-        id,
-      }),
-    );
-    dispatch(setCurrent(id));
+    await refreshConversationDetail(id, restoredConversation, {
+      activate: true,
+    });
   };
 
   return {
@@ -1412,6 +1425,16 @@ export function useConversationActions() {
           ? setHistory(resp.conversations)
           : setRemoteHistory(resp.conversations),
       );
+
+      if (
+        !resp.fromCache &&
+        current !== -1 &&
+        resp.conversations.some((item) => item.id === current)
+      ) {
+        await refreshConversationDetail(current, conversations[current], {
+          activate: false,
+        });
+      }
 
       return resp.conversations;
     },
