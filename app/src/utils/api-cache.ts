@@ -128,10 +128,27 @@ function isRealtimePath(path: string): boolean {
   ].some((item) => path.startsWith(item));
 }
 
+function hasNoCacheRequestHeader(
+  config: InternalAxiosRequestConfig,
+): boolean {
+  const cacheControl = getHeaderValue(config.headers, "Cache-Control")
+    .toLowerCase()
+    .split(",")
+    .map((item) => item.trim());
+  const pragma = getHeaderValue(config.headers, "Pragma").toLowerCase();
+
+  return (
+    cacheControl.includes("no-cache") ||
+    cacheControl.includes("no-store") ||
+    pragma === "no-cache"
+  );
+}
+
 function isCacheable(config: InternalAxiosRequestConfig): boolean {
   if (config.prismCache === false || config.prismCacheRefresh) return false;
   if (!options) return false;
   if (Date.now() < bypassCacheUntil) return false;
+  if (hasNoCacheRequestHeader(config)) return false;
 
   const method = (config.method || "get").toLowerCase();
   const path = getPath(config);
