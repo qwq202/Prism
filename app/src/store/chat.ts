@@ -111,6 +111,7 @@ export type ConversationSerialized = {
   model?: string;
   messages: Message[];
   updated_at?: string;
+  local_pending_until?: number;
 };
 
 export type ConnectionEvent = {
@@ -147,6 +148,7 @@ type initialStateType = {
 };
 
 const defaultConversation: ConversationSerialized = { messages: [] };
+const localMutationProtectionMs = 10_000;
 
 function resetLocalConversationState(state: initialStateType) {
   state.history = [];
@@ -296,6 +298,15 @@ function shouldReplaceConversation(
   );
   const incomingVersion = parseConversationVersion(incoming.updated_at);
 
+  if (hasPendingLocalMutation(currentConversation)) {
+    if (isStreamingConversation(currentConversation)) return false;
+    if (currentVersion !== undefined && incomingVersion !== undefined) {
+      return incomingVersion > currentVersion;
+    }
+
+    return false;
+  }
+
   if (incoming.message.length < currentConversation.messages.length) {
     if (isStreamingConversation(currentConversation)) return false;
     if (currentVersion !== undefined && incomingVersion !== undefined) {
@@ -312,6 +323,14 @@ function shouldReplaceConversation(
   }
 
   return incoming.message.length >= currentConversation.messages.length;
+}
+
+function markConversationPending(conversation: ConversationSerialized) {
+  conversation.local_pending_until = Date.now() + localMutationProtectionMs;
+}
+
+function hasPendingLocalMutation(conversation: ConversationSerialized): boolean {
+  return (conversation.local_pending_until ?? 0) > Date.now();
 }
 
 function isStreamingConversation(conversation: ConversationSerialized): boolean {
@@ -831,6 +850,7 @@ const chatSlice = createSlice({
 
       const conversation = state.conversations[id];
       if (!conversation) return;
+      markConversationPending(conversation);
 
       if (role === AssistantRole && model) {
         conversation.model = model;
@@ -859,6 +879,7 @@ const chatSlice = createSlice({
       };
       const conversation = state.conversations[id];
       if (!conversation) return;
+      markConversationPending(conversation);
 
       if (
         conversation.messages.length === 0 ||
@@ -900,6 +921,7 @@ const chatSlice = createSlice({
       const { id, idx } = action.payload as { id: number; idx: number };
       const conversation = state.conversations[id];
       if (!conversation) return;
+      markConversationPending(conversation);
 
       conversation.messages.splice(idx, 1);
     },
@@ -907,6 +929,7 @@ const chatSlice = createSlice({
       const { id, model } = action.payload as { id: number; model?: string };
       const conversation = state.conversations[id];
       if (!conversation || conversation.messages.length === 0) return;
+      markConversationPending(conversation);
 
       if (model) {
         conversation.model = model;
@@ -927,6 +950,7 @@ const chatSlice = createSlice({
       };
       const conversation = state.conversations[id];
       if (!conversation || conversation.messages.length <= idx) return;
+      markConversationPending(conversation);
 
       conversation.messages[idx].content = message;
     },
@@ -934,6 +958,7 @@ const chatSlice = createSlice({
       const { id } = action.payload as { id: number };
       const conversation = state.conversations[id];
       if (!conversation || conversation.messages.length === 0) return;
+      markConversationPending(conversation);
 
       conversation.messages[conversation.messages.length - 1].end = true;
     },
@@ -1033,6 +1058,7 @@ const chatSlice = createSlice({
 
       const conversation = state.conversations[state.current];
       if (conversation) {
+        markConversationPending(conversation);
         conversation.model = model;
       }
 

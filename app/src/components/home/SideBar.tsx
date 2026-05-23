@@ -98,7 +98,7 @@ function SidebarAction({
           description: t("conversation.delete-failed-prompt"),
         });
 
-    await refreshAction();
+    await refreshAction({ useCache: false });
     setOperateConversation({ target: null, type: "" });
     setRemoveAll(false);
   }
@@ -171,7 +171,7 @@ function SidebarAction({
             ref={refreshRef}
             onClick={() => {
               const hook = animateElement(refreshRef, "active", 500);
-              refreshAction().finally(hook);
+              refreshAction({ useCache: false }).finally(hook);
             }}
           >
             <RotateCw className={`h-4 w-4`} />
