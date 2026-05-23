@@ -19,6 +19,7 @@ export type GeneralState = {
   description: string;
   backend: string;
   docs: string;
+  timezone: string;
   pwa_manifest: string;
   gravatar: string;
   debug_mode: boolean;
@@ -227,6 +228,7 @@ export const initialSystemState: SystemProps = {
     title: "",
     backend: "",
     docs: "",
+    timezone: "Asia/Shanghai",
     pwa_manifest: "",
     gravatar: "",
     debug_mode: false,
@@ -402,6 +404,8 @@ export async function getConfig(): Promise<SystemResponse> {
     if (data.status && data.data) {
       // init system data pre-format
 
+      data.data.general.timezone =
+        data.data.general.timezone || "Asia/Shanghai";
       data.data.mail.white_list.white_list =
         data.data.mail.white_list.white_list || commonWhiteList;
       data.data.search.engines = data.data.search.engines || [];

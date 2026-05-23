@@ -1,48 +1,34 @@
-export function toBrowserDateInputValue(date: Date) {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
+export const defaultRecordTimeZone = "Asia/Shanghai";
+
+export function normalizeRecordTimeZone(timeZone?: string) {
+  const value = timeZone?.trim() || defaultRecordTimeZone;
+  try {
+    new Intl.DateTimeFormat(undefined, { timeZone: value }).format(new Date());
+    return value;
+  } catch {
+    return defaultRecordTimeZone;
+  }
 }
 
-export function formatBrowserRecordTime(value: string) {
+export function toTimeZoneDateInputValue(date: Date, timeZone?: string) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: normalizeRecordTimeZone(timeZone),
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  const parts = formatter.formatToParts(date);
+  const get = (type: string) =>
+    parts.find((part) => part.type === type)?.value || "";
+
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+export function formatRecordTime(value: string, timeZone?: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value || "—";
-  return date.toLocaleString();
-}
-
-function formatBrowserOffset(date: Date) {
-  const offset = -date.getTimezoneOffset();
-  const sign = offset >= 0 ? "+" : "-";
-  const abs = Math.abs(offset);
-  const hours = `${Math.floor(abs / 60)}`.padStart(2, "0");
-  const minutes = `${abs % 60}`.padStart(2, "0");
-  return `${sign}${hours}:${minutes}`;
-}
-
-function formatBrowserDateTimeWithOffset(date: Date) {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  const hour = `${date.getHours()}`.padStart(2, "0");
-  const minute = `${date.getMinutes()}`.padStart(2, "0");
-  const second = `${date.getSeconds()}`.padStart(2, "0");
-  return `${year}-${month}-${day}T${hour}:${minute}:${second}${formatBrowserOffset(date)}`;
-}
-
-export function toBrowserRecordBoundary(
-  value: string,
-  boundary: "start" | "end",
-) {
-  if (!value) return undefined;
-
-  const [year, month, day] = value.split("-").map(Number);
-  if (!year || !month || !day) return undefined;
-
-  const date =
-    boundary === "start"
-      ? new Date(year, month - 1, day, 0, 0, 0)
-      : new Date(year, month - 1, day, 23, 59, 59);
-
-  return formatBrowserDateTimeWithOffset(date);
+  return date.toLocaleString(undefined, {
+    timeZone: normalizeRecordTimeZone(timeZone),
+  });
 }

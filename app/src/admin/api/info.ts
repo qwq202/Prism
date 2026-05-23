@@ -15,6 +15,7 @@ export type SiteInfo = {
   title: string;
   logo: string;
   docs: string;
+  timezone: string;
   backend?: string;
   currency: string;
   announcement: string;
@@ -47,6 +48,7 @@ export async function getSiteInfo(): Promise<SiteInfo> {
       title: "",
       logo: "",
       docs: "",
+      timezone: "Asia/Shanghai",
       backend: undefined,
       currency: "cny",
       announcement: "",

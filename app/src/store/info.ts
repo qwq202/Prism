@@ -42,6 +42,7 @@ export const infoSlice = createSlice({
     title: getMemory("title"),
     logo: getMemory("logo"),
     docs: getMemory("docs"),
+    timezone: getMemory("timezone") || "Asia/Shanghai",
     announcement: getMemory("announcement"),
     buy_link: getMemory("buy_link"),
     hide_key_docs: getBooleanMemory("hide_key_docs", false),
@@ -72,6 +73,7 @@ export const infoSlice = createSlice({
       state.title = form.title ?? "";
       state.logo = form.logo ?? "";
       state.docs = form.docs ?? "";
+      state.timezone = form.timezone || "Asia/Shanghai";
       state.announcement = form.announcement ?? "";
       state.buy_link = form.buy_link ?? "";
       state.hide_key_docs = form.hide_key_docs ?? false;
@@ -84,6 +86,7 @@ export const infoSlice = createSlice({
       setMemory("title", state.title);
       setMemory("logo", state.logo);
       setMemory("docs", state.docs);
+      setMemory("timezone", state.timezone);
       setMemory("announcement", state.announcement);
       setMemory("buy_link", state.buy_link);
       setBooleanMemory("hide_key_docs", state.hide_key_docs);
@@ -129,6 +132,8 @@ export const infoHideKeyDocsSelector = (state: RootState): boolean =>
   state.info.hide_key_docs ?? false;
 export const infoBackendSelector = (state: RootState): string | undefined =>
   state.info.backend;
+export const infoTimeZoneSelector = (state: RootState): string =>
+  state.info.timezone || "Asia/Shanghai";
 export const infoBroadcastSelector = (state: RootState): BroadcastEvent =>
   state.info.broadcast;
 

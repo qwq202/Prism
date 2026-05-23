@@ -1381,6 +1381,8 @@
       "logo": "网站 Logo",
       "docs": "文档链接",
       "docsTip": "文档链接，留空默认 https://coai.dev",
+      "timezone": "系统时区",
+      "timezoneTip": "用于日志显示、日志筛选和今日/月度统计。默认 Asia/Shanghai。",
       "logoTip": "网站 Logo 的链接，用于显示在网站标题，留空默认 (如 {{logo}})",
       "file": "文件解析服务",
       "filePlaceholder": "文件解析服务，留空默认 https://blob.coai.dev (不保证稳定性)",

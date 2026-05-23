@@ -1103,6 +1103,8 @@
       "logo": "網站 Logo",
       "docs": "文件連結",
       "docsTip": "文件連結，留空為預設值 https://coai.dev",
+      "timezone": "系統時區",
+      "timezoneTip": "用於日誌顯示、日誌篩選和今日/月度統計。預設 Asia/Shanghai。",
       "logoTip": "網站 Logo 的連結，用於顯示在網站標題，留空為預設值（如 {{logo}}）",
       "file": "檔案解析服務",
       "filePlaceholder": "檔案解析服務，留空為預設值 https://blob.chatnio.net（不保證穩定性）",

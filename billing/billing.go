@@ -11,7 +11,6 @@ import (
 )
 
 const pageSize int64 = 20
-const recordStorageTimeZone = "Asia/Shanghai"
 
 const recordFilterWhereSQL = `
 		WHERE (? = 0 OR b.user_id = ?)
@@ -71,11 +70,7 @@ type RecordStats struct {
 }
 
 func recordStorageLocation() *time.Location {
-	location, err := time.LoadLocation(recordStorageTimeZone)
-	if err != nil {
-		return time.Local
-	}
-	return location
+	return channel.GetSystemTimeZoneLocation()
 }
 
 func parseRecordStorageTime(value []uint8) *time.Time {
@@ -217,7 +212,7 @@ func buildRecordFilterArgs(isAdmin bool, userId int64, query RecordQuery) ([]int
 }
 
 func GetUserRecordStats(db *sql.DB, userId int64) (RecordStats, error) {
-	now := time.Now()
+	now := time.Now().In(recordStorageLocation())
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	month := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 

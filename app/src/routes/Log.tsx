@@ -21,7 +21,6 @@ import {
   getRecordStats,
   listRecords,
   type Record as BillingRecord,
-  type RecordQuery,
   RecordStats,
   RecordType,
   RecordTypes,
@@ -50,10 +49,11 @@ import {
 } from "@/components/ui/table.tsx";
 import { cn } from "@/components/ui/lib/utils.ts";
 import {
-  formatBrowserRecordTime,
-  toBrowserDateInputValue,
-  toBrowserRecordBoundary,
+  formatRecordTime,
+  toTimeZoneDateInputValue,
 } from "@/utils/record-time.ts";
+import { useSelector } from "react-redux";
+import { infoTimeZoneSelector } from "@/store/info.ts";
 
 type LogFilters = {
   type: RecordType;
@@ -109,7 +109,7 @@ const logRowVariants = {
   },
 };
 
-function getInitialFilters(): LogFilters {
+function getInitialFilters(timeZone: string): LogFilters {
   const end = new Date();
   const start = new Date(end);
   start.setDate(start.getDate() - 6);
@@ -118,16 +118,8 @@ function getInitialFilters(): LogFilters {
     type: RecordType.All,
     model: "",
     token_name: "",
-    start_time: toBrowserDateInputValue(start),
-    end_time: toBrowserDateInputValue(end),
-  };
-}
-
-function toRecordQuery(filters: LogFilters): RecordQuery {
-  return {
-    ...filters,
-    start_time: toBrowserRecordBoundary(filters.start_time, "start"),
-    end_time: toBrowserRecordBoundary(filters.end_time, "end"),
+    start_time: toTimeZoneDateInputValue(start, timeZone),
+    end_time: toTimeZoneDateInputValue(end, timeZone),
   };
 }
 
@@ -213,7 +205,13 @@ function MobileLogSkeleton() {
   );
 }
 
-function MobileLogRecord({ record }: { record: BillingRecord }) {
+function MobileLogRecord({
+  record,
+  timeZone,
+}: {
+  record: BillingRecord;
+  timeZone: string;
+}) {
   const { t } = useTranslation();
 
   return (
@@ -224,7 +222,7 @@ function MobileLogRecord({ record }: { record: BillingRecord }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">
-            {formatBrowserRecordTime(record.created_at)}
+            {formatRecordTime(record.created_at, timeZone)}
           </p>
           <p className="mt-1 truncate text-xs text-muted-foreground">
             {record.token_name || "—"}
@@ -344,12 +342,17 @@ function LogTableSkeleton() {
 
 function Log() {
   const { t } = useTranslation();
+  const timeZone = useSelector(infoTimeZoneSelector);
   const [records, setRecords] = useState<BillingRecord[]>([]);
   const [stats, setStats] = useState<RecordStats>(emptyStats);
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(1);
-  const [filters, setFilters] = useState<LogFilters>(() => getInitialFilters());
-  const [query, setQuery] = useState<LogFilters>(() => getInitialFilters());
+  const [filters, setFilters] = useState<LogFilters>(() =>
+    getInitialFilters(timeZone),
+  );
+  const [query, setQuery] = useState<LogFilters>(() =>
+    getInitialFilters(timeZone),
+  );
   const [loading, setLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(false);
 
@@ -373,7 +376,7 @@ function Log() {
     async (targetPage = page, targetQuery = query) => {
       setLoading(true);
       const resp = await listRecords(targetPage, {
-        ...toRecordQuery(targetQuery),
+        ...targetQuery,
         self: true,
         show_channel: false,
       });
@@ -566,7 +569,11 @@ function Log() {
               </motion.div>
             )}
             {records.map((record) => (
-              <MobileLogRecord key={record.id} record={record} />
+              <MobileLogRecord
+                key={record.id}
+                record={record}
+                timeZone={timeZone}
+              />
             ))}
           </motion.div>
 
@@ -661,7 +668,7 @@ function Log() {
                     }}
                   >
                     <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {formatBrowserRecordTime(record.created_at)}
+                      {formatRecordTime(record.created_at, timeZone)}
                     </TableCell>
                     <TableCell>
                       <RecordTypeLabel type={record.type} />

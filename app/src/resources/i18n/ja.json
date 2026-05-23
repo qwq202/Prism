@@ -855,6 +855,8 @@
       "backendPlaceholder": "バックエンドコールバックドメイン名、デフォルトで空、コールバックを受け入れるために必要",
       "docs": "ドキュメントリンク",
       "docsTip": "ドキュメントリンク、デフォルトの場合は空白のままhttps://coai.dev",
+      "timezone": "システムタイムゾーン",
+      "timezoneTip": "ログ表示、ログ絞り込み、日次/月次統計に使用します。既定は Asia/Shanghai です。",
       "file": "ファイル解析サービス",
       "filePlaceholder": "ファイル解析サービス、デフォルトの場合は空白のままhttps://blob.coai.dev （安定性は保証されていません）",
       "fileTip": "ファイル解析サービスについては、[coai-blob-service ]( https://github.com/zmh-program/blob-service)プロジェクトを参照して構築してください。",

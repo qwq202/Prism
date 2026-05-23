@@ -79,6 +79,19 @@ type CompProps<T> = {
   onChange: (doToast?: boolean) => Promise<void>;
 };
 
+const systemTimeZoneSuggestions = [
+  "Asia/Shanghai",
+  "Asia/Hong_Kong",
+  "Asia/Taipei",
+  "Asia/Tokyo",
+  "Asia/Seoul",
+  "UTC",
+  "Europe/London",
+  "Europe/Paris",
+  "America/New_York",
+  "America/Los_Angeles",
+];
+
 function RootDialog() {
   const { t } = useTranslation();
   const [open, setOpen] = useState<boolean>(false);
@@ -217,6 +230,31 @@ function General({ data, dispatch, onChange }: CompProps<GeneralState>) {
           }
           placeholder={t("admin.system.backendPlaceholder")}
         />
+      </ParagraphItem>
+      <ParagraphItem>
+        <Label>
+          {t("admin.system.timezone")}
+          <Tips
+            className={`inline-block`}
+            content={t("admin.system.timezoneTip")}
+          />
+        </Label>
+        <Input
+          list="system-timezone-options"
+          value={data.timezone || "Asia/Shanghai"}
+          onChange={(e) =>
+            dispatch({
+              type: "update:general.timezone",
+              value: e.target.value,
+            })
+          }
+          placeholder="Asia/Shanghai"
+        />
+        <datalist id="system-timezone-options">
+          {systemTimeZoneSuggestions.map((timezone) => (
+            <option key={timezone} value={timezone} />
+          ))}
+        </datalist>
       </ParagraphItem>
       <ParagraphDescription border>
         {t("admin.system.backendTip", {

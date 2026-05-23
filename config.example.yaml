@@ -21,6 +21,7 @@ server:
 system:
   general:
     backend: ""
+    timezone: Asia/Shanghai
   mail:
     host: ""
     port: 465

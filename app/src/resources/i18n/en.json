@@ -874,6 +874,8 @@
       "backendPlaceholder": "Backend callback domain name, empty by default, required for accepting callbacks",
       "docs": "Document Link",
       "docsTip": "Document link, leave blank for default https://coai.dev",
+      "timezone": "System Time Zone",
+      "timezoneTip": "Used for log display, log filters, and daily/monthly stats. Defaults to Asia/Shanghai.",
       "file": "File Parsing Service",
       "filePlaceholder": "File parsing service, leave blank for default https://blob.coai.dev (stability not guaranteed)",
       "fileTip": "For file parsing services, please refer to the [coai-blob-service] (https://github.com/zmh-program/blob-service) project to build.",

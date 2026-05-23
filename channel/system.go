@@ -5,15 +5,19 @@ import (
 	"chat/utils"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 )
+
+const defaultSystemTimeZone = "Asia/Shanghai"
 
 type ApiInfo struct {
 	Title        string   `json:"title"`
 	Logo         string   `json:"logo"`
 	File         string   `json:"file"`
 	Docs         string   `json:"docs"`
+	TimeZone     string   `json:"timezone"`
 	Announcement string   `json:"announcement"`
 	BuyLink      string   `json:"buy_link"`
 	Contact      string   `json:"contact"`
@@ -34,6 +38,7 @@ type generalState struct {
 	Docs        string `json:"docs" mapstructure:"docs"`
 	PWAManifest string `json:"pwa_manifest" mapstructure:"pwamanifest"`
 	DebugMode   bool   `json:"debug_mode" mapstructure:"debugmode"`
+	TimeZone    string `json:"timezone" mapstructure:"timezone"`
 }
 
 type siteState struct {
@@ -186,6 +191,7 @@ func (c *SystemConfig) Load() {
 	globals.SearchTopic = c.GetSearchTopic()
 	globals.SearchDepth = c.GetSearchDepth()
 	globals.SetTaskModel(c.Task.Model)
+	c.General.TimeZone = c.GetTimeZone()
 }
 
 func (c *SystemConfig) SaveConfig() error {
@@ -198,6 +204,7 @@ func (c *SystemConfig) AsInfo() ApiInfo {
 		Logo:         c.General.Logo,
 		File:         c.General.File,
 		Docs:         c.General.Docs,
+		TimeZone:     c.GetTimeZone(),
 		Announcement: c.Site.Announcement,
 		Contact:      c.Site.Contact,
 		Footer:       c.Site.Footer,
@@ -219,6 +226,7 @@ func (c *SystemConfig) UpdateConfig(data *SystemConfig) error {
 	c.Search = data.Search
 	c.Task = data.Task
 	c.Common = data.Common
+	c.General.TimeZone = normalizeSystemTimeZone(c.General.TimeZone)
 
 	utils.ApplySeo(c.General.Title, c.General.Logo)
 	utils.ApplyPWAManifest(c.General.PWAManifest)
@@ -237,6 +245,48 @@ func (c *SystemConfig) GetInitialQuota() float64 {
 
 func (c *SystemConfig) GetBackend() string {
 	return strings.TrimSuffix(c.General.Backend, "/")
+}
+
+func normalizeSystemTimeZone(value string) string {
+	name := strings.TrimSpace(value)
+	if name == "" {
+		return defaultSystemTimeZone
+	}
+
+	if _, err := time.LoadLocation(name); err != nil {
+		return defaultSystemTimeZone
+	}
+
+	return name
+}
+
+func loadSystemTimeZoneLocation(value string) *time.Location {
+	location, err := time.LoadLocation(normalizeSystemTimeZone(value))
+	if err != nil {
+		return time.Local
+	}
+
+	return location
+}
+
+func GetSystemTimeZone() string {
+	if SystemInstance == nil {
+		return defaultSystemTimeZone
+	}
+
+	return SystemInstance.GetTimeZone()
+}
+
+func GetSystemTimeZoneLocation() *time.Location {
+	return loadSystemTimeZoneLocation(GetSystemTimeZone())
+}
+
+func (c *SystemConfig) GetTimeZone() string {
+	return normalizeSystemTimeZone(c.General.TimeZone)
+}
+
+func (c *SystemConfig) GetTimeZoneLocation() *time.Location {
+	return loadSystemTimeZoneLocation(c.GetTimeZone())
 }
 
 func (c *SystemConfig) GetMail() *utils.SmtpPoster {
