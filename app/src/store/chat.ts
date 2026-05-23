@@ -1290,10 +1290,13 @@ export function useConversationActions() {
 
       return state;
     },
-    refresh: async () => {
-      const cached = await getCachedConversationList();
-      if (cached) {
-        dispatch(setHistory(cached));
+    refresh: async (options?: { useCache?: boolean }) => {
+      const useCache = options?.useCache ?? true;
+      if (useCache) {
+        const cached = await getCachedConversationList();
+        if (cached) {
+          dispatch(setHistory(cached));
+        }
       }
 
       const resp = await getConversationList();

@@ -7,7 +7,7 @@ import {
   selectMaskItem,
   useConversationActions,
 } from "@/store/chat.ts";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ConversationInstance } from "@/api/types.tsx";
 import { extractMessage, filterMessage } from "@/utils/processor.ts";
 import { copyClipboard } from "@/utils/dom.ts";
@@ -62,6 +62,9 @@ type ConversationListProps = {
   operateConversation: Operation;
   setOperateConversation: (operation: Operation) => void;
 };
+
+const conversationAutoRefreshIntervalMs = 30_000;
+const conversationFocusRefreshThrottleMs = 5_000;
 
 function SidebarAction({
   search,
@@ -399,18 +402,71 @@ function SidebarConversationList({
 
 function SideBar() {
   const { t } = useTranslation();
-  const { restore } = useConversationActions();
+  const { restore, refresh } = useConversationActions();
   const open = useSelector(selectMenu);
   const auth = useSelector(selectAuthenticated);
   const init = useSelector(selectInit);
+  const refreshRef = useRef(refresh);
+  const refreshingRef = useRef(false);
+  const lastAutoRefreshRef = useRef(0);
   const [search, setSearch] = useState<string>("");
   const [operateConversation, setOperateConversation] = useState<Operation>({
     target: null,
     type: "",
   });
+
+  useEffect(() => {
+    refreshRef.current = refresh;
+  }, [refresh]);
+
   useEffectAsync(async () => {
     await restore();
   }, []);
+
+  useEffect(() => {
+    if (!init || !auth) return;
+
+    const syncConversations = async (force = false) => {
+      if (refreshingRef.current || document.visibilityState === "hidden") {
+        return;
+      }
+
+      const now = Date.now();
+      if (
+        !force &&
+        now - lastAutoRefreshRef.current < conversationFocusRefreshThrottleMs
+      ) {
+        return;
+      }
+
+      refreshingRef.current = true;
+      try {
+        await refreshRef.current({ useCache: false });
+        lastAutoRefreshRef.current = Date.now();
+      } finally {
+        refreshingRef.current = false;
+      }
+    };
+
+    const interval = window.setInterval(() => {
+      void syncConversations();
+    }, conversationAutoRefreshIntervalMs);
+    const handleFocus = () => void syncConversations(true);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void syncConversations(true);
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [auth, init]);
 
   return (
     <div className={cn("sidebar", open && "open")}>
