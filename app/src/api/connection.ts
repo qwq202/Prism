@@ -91,18 +91,22 @@ type StreamCallback = (id: number, message: StreamMessage) => void;
 export class Connection {
   protected connection?: WebSocket;
   protected callback?: StreamCallback;
+  protected reconnectTimer?: ReturnType<typeof setTimeout>;
   protected stack?: Record<string, unknown>;
+  protected disposed: boolean;
   public id: number;
   public state: boolean;
 
   public constructor(id: number, callback?: StreamCallback) {
     this.state = false;
+    this.disposed = false;
     this.id = id;
 
     callback && this.setCallback(callback);
   }
 
   public init(): void {
+    if (this.disposed) return;
     this.connection = new WebSocket(endpoint);
     this.state = false;
     this.connection.onopen = () => {
@@ -114,6 +118,7 @@ export class Connection {
     };
     this.connection.onclose = (event) => {
       this.state = false;
+      if (this.disposed) return;
 
       this.stack = {
         error: "websocket connection failed",
@@ -122,7 +127,9 @@ export class Connection {
         endpoint: endpoint,
       };
 
-      setTimeout(() => {
+      if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = setTimeout(() => {
+        if (this.disposed) return;
         console.debug(`[connection] reconnecting... (id: ${this.id})`);
         this.init();
       }, 3000);
@@ -140,6 +147,8 @@ export class Connection {
   }
 
   public reconnect(): void {
+    this.disposed = false;
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.init();
   }
 
@@ -221,6 +230,11 @@ export class Connection {
   }
 
   public close(): void {
+    this.disposed = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
     if (!this.connection) return;
     this.connection.close();
   }
@@ -262,6 +276,9 @@ export class ConnectionStack {
   }
 
   public createConnection(id: number): Connection {
+    const current = this.getConnection(id);
+    if (current) return current;
+
     const conn = new Connection(id, this.triggerCallback.bind(this));
     this.connections.push(conn);
 
@@ -327,10 +344,12 @@ export class ConnectionStack {
   public close(id: number): void {
     const conn = this.getConnection(id);
     conn && conn.close();
+    this.connections = this.connections.filter((item) => item.id !== id);
   }
 
   public closeAll(): void {
     this.connections.forEach((conn) => conn.close());
+    this.connections = [];
   }
 
   public reconnect(id: number): void {
@@ -345,6 +364,12 @@ export class ConnectionStack {
   public raiseConnection(id: number): void {
     const conn = this.getConnection(-1);
     if (!conn) return;
+
+    const existing = this.getConnection(id);
+    if (existing && existing !== conn) {
+      existing.close();
+      this.connections = this.connections.filter((item) => item !== existing);
+    }
 
     conn.setId(id);
   }
