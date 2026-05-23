@@ -44,7 +44,15 @@ type CommonMaskResponse struct {
 	Error  string `json:"error"`
 }
 
+func disableConversationResponseCache(c *gin.Context) {
+	c.Header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+	c.Header("Pragma", "no-cache")
+	c.Header("Expires", "0")
+}
+
 func ListAPI(c *gin.Context) {
+	disableConversationResponseCache(c)
+
 	user := auth.GetUser(c)
 	if user == nil {
 		c.JSON(http.StatusOK, gin.H{
@@ -64,6 +72,8 @@ func ListAPI(c *gin.Context) {
 }
 
 func LoadAPI(c *gin.Context) {
+	disableConversationResponseCache(c)
+
 	user := auth.GetUser(c)
 	if user == nil {
 		c.JSON(http.StatusOK, gin.H{
@@ -98,6 +108,8 @@ func LoadAPI(c *gin.Context) {
 }
 
 func DeleteAPI(c *gin.Context) {
+	disableConversationResponseCache(c)
+
 	user := auth.GetUser(c)
 	if user == nil {
 		c.JSON(http.StatusOK, gin.H{
@@ -268,6 +280,8 @@ func UpdateModelAPI(c *gin.Context) {
 }
 
 func CleanAPI(c *gin.Context) {
+	disableConversationResponseCache(c)
+
 	user := auth.GetUser(c)
 	if user == nil {
 		c.JSON(http.StatusOK, gin.H{

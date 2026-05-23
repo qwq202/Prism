@@ -7,10 +7,12 @@ import {
   removeClientCachesByPrefix,
   setClientCache,
 } from "@/utils/client-cache.ts";
+import { getMemory } from "@/utils/memory.ts";
 
 type ConversationSerializedCache = {
   model?: string;
   messages: ConversationInstance["message"];
+  updated_at?: string;
 };
 
 function hashCacheScope(value: string): string {
@@ -24,7 +26,7 @@ function hashCacheScope(value: string): string {
 }
 
 function getCacheScope(): string {
-  const token = localStorage.getItem(tokenField) || "anonymous";
+  const token = getMemory(tokenField) || "anonymous";
   return `${apiEndpoint}:${hashCacheScope(token)}`;
 }
 
@@ -57,7 +59,18 @@ export async function getCachedConversationList(): Promise<
 export async function setCachedConversationList(
   conversations: ConversationInstance[],
 ): Promise<void> {
+  const previous = await getCachedConversationList();
   await setClientCache(getConversationListCacheKey(), conversations);
+
+  if (!previous) return;
+
+  const nextIds = new Set(conversations.map((conversation) => conversation.id));
+  await Promise.all(
+    previous
+      .filter((conversation) => conversation.id !== -1)
+      .filter((conversation) => !nextIds.has(conversation.id))
+      .map((conversation) => clearCachedConversation(conversation.id)),
+  );
 }
 
 export async function removeCachedConversationFromList(

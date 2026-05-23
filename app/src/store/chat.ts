@@ -110,6 +110,7 @@ function resolveOpenAIReasoningEffortForRequest(
 export type ConversationSerialized = {
   model?: string;
   messages: Message[];
+  updated_at?: string;
 };
 
 export type ConnectionEvent = {
@@ -215,6 +216,7 @@ function buildConversationHistoryEntry(
 
   if (model) entry.model = model;
   if (fallback?.shared !== undefined) entry.shared = fallback.shared;
+  entry.updated_at = conversation?.updated_at ?? fallback?.updated_at;
 
   return entry;
 }
@@ -289,7 +291,32 @@ function shouldReplaceConversation(
 ): boolean {
   if (!currentConversation) return true;
 
+  const currentVersion = parseConversationVersion(
+    currentConversation.updated_at,
+  );
+  const incomingVersion = parseConversationVersion(incoming.updated_at);
+
+  if (currentVersion !== undefined && incomingVersion !== undefined) {
+    if (incomingVersion !== currentVersion) {
+      return incomingVersion > currentVersion;
+    }
+  }
+
   return incoming.message.length >= currentConversation.messages.length;
+}
+
+function parseConversationVersion(
+  value: string | undefined,
+): number | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+
+  const normalized = trimmed.includes("T")
+    ? trimmed
+    : trimmed.replace(" ", "T");
+  const parsed = Date.parse(normalized);
+
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 export function inModel(supportModels: Model[], model: string): boolean {
@@ -936,9 +963,15 @@ const chatSlice = createSlice({
 
       state.history = state.history.filter((item) => item.id !== id);
 
+      if (state.current === id) {
+        state.current = -1;
+        state.messages = [];
+        state.mask_item = null;
+        setNumberMemory("history_conversation", -1);
+      }
+
       if (!state.conversations[id]) return;
 
-      if (state.current === id) state.current = -1;
       delete state.conversations[id];
     },
     deleteAllConversation: (state) => {
@@ -1268,6 +1301,7 @@ export function useConversationActions() {
         restoredConversation = {
           model: cached.model,
           messages: cached.messages,
+          updated_at: cached.updated_at,
         };
         dispatch(
           setConversation({
@@ -1309,6 +1343,7 @@ export function useConversationActions() {
         conversation: {
           model: data.model,
           messages: data.message,
+          updated_at: data.updated_at,
         },
         id,
       }),

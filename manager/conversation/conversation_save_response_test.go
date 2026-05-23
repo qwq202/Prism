@@ -138,6 +138,9 @@ func TestSaveConversationQueryUpdatesModelColumn(t *testing.T) {
 	if !strings.Contains(saveConversationQuery, "model = VALUES(model)") {
 		t.Fatalf("expected save conversation query to update model column, got %q", saveConversationQuery)
 	}
+	if !strings.Contains(saveConversationQuery, "updated_at = CURRENT_TIMESTAMP") {
+		t.Fatalf("expected save conversation query to bump updated_at, got %q", saveConversationQuery)
+	}
 }
 
 func TestSaveConversationQuerySqlitePreflightUpdatesModelColumn(t *testing.T) {
@@ -150,6 +153,9 @@ func TestSaveConversationQuerySqlitePreflightUpdatesModelColumn(t *testing.T) {
 	query := globals.PreflightSql(saveConversationQuery)
 	if !strings.Contains(query, "model = excluded.model") {
 		t.Fatalf("expected sqlite save conversation query to update model column, got %q", query)
+	}
+	if !strings.Contains(query, "updated_at = CURRENT_TIMESTAMP") {
+		t.Fatalf("expected sqlite save conversation query to bump updated_at, got %q", query)
 	}
 	if strings.Contains(query, "DUPLICATE KEY") {
 		t.Fatalf("expected sqlite save conversation query to remove mysql upsert syntax, got %q", query)

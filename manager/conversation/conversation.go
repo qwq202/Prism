@@ -22,6 +22,7 @@ type Conversation struct {
 	Message                  []globals.Message `json:"message"`
 	Model                    string            `json:"model"`
 	TaskID                   string            `json:"task_id,omitempty"`
+	UpdatedAt                string            `json:"updated_at,omitempty"`
 	EnableWeb                bool              `json:"enable_web"`
 	WebSearch                bool              `json:"web_search"`
 	URLContext               bool              `json:"url_context"`

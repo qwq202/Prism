@@ -14,7 +14,7 @@ func TestPreflightSqlConvertsConversationUpsertWithModel(t *testing.T) {
 
 	query := `
 		INSERT INTO conversation (user_id, conversation_id, conversation_name, data, model, task_id) VALUES (?, ?, ?, ?, ?, ?)
-		ON DUPLICATE KEY UPDATE conversation_name = VALUES(conversation_name), data = VALUES(data), model = VALUES(model), task_id = VALUES(task_id)
+		ON DUPLICATE KEY UPDATE conversation_name = VALUES(conversation_name), data = VALUES(data), model = VALUES(model), task_id = VALUES(task_id), updated_at = CURRENT_TIMESTAMP
 	`
 
 	got := PreflightSql(query)
@@ -26,5 +26,8 @@ func TestPreflightSqlConvertsConversationUpsertWithModel(t *testing.T) {
 	}
 	if !strings.Contains(got, "model = excluded.model") {
 		t.Fatalf("expected model column to be updated in sqlite upsert, got %q", got)
+	}
+	if !strings.Contains(got, "updated_at = CURRENT_TIMESTAMP") {
+		t.Fatalf("expected updated_at to be bumped in sqlite upsert, got %q", got)
 	}
 }

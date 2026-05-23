@@ -69,8 +69,8 @@ func PreflightSql(sql string) string {
 					false,
 				},
 				{
-					"INSERT INTO conversation (user_id, conversation_id, conversation_name, data, model, task_id) VALUES (?, ?, ?, ?, ?, ?)\n\t\tON DUPLICATE KEY UPDATE conversation_name = VALUES(conversation_name), data = VALUES(data), model = VALUES(model), task_id = VALUES(task_id)",
-					"INSERT INTO conversation (user_id, conversation_id, conversation_name, data, model, task_id) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, conversation_id) DO UPDATE SET conversation_name = excluded.conversation_name, data = excluded.data, model = excluded.model, task_id = excluded.task_id",
+					"INSERT INTO conversation (user_id, conversation_id, conversation_name, data, model, task_id) VALUES (?, ?, ?, ?, ?, ?)\n\t\tON DUPLICATE KEY UPDATE conversation_name = VALUES(conversation_name), data = VALUES(data), model = VALUES(model), task_id = VALUES(task_id), updated_at = CURRENT_TIMESTAMP",
+					"INSERT INTO conversation (user_id, conversation_id, conversation_name, data, model, task_id) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, conversation_id) DO UPDATE SET conversation_name = excluded.conversation_name, data = excluded.data, model = excluded.model, task_id = excluded.task_id, updated_at = CURRENT_TIMESTAMP",
 					false,
 				},
 			})

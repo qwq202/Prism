@@ -26,13 +26,21 @@ type ConversationLoadResult =
       conversation?: undefined;
     };
 
+const noCacheHeaders = {
+  "Cache-Control": "no-cache",
+  Pragma: "no-cache",
+};
+
 export async function getConversationList(): Promise<ConversationInstance[]> {
   return (await fetchConversationList()).conversations;
 }
 
 export async function fetchConversationList(): Promise<ConversationListResult> {
   try {
-    const resp = await axios.get("/conversation/list");
+    const resp = await axios.get("/conversation/list", {
+      headers: noCacheHeaders,
+      params: { _: Date.now() },
+    });
     const conversations = (
       resp.data.status ? resp.data.data || [] : []
     ) as ConversationInstance[];
@@ -66,7 +74,10 @@ export async function fetchConversation(
   id: number,
 ): Promise<ConversationLoadResult> {
   try {
-    const resp = await axios.get(`/conversation/load?id=${id}`);
+    const resp = await axios.get("/conversation/load", {
+      headers: noCacheHeaders,
+      params: { id, _: Date.now() },
+    });
 
     if (resp.data.status) {
       const conversation = resp.data.data as ConversationInstance;
@@ -174,7 +185,10 @@ export async function loadConversation(
 
 export async function deleteConversation(id: number): Promise<boolean> {
   try {
-    const resp = await axios.get(`/conversation/delete?id=${id}`);
+    const resp = await axios.get("/conversation/delete", {
+      headers: noCacheHeaders,
+      params: { id, _: Date.now() },
+    });
     return resp.data.status;
   } catch (e) {
     console.warn(e);
@@ -220,7 +234,10 @@ export async function retitleConversation(id: number): Promise<CommonResponse> {
 
 export async function deleteAllConversations(): Promise<boolean> {
   try {
-    const resp = await axios.get("/conversation/clean");
+    const resp = await axios.get("/conversation/clean", {
+      headers: noCacheHeaders,
+      params: { _: Date.now() },
+    });
     return resp.data.status;
   } catch (e) {
     console.warn(e);

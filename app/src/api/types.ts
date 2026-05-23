@@ -100,6 +100,7 @@ export type ConversationInstance = {
   message: Message[];
   model?: string;
   shared?: boolean;
+  updated_at?: string;
 };
 
 export type PlanItem = {

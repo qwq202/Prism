@@ -49,6 +49,7 @@ store.subscribe(() => {
         name: item.name,
         model: item.model,
         shared: item.shared,
+        updated_at: item.updated_at,
       })),
       current,
       currentConversation,

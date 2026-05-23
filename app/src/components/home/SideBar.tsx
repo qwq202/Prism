@@ -64,8 +64,8 @@ type ConversationListProps = {
   setOperateConversation: (operation: Operation) => void;
 };
 
-const conversationAutoRefreshIntervalMs = 30_000;
-const conversationFocusRefreshThrottleMs = 5_000;
+const conversationAutoRefreshIntervalMs = 10_000;
+const conversationFocusRefreshThrottleMs = 2_000;
 
 function SidebarAction({
   search,

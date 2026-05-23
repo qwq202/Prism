@@ -19,8 +19,23 @@ var orphanCleanupState struct {
 
 const saveConversationQuery = `
 		INSERT INTO conversation (user_id, conversation_id, conversation_name, data, model, task_id) VALUES (?, ?, ?, ?, ?, ?)
-		ON DUPLICATE KEY UPDATE conversation_name = VALUES(conversation_name), data = VALUES(data), model = VALUES(model), task_id = VALUES(task_id)
+		ON DUPLICATE KEY UPDATE conversation_name = VALUES(conversation_name), data = VALUES(data), model = VALUES(model), task_id = VALUES(task_id), updated_at = CURRENT_TIMESTAMP
 	`
+
+func normalizeDBString(value interface{}) string {
+	switch v := value.(type) {
+	case nil:
+		return ""
+	case []byte:
+		return string(v)
+	case string:
+		return v
+	case time.Time:
+		return v.Format(time.DateTime)
+	default:
+		return fmt.Sprint(v)
+	}
+}
 
 func loadGlobalConversationAttachmentNames(db *sql.DB) map[string]struct{} {
 	rows, err := globals.QueryDb(db, `SELECT data FROM conversation`)
@@ -176,27 +191,27 @@ func LoadConversation(db *sql.DB, userId int64, conversationId int64) *Conversat
 	}
 
 	var (
-		data   string
-		model  interface{}
-		taskID sql.NullString
+		data      string
+		model     interface{}
+		taskID    sql.NullString
+		updatedAt interface{}
 	)
 	err := globals.QueryRowDb(db, `
-		SELECT conversation_name, model, data, task_id FROM conversation
+		SELECT conversation_name, model, data, task_id, updated_at FROM conversation
 		WHERE user_id = ? AND conversation_id = ?
-		`, userId, conversationId).Scan(&conversation.Name, &model, &data, &taskID)
-	if value, ok := model.([]byte); ok {
-		conversation.Model = string(value)
-	} else {
-		conversation.Model = globals.GPT3Turbo
-	}
-
-	if taskID.Valid {
-		conversation.TaskID = taskID.String
-	}
-
+		`, userId, conversationId).Scan(&conversation.Name, &model, &data, &taskID, &updatedAt)
 	if err != nil {
 		return nil
 	}
+
+	conversation.Model = normalizeDBString(model)
+	if conversation.Model == "" {
+		conversation.Model = globals.GPT3Turbo
+	}
+	if taskID.Valid {
+		conversation.TaskID = taskID.String
+	}
+	conversation.UpdatedAt = normalizeDBString(updatedAt)
 
 	conversation.Message, err = utils.Unmarshal[[]globals.Message]([]byte(data))
 	if err != nil {
@@ -209,7 +224,7 @@ func LoadConversation(db *sql.DB, userId int64, conversationId int64) *Conversat
 func LoadConversationList(db *sql.DB, userId int64) []Conversation {
 	var conversationList []Conversation
 	rows, err := globals.QueryDb(db, `
-			SELECT conversation_id, conversation_name FROM conversation WHERE user_id = ? 
+			SELECT conversation_id, conversation_name, updated_at FROM conversation WHERE user_id = ?
 			ORDER BY conversation_id DESC LIMIT 100
 	`, userId)
 	if err != nil {
@@ -224,10 +239,12 @@ func LoadConversationList(db *sql.DB, userId int64) []Conversation {
 
 	for rows.Next() {
 		var conversation Conversation
-		err := rows.Scan(&conversation.Id, &conversation.Name)
+		var updatedAt interface{}
+		err := rows.Scan(&conversation.Id, &conversation.Name, &updatedAt)
 		if err != nil {
 			continue
 		}
+		conversation.UpdatedAt = normalizeDBString(updatedAt)
 		conversationList = append(conversationList, conversation)
 	}
 
@@ -240,7 +257,7 @@ func (c *Conversation) DeleteConversation(db *sql.DB) bool {
 }
 
 func (c *Conversation) RenameConversation(db *sql.DB, name string) bool {
-	_, err := globals.ExecDb(db, "UPDATE conversation SET conversation_name = ? WHERE user_id = ? AND conversation_id = ?", name, c.UserID, c.Id)
+	_, err := globals.ExecDb(db, "UPDATE conversation SET conversation_name = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND conversation_id = ?", name, c.UserID, c.Id)
 	if err != nil {
 		return false
 	}
