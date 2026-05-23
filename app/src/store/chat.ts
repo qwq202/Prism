@@ -177,11 +177,13 @@ function replaceWithRemoteConversationHistory(
   Object.keys(state.conversations).forEach((key) => {
     const id = Number(key);
     if (id !== -1 && !remoteIds.has(id)) {
+      closeConversationConnection(id);
       delete state.conversations[id];
     }
   });
 
   if (state.current !== -1 && !remoteIds.has(state.current)) {
+    closeConversationConnection(state.current);
     state.current = -1;
     state.messages = [];
     state.mask_item = null;
@@ -801,6 +803,16 @@ function finalizePendingToolCalls(
 }
 
 export const stack = new ConnectionStack();
+
+function closeConversationConnection(id: number) {
+  if (id === -1) return;
+  stack.close(id);
+}
+
+function closeAllConversationConnections() {
+  stack.closeAll();
+}
+
 const offline = loadPreferenceModels(getOfflineModels());
 const initialModel = getModel(offline, getMemory("model"));
 const chatSlice = createSlice({
@@ -1011,9 +1023,11 @@ const chatSlice = createSlice({
 
       if (!state.conversations[id]) return;
 
+      closeConversationConnection(id);
       delete state.conversations[id];
     },
     deleteAllConversation: (state) => {
+      closeAllConversationConnections();
       resetLocalConversationState(state);
     },
     setHistory: (state, action) => {
@@ -1783,7 +1797,9 @@ export function useMessageActions() {
       dispatch(restartMessage({ id: current, model }));
     },
     remove: (idx: number) => {
-      if (idx < 0 || idx >= conversations[current].messages.length) return;
+      const conversation = conversations[current];
+      if (!conversation || idx < 0 || idx >= conversation.messages.length)
+        return;
 
       dispatch(removeMessage({ id: current, idx }));
 
@@ -1791,7 +1807,9 @@ export function useMessageActions() {
       stack.sendRemoveEvent(current, t, idx);
     },
     edit: (idx: number, message: string) => {
-      if (idx < 0 || idx >= conversations[current].messages.length) return;
+      const conversation = conversations[current];
+      if (!conversation || idx < 0 || idx >= conversation.messages.length)
+        return;
 
       dispatch(editMessage({ id: current, idx, message }));
       if (!stack.hasConnection(current)) stack.createConnection(current);

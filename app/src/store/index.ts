@@ -43,6 +43,13 @@ store.subscribe(() => {
     const { history, current, conversations } = store.getState().chat;
     const cacheableHistory = history.filter((item) => item.id !== -1);
     const currentConversation = current !== -1 ? conversations[current] : null;
+    const cacheableConversation = currentConversation
+      ? {
+          model: currentConversation.model,
+          messages: currentConversation.messages,
+          updated_at: currentConversation.updated_at,
+        }
+      : null;
     const signature = JSON.stringify({
       history: cacheableHistory.map((item) => ({
         id: item.id,
@@ -52,15 +59,15 @@ store.subscribe(() => {
         updated_at: item.updated_at,
       })),
       current,
-      currentConversation,
+      currentConversation: cacheableConversation,
     });
 
     if (signature === lastChatCacheSignature) return;
     lastChatCacheSignature = signature;
 
     void setCachedConversationList(cacheableHistory);
-    if (current !== -1 && currentConversation) {
-      void setCachedConversation(current, currentConversation);
+    if (current !== -1 && cacheableConversation) {
+      void setCachedConversation(current, cacheableConversation);
     }
   }, 500);
 });
