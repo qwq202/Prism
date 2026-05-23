@@ -1,6 +1,6 @@
 import axios from "axios";
 import type { ConversationInstance } from "./types.tsx";
-import { setHistory } from "@/store/chat.ts";
+import { setHistory, setRemoteHistory } from "@/store/chat.ts";
 import { AppDispatch } from "@/store";
 import { CommonResponse } from "@/api/common.ts";
 import { getErrorMessage } from "@/utils/base.ts";
@@ -8,11 +8,29 @@ import { VirtualWebSearchRole, VirtualRolePrefix, Message } from "./types.tsx";
 import { formatToolCallResult } from "@/api/plugin.ts";
 import {
   getCachedConversationList,
-  setCachedConversation,
   setCachedConversationList,
 } from "@/utils/conversation-cache.ts";
 
+type ConversationListResult = {
+  conversations: ConversationInstance[];
+  fromCache: boolean;
+};
+
+type ConversationLoadResult =
+  | {
+      status: "ok";
+      conversation: ConversationInstance;
+    }
+  | {
+      status: "not_found" | "error";
+      conversation?: undefined;
+    };
+
 export async function getConversationList(): Promise<ConversationInstance[]> {
+  return (await fetchConversationList()).conversations;
+}
+
+export async function fetchConversationList(): Promise<ConversationListResult> {
   try {
     const resp = await axios.get("/conversation/list");
     const conversations = (
@@ -23,23 +41,30 @@ export async function getConversationList(): Promise<ConversationInstance[]> {
         conversations.filter((item) => item.id !== -1),
       );
     }
-    return conversations;
+    return { conversations, fromCache: false };
   } catch (e) {
     console.warn(e);
-    return (await getCachedConversationList()) ?? [];
+    return {
+      conversations: (await getCachedConversationList()) ?? [],
+      fromCache: true,
+    };
   }
 }
 
 export async function updateConversationList(
   dispatch: AppDispatch,
 ): Promise<void> {
-  const resp = await getConversationList();
-  dispatch(setHistory(resp));
+  const resp = await fetchConversationList();
+  dispatch(
+    resp.fromCache
+      ? setHistory(resp.conversations)
+      : setRemoteHistory(resp.conversations),
+  );
 }
 
-export async function loadConversation(
+export async function fetchConversation(
   id: number,
-): Promise<ConversationInstance> {
+): Promise<ConversationLoadResult> {
   try {
     const resp = await axios.get(`/conversation/load?id=${id}`);
 
@@ -130,18 +155,21 @@ export async function loadConversation(
         conversation.message = processedMessages;
       }
 
-      void setCachedConversation(id, {
-        model: conversation.model,
-        messages: conversation.message,
-      });
-
-      return conversation;
+      return { status: "ok", conversation };
     }
-    return { id, name: "", message: [] };
+    return { status: "not_found" };
   } catch (e) {
     console.warn(e);
-    return { id, name: "", message: [] };
+    return { status: "error" };
   }
+}
+
+export async function loadConversation(
+  id: number,
+): Promise<ConversationInstance> {
+  const resp = await fetchConversation(id);
+  if (resp.status === "ok") return resp.conversation;
+  return { id, name: "", message: [] };
 }
 
 export async function deleteConversation(id: number): Promise<boolean> {

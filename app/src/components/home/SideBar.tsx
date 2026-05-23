@@ -45,6 +45,7 @@ import { goAuth } from "@/utils/app.ts";
 import { cn } from "@/components/ui/lib/utils.ts";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
+import { isConversationListCacheStorageKey } from "@/utils/conversation-cache.ts";
 
 type Operation = {
   target: ConversationInstance | null;
@@ -466,6 +467,18 @@ function SideBar() {
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
+  }, [auth, init]);
+
+  useEffect(() => {
+    if (!init || !auth) return;
+
+    const handleStorage = (event: StorageEvent) => {
+      if (!isConversationListCacheStorageKey(event.key)) return;
+      void refreshRef.current({ useCache: false });
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
   }, [auth, init]);
 
   return (

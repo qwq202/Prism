@@ -1,6 +1,12 @@
 import type { ConversationInstance } from "@/api/types.tsx";
 import { apiEndpoint, tokenField } from "@/conf/bootstrap.ts";
-import { getClientCache, setClientCache } from "@/utils/client-cache.ts";
+import {
+  getClientCache,
+  getClientCacheStorageKey,
+  removeClientCache,
+  removeClientCachesByPrefix,
+  setClientCache,
+} from "@/utils/client-cache.ts";
 
 type ConversationSerializedCache = {
   model?: string;
@@ -30,6 +36,16 @@ function getConversationCacheKey(id: number): string {
   return `conversation:${getCacheScope()}:${id}`;
 }
 
+function getConversationCacheKeyPrefix(): string {
+  return `conversation:${getCacheScope()}:`;
+}
+
+export function isConversationListCacheStorageKey(
+  key: string | null,
+): boolean {
+  return key === getClientCacheStorageKey(getConversationListCacheKey());
+}
+
 export async function getCachedConversationList(): Promise<
   ConversationInstance[] | undefined
 > {
@@ -42,6 +58,17 @@ export async function setCachedConversationList(
   conversations: ConversationInstance[],
 ): Promise<void> {
   await setClientCache(getConversationListCacheKey(), conversations);
+}
+
+export async function removeCachedConversationFromList(
+  id: number,
+): Promise<void> {
+  const conversations = await getCachedConversationList();
+  if (!conversations) return;
+
+  await setCachedConversationList(
+    conversations.filter((conversation) => conversation.id !== id),
+  );
 }
 
 export async function getCachedConversation(
@@ -59,4 +86,14 @@ export async function setCachedConversation(
 ): Promise<void> {
   if (id === -1) return;
   await setClientCache(getConversationCacheKey(id), conversation);
+}
+
+export async function clearCachedConversation(id: number): Promise<void> {
+  if (id === -1) return;
+  await removeClientCache(getConversationCacheKey(id));
+}
+
+export async function clearCachedConversations(): Promise<void> {
+  await setCachedConversationList([]);
+  await removeClientCachesByPrefix(getConversationCacheKeyPrefix());
 }

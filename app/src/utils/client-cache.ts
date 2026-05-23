@@ -10,6 +10,10 @@ function getCacheKey(key: string): string {
   return `${cachePrefix}${key}`;
 }
 
+export function getClientCacheStorageKey(key: string): string {
+  return getCacheKey(key);
+}
+
 function getStorageValue<T>(key: string): T | undefined {
   const fallback = localStorage.getItem(key);
   if (!fallback) return undefined;
@@ -47,4 +51,22 @@ export async function setClientCache<T>(
       data,
     } satisfies CacheEnvelope<T>),
   );
+}
+
+export async function removeClientCache(key: string): Promise<void> {
+  localStorage.removeItem(getCacheKey(key));
+}
+
+export async function removeClientCachesByPrefix(
+  keyPrefix: string,
+): Promise<void> {
+  const storagePrefix = getCacheKey(keyPrefix);
+  const keys: string[] = [];
+
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key?.startsWith(storagePrefix)) keys.push(key);
+  }
+
+  keys.forEach((key) => localStorage.removeItem(key));
 }

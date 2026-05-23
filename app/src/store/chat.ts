@@ -27,12 +27,15 @@ import {
   deleteAllConversations as doDeleteAllConversations,
   renameConversation as doRenameConversation,
   retitleConversation as doRetitleConversation,
-  loadConversation,
-  getConversationList,
+  fetchConversation,
+  fetchConversationList,
 } from "@/api/history.ts";
 import {
+  clearCachedConversation,
+  clearCachedConversations,
   getCachedConversation,
   getCachedConversationList,
+  removeCachedConversationFromList,
 } from "@/utils/conversation-cache.ts";
 import { CustomMask, Mask } from "@/masks/types.ts";
 import { listMasks } from "@/api/mask.ts";
@@ -153,6 +156,36 @@ function resetLocalConversationState(state: initialStateType) {
   setNumberMemory("history_conversation", -1);
 }
 
+function replaceWithRemoteConversationHistory(
+  state: initialStateType,
+  incoming: ConversationInstance[],
+) {
+  const stable = dedupeStableHistory(incoming);
+  const remoteIds = new Set(stable.map((item) => item.id));
+  const pending = state.history.find((item) => item.id === -1);
+
+  state.history =
+    state.current === -1 &&
+    pending &&
+    state.conversations[-1]?.messages.length > 0
+      ? [pending, ...stable]
+      : stable;
+
+  Object.keys(state.conversations).forEach((key) => {
+    const id = Number(key);
+    if (id !== -1 && !remoteIds.has(id)) {
+      delete state.conversations[id];
+    }
+  });
+
+  if (state.current !== -1 && !remoteIds.has(state.current)) {
+    state.current = -1;
+    state.messages = [];
+    state.mask_item = null;
+    setNumberMemory("history_conversation", -1);
+  }
+}
+
 function getConversationHistoryName(
   conversation?: ConversationSerialized,
   fallback?: string,
@@ -248,6 +281,15 @@ function reconcileConversationHistory(
     buildConversationHistoryEntry(current, activeConversation, existing),
     ...stable,
   ];
+}
+
+function shouldReplaceConversation(
+  currentConversation: ConversationSerialized | undefined,
+  incoming: ConversationInstance,
+): boolean {
+  if (!currentConversation) return true;
+
+  return incoming.message.length >= currentConversation.messages.length;
 }
 
 export function inModel(supportModels: Model[], model: string): boolean {
@@ -910,6 +952,12 @@ const chatSlice = createSlice({
         state.conversations,
       );
     },
+    setRemoteHistory: (state, action) => {
+      replaceWithRemoteConversationHistory(
+        state,
+        action.payload as ConversationInstance[],
+      );
+    },
     preflightHistory: (state, action) => {
       const name = action.payload as string;
 
@@ -1093,6 +1141,7 @@ const chatSlice = createSlice({
 
 export const {
   setHistory,
+  setRemoteHistory,
   renameHistory,
   setCurrent,
   setModel,
@@ -1238,10 +1287,20 @@ export function useConversationActions() {
 
     if (!refreshRemote) return;
 
-    const data = await loadConversation(id);
-    const hasRemoteConversation =
-      data.name.length > 0 || data.message.length > 0 || Boolean(data.model);
-    if (!hasRemoteConversation) return;
+    const result = await fetchConversation(id);
+    if (result.status === "not_found") {
+      await clearCachedConversation(id);
+      await removeCachedConversationFromList(id);
+      dispatch(deleteConversation(id));
+      return;
+    }
+    if (result.status !== "ok") return;
+
+    const data = result.conversation;
+    if (!shouldReplaceConversation(conversations[id], data)) {
+      dispatch(setCurrent(id));
+      return;
+    }
 
     dispatch(
       setConversation({
@@ -1280,13 +1339,20 @@ export function useConversationActions() {
     },
     remove: async (id: number) => {
       const state = await doDeleteConversation(id);
-      state && dispatch(deleteConversation(id));
+      if (state) {
+        await clearCachedConversation(id);
+        await removeCachedConversationFromList(id);
+        dispatch(deleteConversation(id));
+      }
 
       return state;
     },
     removeAll: async () => {
       const state = await doDeleteAllConversations();
-      state && dispatch(deleteAllConversation());
+      if (state) {
+        await clearCachedConversations();
+        dispatch(deleteAllConversation());
+      }
 
       return state;
     },
@@ -1299,10 +1365,14 @@ export function useConversationActions() {
         }
       }
 
-      const resp = await getConversationList();
-      dispatch(setHistory(resp));
+      const resp = await fetchConversationList();
+      dispatch(
+        resp.fromCache
+          ? setHistory(resp.conversations)
+          : setRemoteHistory(resp.conversations),
+      );
 
-      return resp;
+      return resp.conversations;
     },
     restore: async () => {
       const cached = await getCachedConversationList();
@@ -1321,14 +1391,21 @@ export function useConversationActions() {
         }
       }
 
-      const resp = await getConversationList();
-      dispatch(setHistory(resp));
+      const resp = await fetchConversationList();
+      dispatch(
+        resp.fromCache
+          ? setHistory(resp.conversations)
+          : setRemoteHistory(resp.conversations),
+      );
 
-      if (stored !== -1 && resp.some((item) => item.id === stored)) {
+      if (
+        stored !== -1 &&
+        resp.conversations.some((item) => item.id === stored)
+      ) {
         await showConversation(stored, { useCache: true });
       }
 
-      return resp;
+      return resp.conversations;
     },
     mask: (mask: Mask) => {
       dispatch(setMaskItem(mask));
