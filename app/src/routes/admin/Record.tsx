@@ -46,6 +46,10 @@ import {
 } from "lucide-react";
 import { mobile } from "@/utils/device.ts";
 import { cn } from "@/components/ui/lib/utils.ts";
+import {
+  formatBrowserRecordTime,
+  toBrowserRecordBoundary,
+} from "@/utils/record-time.ts";
 
 const defaultRecordQuery: RecordQuery = {
   type: RecordType.All,
@@ -179,8 +183,8 @@ function RecordTable() {
       username: input.username || undefined,
       model: input.model || undefined,
       token_name: input.token_name || undefined,
-      start_time: input.start_time || undefined,
-      end_time: input.end_time || undefined,
+      start_time: toBrowserRecordBoundary(input.start_time, "start"),
+      end_time: toBrowserRecordBoundary(input.end_time, "end"),
       show_channel: true,
     };
     setQuery(q);
@@ -327,7 +331,7 @@ function RecordTable() {
                 <TableCell>{r.duration.toFixed(1)}s</TableCell>
                 <TableCell>{r.channel_name || r.channel || "—"}</TableCell>
                 <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                  {new Date(r.created_at).toLocaleString()}
+                  {formatBrowserRecordTime(r.created_at)}
                 </TableCell>
               </TableRow>
             ))}

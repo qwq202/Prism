@@ -11,6 +11,7 @@ import (
 )
 
 const pageSize int64 = 20
+const recordStorageTimeZone = "Asia/Shanghai"
 
 const recordFilterWhereSQL = `
 		WHERE (? = 0 OR b.user_id = ?)
@@ -69,6 +70,22 @@ type RecordStats struct {
 	Tpm          int64   `json:"tpm"`
 }
 
+func recordStorageLocation() *time.Location {
+	location, err := time.LoadLocation(recordStorageTimeZone)
+	if err != nil {
+		return time.Local
+	}
+	return location
+}
+
+func parseRecordStorageTime(value []uint8) *time.Time {
+	parsed, err := time.ParseInLocation("2006-01-02 15:04:05", string(value), recordStorageLocation())
+	if err != nil {
+		return nil
+	}
+	return &parsed
+}
+
 func CreateRecord(db *sql.DB, userId int64, username string, recordType string,
 	tokenName string, model string, inputTokens int64, outputTokens int64,
 	quota float64, duration float32, detail string, prompts string, responsePrompts string,
@@ -104,20 +121,29 @@ func buildRecordTimeRange(value string, isEnd bool) (string, error) {
 		return "", nil
 	}
 
-	layouts := []string{
-		"2006-01-02",
-		time.RFC3339,
-		"2006-01-02 15:04:05",
-		"2006-01-02T15:04:05",
+	type recordTimeLayout struct {
+		layout      string
+		hasTimeZone bool
 	}
+	layouts := []recordTimeLayout{
+		{layout: "2006-01-02"},
+		{layout: time.RFC3339Nano, hasTimeZone: true},
+		{layout: time.RFC3339, hasTimeZone: true},
+		{layout: "2006-01-02 15:04:05"},
+		{layout: "2006-01-02T15:04:05"},
+	}
+	location := recordStorageLocation()
 
-	for _, layout := range layouts {
-		parsed, err := time.ParseInLocation(layout, value, time.Local)
+	for _, item := range layouts {
+		parsed, err := time.ParseInLocation(item.layout, value, location)
 		if err != nil {
 			continue
 		}
+		if item.hasTimeZone {
+			parsed = parsed.In(location)
+		}
 
-		if layout == "2006-01-02" {
+		if item.layout == "2006-01-02" {
 			if isEnd {
 				return parsed.AddDate(0, 0, 1).Format("2006-01-02 15:04:05"), nil
 			}
@@ -272,7 +298,7 @@ func ListRecords(db *sql.DB, isAdmin bool, userId int64, page int64, query Recor
 		); err != nil {
 			return RecordData{}, err
 		}
-		if t := utils.ConvertTime(createdAt); t != nil {
+		if t := parseRecordStorageTime(createdAt); t != nil {
 			r.CreatedAt = *t
 		}
 		if len(strings.TrimSpace(r.ChannelName)) == 0 {

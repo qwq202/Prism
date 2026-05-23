@@ -21,6 +21,7 @@ import {
   getRecordStats,
   listRecords,
   type Record as BillingRecord,
+  type RecordQuery,
   RecordStats,
   RecordType,
   RecordTypes,
@@ -48,6 +49,11 @@ import {
   TableRow,
 } from "@/components/ui/table.tsx";
 import { cn } from "@/components/ui/lib/utils.ts";
+import {
+  formatBrowserRecordTime,
+  toBrowserDateInputValue,
+  toBrowserRecordBoundary,
+} from "@/utils/record-time.ts";
 
 type LogFilters = {
   type: RecordType;
@@ -103,13 +109,6 @@ const logRowVariants = {
   },
 };
 
-function toDateInputValue(date: Date) {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 function getInitialFilters(): LogFilters {
   const end = new Date();
   const start = new Date(end);
@@ -119,15 +118,17 @@ function getInitialFilters(): LogFilters {
     type: RecordType.All,
     model: "",
     token_name: "",
-    start_time: toDateInputValue(start),
-    end_time: toDateInputValue(end),
+    start_time: toBrowserDateInputValue(start),
+    end_time: toBrowserDateInputValue(end),
   };
 }
 
-function formatDateTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value || "—";
-  return date.toLocaleString();
+function toRecordQuery(filters: LogFilters): RecordQuery {
+  return {
+    ...filters,
+    start_time: toBrowserRecordBoundary(filters.start_time, "start"),
+    end_time: toBrowserRecordBoundary(filters.end_time, "end"),
+  };
 }
 
 function formatQuota(value: number) {
@@ -223,7 +224,7 @@ function MobileLogRecord({ record }: { record: BillingRecord }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">
-            {formatDateTime(record.created_at)}
+            {formatBrowserRecordTime(record.created_at)}
           </p>
           <p className="mt-1 truncate text-xs text-muted-foreground">
             {record.token_name || "—"}
@@ -372,7 +373,7 @@ function Log() {
     async (targetPage = page, targetQuery = query) => {
       setLoading(true);
       const resp = await listRecords(targetPage, {
-        ...targetQuery,
+        ...toRecordQuery(targetQuery),
         self: true,
         show_channel: false,
       });
@@ -660,7 +661,7 @@ function Log() {
                     }}
                   >
                     <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {formatDateTime(record.created_at)}
+                      {formatBrowserRecordTime(record.created_at)}
                     </TableCell>
                     <TableCell>
                       <RecordTypeLabel type={record.type} />

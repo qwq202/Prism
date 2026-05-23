@@ -86,6 +86,57 @@ func TestListRecordsFiltersByPartialTokenNameAndInclusiveDate(t *testing.T) {
 	}
 }
 
+func TestListRecordsConvertsOffsetFilterToRecordStorageTime(t *testing.T) {
+	db := openBillingTestDB(t)
+
+	seedBillingRecord(t, db, "root", "consume", "before-browser-day", "deepseek-v4-flash", "2026-05-23 11:59:59")
+	seedBillingRecord(t, db, "root", "consume", "browser-day-start", "deepseek-v4-flash", "2026-05-23 12:00:00")
+	seedBillingRecord(t, db, "root", "consume", "browser-day-end", "deepseek-v4-flash", "2026-05-24 11:59:59")
+	seedBillingRecord(t, db, "root", "consume", "after-browser-day", "deepseek-v4-flash", "2026-05-24 12:00:00")
+
+	data, err := ListRecords(db, true, 1, 0, RecordQuery{
+		StartTime: "2026-05-23T00:00:00-04:00",
+		EndTime:   "2026-05-23T23:59:59-04:00",
+		Type:      "consume",
+	})
+	if err != nil {
+		t.Fatalf("list records: %v", err)
+	}
+
+	if len(data.Records) != 2 {
+		t.Fatalf("expected 2 records in browser-local day, got %d (%#v)", len(data.Records), data.Records)
+	}
+
+	got := map[string]bool{}
+	for _, record := range data.Records {
+		got[record.TokenName] = true
+	}
+	if !got["browser-day-start"] || !got["browser-day-end"] {
+		t.Fatalf("expected converted range to keep browser day boundaries, got %#v", got)
+	}
+}
+
+func TestListRecordsReturnsCreatedAtWithRecordStorageLocation(t *testing.T) {
+	db := openBillingTestDB(t)
+
+	seedBillingRecord(t, db, "root", "consume", "time-zone-token", "deepseek-v4-flash", "2026-05-23 19:55:28")
+
+	data, err := ListRecords(db, true, 1, 0, RecordQuery{
+		TokenName: "time-zone-token",
+	})
+	if err != nil {
+		t.Fatalf("list records: %v", err)
+	}
+
+	if len(data.Records) != 1 {
+		t.Fatalf("expected 1 record, got %d (%#v)", len(data.Records), data.Records)
+	}
+
+	if got := data.Records[0].CreatedAt.Format("2006-01-02T15:04:05Z07:00"); got != "2026-05-23T19:55:28+08:00" {
+		t.Fatalf("expected created_at to preserve record storage zone, got %s", got)
+	}
+}
+
 func TestListRecordsTreatsUsernameFilterAsBoundParameter(t *testing.T) {
 	db := openBillingTestDB(t)
 
