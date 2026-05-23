@@ -421,8 +421,9 @@ function SideBar() {
   }, [refresh]);
 
   useEffectAsync(async () => {
-    await restore();
-  }, []);
+    if (!init || !auth) return;
+    await restore({ useCache: false });
+  }, [auth, init]);
 
   useEffect(() => {
     if (!init || !auth) return;
@@ -461,6 +462,7 @@ function SideBar() {
 
     window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    void syncConversations(true);
 
     return () => {
       window.clearInterval(interval);

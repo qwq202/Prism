@@ -1374,8 +1374,9 @@ export function useConversationActions() {
 
       return resp.conversations;
     },
-    restore: async () => {
-      const cached = await getCachedConversationList();
+    restore: async (options?: { useCache?: boolean }) => {
+      const useCache = options?.useCache ?? true;
+      const cached = useCache ? await getCachedConversationList() : undefined;
       const stored = getNumberMemory("history_conversation", -1);
       if (cached) {
         dispatch(setHistory(cached));
