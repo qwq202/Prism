@@ -1260,16 +1260,18 @@ export function useConversationActions() {
       return;
     }
 
-    let restored = Boolean(conversations[id]);
+    let restoredConversation = conversations[id];
+    let restored = Boolean(restoredConversation);
     if (!restored && options?.useCache) {
       const cached = await getCachedConversation(id);
       if (cached) {
+        restoredConversation = {
+          model: cached.model,
+          messages: cached.messages,
+        };
         dispatch(
           setConversation({
-            conversation: {
-              model: cached.model,
-              messages: cached.messages,
-            },
+            conversation: restoredConversation,
             id,
           }),
         );
@@ -1297,7 +1299,7 @@ export function useConversationActions() {
     if (result.status !== "ok") return;
 
     const data = result.conversation;
-    if (!shouldReplaceConversation(conversations[id], data)) {
+    if (!shouldReplaceConversation(restoredConversation, data)) {
       dispatch(setCurrent(id));
       return;
     }
