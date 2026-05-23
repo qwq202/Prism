@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"path/filepath"
 	"testing"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -182,6 +183,21 @@ func TestCreateRecordPersistsBeforeReturning(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("expected billing record to be persisted before return, got %d", count)
+	}
+
+	var createdAtRaw string
+	if err := globals.QueryRowDb(db, "SELECT created_at FROM billing WHERE token_name = ?", "sync-token").Scan(&createdAtRaw); err != nil {
+		t.Fatalf("select billing record created_at: %v", err)
+	}
+
+	createdAt, err := time.ParseInLocation("2006-01-02 15:04:05", createdAtRaw, recordStorageLocation())
+	if err != nil {
+		t.Fatalf("parse billing record created_at %q: %v", createdAtRaw, err)
+	}
+
+	now := time.Now().In(recordStorageLocation())
+	if diff := now.Sub(createdAt); diff < -5*time.Second || diff > 5*time.Second {
+		t.Fatalf("expected created_at to be written in record storage zone near now, got %s, now %s", createdAtRaw, now.Format("2006-01-02 15:04:05"))
 	}
 }
 

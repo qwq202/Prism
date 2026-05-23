@@ -86,10 +86,11 @@ func CreateRecord(db *sql.DB, userId int64, username string, recordType string,
 	quota float64, duration float32, detail string, prompts string, responsePrompts string,
 	channelId int, channelName string) {
 
+	createdAt := time.Now().In(recordStorageLocation()).Format("2006-01-02 15:04:05")
 	_, err := globals.ExecDb(db, `
-			INSERT INTO billing (user_id, username, type, token_name, model, input_tokens, output_tokens, quota, duration, detail, prompts, response_prompts, channel, channel_name)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, userId, username, recordType, tokenName, model, inputTokens, outputTokens, quota, duration, detail, prompts, responsePrompts, channelId, channelName)
+			INSERT INTO billing (user_id, username, type, token_name, model, input_tokens, output_tokens, quota, duration, detail, prompts, response_prompts, channel, channel_name, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, userId, username, recordType, tokenName, model, inputTokens, outputTokens, quota, duration, detail, prompts, responsePrompts, channelId, channelName, createdAt)
 	if err != nil {
 		globals.Warn(fmt.Sprintf("[billing] failed to create record: %s", err.Error()))
 	}
