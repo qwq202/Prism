@@ -17,8 +17,6 @@ export const initializeMasks = async () => {
   return MASKS;
 };
 
-initializeMasks().then(() => {
-  console.log("[presets] initialized:", MASKS);
-});
+void initializeMasks();
 
 export { MASKS };

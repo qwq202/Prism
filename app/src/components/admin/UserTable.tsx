@@ -264,7 +264,6 @@ function OperationMenu({ user, onRefresh }: OperationMenuProps) {
         setOpen={setSubscriptionLevelOpen}
         onSubmit={async (value) => {
           const level = userTypeArray.indexOf(value as UserType);
-          console.log(level);
           const resp = await subscriptionLevelOperation(user.id, level);
           doToast(t, resp);
 

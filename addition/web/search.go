@@ -71,7 +71,7 @@ func GenerateSearchResult(q string) (string, error) {
 	}
 
 	content := formatResponse(res)
-	globals.Debug(fmt.Sprintf("[web] search result: %s (query: %s)", utils.Extract(content, 50, "..."), q))
+	globals.Debug(fmt.Sprintf("[web] search result: %s (query: %s)", utils.Extract(content, 50, "..."), utils.Extract(q, 20, "...")))
 
 	if globals.SearchCrop {
 		globals.Debug(fmt.Sprintf("[web] crop search result length %d to %d max", len(content), globals.SearchCropLength))
@@ -83,8 +83,6 @@ func GenerateSearchResult(q string) (string, error) {
 func TestSearch(c *gin.Context) {
 	// get `query` param from query
 	query := c.Query("query")
-
-	fmt.Println(query)
 
 	res, err := GenerateSearchResult(query)
 	if err != nil {
