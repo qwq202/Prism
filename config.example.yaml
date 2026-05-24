@@ -13,7 +13,7 @@ redis:
   password: ""
 
 
-secret: secret
+secret: replace_with_a_random_32_byte_string
 serve_static: true
 
 server:

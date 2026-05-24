@@ -137,6 +137,7 @@ docker compose up -d
 > - MySQL 数据库挂载目录项目 ~/**db**
 > - Redis 数据库挂载目录项目 ~/**redis**
 > - 配置文件挂载目录项目 ~/**config**
+> - 首次启动会自动在 `./config/config.yaml` 中生成随机 `secret`；如需自行托管密钥, 请设置至少 32 位随机字符串。
 
 ### ⚡ Docker 安装 (轻量运行时, 常用于外置 _MYSQL/RDS_ 服务)
 > [!NOTE]
