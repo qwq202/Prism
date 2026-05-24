@@ -5,8 +5,10 @@ import (
 	"chat/globals"
 	"chat/utils"
 	"fmt"
-	"github.com/gin-gonic/gin"
+	"net/http"
 	"strings"
+
+	"github.com/gin-gonic/gin"
 )
 
 type WebsocketArticleForm struct {
@@ -24,12 +26,22 @@ type WebsocketArticleResponse struct {
 
 func ProjectTarDownloadAPI(c *gin.Context) {
 	hash := strings.TrimSpace(c.Query("hash"))
+	if !utils.IsMd5Hash(hash) {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+
 	c.Writer.Header().Add("Content-Disposition", "attachment; filename=article.tar.gz")
 	c.File(fmt.Sprintf("storage/article/%s.tar.gz", hash))
 }
 
 func ProjectZipDownloadAPI(c *gin.Context) {
 	hash := strings.TrimSpace(c.Query("hash"))
+	if !utils.IsMd5Hash(hash) {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+
 	c.Writer.Header().Add("Content-Disposition", "attachment; filename=article.zip")
 	c.File(fmt.Sprintf("storage/article/%s.zip", hash))
 }

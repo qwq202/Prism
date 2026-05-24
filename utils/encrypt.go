@@ -11,11 +11,15 @@ import (
 	"encoding/hex"
 	"io"
 	"regexp"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
-var legacySha256Pattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
+var (
+	legacySha256Pattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
+	md5HashPattern      = regexp.MustCompile(`^[a-f0-9]{32}$`)
+)
 
 func Sha2Encrypt(raw string) string {
 	// return 64-bit hash
@@ -48,6 +52,14 @@ func VerifyPassword(raw string, stored string) (bool, bool) {
 	}
 
 	return false, false
+}
+
+func IsSha256Hash(raw string) bool {
+	return legacySha256Pattern.MatchString(strings.TrimSpace(raw))
+}
+
+func IsMd5Hash(raw string) bool {
+	return md5HashPattern.MatchString(strings.TrimSpace(raw))
 }
 
 func Sha2EncryptForm(form interface{}) string {

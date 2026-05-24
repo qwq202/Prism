@@ -40,3 +40,18 @@ func TestGenerateSecretsHaveExpectedShape(t *testing.T) {
 		t.Fatalf("expected 64 byte secret, got %q", secret)
 	}
 }
+
+func TestHashShapeValidators(t *testing.T) {
+	if !IsSha256Hash("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef") {
+		t.Fatalf("expected sha256-shaped hash to be accepted")
+	}
+	if IsSha256Hash("../0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef") {
+		t.Fatalf("expected path-like sha256 value to be rejected")
+	}
+	if !IsMd5Hash("0123456789abcdef0123456789abcdef") {
+		t.Fatalf("expected md5-shaped hash to be accepted")
+	}
+	if IsMd5Hash("0123456789abcdef0123456789abcdef/evil") {
+		t.Fatalf("expected path-like md5 value to be rejected")
+	}
+}
