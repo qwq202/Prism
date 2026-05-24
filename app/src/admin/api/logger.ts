@@ -27,18 +27,27 @@ export async function getLoggerConsole(n?: number): Promise<string> {
   }
 }
 
+function getDownloadName(path: string): string {
+  return path.split(/[\\/]/).filter(Boolean).pop() || "chatnio.log";
+}
+
 export async function downloadLogger(path: string): Promise<void> {
   try {
     const response = await axios.get("/admin/logger/download", {
       responseType: "blob",
       params: { path },
     });
-    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const url = window.URL.createObjectURL(response.data);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", path);
+    link.setAttribute("download", getDownloadName(path));
     document.body.appendChild(link);
-    link.click();
+    try {
+      link.click();
+    } finally {
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    }
   } catch (e) {
     console.warn(e);
   }
@@ -46,7 +55,9 @@ export async function downloadLogger(path: string): Promise<void> {
 
 export async function deleteLogger(path: string): Promise<CommonResponse> {
   try {
-    const response = await axios.post(`/admin/logger/delete?path=${path}`);
+    const response = await axios.post("/admin/logger/delete", undefined, {
+      params: { path },
+    });
     return response.data as CommonResponse;
   } catch (e) {
     console.warn(e);
