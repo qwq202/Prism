@@ -253,14 +253,22 @@ func (c *SystemConfig) AsInfo() ApiInfo {
 }
 
 func (c *SystemConfig) UpdateConfig(data *SystemConfig) error {
-	c.General = data.General
-	c.Site = data.Site
-	c.Mail = data.Mail
-	c.Auth = data.Auth
-	c.Search = data.Search
-	c.Task = data.Task
-	c.Common = data.Common
-	c.Normalize()
+	next := *data
+	next.Normalize()
+	if err := utils.ValidateStoragePublicBaseURL(next.GetStorageS3PublicBaseURL()); err != nil {
+		return err
+	}
+	if err := utils.ValidateStoragePublicBaseURL(next.GetStorageR2PublicBaseURL()); err != nil {
+		return err
+	}
+
+	c.General = next.General
+	c.Site = next.Site
+	c.Mail = next.Mail
+	c.Auth = next.Auth
+	c.Search = next.Search
+	c.Task = next.Task
+	c.Common = next.Common
 
 	utils.ApplySeo(c.General.Title, c.General.Logo)
 	utils.ApplyPWAManifest(c.General.PWAManifest)

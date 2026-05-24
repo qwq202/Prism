@@ -261,6 +261,28 @@ func isBlockedPublicStorageHost(host string) bool {
 	return false
 }
 
+func ValidateStoragePublicBaseURL(publicBaseURL string) error {
+	publicBaseURL = strings.TrimSpace(publicBaseURL)
+	if publicBaseURL == "" {
+		return nil
+	}
+
+	instance, err := neturl.Parse(publicBaseURL)
+	if err != nil {
+		return fmt.Errorf("invalid public base url: %w", err)
+	}
+
+	if !Contains(strings.ToLower(instance.Scheme), []string{"http", "https"}) || instance.Hostname() == "" {
+		return fmt.Errorf("public base url must be a full http or https url")
+	}
+
+	if isBlockedPublicStorageHost(instance.Hostname()) {
+		return fmt.Errorf("public base url must be a real public file url such as r2.dev or a custom domain, not the object storage api endpoint")
+	}
+
+	return nil
+}
+
 func storageReadyWithConfig(config storageClientConfig) bool {
 	switch strings.ToLower(strings.TrimSpace(config.Mode)) {
 	case "s3", "r2":
@@ -731,19 +753,14 @@ func ListConfiguredStoredAttachments() ([]StoredAttachmentInfo, error) {
 
 func TestStorageConnection(config StorageTestConfig) error {
 	current := buildStorageTestConfig(config)
-	if strings.TrimSpace(current.PublicBaseURL) == "" && strings.TrimSpace(current.Backend) == "" {
+	if !strings.EqualFold(current.Mode, "local") &&
+		strings.TrimSpace(current.PublicBaseURL) == "" &&
+		strings.TrimSpace(current.Backend) == "" {
 		return fmt.Errorf("public base url or backend domain is required")
 	}
 
-	if strings.TrimSpace(current.PublicBaseURL) != "" {
-		instance, err := neturl.Parse(current.PublicBaseURL)
-		if err != nil {
-			return fmt.Errorf("invalid public base url: %w", err)
-		}
-
-		if isBlockedPublicStorageHost(instance.Hostname()) {
-			return fmt.Errorf("public base url must be a real public file url such as r2.dev or a custom domain, not the object storage api endpoint")
-		}
+	if err := ValidateStoragePublicBaseURL(current.PublicBaseURL); err != nil {
+		return err
 	}
 
 	content := []byte(fmt.Sprintf("storage-test-%d", time.Now().UnixNano()))

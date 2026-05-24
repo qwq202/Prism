@@ -87,3 +87,57 @@ func TestListConfiguredStoredAttachmentsSkipsInvalidNames(t *testing.T) {
 		t.Fatalf("expected only valid attachment, got %#v", attachments)
 	}
 }
+
+func TestValidateStoragePublicBaseURL(t *testing.T) {
+	valid := []string{
+		"",
+		"https://cdn.example.com",
+		"http://localhost:8094/files",
+	}
+	for _, value := range valid {
+		if err := ValidateStoragePublicBaseURL(value); err != nil {
+			t.Fatalf("expected %q to be valid, got %v", value, err)
+		}
+	}
+
+	invalid := []string{
+		"cdn.example.com",
+		"ftp://cdn.example.com",
+		"https://example.r2.cloudflarestorage.com",
+	}
+	for _, value := range invalid {
+		if err := ValidateStoragePublicBaseURL(value); err == nil {
+			t.Fatalf("expected %q to be rejected", value)
+		}
+	}
+}
+
+func TestStorageConnectionAllowsLocalWithoutPublicURL(t *testing.T) {
+	previousWorkingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working dir: %v", err)
+	}
+	workingDir := t.TempDir()
+	if err := os.Chdir(workingDir); err != nil {
+		t.Fatalf("chdir temp dir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(previousWorkingDir)
+	})
+
+	if err := TestStorageConnection(StorageTestConfig{Mode: "local"}); err != nil {
+		t.Fatalf("expected local storage test without public url to pass, got %v", err)
+	}
+}
+
+func TestStorageConnectionRejectsBarePublicBaseURL(t *testing.T) {
+	err := TestStorageConnection(StorageTestConfig{
+		Mode: "s3",
+		S3: StorageS3Config{
+			PublicBaseURL: "cdn.example.com",
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected bare public base url to be rejected")
+	}
+}
