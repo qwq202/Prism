@@ -94,6 +94,8 @@ export function TypeBadge({ type, className, variant }: TypeBadgeProps) {
 
 // ── Health badge ──────────────────────────────────────────────────────────────
 function HealthBadge({ stat }: { stat: ChannelStat | undefined }) {
+  const { t } = useTranslation();
+
   if (!stat || (stat.requests === 0 && stat.errors === 0)) {
     return (
       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground/50 select-none">
@@ -110,13 +112,17 @@ function HealthBadge({ stat }: { stat: ChannelStat | undefined }) {
   let label: string;
   if (rate === 0) {
     color = "text-green-500";
-    label = "正常";
+    label = t("admin.channels.health-ok");
   } else if (rate < 0.1) {
     color = "text-yellow-500";
-    label = `${(rate * 100).toFixed(0)}% 错误`;
+    label = t("admin.channels.health-error-rate", {
+      rate: (rate * 100).toFixed(0),
+    });
   } else {
     color = "text-red-500";
-    label = `${(rate * 100).toFixed(0)}% 错误`;
+    label = t("admin.channels.health-error-rate", {
+      rate: (rate * 100).toFixed(0),
+    });
   }
 
   return (
@@ -125,7 +131,10 @@ function HealthBadge({ stat }: { stat: ChannelStat | undefined }) {
         "inline-flex items-center gap-1 text-xs select-none whitespace-nowrap",
         color,
       )}
-      title={`今日 ${total} 次请求，${stat.errors} 次错误`}
+      title={t("admin.channels.health-title", {
+        total,
+        errors: stat.errors,
+      })}
     >
       <Circle className="h-2 w-2 fill-current shrink-0" />
       <span>{label}</span>
@@ -144,6 +153,7 @@ function HealthSummaryBar({
   statsMap: Map<number, ChannelStat>;
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   const active = channels.filter((c) => c.state);
   const withData = active.filter(
     (c) =>
@@ -171,36 +181,42 @@ function HealthSummaryBar({
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 py-2 text-xs text-muted-foreground select-none">
       {loading ? (
-        <span className="animate-pulse">加载健康数据…</span>
+        <span className="animate-pulse">
+          {t("admin.channels.health-loading")}
+        </span>
       ) : (
         <>
-          <span className="font-medium text-foreground/70">今日健康状态</span>
+          <span className="font-medium text-foreground/70">
+            {t("admin.channels.health-summary")}
+          </span>
           {healthy.length > 0 && (
             <span className="flex items-center gap-1 text-green-500">
               <Circle className="h-2 w-2 fill-current" />
-              正常 {healthy.length}
+              {t("admin.channels.health-ok")} {healthy.length}
             </span>
           )}
           {warn.length > 0 && (
             <span className="flex items-center gap-1 text-yellow-500">
               <Circle className="h-2 w-2 fill-current" />
-              告警 {warn.length}
+              {t("admin.channels.health-warning")} {warn.length}
             </span>
           )}
           {critical.length > 0 && (
             <span className="flex items-center gap-1 text-red-500">
               <Circle className="h-2 w-2 fill-current" />
-              异常 {critical.length}
+              {t("admin.channels.health-critical")} {critical.length}
             </span>
           )}
           {idle.length > 0 && (
             <span className="flex items-center gap-1 opacity-50">
               <Circle className="h-2 w-2 fill-current" />
-              无流量 {idle.length}
+              {t("admin.channels.health-idle")} {idle.length}
             </span>
           )}
           <span className="ml-auto opacity-50">
-            共 {active.length} 个启用渠道
+            {t("admin.channels.health-active-count", {
+              count: active.length,
+            })}
           </span>
         </>
       )}
@@ -566,7 +582,9 @@ function ChannelTable({
                 <TableCell className={merge("retry-name")}>
                   {t("admin.channels.retry-name")}
                 </TableCell>
-                <TableCell className={merge("health")}>今日状态</TableCell>
+                <TableCell className={merge("health")}>
+                  {t("admin.channels.health-status")}
+                </TableCell>
                 <TableCell className={merge("state")}>
                   {t("admin.channels.state")}
                 </TableCell>
