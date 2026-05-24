@@ -17,8 +17,9 @@ function hashCacheScope(value: string): string {
 }
 
 function getUserInfoCacheKey(): string {
+  const endpoint = String(axios.defaults.baseURL ?? "default");
   const token = String(axios.defaults.headers.common["Authorization"] ?? "");
-  return `${userInfoCacheKey}:${hashCacheScope(token)}`;
+  return `${userInfoCacheKey}:${endpoint}:${hashCacheScope(token)}`;
 }
 
 export type LoginForm = {
