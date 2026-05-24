@@ -3,6 +3,7 @@ package admin
 import (
 	"chat/connection"
 	"chat/globals"
+	"chat/utils"
 	"database/sql"
 	"path/filepath"
 	"testing"
@@ -82,6 +83,91 @@ func TestCreateUserRejectsDuplicateUsername(t *testing.T) {
 	}
 	if err := createUser(db, "alice", "other@example.com", "secret123"); err == nil {
 		t.Fatalf("expected duplicate username to be rejected")
+	}
+}
+
+func TestPasswordMigrationRequiresExistingUser(t *testing.T) {
+	db := openAdminUserTestDB(t)
+
+	if err := passwordMigration(db, nil, 999, "secret123"); err == nil {
+		t.Fatalf("expected missing user password migration to fail")
+	}
+}
+
+func TestPasswordMigrationUpdatesExistingUser(t *testing.T) {
+	db := openAdminUserTestDB(t)
+
+	if err := createUser(db, "alice", "alice@example.com", "secret123"); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	var id int64
+	if err := globals.QueryRowDb(db, "SELECT id FROM auth WHERE username = ?", "alice").Scan(&id); err != nil {
+		t.Fatalf("fetch created user: %v", err)
+	}
+
+	if err := passwordMigration(db, nil, id, "newsecret123"); err != nil {
+		t.Fatalf("update user password: %v", err)
+	}
+
+	var hash string
+	if err := globals.QueryRowDb(db, "SELECT password FROM auth WHERE id = ?", id).Scan(&hash); err != nil {
+		t.Fatalf("fetch updated password: %v", err)
+	}
+	if ok, _ := utils.VerifyPassword("newsecret123", hash); !ok {
+		t.Fatalf("expected updated password hash to verify")
+	}
+}
+
+func TestEmailMigrationValidatesUserAndAddress(t *testing.T) {
+	db := openAdminUserTestDB(t)
+
+	if err := createUser(db, "alice", "alice@example.com", "secret123"); err != nil {
+		t.Fatalf("create alice: %v", err)
+	}
+	if err := createUser(db, "bob", "bob@example.com", "secret123"); err != nil {
+		t.Fatalf("create bob: %v", err)
+	}
+
+	var aliceID int64
+	if err := globals.QueryRowDb(db, "SELECT id FROM auth WHERE username = ?", "alice").Scan(&aliceID); err != nil {
+		t.Fatalf("fetch alice: %v", err)
+	}
+
+	if err := emailMigration(db, 999, "new@example.com"); err == nil {
+		t.Fatalf("expected missing user email migration to fail")
+	}
+	if err := emailMigration(db, aliceID, "not-an-email"); err == nil {
+		t.Fatalf("expected invalid email to be rejected")
+	}
+	if err := emailMigration(db, aliceID, "bob@example.com"); err == nil {
+		t.Fatalf("expected duplicate email to be rejected")
+	}
+	if err := emailMigration(db, aliceID, " alice2@example.com "); err != nil {
+		t.Fatalf("update email: %v", err)
+	}
+
+	var email string
+	if err := globals.QueryRowDb(db, "SELECT email FROM auth WHERE id = ?", aliceID).Scan(&email); err != nil {
+		t.Fatalf("fetch updated email: %v", err)
+	}
+	if email != "alice2@example.com" {
+		t.Fatalf("expected trimmed email to be saved, got %q", email)
+	}
+}
+
+func TestUpdateRootPasswordRequiresRootUser(t *testing.T) {
+	db := openAdminUserTestDB(t)
+
+	if err := UpdateRootPassword(db, nil, "newsecret123"); err != nil {
+		t.Fatalf("update root password: %v", err)
+	}
+
+	if _, err := globals.ExecDb(db, "DELETE FROM auth WHERE username = ?", "root"); err != nil {
+		t.Fatalf("delete root: %v", err)
+	}
+	if err := UpdateRootPassword(db, nil, "anothersecret123"); err == nil {
+		t.Fatalf("expected missing root update to fail")
 	}
 }
 

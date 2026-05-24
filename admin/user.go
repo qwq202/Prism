@@ -123,6 +123,10 @@ func getUsersForm(db *sql.DB, page int64, search string) PaginationForm {
 
 // clearUserCache clears all cache keys starting with nio:user:
 func clearUserCache(cache *redis.Client) error {
+	if cache == nil {
+		return nil
+	}
+
 	ctx := context.Background()
 	iter := cache.Scan(ctx, 0, "nio:user:*", 100).Iterator()
 	for iter.Next(ctx) {
@@ -277,6 +281,10 @@ func ensureCanDisableActiveAdmin(db *sql.DB, id int64, message string) error {
 }
 
 func passwordMigration(db *sql.DB, cache *redis.Client, id int64, password string) error {
+	if id <= 0 {
+		return fmt.Errorf("invalid user id")
+	}
+
 	password = strings.TrimSpace(password)
 	if len(password) < 6 || len(password) > 36 {
 		return fmt.Errorf("password length must be between 6 and 36")
@@ -287,12 +295,18 @@ func passwordMigration(db *sql.DB, cache *redis.Client, id int64, password strin
 	}
 
 	// Update password in database
-	_, err = globals.ExecDb(db, `
-		UPDATE auth SET password = ? WHERE id = ?
+	result, err := globals.ExecDb(db, `
+			UPDATE auth SET password = ? WHERE id = ?
 	`, hash_passwd, id)
-
 	if err != nil {
 		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return fmt.Errorf("user not found")
 	}
 
 	// Clear all user related cache
@@ -304,7 +318,34 @@ func passwordMigration(db *sql.DB, cache *redis.Client, id int64, password strin
 }
 
 func emailMigration(db *sql.DB, id int64, email string) error {
-	_, err := globals.ExecDb(db, `
+	if id <= 0 {
+		return fmt.Errorf("invalid user id")
+	}
+	email = strings.TrimSpace(email)
+	if len(email) < 1 || len(email) > 255 {
+		return fmt.Errorf("invalid email format")
+	}
+	addr, err := mail.ParseAddress(email)
+	if err != nil || addr.Address != email {
+		return fmt.Errorf("invalid email format")
+	}
+
+	var count int64
+	if err := globals.QueryRowDb(db, "SELECT COUNT(*) FROM auth WHERE id = ?", id).Scan(&count); err != nil {
+		return err
+	}
+	if count == 0 {
+		return fmt.Errorf("user not found")
+	}
+
+	if err := globals.QueryRowDb(db, "SELECT COUNT(*) FROM auth WHERE email = ? AND id <> ?", email, id).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return fmt.Errorf("email is already taken")
+	}
+
+	_, err = globals.ExecDb(db, `
 		UPDATE auth SET email = ? WHERE id = ?
 	`, email, id)
 
@@ -606,10 +647,18 @@ func UpdateRootPassword(db *sql.DB, cache *redis.Client, password string) error 
 		return err
 	}
 
-	if _, err := globals.ExecDb(db, `
-		UPDATE auth SET password = ? WHERE username = 'root'
-	`, hash); err != nil {
+	result, err := globals.ExecDb(db, `
+			UPDATE auth SET password = ? WHERE username = 'root'
+	`, hash)
+	if err != nil {
 		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return fmt.Errorf("root user not found")
 	}
 
 	// Clear all user related cache
