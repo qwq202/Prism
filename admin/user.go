@@ -69,6 +69,7 @@ func getUsersForm(db *sql.DB, page int64, search string) PaginationForm {
 			Message: err.Error(),
 		}
 	}
+	defer rows.Close()
 
 	for rows.Next() {
 		var user UserData
@@ -112,6 +113,12 @@ func getUsersForm(db *sql.DB, page int64, search string) PaginationForm {
 		user.IsBanned = isBanned.Valid && isBanned.Bool
 
 		users = append(users, user)
+	}
+	if err := rows.Err(); err != nil {
+		return PaginationForm{
+			Status:  false,
+			Message: err.Error(),
+		}
 	}
 
 	return PaginationForm{

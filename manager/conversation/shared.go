@@ -155,6 +155,7 @@ func ListSharedConversation(db *sql.DB, user *auth.User) []SharedPreviewForm {
 	if err != nil {
 		return nil
 	}
+	defer rows.Close()
 
 	result := make([]SharedPreviewForm, 0)
 	for rows.Next() {

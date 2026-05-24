@@ -249,7 +249,7 @@ func DeepLogin(c *gin.Context, token string) (string, error) {
 			return "", err
 		}
 
-		_, err = globals.QueryDb(db, "INSERT INTO auth (bind_id, username, token, password) VALUES (?, ?, ?, ?)",
+		_, err = globals.ExecDb(db, "INSERT INTO auth (bind_id, username, token, password) VALUES (?, ?, ?, ?)",
 			user.ID, user.Username, utils.Extract(token, 255, ""), hash)
 		if err != nil {
 			return "", err

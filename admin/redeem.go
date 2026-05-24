@@ -41,6 +41,7 @@ func GetRedeemData(db *sql.DB, page int64) PaginationForm {
 			Message: err.Error(),
 		}
 	}
+	defer rows.Close()
 
 	for rows.Next() {
 		var redeem RedeemData
@@ -56,6 +57,12 @@ func GetRedeemData(db *sql.DB, page int64) PaginationForm {
 		redeem.CreatedAt = utils.ConvertTime(createdAt).Format("2006-01-02 15:04:05")
 		redeem.UpdatedAt = utils.ConvertTime(updatedAt).Format("2006-01-02 15:04:05")
 		data = append(data, redeem)
+	}
+	if err := rows.Err(); err != nil {
+		return PaginationForm{
+			Status:  false,
+			Message: err.Error(),
+		}
 	}
 
 	return PaginationForm{
@@ -151,6 +158,7 @@ func GetRedeemBatches(db *sql.DB) RedeemBatchResponse {
 	if err != nil {
 		return RedeemBatchResponse{Status: false, Message: err.Error()}
 	}
+	defer rows.Close()
 
 	var batches []RedeemBatchData
 	for rows.Next() {
@@ -161,6 +169,9 @@ func GetRedeemBatches(db *sql.DB) RedeemBatchResponse {
 		}
 		b.CreatedAt = utils.ConvertTime(createdAt).Format("2006-01-02 15:04:05")
 		batches = append(batches, b)
+	}
+	if err := rows.Err(); err != nil {
+		return RedeemBatchResponse{Status: false, Message: err.Error()}
 	}
 
 	if batches == nil {
@@ -180,6 +191,7 @@ func GetBatchCodes(db *sql.DB, batchId string) RedeemBatchCodesResponse {
 	if err != nil {
 		return RedeemBatchCodesResponse{Status: false, Message: err.Error()}
 	}
+	defer rows.Close()
 
 	var codes []RedeemData
 	for rows.Next() {
@@ -192,6 +204,9 @@ func GetBatchCodes(db *sql.DB, batchId string) RedeemBatchCodesResponse {
 		r.CreatedAt = utils.ConvertTime(createdAt).Format("2006-01-02 15:04:05")
 		r.UpdatedAt = utils.ConvertTime(updatedAt).Format("2006-01-02 15:04:05")
 		codes = append(codes, r)
+	}
+	if err := rows.Err(); err != nil {
+		return RedeemBatchCodesResponse{Status: false, Message: err.Error()}
 	}
 
 	if codes == nil {

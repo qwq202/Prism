@@ -110,6 +110,7 @@ func getBroadcastList(c *gin.Context) ([]Info, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	for rows.Next() {
 		var b Info
@@ -127,6 +128,9 @@ func getBroadcastList(c *gin.Context) ([]Info, error) {
 			b.EndAt = t.Format("2006-01-02 15:04:05")
 		}
 		broadcastList = append(broadcastList, b)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return broadcastList, nil

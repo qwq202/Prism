@@ -37,6 +37,7 @@ func GetInvitationPagination(db *sql.DB, page int64) PaginationForm {
 			Message: err.Error(),
 		}
 	}
+	defer rows.Close()
 
 	for rows.Next() {
 		var invitation InvitationData
@@ -51,6 +52,12 @@ func GetInvitationPagination(db *sql.DB, page int64) PaginationForm {
 		invitation.CreatedAt = utils.ConvertTime(createdAt).Format("2006-01-02 15:04:05")
 		invitation.UpdatedAt = utils.ConvertTime(updatedAt).Format("2006-01-02 15:04:05")
 		invitations = append(invitations, invitation)
+	}
+	if err := rows.Err(); err != nil {
+		return PaginationForm{
+			Status:  false,
+			Message: err.Error(),
+		}
 	}
 
 	return PaginationForm{

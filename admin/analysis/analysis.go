@@ -191,6 +191,7 @@ func GetRegistrationData(db *sql.DB) RegistrationChartForm {
 		GROUP BY DATE(created_at)
 	`, dates[0].Format("2006-01-02"))
 	if err == nil {
+		defer rows.Close()
 		for rows.Next() {
 			var d string
 			var c int64
