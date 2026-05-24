@@ -11,6 +11,8 @@ import (
 	"strings"
 )
 
+const maxSafeFileNameRunes = 120
+
 func CreateFolder(path string) bool {
 	if err := os.MkdirAll(path, os.ModePerm); err != nil && !os.IsExist(err) {
 		return false
@@ -39,6 +41,87 @@ func FileDirSafe(file string) string {
 func FileSafe(file string) string {
 	FileDirSafe(file)
 	return file
+}
+
+func SafeJoin(base string, parts ...string) (string, error) {
+	base = strings.TrimSpace(base)
+	if base == "" {
+		return "", errors.New("base path cannot be empty")
+	}
+
+	baseClean := filepath.Clean(base)
+	cleanParts := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(strings.ReplaceAll(part, "\\", "/"))
+		if part == "" {
+			return "", errors.New("path segment cannot be empty")
+		}
+		if strings.ContainsRune(part, 0) {
+			return "", errors.New("path segment cannot contain null bytes")
+		}
+		if strings.HasPrefix(part, "/") {
+			return "", fmt.Errorf("path segment escapes base: %s", part)
+		}
+
+		clean := filepath.Clean(filepath.FromSlash(part))
+		if clean == "." || clean == ".." || strings.HasPrefix(clean, fmt.Sprintf("..%c", os.PathSeparator)) || filepath.IsAbs(clean) {
+			return "", fmt.Errorf("path segment escapes base: %s", part)
+		}
+		cleanParts = append(cleanParts, clean)
+	}
+
+	target := filepath.Join(append([]string{baseClean}, cleanParts...)...)
+	baseAbs, err := filepath.Abs(baseClean)
+	if err != nil {
+		return "", err
+	}
+	targetAbs, err := filepath.Abs(target)
+	if err != nil {
+		return "", err
+	}
+	rel, err := filepath.Rel(baseAbs, targetAbs)
+	if err != nil {
+		return "", err
+	}
+	if rel == ".." || filepath.IsAbs(rel) || strings.HasPrefix(rel, fmt.Sprintf("..%c", os.PathSeparator)) {
+		return "", fmt.Errorf("path escapes base: %s", target)
+	}
+
+	return filepath.ToSlash(target), nil
+}
+
+func SafeFileName(raw string, fallback string) string {
+	name := strings.TrimSpace(raw)
+	var builder strings.Builder
+	for _, char := range name {
+		switch {
+		case char == 0:
+			continue
+		case char < 32 || char == 127:
+			builder.WriteRune('-')
+		case strings.ContainsRune(`/\<>:"|?*`, char):
+			builder.WriteRune('-')
+		default:
+			builder.WriteRune(char)
+		}
+	}
+
+	name = strings.Trim(builder.String(), ". ")
+	if name == "" {
+		name = strings.TrimSpace(fallback)
+	}
+	if name == "" {
+		name = "file"
+	}
+
+	runes := []rune(name)
+	if len(runes) > maxSafeFileNameRunes {
+		name = strings.TrimSpace(string(runes[:maxSafeFileNameRunes]))
+	}
+	if name == "" {
+		return "file"
+	}
+	return name
 }
 
 func WriteFile(path string, data string, folderSafe bool) error {

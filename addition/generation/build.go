@@ -1,6 +1,7 @@
 package generation
 
 import (
+	"chat/globals"
 	"chat/utils"
 	"fmt"
 	"time"
@@ -17,15 +18,24 @@ func GetFolderByHash(model string, prompt string) (string, string) {
 
 func GenerateProject(path string, instance ProjectResult) bool {
 	for name, data := range instance.Result {
-		current := fmt.Sprintf("%s/%s", path, name)
-		if content, ok := data.(string); ok {
+		current, err := utils.SafeJoin(path, name)
+		if err != nil {
+			globals.Debug(fmt.Sprintf("[generation] reject unsafe project path %q: %s", name, err.Error()))
+			return false
+		}
+
+		switch content := data.(type) {
+		case string:
 			if utils.WriteFile(current, content, true) != nil {
 				return false
 			}
-		} else {
-			GenerateProject(current, ProjectResult{
-				Result: data.(map[string]interface{}),
-			})
+		case map[string]interface{}:
+			if !GenerateProject(current, ProjectResult{Result: content}) {
+				return false
+			}
+		default:
+			globals.Debug(fmt.Sprintf("[generation] reject unsupported project node for %q", name))
+			return false
 		}
 	}
 	return true
