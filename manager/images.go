@@ -2,6 +2,7 @@ package manager
 
 import (
 	"chat/auth"
+	"chat/globals"
 	"chat/utils"
 	"fmt"
 	"io"
@@ -16,6 +17,7 @@ const (
 	maxAttachmentUploadBytes          int64 = 100 * 1024 * 1024
 	maxAttachmentMultipartOverhead    int64 = 1024 * 1024
 	maxAttachmentMultipartUploadBytes       = maxAttachmentUploadBytes + maxAttachmentMultipartOverhead
+	attachmentUploadServerError             = "failed to upload attachment"
 )
 
 type AttachmentUploadResponse struct {
@@ -33,6 +35,11 @@ func attachmentUploadError(c *gin.Context, error string) {
 		Status: false,
 		Error:  error,
 	})
+}
+
+func attachmentUploadInternalError(c *gin.Context, step string, err error) {
+	globals.Warn(fmt.Sprintf("[attachment] %s failed: %s", step, err.Error()))
+	attachmentUploadError(c, attachmentUploadServerError)
 }
 
 func isAttachmentBodyTooLarge(err error) bool {
@@ -98,7 +105,7 @@ func UploadAttachmentAPI(c *gin.Context) {
 
 	src, err := file.Open()
 	if err != nil {
-		attachmentUploadError(c, err.Error())
+		attachmentUploadInternalError(c, "open upload", err)
 		return
 	}
 	defer src.Close()
@@ -109,7 +116,7 @@ func UploadAttachmentAPI(c *gin.Context) {
 			attachmentUploadError(c, attachmentUploadSizeError())
 			return
 		}
-		attachmentUploadError(c, err.Error())
+		attachmentUploadInternalError(c, "read upload", err)
 		return
 	}
 
@@ -121,7 +128,7 @@ func UploadAttachmentAPI(c *gin.Context) {
 
 	url, err := utils.StoreAttachmentData(file.Filename, data, detectedContentType)
 	if err != nil {
-		attachmentUploadError(c, err.Error())
+		attachmentUploadInternalError(c, "store upload", err)
 		return
 	}
 

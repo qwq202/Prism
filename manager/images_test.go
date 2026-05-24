@@ -140,3 +140,44 @@ func TestUploadAttachmentAcceptsOctetStreamImage(t *testing.T) {
 		t.Fatalf("expected local attachment url, got %q", response.Url)
 	}
 }
+
+func TestUploadAttachmentHidesStorageErrorDetails(t *testing.T) {
+	previousWorkingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working dir: %v", err)
+	}
+	workingDir := t.TempDir()
+	if err := os.Chdir(workingDir); err != nil {
+		t.Fatalf("chdir temp dir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(previousWorkingDir)
+	})
+
+	if err := os.WriteFile("storage", []byte("not a directory"), 0o644); err != nil {
+		t.Fatalf("create storage blocker: %v", err)
+	}
+
+	image, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=")
+	if err != nil {
+		t.Fatalf("decode png fixture: %v", err)
+	}
+
+	response := attachmentUploadResponse(
+		t,
+		"pixel.png",
+		"image/png",
+		image,
+		-1,
+	)
+
+	if response.Status {
+		t.Fatalf("expected upload to fail")
+	}
+	if response.Error != attachmentUploadServerError {
+		t.Fatalf("expected generic upload error, got %q", response.Error)
+	}
+	if strings.Contains(response.Error, "storage") || strings.Contains(response.Error, string(os.PathSeparator)) {
+		t.Fatalf("expected storage details to be hidden, got %q", response.Error)
+	}
+}
