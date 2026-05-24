@@ -36,7 +36,12 @@ function AdminAttachment() {
   const sync = async () => {
     if (loading) return;
     setLoading(true);
-    setData(await listAttachments());
+    const res = await listAttachments();
+    if (res.status) {
+      setData(res.data);
+    } else {
+      withNotify(t, res);
+    }
     setLoading(false);
   };
 

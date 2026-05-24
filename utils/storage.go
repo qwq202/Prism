@@ -27,7 +27,10 @@ import (
 
 const attachmentPrefix = "attachments"
 
-var attachmentNamePattern = regexp.MustCompile(`attachments/([a-f0-9]{32}\.[A-Za-z0-9]+)`)
+var (
+	attachmentNamePattern     = regexp.MustCompile(`attachments/([a-f0-9]{32}\.[A-Za-z0-9]+)`)
+	storedAttachmentNameRegex = regexp.MustCompile(`^[a-f0-9]{32}\.[A-Za-z0-9]+$`)
+)
 
 type StorageS3Config struct {
 	Endpoint       string
@@ -93,6 +96,17 @@ func AttachmentPublicURL(name string) string {
 	}
 
 	return fmt.Sprintf("/attachments/%s", name)
+}
+
+func validateStoredAttachmentName(name string) (string, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", fmt.Errorf("attachment name is required")
+	}
+	if !storedAttachmentNameRegex.MatchString(name) {
+		return "", fmt.Errorf("invalid attachment name")
+	}
+	return name, nil
 }
 
 func ExtractAttachmentNames(data string) []string {
@@ -509,6 +523,12 @@ func StoreAttachmentData(filename string, data []byte, contentType string) (stri
 }
 
 func ServeStoredAttachment(c *gin.Context, name string) {
+	name, err := validateStoredAttachmentName(name)
+	if err != nil {
+		c.Status(http.StatusNotFound)
+		return
+	}
+
 	localPath := AttachmentLocalPath(name)
 	if IsFileExist(localPath) {
 		c.File(localPath)
@@ -542,6 +562,11 @@ func ServeStoredAttachment(c *gin.Context, name string) {
 func DeleteStoredAttachment(name string) error {
 	var result error
 
+	name, err := validateStoredAttachmentName(name)
+	if err != nil {
+		return err
+	}
+
 	localPath := AttachmentLocalPath(name)
 	if IsFileExist(localPath) {
 		if err := DeleteFile(localPath); err != nil && !os.IsNotExist(err) {
@@ -561,9 +586,10 @@ func DeleteStoredAttachment(name string) error {
 }
 
 func DeleteConfiguredStoredAttachment(name string) error {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return fmt.Errorf("attachment name is required")
+	var err error
+	name, err = validateStoredAttachmentName(name)
+	if err != nil {
+		return err
 	}
 
 	current := currentStorageConfig()
@@ -584,7 +610,7 @@ func ListStoredAttachmentNames() ([]string, error) {
 
 	appendName := func(name string) {
 		name = strings.TrimSpace(name)
-		if name == "" {
+		if _, err := validateStoredAttachmentName(name); err != nil {
 			return
 		}
 		if _, ok := seen[name]; ok {
@@ -641,7 +667,7 @@ func ListConfiguredStoredAttachments() ([]StoredAttachmentInfo, error) {
 
 	appendAttachment := func(item StoredAttachmentInfo) {
 		item.Name = strings.TrimSpace(item.Name)
-		if item.Name == "" {
+		if _, err := validateStoredAttachmentName(item.Name); err != nil {
 			return
 		}
 		item.StorageMode = current.Mode

@@ -12,13 +12,28 @@ export type Attachment = {
   reference_count: number;
 };
 
-export async function listAttachments(): Promise<Attachment[]> {
+export type AttachmentListResponse = CommonResponse & {
+  data: Attachment[];
+};
+
+export async function listAttachments(): Promise<AttachmentListResponse> {
   try {
     const response = await axios.get("/admin/attachment/list");
-    return Array.isArray(response.data) ? (response.data as Attachment[]) : [];
+    if (Array.isArray(response.data)) {
+      return { status: true, data: response.data as Attachment[] };
+    }
+
+    const data = response.data as CommonResponse;
+    return {
+      status: data.status,
+      error: data.error,
+      reason: data.reason,
+      message: data.message,
+      data: [],
+    };
   } catch (e) {
     console.warn(e);
-    return [];
+    return { status: false, error: getErrorMessage(e), data: [] };
   }
 }
 
