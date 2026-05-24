@@ -383,28 +383,16 @@ func readStoredImageSource(source string) ([]byte, string, error) {
 		if err != nil {
 			return nil, "", err
 		}
+		if int64(len(decoded)) > maxRemoteImageBytes {
+			return nil, "", remoteImageSizeError(maxRemoteImageBytes)
+		}
 
 		return decoded, contentType, nil
 	}
 
-	res, err := http.Get(source)
+	data, contentType, err := readRemoteImageBytes(source, maxRemoteImageBytes)
 	if err != nil {
 		return nil, "", err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusBadRequest {
-		return nil, "", fmt.Errorf("unexpected status code: %d", res.StatusCode)
-	}
-
-	data, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, "", err
-	}
-
-	contentType := normalizeContentType(res.Header.Get("Content-Type"))
-	if contentType == "" {
-		contentType = normalizeContentType(http.DetectContentType(data))
 	}
 
 	return data, contentType, nil

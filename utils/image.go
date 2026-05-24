@@ -16,15 +16,80 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"golang.org/x/image/webp"
 )
+
+const (
+	maxRemoteImageBytes     int64 = 100 * 1024 * 1024
+	remoteImageFetchTimeout       = 30 * time.Second
+)
+
+var remoteImageHTTPClient = &http.Client{Timeout: remoteImageFetchTimeout}
 
 type Image struct {
 	Object  image.Image
 	Content string
 }
 type Images []Image
+
+func remoteImageSizeError(maxBytes int64) error {
+	return fmt.Errorf("remote image exceeds %dMB limit", maxBytes/1024/1024)
+}
+
+func openRemoteImageResponse(source string) (*http.Response, error) {
+	instance, err := neturl.Parse(strings.TrimSpace(source))
+	if err != nil || instance == nil || instance.Host == "" {
+		return nil, fmt.Errorf("invalid image url")
+	}
+	if instance.Scheme != "http" && instance.Scheme != "https" {
+		return nil, fmt.Errorf("unsupported image url scheme")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, instance.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := remoteImageHTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusBadRequest {
+		_ = res.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
+
+	return res, nil
+}
+
+func readRemoteImageBytes(source string, maxBytes int64) ([]byte, string, error) {
+	res, err := openRemoteImageResponse(source)
+	if err != nil {
+		return nil, "", err
+	}
+	defer res.Body.Close()
+
+	if res.ContentLength > maxBytes {
+		return nil, "", remoteImageSizeError(maxBytes)
+	}
+
+	data, err := io.ReadAll(io.LimitReader(res.Body, maxBytes+1))
+	if err != nil {
+		return nil, "", err
+	}
+	if int64(len(data)) > maxBytes {
+		return nil, "", remoteImageSizeError(maxBytes)
+	}
+
+	contentType := normalizeContentType(res.Header.Get("Content-Type"))
+	if contentType == "" {
+		contentType = normalizeContentType(http.DetectContentType(data))
+	}
+
+	return data, contentType, nil
+}
 
 func NewImage(url string) (*Image, error) {
 	if strings.HasPrefix(url, "data:image/") {
@@ -37,8 +102,11 @@ func NewImage(url string) (*Image, error) {
 		if err != nil {
 			return nil, err
 		}
+		if int64(len(decoded)) > maxRemoteImageBytes {
+			return nil, remoteImageSizeError(maxRemoteImageBytes)
+		}
 
-		img, _, err := image.Decode(strings.NewReader(string(decoded)))
+		img, _, err := image.Decode(bytes.NewReader(decoded))
 		if err != nil {
 			return nil, err
 		}
@@ -46,30 +114,28 @@ func NewImage(url string) (*Image, error) {
 		return &Image{Object: img, Content: url}, nil
 	}
 
-	res, err := http.Get(url)
+	data, _, err := readRemoteImageBytes(url, maxRemoteImageBytes)
 	if err != nil {
 		return nil, err
 	}
-
-	defer res.Body.Close()
 
 	var img image.Image
 	suffix := strings.ToLower(path.Ext(url))
 	switch suffix {
 	case ".png":
-		if img, _, err = image.Decode(res.Body); err != nil {
+		if img, _, err = image.Decode(bytes.NewReader(data)); err != nil {
 			return nil, err
 		}
 	case ".jpg", ".jpeg":
-		if img, err = jpeg.Decode(res.Body); err != nil {
+		if img, err = jpeg.Decode(bytes.NewReader(data)); err != nil {
 			return nil, err
 		}
 	case ".webp":
-		if img, err = webp.Decode(res.Body); err != nil {
+		if img, err = webp.Decode(bytes.NewReader(data)); err != nil {
 			return nil, err
 		}
 	case ".gif":
-		ticks, err := gif.DecodeAll(res.Body)
+		ticks, err := gif.DecodeAll(bytes.NewReader(data))
 		if err != nil {
 			return nil, err
 		}
@@ -92,14 +158,7 @@ func ConvertToBase64(url string) (string, error) {
 		return data[1], nil
 	}
 
-	res, err := http.Get(url)
-	if err != nil {
-		return "", err
-	}
-
-	defer res.Body.Close()
-
-	data, err := io.ReadAll(res.Body)
+	data, _, err := readRemoteImageBytes(url, maxRemoteImageBytes)
 	if err != nil {
 		return "", err
 	}
@@ -260,30 +319,11 @@ func (i *Image) ToRawBase64() string {
 }
 
 func DownloadImage(url string, path string) error {
-	res, err := http.Get(url)
+	data, _, err := readRemoteImageBytes(url, maxRemoteImageBytes)
 	if err != nil {
 		return err
 	}
 
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			globals.Debug(fmt.Sprintf("[utils] close file error: %s (path: %s)", err.Error(), path))
-		}
-	}(res.Body)
-
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-
-	defer func(file *os.File) {
-		err := file.Close()
-		if err != nil {
-			globals.Debug(fmt.Sprintf("[utils] close file error: %s (path: %s)", err.Error(), path))
-		}
-	}(file)
-
-	_, err = io.Copy(file, res.Body)
-	return err
+	FileDirSafe(path)
+	return os.WriteFile(path, data, 0o644)
 }
