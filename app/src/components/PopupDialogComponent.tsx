@@ -154,7 +154,6 @@ function CalendarComp(props: {
 
   const convertedDate = useMemo(() => {
     const date = new Date(value.split(" ")[0] || "1970-01-01");
-    console.log(`[calendar] converted date:`, date);
     return date;
   }, [value]);
 
@@ -168,7 +167,6 @@ function CalendarComp(props: {
           date.getMinutes(),
         )}:${fixedZero(date.getSeconds())}`;
 
-    console.log(`[calendar] clicked date: [${v} ${t}]`);
     onValueChange(`${v} ${t}`);
   };
 

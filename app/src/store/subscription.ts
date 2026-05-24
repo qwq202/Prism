@@ -25,10 +25,6 @@ export const subscriptionSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder.addCase(refreshSubscription.fulfilled, (state, action) => {
-      console.log(
-        "[redux] receive task `refreshSubscription` event: ",
-        action.payload,
-      );
       if (!action.payload.status) return;
       state.is_subscribed = action.payload.is_subscribed;
       state.expired = action.payload.expired;

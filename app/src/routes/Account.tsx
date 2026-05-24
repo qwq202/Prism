@@ -304,7 +304,6 @@ function Account() {
     }
 
     const resp = await getUserInfo();
-    console.log(`[account api] get user info:`, resp);
     if (!cached || !resp.status) {
       withNotify(t, resp);
     }

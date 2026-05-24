@@ -60,10 +60,6 @@ function NavBar() {
     const quotaTask = createCronJob(dispatch, refreshQuota, 30, true);
     const planTask = createCronJob(dispatch, refreshSubscription, 30, true);
 
-    console.log(
-      `[cron] register quota and plan fetching tasks: ${quotaTask}, ${planTask}`,
-    );
-
     return () => clearCronJobs([quotaTask, planTask]);
   }, [auth]);
 

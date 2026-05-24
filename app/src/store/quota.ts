@@ -14,10 +14,6 @@ export const quotaSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addCase(refreshQuota.fulfilled, (state, action) => {
-      console.log(
-        "[redux] receive task `refreshQuota` event: ",
-        action.payload,
-      );
       state.quota = action.payload as number;
     });
   },

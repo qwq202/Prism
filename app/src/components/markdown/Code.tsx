@@ -5,8 +5,13 @@ import { copyClipboard } from "@/utils/dom.ts";
 import { Check, Copy } from "lucide-react";
 import { LightAsync as SyntaxHighlighter } from "react-syntax-highlighter";
 import { atomOneDark as style } from "react-syntax-highlighter/dist/esm/styles/hljs";
-import React, { useMemo } from "react";
-import { MarkdownMermaid } from "@/components/plugins/mermaid.tsx";
+import React, { Suspense, useMemo } from "react";
+
+const MarkdownMermaid = React.lazy(() =>
+  import("@/components/plugins/mermaid.tsx").then((module) => ({
+    default: module.MarkdownMermaid,
+  })),
+);
 
 const LanguageMap: Record<string, string> = {
   html: "htmlbars",
@@ -41,7 +46,12 @@ function Code({
   if (language === "file") return <MarkdownFile children={children} />;
   if (language === "progress")
     return <MarkdownProgressbar children={children} />;
-  if (language === "mermaid") return <MarkdownMermaid children={children} />;
+  if (language === "mermaid")
+    return (
+      <Suspense fallback={null}>
+        <MarkdownMermaid children={children} />
+      </Suspense>
+    );
 
   if (inline)
     return (

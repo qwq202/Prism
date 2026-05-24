@@ -3,11 +3,19 @@ package manager
 import (
 	"chat/auth"
 	"chat/utils"
+	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+)
+
+const (
+	maxAttachmentUploadBytes          int64 = 100 * 1024 * 1024
+	maxAttachmentMultipartOverhead    int64 = 1024 * 1024
+	maxAttachmentMultipartUploadBytes       = maxAttachmentUploadBytes + maxAttachmentMultipartOverhead
 )
 
 type AttachmentUploadResponse struct {
@@ -16,54 +24,94 @@ type AttachmentUploadResponse struct {
 	Error  string `json:"error,omitempty"`
 }
 
+func attachmentUploadSizeError() string {
+	return fmt.Sprintf("file exceeds %dMB upload limit", maxAttachmentUploadBytes/1024/1024)
+}
+
+func attachmentUploadError(c *gin.Context, error string) {
+	c.JSON(http.StatusOK, AttachmentUploadResponse{
+		Status: false,
+		Error:  error,
+	})
+}
+
+func isAttachmentBodyTooLarge(err error) bool {
+	return err != nil && strings.Contains(strings.ToLower(err.Error()), "request body too large")
+}
+
+func isSupportedAttachmentContentType(contentType string) bool {
+	mediaType, _, err := mime.ParseMediaType(strings.TrimSpace(contentType))
+	if err != nil {
+		mediaType = strings.TrimSpace(contentType)
+	}
+
+	mediaType = strings.ToLower(mediaType)
+	return strings.HasPrefix(mediaType, "image/") && mediaType != "image/svg+xml"
+}
+
 func UploadAttachmentAPI(c *gin.Context) {
 	user := auth.RequireAuth(c)
 	if user == nil {
 		return
 	}
 
+	if c.Request.ContentLength > maxAttachmentMultipartUploadBytes {
+		attachmentUploadError(c, attachmentUploadSizeError())
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxAttachmentMultipartUploadBytes)
+
 	file, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusOK, AttachmentUploadResponse{
-			Status: false,
-			Error:  "file is required",
-		})
+		if isAttachmentBodyTooLarge(err) {
+			attachmentUploadError(c, attachmentUploadSizeError())
+			return
+		}
+		attachmentUploadError(c, "file is required")
 		return
 	}
 
-	if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(file.Header.Get("Content-Type"))), "image/") {
-		c.JSON(http.StatusOK, AttachmentUploadResponse{
-			Status: false,
-			Error:  "only image upload is supported",
-		})
+	if file.Size > maxAttachmentUploadBytes {
+		attachmentUploadError(c, attachmentUploadSizeError())
+		return
+	}
+	if file.Size <= 0 {
+		attachmentUploadError(c, "file is empty")
+		return
+	}
+
+	headerContentType := file.Header.Get("Content-Type")
+	if headerContentType != "" && !isSupportedAttachmentContentType(headerContentType) {
+		attachmentUploadError(c, "only raster image upload is supported")
 		return
 	}
 
 	src, err := file.Open()
 	if err != nil {
-		c.JSON(http.StatusOK, AttachmentUploadResponse{
-			Status: false,
-			Error:  err.Error(),
-		})
+		attachmentUploadError(c, err.Error())
 		return
 	}
 	defer src.Close()
 
 	data, err := io.ReadAll(src)
 	if err != nil {
-		c.JSON(http.StatusOK, AttachmentUploadResponse{
-			Status: false,
-			Error:  err.Error(),
-		})
+		if isAttachmentBodyTooLarge(err) {
+			attachmentUploadError(c, attachmentUploadSizeError())
+			return
+		}
+		attachmentUploadError(c, err.Error())
 		return
 	}
 
-	url, err := utils.StoreAttachmentData(file.Filename, data, file.Header.Get("Content-Type"))
+	detectedContentType := http.DetectContentType(data)
+	if !isSupportedAttachmentContentType(detectedContentType) {
+		attachmentUploadError(c, "invalid image data")
+		return
+	}
+
+	url, err := utils.StoreAttachmentData(file.Filename, data, detectedContentType)
 	if err != nil {
-		c.JSON(http.StatusOK, AttachmentUploadResponse{
-			Status: false,
-			Error:  err.Error(),
-		})
+		attachmentUploadError(c, err.Error())
 		return
 	}
 

@@ -77,7 +77,7 @@ function MarkdownContent({
       rehypePlugins={rehypePlugins}
       className={cn("markdown-body", className)}
       children={children}
-      skipHtml={acceptHtml}
+      skipHtml={false}
       components={components}
     />
   );
