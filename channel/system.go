@@ -198,6 +198,40 @@ func (c *SystemConfig) SaveConfig() error {
 	return utils.SaveConfig("system", c)
 }
 
+func (c *SystemConfig) Normalize() {
+	c.General.Backend = c.GetBackend()
+	c.General.TimeZone = c.GetTimeZone()
+
+	c.Search.ApiKey = strings.TrimSpace(c.Search.ApiKey)
+	c.Search.CropLen = c.GetSearchCropLength()
+	c.Search.MaxResults = c.GetSearchMaxResults()
+	c.Search.Topic = c.GetSearchTopic()
+	c.Search.Depth = c.GetSearchDepth()
+
+	c.Common.Expire = c.GetCacheAcceptedExpire()
+	c.Common.Size = c.GetCacheAcceptedSize()
+	c.Common.OrphanCleanupInterval = c.GetOrphanCleanupInterval()
+	c.Common.StorageMode = c.GetRawStorageMode()
+	c.Common.S3.Endpoint = c.GetStorageS3Endpoint()
+	c.Common.S3.Region = c.GetStorageS3Region()
+	c.Common.S3.Bucket = c.GetStorageS3Bucket()
+	c.Common.S3.AccessKey = c.GetStorageS3AccessKey()
+	c.Common.S3.SecretKey = c.GetStorageS3SecretKey()
+	c.Common.S3.PublicBaseURL = c.GetStorageS3PublicBaseURL()
+	c.Common.R2.AccountID = c.GetStorageR2AccountID()
+	c.Common.R2.Jurisdiction = c.GetStorageR2Jurisdiction()
+	c.Common.R2.Bucket = c.GetStorageR2Bucket()
+	c.Common.R2.AccessKey = c.GetStorageR2AccessKey()
+	c.Common.R2.SecretKey = c.GetStorageR2SecretKey()
+	c.Common.R2.PublicBaseURL = c.GetStorageR2PublicBaseURL()
+
+	c.Auth.Passkey.RPDisplayName = strings.TrimSpace(c.Auth.Passkey.RPDisplayName)
+	c.Auth.Passkey.RPID = c.GetPasskeyRPID()
+	c.Auth.Passkey.UserVerification = c.GetPasskeyUserVerification()
+	c.Auth.Passkey.AuthenticatorAttachment = c.GetPasskeyAuthenticatorAttachment()
+	c.Auth.Passkey.Origins = strings.Join(c.GetPasskeyOrigins(), "\n")
+}
+
 func (c *SystemConfig) AsInfo() ApiInfo {
 	return ApiInfo{
 		Title:        c.General.Title,
@@ -226,7 +260,7 @@ func (c *SystemConfig) UpdateConfig(data *SystemConfig) error {
 	c.Search = data.Search
 	c.Task = data.Task
 	c.Common = data.Common
-	c.General.TimeZone = normalizeSystemTimeZone(c.General.TimeZone)
+	c.Normalize()
 
 	utils.ApplySeo(c.General.Title, c.General.Logo)
 	utils.ApplyPWAManifest(c.General.PWAManifest)
@@ -244,7 +278,7 @@ func (c *SystemConfig) GetInitialQuota() float64 {
 }
 
 func (c *SystemConfig) GetBackend() string {
-	return strings.TrimSuffix(c.General.Backend, "/")
+	return strings.TrimSuffix(strings.TrimSpace(c.General.Backend), "/")
 }
 
 func normalizeSystemTimeZone(value string) string {
@@ -552,22 +586,24 @@ func (c *SystemConfig) GetPasskeyRPDisplayName() string {
 }
 
 func (c *SystemConfig) GetPasskeyRPID() string {
-	return strings.TrimSpace(c.Auth.Passkey.RPID)
+	return strings.ToLower(strings.TrimSpace(c.Auth.Passkey.RPID))
 }
 
 func (c *SystemConfig) GetPasskeyUserVerification() string {
-	switch strings.TrimSpace(c.Auth.Passkey.UserVerification) {
+	verification := strings.TrimSpace(c.Auth.Passkey.UserVerification)
+	switch verification {
 	case "required", "preferred", "discouraged":
-		return c.Auth.Passkey.UserVerification
+		return verification
 	default:
 		return "preferred"
 	}
 }
 
 func (c *SystemConfig) GetPasskeyAuthenticatorAttachment() string {
-	switch strings.TrimSpace(c.Auth.Passkey.AuthenticatorAttachment) {
+	attachment := strings.TrimSpace(c.Auth.Passkey.AuthenticatorAttachment)
+	switch attachment {
 	case "platform", "cross-platform":
-		return c.Auth.Passkey.AuthenticatorAttachment
+		return attachment
 	default:
 		return "any"
 	}
