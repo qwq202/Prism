@@ -139,6 +139,14 @@ docker compose up -d
 > - 配置文件挂载目录项目 ~/**config**
 > - 首次启动会自动在 `./config/config.yaml` 中生成随机 `secret`；如需自行托管密钥, 请设置至少 32 位随机字符串。
 
+部署后自检：
+```shell
+docker compose ps
+curl http://localhost:8000/health
+```
+
+`/health` 会返回服务、MySQL、Redis 的可用状态；若 `status` 不是 `ok`，请先检查 `docker compose logs` 中对应依赖的启动日志。开启 `SERVE_STATIC=true` 时，也可通过 `/api/health` 访问同一健康检查。
+
 ### ⚡ Docker 安装 (轻量运行时, 常用于外置 _MYSQL/RDS_ 服务)
 > [!NOTE]
 > 运行成功后, 宿主机地址为 `http://localhost:8094`
@@ -168,6 +176,11 @@ docker run -d --name prism \
 > - SERVE_STATIC: 是否启用静态文件服务 (正常情况下不需要更改此项)
 > - *-v ~/config:/config* 挂载配置文件, *-v ~/logs:/logs* 挂载日志文件, *-v ~/storage:/storage* 挂载附加功能的生成文件
 > - 需配置 MySQL 和 Redis 服务, 请自行参考上方信息修改环境变量
+
+部署后可通过以下命令确认服务和外部依赖是否可用：
+```shell
+curl http://localhost:8094/health
+```
 
 版本更新：
 ```shell
