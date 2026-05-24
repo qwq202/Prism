@@ -33,7 +33,6 @@ const healthCheckTimeout = 2 * time.Second
 
 type healthDependency struct {
 	Status string `json:"status"`
-	Error  string `json:"error,omitempty"`
 }
 
 func normalizeAllowedOriginHost(origin string) string {
@@ -85,10 +84,7 @@ func checkRedis(ctx context.Context, cache *redis.Client) error {
 
 func dependencyHealth(ctx context.Context, check func(context.Context) error) healthDependency {
 	if err := check(ctx); err != nil {
-		return healthDependency{
-			Status: "unavailable",
-			Error:  err.Error(),
-		}
+		return healthDependency{Status: "unavailable"}
 	}
 
 	return healthDependency{Status: "ok"}
