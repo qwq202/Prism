@@ -157,7 +157,7 @@ docker run -d --name prism \
    -e MYSQL_PASSWORD=your_mysql_password \
    -e REDIS_HOST=localhost \
    -e REDIS_PORT=6379 \
-   -e SECRET=secret \
+   -e SECRET=replace_with_a_random_32_byte_string \
    -e SERVE_STATIC=true \
    qunqin45/prism:latest
 ```
