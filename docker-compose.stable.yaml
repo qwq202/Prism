@@ -1,8 +1,6 @@
-version: "3"
 services:
   mysql:
     image: mysql:5.7.44
-    container_name: db
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: root
@@ -14,32 +12,41 @@ services:
       - "3306"
     volumes:
       - ./db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     networks:
       - chatnio-network
 
   redis:
     image: redis:8.2.1
-    container_name: redis
     restart: always
     expose:
       - "6379"
     volumes:
       - ./redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     networks:
       - chatnio-network
 
   chatnio:
     image: qunqin45/prism:${PRISM_IMAGE_TAG:-latest}
-    container_name: chatnio
     restart: always
     ports:
       - "8000:8094"
     depends_on:
-      - mysql
-      - redis
-    links:
-      - mysql
-      - redis
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ulimits:
       nofile:
         soft: 65535
