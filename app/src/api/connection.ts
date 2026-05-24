@@ -153,8 +153,14 @@ export class Connection {
   }
 
   public send(data: Record<string, string | boolean | number | undefined>): boolean {
-    if (!this.state || !this.connection) {
-      if (this.connection === undefined) this.init();
+    if (!this.connection || this.connection.readyState !== WebSocket.OPEN) {
+      this.state = false;
+      if (
+        this.connection === undefined ||
+        this.connection.readyState === WebSocket.CLOSED
+      ) {
+        this.init();
+      }
       console.debug("[connection] connection not ready, retrying in 500ms...");
       return false;
     }
@@ -180,9 +186,15 @@ export class Connection {
     }
 
     const trace = JSON.stringify(
-      this.stack ?? {
-        message: data.message,
-        endpoint: endpoint,
+      {
+        ...(this.stack ?? {
+          error: "websocket connection unavailable",
+          endpoint: endpoint,
+        }),
+        type: data.type ?? "chat",
+        model: data.model,
+        message_length:
+          typeof data.message === "string" ? data.message.length : undefined,
       },
       null,
       2,

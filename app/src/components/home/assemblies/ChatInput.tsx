@@ -72,6 +72,7 @@ function ChatInput({
                 value.slice(selectionEnd);
               input.selectionStart = input.selectionEnd = selectionStart + 1;
               onValueChange(input.value);
+              setMemory("history", input.value);
             }
           } else {
             // on Enter, keep the input & on Ctrl + Enter, send the input
