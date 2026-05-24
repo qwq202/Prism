@@ -28,6 +28,21 @@ import { localizeError } from "@/utils/error.ts";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import { toast } from "sonner";
 import { Fingerprint } from "lucide-react";
+import { useLocation } from "react-router-dom";
+
+function getPostLoginRedirect(state: unknown): string {
+  const from = (state as { from?: unknown } | null)?.from;
+  if (
+    typeof from !== "string" ||
+    !from.startsWith("/") ||
+    from.startsWith("//") ||
+    from.startsWith("/login")
+  ) {
+    return "/";
+  }
+
+  return from;
+}
 
 function base64urlToBuffer(value: string): ArrayBuffer {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
@@ -121,6 +136,8 @@ function DeepAuth() {
 function Login() {
   const { t } = useTranslation();
   const globalDispatch = useDispatch();
+  const location = useLocation();
+  const redirectPath = getPostLoginRedirect(location.state);
   const [form, dispatch] = useReducer(formReducer<LoginForm>(), {
     username: "",
     password: "",
@@ -164,7 +181,7 @@ function Login() {
       }
 
       validateToken(globalDispatch, resp.token, async () => {
-        await router.navigate("/");
+        await router.navigate(redirectPath);
       });
     } catch (err) {
       console.debug(err);
@@ -172,7 +189,7 @@ function Login() {
         description: `${t("server-error-prompt")}\n${getErrorMessage(err)}`,
       });
     }
-  }, [form, globalDispatch, t]);
+  }, [form, globalDispatch, redirectPath, t]);
 
   const onPasskeyLogin = useCallback(async () => {
     if (!window.PublicKeyCredential || !navigator.credentials?.get) {
@@ -245,7 +262,7 @@ function Login() {
       });
 
       validateToken(globalDispatch, resp.token, async () => {
-        await router.navigate("/");
+        await router.navigate(redirectPath);
       });
     } catch (err) {
       console.debug(err);
@@ -260,7 +277,7 @@ function Login() {
         description: `${t("server-error-prompt")}\n${getErrorMessage(err)}`,
       });
     }
-  }, [globalDispatch, t]);
+  }, [globalDispatch, redirectPath, t]);
 
   useEffect(() => {
     // listen to enter key and auto submit
