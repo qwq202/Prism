@@ -29,7 +29,19 @@ func openAdminUserTestDB(t *testing.T) *sql.DB {
 	})
 
 	connection.CreateUserTable(db)
+	connection.CreatePackageTable(db)
 	connection.CreateQuotaTable(db)
+	connection.CreateConversationTable(db)
+	connection.CreateMemoryTable(db)
+	connection.CreateMaskTable(db)
+	connection.CreateSharingTable(db)
+	connection.CreateSubscriptionTable(db)
+	connection.CreatePasskeyCredentialTable(db)
+	connection.CreateInvitationTable(db)
+	connection.CreateRedeemTable(db)
+	connection.CreateBroadcastTable(db)
+	connection.CreateBillingTable(db)
+	connection.CreatePaymentOrdersTable(db)
 
 	return db
 }
@@ -70,5 +82,44 @@ func TestCreateUserRejectsDuplicateUsername(t *testing.T) {
 	}
 	if err := createUser(db, "alice", "other@example.com", "secret123"); err == nil {
 		t.Fatalf("expected duplicate username to be rejected")
+	}
+}
+
+func TestAdminOperationsKeepAtLeastOneActiveAdmin(t *testing.T) {
+	db := openAdminUserTestDB(t)
+
+	if err := setAdmin(db, 1, false); err == nil {
+		t.Fatalf("expected demoting the last active admin to fail")
+	}
+	if err := banUser(db, 1, true); err == nil {
+		t.Fatalf("expected banning the last active admin to fail")
+	}
+	if err := deleteUser(db, nil, 1); err == nil {
+		t.Fatalf("expected deleting the last active admin to fail")
+	}
+	if err := batchUsers(db, []int64{1}, "ban", 0); err == nil {
+		t.Fatalf("expected batch banning the last active admin to fail")
+	}
+}
+
+func TestAdminOperationsAllowDisablingOneAdminWhenAnotherActiveAdminExists(t *testing.T) {
+	db := openAdminUserTestDB(t)
+
+	if err := createUser(db, "alice", "alice@example.com", "secret123"); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	if err := setAdmin(db, 2, true); err != nil {
+		t.Fatalf("promote second admin: %v", err)
+	}
+	if err := setAdmin(db, 1, false); err != nil {
+		t.Fatalf("demote one of multiple admins: %v", err)
+	}
+
+	var rootAdmin bool
+	if err := globals.QueryRowDb(db, "SELECT is_admin FROM auth WHERE id = ?", 1).Scan(&rootAdmin); err != nil {
+		t.Fatalf("query root admin state: %v", err)
+	}
+	if rootAdmin {
+		t.Fatalf("expected root admin flag to be removed")
 	}
 }

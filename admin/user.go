@@ -6,6 +6,7 @@ import (
 	"chat/utils"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"math"
 	"net/mail"
@@ -18,6 +19,12 @@ import (
 // AuthLike is to solve the problem of import cycle
 type AuthLike struct {
 	ID int64 `json:"id"`
+}
+
+type userAdminState struct {
+	Exists   bool
+	IsAdmin  bool
+	IsBanned bool
 }
 
 func (a *AuthLike) GetID(_ *sql.DB) int64 {
@@ -214,6 +221,61 @@ func createUser(db *sql.DB, username string, email string, password string) erro
 	return tx.Commit()
 }
 
+func getUserAdminState(db *sql.DB, id int64) (userAdminState, error) {
+	var state userAdminState
+	if id <= 0 {
+		return state, fmt.Errorf("invalid user id")
+	}
+
+	var isAdmin sql.NullBool
+	var isBanned sql.NullBool
+	err := globals.QueryRowDb(db, `
+		SELECT is_admin, is_banned FROM auth WHERE id = ?
+	`, id).Scan(&isAdmin, &isBanned)
+	if errors.Is(err, sql.ErrNoRows) {
+		return state, nil
+	}
+	if err != nil {
+		return state, err
+	}
+
+	state.Exists = true
+	state.IsAdmin = isAdmin.Valid && isAdmin.Bool
+	state.IsBanned = isBanned.Valid && isBanned.Bool
+	return state, nil
+}
+
+func countActiveAdmins(db *sql.DB) (int64, error) {
+	var count int64
+	err := globals.QueryRowDb(db, `
+		SELECT COUNT(*) FROM auth WHERE is_admin = ? AND (is_banned = ? OR is_banned IS NULL)
+	`, true, false).Scan(&count)
+	return count, err
+}
+
+func ensureCanDisableActiveAdmin(db *sql.DB, id int64, message string) error {
+	state, err := getUserAdminState(db, id)
+	if err != nil {
+		return err
+	}
+	if !state.Exists {
+		return fmt.Errorf("user not found")
+	}
+	if !state.IsAdmin || state.IsBanned {
+		return nil
+	}
+
+	count, err := countActiveAdmins(db)
+	if err != nil {
+		return err
+	}
+	if count <= 1 {
+		return errors.New(message)
+	}
+
+	return nil
+}
+
 func passwordMigration(db *sql.DB, cache *redis.Client, id int64, password string) error {
 	password = strings.TrimSpace(password)
 	if len(password) < 6 || len(password) > 36 {
@@ -250,6 +312,20 @@ func emailMigration(db *sql.DB, id int64, email string) error {
 }
 
 func setAdmin(db *sql.DB, id int64, isAdmin bool) error {
+	if !isAdmin {
+		if err := ensureCanDisableActiveAdmin(db, id, "cannot remove the last active admin"); err != nil {
+			return err
+		}
+	} else {
+		state, err := getUserAdminState(db, id)
+		if err != nil {
+			return err
+		}
+		if !state.Exists {
+			return fmt.Errorf("user not found")
+		}
+	}
+
 	_, err := globals.ExecDb(db, `
 		UPDATE auth SET is_admin = ? WHERE id = ?
 	`, isAdmin, id)
@@ -258,6 +334,20 @@ func setAdmin(db *sql.DB, id int64, isAdmin bool) error {
 }
 
 func banUser(db *sql.DB, id int64, isBanned bool) error {
+	if isBanned {
+		if err := ensureCanDisableActiveAdmin(db, id, "cannot ban the last active admin"); err != nil {
+			return err
+		}
+	} else {
+		state, err := getUserAdminState(db, id)
+		if err != nil {
+			return err
+		}
+		if !state.Exists {
+			return fmt.Errorf("user not found")
+		}
+	}
+
 	_, err := globals.ExecDb(db, `
 		UPDATE auth SET is_banned = ? WHERE id = ?
 	`, isBanned, id)
@@ -289,12 +379,17 @@ func deleteUser(db *sql.DB, cache *redis.Client, id int64) error {
 		return fmt.Errorf("invalid user id")
 	}
 
-	var exists int64
-	if err := globals.QueryRowDb(db, "SELECT COUNT(*) FROM auth WHERE id = ?", id).Scan(&exists); err != nil {
+	state, err := getUserAdminState(db, id)
+	if err != nil {
 		return err
 	}
-	if exists == 0 {
+	if !state.Exists {
 		return fmt.Errorf("user not found")
+	}
+	if state.IsAdmin && !state.IsBanned {
+		if err := ensureCanDisableActiveAdmin(db, id, "cannot delete the last active admin"); err != nil {
+			return err
+		}
 	}
 
 	tx, err := db.Begin()
@@ -348,6 +443,34 @@ func batchUsers(db *sql.DB, ids []int64, action string, value float32) error {
 	case "ban", "unban", "add_quota":
 	default:
 		return fmt.Errorf("invalid batch action")
+	}
+
+	if action == "ban" {
+		activeAdmins, err := countActiveAdmins(db)
+		if err != nil {
+			return err
+		}
+
+		seen := make(map[int64]bool)
+		selectedActiveAdmins := int64(0)
+		for _, id := range ids {
+			if id <= 0 || seen[id] {
+				continue
+			}
+			seen[id] = true
+
+			state, err := getUserAdminState(db, id)
+			if err != nil {
+				return err
+			}
+			if state.Exists && state.IsAdmin && !state.IsBanned {
+				selectedActiveAdmins++
+			}
+		}
+
+		if activeAdmins > 0 && activeAdmins-selectedActiveAdmins <= 0 {
+			return fmt.Errorf("cannot ban the last active admin")
+		}
 	}
 
 	tx, err := db.Begin()
