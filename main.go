@@ -16,24 +16,43 @@ import (
 	"chat/middleware"
 	"chat/utils"
 	"fmt"
+	"net/url"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
-	"net/url"
 )
+
+func normalizeAllowedOriginHost(origin string) string {
+	origin = strings.TrimSpace(origin)
+	if origin == "" {
+		return ""
+	}
+
+	if parsed, err := url.Parse(origin); err == nil && parsed.Host != "" {
+		origin = parsed.Host
+	} else if parsed, err := url.Parse("//" + origin); err == nil && parsed.Host != "" {
+		origin = parsed.Host
+	} else {
+		return ""
+	}
+
+	origin = strings.TrimSuffix(origin, "/")
+	if strings.HasPrefix(origin, "www.") {
+		origin = origin[4:]
+	}
+	return origin
+}
 
 func readCorsOrigins() {
 	origins := viper.GetStringSlice("allow_origins")
 	if len(origins) > 0 {
-		globals.AllowedOrigins = utils.Each(origins, func(origin string) string {
-			// remove protocol and trailing slash
-			// e.g. https://chatnio.net/ -> chatnio.net
-
-			if host, err := url.Parse(origin); err == nil {
-				return host.Host
+		globals.AllowedOrigins = make([]string, 0, len(origins))
+		for _, origin := range origins {
+			if host := normalizeAllowedOriginHost(origin); host != "" {
+				globals.AllowedOrigins = append(globals.AllowedOrigins, host)
 			}
-
-			return origin
-		})
+		}
 	}
 }
 
