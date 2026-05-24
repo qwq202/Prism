@@ -1739,6 +1739,7 @@
     "bind-passkey": "Bind passkey",
     "passkey-default-name": "My passkey",
     "passkey-bound": "Passkey bound",
+    "passkey-cancelled": "Passkey binding was canceled",
     "passkey-removed": "Passkey removed",
     "passkey-unsupported": "Passkeys are not supported by the current browser or environment",
     "passkey-created-at": "Created at: {{time}}",

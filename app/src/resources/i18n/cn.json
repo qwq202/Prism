@@ -1836,6 +1836,7 @@
     "bind-passkey": "绑定通行密钥",
     "passkey-default-name": "我的通行密钥",
     "passkey-bound": "通行密钥已绑定",
+    "passkey-cancelled": "通行密钥绑定已取消",
     "passkey-removed": "通行密钥已移除",
     "passkey-unsupported": "当前浏览器或环境不支持通行密钥",
     "passkey-created-at": "创建时间：{{time}}",

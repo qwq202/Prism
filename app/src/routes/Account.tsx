@@ -79,6 +79,7 @@ import { toast } from "sonner";
 import Emoji from "@/components/Emoji";
 import { motion } from "framer-motion";
 import { isEmailValid, isTextInRange } from "@/utils/form.ts";
+import { getErrorMessage } from "@/utils/base.ts";
 
 type AccountCardProps = {
   title: string;
@@ -422,55 +423,72 @@ function Account() {
       return;
     }
 
-    const resp = await createPasskeyRegistrationOptions();
-    if (!resp.status || !resp.data) {
-      withNotify(t, resp);
-      return;
-    }
+    try {
+      const resp = await createPasskeyRegistrationOptions();
+      if (!resp.status || !resp.data) {
+        withNotify(t, resp);
+        return;
+      }
 
-    const options = resp.data.publicKey;
-    const authenticatorSelection = {
-      ...options.authenticatorSelection,
-    } as AuthenticatorSelectionCriteria;
+      const options = resp.data.publicKey;
+      const authenticatorSelection = {
+        ...options.authenticatorSelection,
+      } as AuthenticatorSelectionCriteria;
 
-    if (!authenticatorSelection.authenticatorAttachment) {
-      delete authenticatorSelection.authenticatorAttachment;
-    }
+      if (!authenticatorSelection.authenticatorAttachment) {
+        delete authenticatorSelection.authenticatorAttachment;
+      }
 
-    const credential = (await navigator.credentials.create({
-      publicKey: {
-        ...options,
-        challenge: base64urlToBuffer(options.challenge),
-        user: {
-          ...options.user,
-          id: base64urlToBuffer(options.user.id),
+      const credential = (await navigator.credentials.create({
+        publicKey: {
+          ...options,
+          challenge: base64urlToBuffer(options.challenge),
+          user: {
+            ...options.user,
+            id: base64urlToBuffer(options.user.id),
+          },
+          excludeCredentials: options.excludeCredentials.map((item) => ({
+            type: item.type,
+            id: base64urlToBuffer(item.id),
+          })),
+          authenticatorSelection,
         },
-        excludeCredentials: options.excludeCredentials.map((item) => ({
-          type: item.type,
-          id: base64urlToBuffer(item.id),
-        })),
-        authenticatorSelection,
-      },
-    })) as PublicKeyCredential | null;
+      })) as PublicKeyCredential | null;
 
-    if (!credential) {
-      return;
-    }
+      if (!credential) {
+        toast.warning(t("error"), {
+          description: t("account.passkey-cancelled"),
+        });
+        return;
+      }
 
-    const response = credential.response as AuthenticatorAttestationResponse;
-    const registerResp = await registerPasskey({
-      name: t("account.passkey-default-name"),
-      id: credential.id,
-      raw_id: bufferToBase64url(credential.rawId),
-      type: credential.type,
-      client_data_json: bufferToBase64url(response.clientDataJSON),
-      attestation_object: bufferToBase64url(response.attestationObject),
-      transports: response.getTransports?.() ?? [],
-    });
+      const response = credential.response as AuthenticatorAttestationResponse;
+      const registerResp = await registerPasskey({
+        name: t("account.passkey-default-name"),
+        id: credential.id,
+        raw_id: bufferToBase64url(credential.rawId),
+        type: credential.type,
+        client_data_json: bufferToBase64url(response.clientDataJSON),
+        attestation_object: bufferToBase64url(response.attestationObject),
+        transports: response.getTransports?.() ?? [],
+      });
 
-    withNotify(t, registerResp, true, t("account.passkey-bound"));
-    if (registerResp.status) {
-      await refreshPasskeys();
+      withNotify(t, registerResp, true, t("account.passkey-bound"));
+      if (registerResp.status) {
+        await refreshPasskeys();
+      }
+    } catch (err) {
+      console.debug(err);
+      if (err instanceof DOMException && err.name === "NotAllowedError") {
+        toast.warning(t("error"), {
+          description: t("account.passkey-cancelled"),
+        });
+        return;
+      }
+
+      toast.error(t("error"), {
+        description: getErrorMessage(err),
+      });
     }
   }
 

@@ -1716,6 +1716,7 @@
     "bind-passkey": "Привязать passkey",
     "passkey-default-name": "Мой passkey",
     "passkey-bound": "Passkey привязан",
+    "passkey-cancelled": "Привязка passkey отменена",
     "passkey-removed": "Passkey удален",
     "passkey-unsupported": "Текущий браузер или среда не поддерживает passkey",
     "passkey-created-at": "Создано: {{time}}",

@@ -1832,6 +1832,7 @@
     "bind-passkey": "綁定通行密鑰",
     "passkey-default-name": "我的通行密鑰",
     "passkey-bound": "通行密鑰已綁定",
+    "passkey-cancelled": "通行密鑰綁定已取消",
     "passkey-removed": "通行密鑰已移除",
     "passkey-unsupported": "目前瀏覽器或環境不支援通行密鑰",
     "passkey-created-at": "建立時間：{{time}}",

@@ -1711,6 +1711,7 @@
     "bind-passkey": "パスキーを紐づけ",
     "passkey-default-name": "マイパスキー",
     "passkey-bound": "パスキーを紐づけました",
+    "passkey-cancelled": "パスキーの紐づけをキャンセルしました",
     "passkey-removed": "パスキーを削除しました",
     "passkey-unsupported": "現在のブラウザまたは環境はパスキーに対応していません",
     "passkey-created-at": "作成日時：{{time}}",
