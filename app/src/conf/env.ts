@@ -7,12 +7,31 @@ export let appLogo =
   localStorage.getItem("app_logo") ||
   import.meta.env.VITE_APP_LOGO ||
   "/favicon.svg";
-export let docsEndpoint =
-  localStorage.getItem("docs_url") ||
-  import.meta.env.VITE_DOCS_ENDPOINT ||
-  "https://coai.dev";
-export let buyLink =
-  localStorage.getItem("buy_link") || import.meta.env.VITE_BUY_LINK || "";
+const safeExternalProtocols = new Set(["http:", "https:", "mailto:", "tel:"]);
+
+function normalizeExternalUrl(
+  url: string | null | undefined,
+  fallback: string,
+) {
+  const value = (url || "").trim();
+  if (!value) return fallback;
+
+  try {
+    const parsed = new URL(value, window.location.href);
+    return safeExternalProtocols.has(parsed.protocol) ? parsed.href : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export let docsEndpoint = normalizeExternalUrl(
+  localStorage.getItem("docs_url") || import.meta.env.VITE_DOCS_ENDPOINT,
+  "https://coai.dev",
+);
+export let buyLink = normalizeExternalUrl(
+  localStorage.getItem("buy_link") || import.meta.env.VITE_BUY_LINK,
+  "",
+);
 
 export const useDeeptrain = !!import.meta.env.VITE_USE_DEEPTRAIN;
 export const backendEndpoint = normalizeBackendEndpoint(
@@ -98,7 +117,7 @@ export function setDocsUrl(url: string): void {
   /**
    * set the docs url in localStorage
    */
-  url = url.trim() || "https://coai.dev";
+  url = normalizeExternalUrl(url, "https://coai.dev");
   setMemory("docs_url", url);
   docsEndpoint = url;
 }
@@ -107,7 +126,7 @@ export function setBuyLink(link: string): void {
   /**
    * set the buy link in localStorage
    */
-  link = link.trim() || "";
+  link = normalizeExternalUrl(link, "");
   setMemory("buy_link", link);
   buyLink = link;
 }

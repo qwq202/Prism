@@ -3,6 +3,8 @@ import { getErrorMessage } from "@/utils/base.ts";
 import { extractMessage } from "@/utils/processor.ts";
 import { toast } from "sonner";
 
+const downloadUrlRevokeDelay = 1000;
+
 async function _copyClipboard(text: string) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
     return await navigator.clipboard.writeText(text);
@@ -67,6 +69,18 @@ export function useClipboard() {
   };
 }
 
+function triggerDownload(filename: string, url: string) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  try {
+    a.click();
+  } finally {
+    document.body.removeChild(a);
+  }
+}
+
 export function saveAsFile(filename: string, content: string) {
   /**
    * Save text as file
@@ -77,10 +91,9 @@ export function saveAsFile(filename: string, content: string) {
    * @see https://developer.mozilla.org/en-US/docs/Web/API/Blob
    */
 
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([content]));
-  a.download = filename;
-  a.click();
+  const url = URL.createObjectURL(new Blob([content]));
+  triggerDownload(filename, url);
+  window.setTimeout(() => URL.revokeObjectURL(url), downloadUrlRevokeDelay);
 }
 
 export function saveBlobAsFile(filename: string, blob: Blob) {
@@ -93,10 +106,9 @@ export function saveBlobAsFile(filename: string, blob: Blob) {
    * @see https://developer.mozilla.org/en-US/docs/Web/API/Blob
    */
 
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  a.click();
+  const url = URL.createObjectURL(blob);
+  triggerDownload(filename, url);
+  window.setTimeout(() => URL.revokeObjectURL(url), downloadUrlRevokeDelay);
 }
 
 export function saveImageAsFile(filename: string, data_url: string) {
@@ -108,10 +120,7 @@ export function saveImageAsFile(filename: string, data_url: string) {
    * saveImageAsFile("hello.png", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAABwElEQVRIS+2VwQ3CMBBF/4f7B0Qf4B9
    */
 
-  const a = document.createElement("a");
-  a.href = data_url;
-  a.download = filename;
-  a.click();
+  triggerDownload(filename, data_url);
 }
 
 export function getSelectionText(): string {
