@@ -40,7 +40,7 @@ FROM alpine
 
 # Install dependencies
 RUN apk upgrade --no-cache && \
-    apk add --no-cache wget ca-certificates tzdata && \
+    apk add --no-cache wget ca-certificates tzdata su-exec && \
     (update-ca-certificates 2>/dev/null || true) && \
     addgroup -S chat && \
     adduser -S -G chat chat && \
@@ -59,6 +59,8 @@ COPY --from=backend /backend/config.example.yaml /config.example.yaml
 COPY --from=backend /backend/utils/templates /utils/templates
 COPY --from=backend /backend/addition/article/template.docx /addition/article/template.docx
 COPY --from=frontend --chown=chat:chat /app/dist /app/dist
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 # Volumes
 VOLUME ["/config", "/logs", "/storage"]
@@ -66,7 +68,6 @@ VOLUME ["/config", "/logs", "/storage"]
 # Expose port
 EXPOSE 8094
 
-USER chat
-
 # Run application
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["./chat"]
