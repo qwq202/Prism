@@ -49,6 +49,16 @@ func isSupportedAttachmentContentType(contentType string) bool {
 	return strings.HasPrefix(mediaType, "image/") && mediaType != "image/svg+xml"
 }
 
+func isGenericAttachmentContentType(contentType string) bool {
+	mediaType, _, err := mime.ParseMediaType(strings.TrimSpace(contentType))
+	if err != nil {
+		mediaType = strings.TrimSpace(contentType)
+	}
+
+	mediaType = strings.ToLower(mediaType)
+	return mediaType == "" || mediaType == "application/octet-stream"
+}
+
 func UploadAttachmentAPI(c *gin.Context) {
 	user := auth.RequireAuth(c)
 	if user == nil {
@@ -81,7 +91,7 @@ func UploadAttachmentAPI(c *gin.Context) {
 	}
 
 	headerContentType := file.Header.Get("Content-Type")
-	if headerContentType != "" && !isSupportedAttachmentContentType(headerContentType) {
+	if headerContentType != "" && !isGenericAttachmentContentType(headerContentType) && !isSupportedAttachmentContentType(headerContentType) {
 		attachmentUploadError(c, "only raster image upload is supported")
 		return
 	}

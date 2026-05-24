@@ -2,11 +2,13 @@ package manager
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
+	"os"
 	"strings"
 	"testing"
 
@@ -102,5 +104,39 @@ func TestUploadAttachmentRejectsSpoofedImage(t *testing.T) {
 	}
 	if response.Error != "invalid image data" {
 		t.Fatalf("unexpected error: %q", response.Error)
+	}
+}
+
+func TestUploadAttachmentAcceptsOctetStreamImage(t *testing.T) {
+	previousWorkingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working dir: %v", err)
+	}
+	workingDir := t.TempDir()
+	if err := os.Chdir(workingDir); err != nil {
+		t.Fatalf("chdir temp dir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(previousWorkingDir)
+	})
+
+	image, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=")
+	if err != nil {
+		t.Fatalf("decode png fixture: %v", err)
+	}
+
+	response := attachmentUploadResponse(
+		t,
+		"pixel.png",
+		"application/octet-stream",
+		image,
+		-1,
+	)
+
+	if !response.Status {
+		t.Fatalf("expected octet-stream image upload to pass, got %q", response.Error)
+	}
+	if !strings.HasPrefix(response.Url, "/attachments/") {
+		t.Fatalf("expected local attachment url, got %q", response.Url)
 	}
 }
