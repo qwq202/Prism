@@ -32,8 +32,8 @@ func getErrorBody(resp *http.Response) string {
 		return ""
 	}
 
-	if content, err := io.ReadAll(resp.Body); err == nil {
-		return string(content)
+	if content, truncated, err := readErrorBody(resp.Body); err == nil {
+		return appendTruncatedNotice(string(content), truncated, maxHTTPErrorBodyBytes)
 	}
 
 	return ""

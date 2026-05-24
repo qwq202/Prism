@@ -18,6 +18,11 @@ import (
 	"golang.org/x/net/proxy"
 )
 
+const (
+	maxHTTPLogBodyBytes   = 64 * 1024
+	maxHTTPErrorBodyBytes = 1024 * 1024
+)
+
 func newClient(c []globals.ProxyConfig) *http.Client {
 	client := &http.Client{
 		Timeout: globals.HttpMaxTimeout,
@@ -78,6 +83,40 @@ func newClient(c []globals.ProxyConfig) *http.Client {
 	return client
 }
 
+func truncateLogText(data []byte) (string, bool) {
+	if len(data) <= maxHTTPLogBodyBytes {
+		return string(data), false
+	}
+
+	end := maxHTTPLogBodyBytes
+	for end > 0 && !utf8.Valid(data[:end]) {
+		end--
+	}
+	if end == 0 {
+		end = maxHTTPLogBodyBytes
+	}
+
+	return string(data[:end]), true
+}
+
+func readErrorBody(body io.Reader) ([]byte, bool, error) {
+	data, err := io.ReadAll(io.LimitReader(body, maxHTTPErrorBodyBytes+1))
+	if err != nil {
+		return data, false, err
+	}
+	if len(data) <= maxHTTPErrorBodyBytes {
+		return data, false, nil
+	}
+	return data[:maxHTTPErrorBodyBytes], true, nil
+}
+
+func appendTruncatedNotice(content string, truncated bool, limit int) string {
+	if !truncated {
+		return content
+	}
+	return fmt.Sprintf("%s\n...[truncated to %s]", content, formatSize(limit))
+}
+
 func fillHeaders(req *http.Request, headers map[string]string) {
 	for key, value := range headers {
 		req.Header.Set(key, value)
@@ -133,7 +172,8 @@ func formatBodyForLog(data []byte, contentType string) string {
 		return fmt.Sprintf("[Binary Content] Type: %s, Size: %s (%d bytes)", detectedType, sizeStr, size)
 	}
 
-	return string(data)
+	content, truncated := truncateLogText(data)
+	return appendTruncatedNotice(content, truncated, maxHTTPLogBodyBytes)
 }
 
 func formatSize(bytes int) string {
@@ -367,11 +407,13 @@ func EventSource(method string, uri string, headers map[string]string, body inte
 			globals.Debug(fmt.Sprintf("[http-stream] request failed with status: %s\nresponse: %s", res.Status, res.Body))
 		}
 
-		if content, err := io.ReadAll(res.Body); err == nil {
+		if content, truncated, err := readErrorBody(res.Body); err == nil {
 			if form, err := Unmarshal[map[string]interface{}](content); err == nil {
 				data := MarshalWithIndent(form, 2)
-				return fmt.Errorf("request failed with status: %s\n```json\n%s\n```", res.Status, data)
+				return fmt.Errorf("request failed with status: %s\n```json\n%s\n```", res.Status, appendTruncatedNotice(data, truncated, maxHTTPErrorBodyBytes))
 			}
+
+			return fmt.Errorf("request failed with status: %s\n%s", res.Status, appendTruncatedNotice(string(content), truncated, maxHTTPErrorBodyBytes))
 		}
 
 		return fmt.Errorf("request failed with status: %s", res.Status)
