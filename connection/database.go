@@ -53,25 +53,27 @@ func getConn() *sql.DB {
 		mysqlUrl += "?tls=tls"
 	}
 
-	// connect to MySQL
-	db, err := sql.Open("mysql", mysqlUrl)
+	for {
+		db, err := sql.Open("mysql", mysqlUrl)
+		if err == nil {
+			err = db.Ping()
+		}
+		if err == nil {
+			globals.Debug(fmt.Sprintf("[connection] connected to mysql server (host: %s)", viper.GetString("mysql.host")))
+			return db
+		}
 
-	if pingErr := db.Ping(); err != nil || pingErr != nil {
-		errMsg := utils.Multi[string](err != nil, utils.GetError(err), utils.GetError(pingErr)) // err.Error() may contain nil pointer
 		globals.Warn(
 			fmt.Sprintf("[connection] failed to connect to mysql server: %s (message: %s), will retry in 5 seconds",
-				viper.GetString("mysql.host"), errMsg,
+				viper.GetString("mysql.host"), utils.GetError(err),
 			),
 		)
 
+		if db != nil {
+			_ = db.Close()
+		}
 		utils.Sleep(5000)
-		db.Close()
-
-		return getConn()
 	}
-
-	globals.Debug(fmt.Sprintf("[connection] connected to mysql server (host: %s)", viper.GetString("mysql.host")))
-	return db
 }
 
 func ConnectDatabase() *sql.DB {

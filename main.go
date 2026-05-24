@@ -15,13 +15,26 @@ import (
 	"chat/manager/memory"
 	"chat/middleware"
 	"chat/utils"
+	"context"
+	"database/sql"
+	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
 	"github.com/spf13/viper"
 )
+
+const healthCheckTimeout = 2 * time.Second
+
+type healthDependency struct {
+	Status string `json:"status"`
+	Error  string `json:"error,omitempty"`
+}
 
 func normalizeAllowedOriginHost(origin string) string {
 	origin = strings.TrimSpace(origin)
@@ -53,6 +66,79 @@ func readCorsOrigins() {
 				globals.AllowedOrigins = append(globals.AllowedOrigins, host)
 			}
 		}
+	}
+}
+
+func checkDatabase(ctx context.Context, db *sql.DB) error {
+	if db == nil {
+		return errors.New("database is not initialized")
+	}
+	return db.PingContext(ctx)
+}
+
+func checkRedis(ctx context.Context, cache *redis.Client) error {
+	if cache == nil {
+		return errors.New("redis is not initialized")
+	}
+	return cache.Ping(ctx).Err()
+}
+
+func dependencyHealth(ctx context.Context, check func(context.Context) error) healthDependency {
+	if err := check(ctx); err != nil {
+		return healthDependency{
+			Status: "unavailable",
+			Error:  err.Error(),
+		}
+	}
+
+	return healthDependency{Status: "ok"}
+}
+
+func healthHTTPStatus(dependencies ...healthDependency) int {
+	for _, dependency := range dependencies {
+		if dependency.Status != "ok" {
+			return http.StatusServiceUnavailable
+		}
+	}
+	return http.StatusOK
+}
+
+func buildHealthResponse(ctx context.Context, db *sql.DB, cache *redis.Client) (int, gin.H) {
+	databaseHealth := dependencyHealth(ctx, func(ctx context.Context) error {
+		return checkDatabase(ctx, db)
+	})
+	redisHealth := dependencyHealth(ctx, func(ctx context.Context) error {
+		return checkRedis(ctx, cache)
+	})
+
+	status := healthHTTPStatus(databaseHealth, redisHealth)
+	overall := "ok"
+	if status != http.StatusOK {
+		overall = "unavailable"
+	}
+
+	return status, gin.H{
+		"status":   overall,
+		"database": databaseHealth,
+		"redis":    redisHealth,
+	}
+}
+
+func healthHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), healthCheckTimeout)
+		defer cancel()
+
+		status, response := buildHealthResponse(ctx, connection.DB, connection.Cache)
+		c.JSON(status, response)
+	}
+}
+
+func registerHealthRoutes(engine *gin.Engine) {
+	handler := healthHandler()
+	engine.GET("/health", handler)
+	if viper.GetBool("serve_static") {
+		engine.GET("/api/health", handler)
 	}
 }
 
@@ -90,6 +176,7 @@ func main() {
 	defer worker()
 	conversation.StartOrphanAttachmentCleanupWorker(connection.DB)
 
+	registerHealthRoutes(app)
 	utils.RegisterStaticRoute(app)
 	registerApiRouter(app)
 	readCorsOrigins()

@@ -68,6 +68,9 @@ VOLUME ["/config", "/logs", "/storage"]
 # Expose port
 EXPOSE 8094
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD sh -c 'wget -qO- "http://127.0.0.1:${SERVER_PORT:-8094}/health" >/dev/null || exit 1'
+
 # Run application
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["./chat"]
