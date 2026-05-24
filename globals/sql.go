@@ -73,6 +73,11 @@ func PreflightSql(sql string) string {
 					"INSERT INTO conversation (user_id, conversation_id, conversation_name, data, model, task_id) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, conversation_id) DO UPDATE SET conversation_name = excluded.conversation_name, data = excluded.data, model = excluded.model, task_id = excluded.task_id, updated_at = CURRENT_TIMESTAMP",
 					false,
 				},
+				{
+					`INSERT INTO sharing \(hash, user_id, conversation_id, refs\) VALUES \(\?, \?, \?, \?\)\s+ON DUPLICATE KEY UPDATE refs = \?, updated_at = CURRENT_TIMESTAMP`,
+					"INSERT INTO sharing (hash, user_id, conversation_id, refs) VALUES (?, ?, ?, ?) ON CONFLICT(hash) DO UPDATE SET refs = ?, updated_at = CURRENT_TIMESTAMP",
+					true,
+				},
 			})
 		}
 
