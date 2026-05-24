@@ -442,6 +442,31 @@
     "empty": "Generating...",
     "download": "Download {{name}} format"
   },
+  "drawing": {
+    "model": "Model",
+    "manage": "Manage",
+    "selectModel": "Select model",
+    "noModels": "No models available",
+    "noModelsPrompt": "Add a model and set its endpoint type to image generation to start creating.",
+    "goSettings": "Go to settings",
+    "mode": {
+      "generate": "Draw",
+      "edit": "Edit"
+    },
+    "emptyTitle": "Start creating",
+    "emptyPrompt": "Describe the image you want below, and AI will create it.",
+    "promptLabel": "Image prompt",
+    "promptHint": "· Wrap exact text in double quotes",
+    "uploadReference": "Upload reference image",
+    "promptPlaceholder": "Describe the image you want to generate...",
+    "tools": {
+      "translate": "Translate",
+      "style": "Style",
+      "ratio": "Ratio"
+    },
+    "advanced": "Advanced settings",
+    "generateImage": "Generate image"
+  },
   "service": {
     "title": "New Version Available",
     "version": "Version",

@@ -22,11 +22,12 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/components/ui/lib/utils";
+import { useTranslation } from "react-i18next";
 
 type Mode = "generate" | "edit";
 
-
 function Drawing() {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<Mode>("generate");
   const [prompt, setPrompt] = useState("");
   const [focused, setFocused] = useState(false);
@@ -39,15 +40,17 @@ function Drawing() {
           {/* Provider */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">模型</label>
+              <label className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+                {t("drawing.model")}
+              </label>
               <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors group">
                 <Settings className="w-3 h-3 group-hover:rotate-45 transition-transform duration-300" />
-                管理
+                {t("drawing.manage")}
               </button>
             </div>
             <Select defaultValue="openai">
               <SelectTrigger className="w-full h-10 text-sm border-border/60 bg-background/60">
-                <SelectValue placeholder="选择模型" />
+                <SelectValue placeholder={t("drawing.selectModel")} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="openai">OpenAI (DALL-E 3)</SelectItem>
@@ -68,13 +71,15 @@ function Drawing() {
               </div>
             </div>
             <div className="space-y-1.5 px-2">
-              <p className="text-sm font-medium text-foreground/80">暂无可用模型</p>
+              <p className="text-sm font-medium text-foreground/80">
+                {t("drawing.noModels")}
+              </p>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                新增模型并设置端点类型为图像生成以开始创作
+                {t("drawing.noModelsPrompt")}
               </p>
             </div>
             <button className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors group">
-              去设置
+              {t("drawing.goSettings")}
               <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
             </button>
           </div>
@@ -106,7 +111,7 @@ function Drawing() {
                 )}
                 aria-pressed={mode === m}
               >
-                {m === "generate" ? "绘图" : "编辑"}
+                {t(`drawing.mode.${m}`)}
               </button>
             ))}
           </div>
@@ -118,8 +123,12 @@ function Drawing() {
             <div className="w-14 h-14 rounded-3xl bg-gradient-to-br from-violet-500/15 via-blue-500/10 to-transparent border border-border/50 flex items-center justify-center mb-1 shadow-inner">
               <Sparkles className="w-6 h-6 text-muted-foreground/50" />
             </div>
-            <p className="text-base font-semibold text-foreground/70 tracking-wide">开始你的创作</p>
-            <p className="text-sm text-muted-foreground/50">在下方描述你想要的图像，AI 将为你实现</p>
+            <p className="text-base font-semibold text-foreground/70 tracking-wide">
+              {t("drawing.emptyTitle")}
+            </p>
+            <p className="text-sm text-muted-foreground/50">
+              {t("drawing.emptyPrompt")}
+            </p>
           </div>
         </div>
 
@@ -140,12 +149,16 @@ function Drawing() {
                 <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-foreground text-background">
                   <Wand2 className="h-3 w-3" />
                 </div>
-                <span className="text-[13px] font-semibold text-foreground">图像提示词</span>
-                <span className="text-[11px] text-muted-foreground/50 hidden sm:inline">· 支持中文，文本用"双引号"包裹</span>
+                <span className="text-[13px] font-semibold text-foreground">
+                  {t("drawing.promptLabel")}
+                </span>
+                <span className="text-[11px] text-muted-foreground/50 hidden sm:inline">
+                  {t("drawing.promptHint")}
+                </span>
               </div>
               <button
                 className="rounded-md p-1.5 text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50 transition-all duration-150"
-                title="上传参考图"
+                title={t("drawing.uploadReference")}
               >
                 <Upload className="h-3.5 w-3.5" />
               </button>
@@ -158,29 +171,29 @@ function Drawing() {
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
               className="min-h-[84px] w-full resize-none border-0 bg-transparent px-4 py-3 text-sm leading-relaxed text-foreground shadow-none placeholder:text-muted-foreground/35 focus-visible:ring-0 focus-visible:ring-offset-0"
-              placeholder='描述你想生成的图像...'
+              placeholder={t("drawing.promptPlaceholder")}
             />
 
             {/* Toolbar */}
             <div className="flex items-center justify-between px-2.5 pb-2.5 gap-2">
               <div className="flex items-center">
                 {[
-                  { icon: Languages, label: "翻译" },
-                  { icon: Palette, label: "风格" },
-                  { icon: Ratio, label: "比例" },
-                ].map(({ icon: Icon, label }) => (
+                  { icon: Languages, key: "translate" },
+                  { icon: Palette, key: "style" },
+                  { icon: Ratio, key: "ratio" },
+                ].map(({ icon: Icon, key }) => (
                   <button
-                    key={label}
+                    key={key}
                     className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs text-muted-foreground/70 hover:text-foreground hover:bg-muted/50 transition-all duration-150 font-medium"
                   >
                     <Icon className="h-3.5 w-3.5" />
-                    {label}
+                    {t(`drawing.tools.${key}`)}
                   </button>
                 ))}
                 <div className="mx-1 h-4 w-px bg-border/60" />
                 <button
                   className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50 transition-all duration-150"
-                  title="高级参数"
+                  title={t("drawing.advanced")}
                 >
                   <SlidersHorizontal className="h-3.5 w-3.5" />
                 </button>
@@ -194,8 +207,8 @@ function Drawing() {
                     ? "bg-foreground text-background hover:opacity-85 active:scale-[0.96] shadow-sm"
                     : "bg-muted/60 text-muted-foreground/40 cursor-not-allowed"
                 )}
-                aria-label="生成图片"
-                title="生成图片"
+                aria-label={t("drawing.generateImage")}
+                title={t("drawing.generateImage")}
               >
                 <ArrowUp className="h-4 w-4" />
               </button>

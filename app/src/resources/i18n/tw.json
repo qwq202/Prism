@@ -518,6 +518,31 @@
     "empty": "產生中...",
     "download": "下載 {{name}} 格式"
   },
+  "drawing": {
+    "model": "模型",
+    "manage": "管理",
+    "selectModel": "選擇模型",
+    "noModels": "暫無可用模型",
+    "noModelsPrompt": "新增模型並設定端點類型為圖像生成以開始創作",
+    "goSettings": "去設定",
+    "mode": {
+      "generate": "繪圖",
+      "edit": "編輯"
+    },
+    "emptyTitle": "開始你的創作",
+    "emptyPrompt": "在下方描述你想要的圖像，AI 將為你實現",
+    "promptLabel": "圖像提示詞",
+    "promptHint": "· 支援中文，文字用\"雙引號\"包裹",
+    "uploadReference": "上傳參考圖",
+    "promptPlaceholder": "描述你想生成的圖像...",
+    "tools": {
+      "translate": "翻譯",
+      "style": "風格",
+      "ratio": "比例"
+    },
+    "advanced": "進階參數",
+    "generateImage": "生成圖片"
+  },
   "service": {
     "title": "發現新版本",
     "version": "版本",

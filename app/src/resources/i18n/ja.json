@@ -442,6 +442,31 @@
     "empty": "生成しています...",
     "download": "{{name}}形式をダウンロード"
   },
+  "drawing": {
+    "model": "モデル",
+    "manage": "管理",
+    "selectModel": "モデルを選択",
+    "noModels": "利用可能なモデルがありません",
+    "noModelsPrompt": "モデルを追加し、エンドポイント種別を画像生成に設定して作成を始めましょう。",
+    "goSettings": "設定へ",
+    "mode": {
+      "generate": "描画",
+      "edit": "編集"
+    },
+    "emptyTitle": "作成を始めましょう",
+    "emptyPrompt": "下に作りたい画像を説明すると、AI が生成します。",
+    "promptLabel": "画像プロンプト",
+    "promptHint": "· 正確な文字はダブルクォートで囲んでください",
+    "uploadReference": "参照画像をアップロード",
+    "promptPlaceholder": "生成したい画像を説明してください...",
+    "tools": {
+      "translate": "翻訳",
+      "style": "スタイル",
+      "ratio": "比率"
+    },
+    "advanced": "詳細設定",
+    "generateImage": "画像を生成"
+  },
   "service": {
     "title": "新しいバージョンを発見する",
     "version": "バージョン",
