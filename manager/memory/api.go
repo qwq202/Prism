@@ -21,6 +21,21 @@ type updateForm struct {
 	Category string `json:"category"`
 }
 
+type deleteForm struct {
+	ID int64 `json:"id"`
+}
+
+func getDeleteID(c *gin.Context) (int64, error) {
+	if c.Request.Method == http.MethodPost {
+		var form deleteForm
+		if err := c.ShouldBindJSON(&form); err == nil {
+			return form.ID, nil
+		}
+	}
+
+	return strconv.ParseInt(c.Query("id"), 10, 64)
+}
+
 func ListAPI(c *gin.Context) {
 	user := auth.GetUser(c)
 	if user == nil {
@@ -101,7 +116,7 @@ func DeleteAPI(c *gin.Context) {
 		return
 	}
 
-	id, err := strconv.ParseInt(c.Query("id"), 10, 64)
+	id, err := getDeleteID(c)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status": false, "message": "invalid id"})
 		return

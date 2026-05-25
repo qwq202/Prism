@@ -8,6 +8,7 @@ func Register(app *gin.RouterGroup) {
 		router.GET("/list", ListAPI)
 		router.POST("/create", CreateAPI)
 		router.POST("/update", UpdateAPI)
+		router.POST("/delete", DeleteAPI)
 		router.GET("/delete", DeleteAPI)
 	}
 }

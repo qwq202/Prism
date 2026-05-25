@@ -65,7 +65,7 @@ export async function updateMemory(
 
 export async function deleteMemory(id: number): Promise<MemoryMutationResponse> {
   try {
-    const resp = await axios.get(`/memory/delete?id=${id}`);
+    const resp = await axios.post("/memory/delete", { id });
     return resp.data as MemoryMutationResponse;
   } catch (e) {
     return { status: false, message: getErrorMessage(e) };
