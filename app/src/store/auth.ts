@@ -72,6 +72,16 @@ function clearInvalidToken(dispatch: AppDispatch) {
   );
 }
 
+function keepTokenForRetry(dispatch: AppDispatch) {
+  dispatch(
+    authSlice.actions.updateData({
+      authenticated: false,
+      username: "",
+      admin: false,
+    }),
+  );
+}
+
 export function validateToken(
   dispatch: AppDispatch,
   token: string,
@@ -104,7 +114,7 @@ export function validateToken(
     })
     .catch((err) => {
       console.debug(err);
-      clearInvalidToken(dispatch);
+      keepTokenForRetry(dispatch);
     });
 }
 
