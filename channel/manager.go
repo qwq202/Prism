@@ -15,6 +15,10 @@ var ChargeInstance *ChargeManager
 var SystemInstance *SystemConfig
 var PlanInstance *PlanManager
 
+var saveChannelConfig = func(seq Sequence) error {
+	return utils.SaveConfig("channel", seq)
+}
+
 func InitManager() {
 	ConduitInstance = NewChannelManager()
 	ChargeInstance = NewChargeManager()
@@ -151,7 +155,7 @@ func (m *Manager) GetMaxId() int {
 }
 
 func (m *Manager) SaveConfig() error {
-	return utils.SaveConfig("channel", m.Sequence)
+	return saveChannelConfig(m.Sequence)
 }
 
 func (m *Manager) CreateChannel(channel *Channel) error {
@@ -159,8 +163,12 @@ func (m *Manager) CreateChannel(channel *Channel) error {
 		return err
 	}
 	channel.Id = m.GetMaxId() + 1
-	m.Sequence = append(m.Sequence, channel)
-	return m.SaveConfig()
+	next := append(append(Sequence(nil), m.Sequence...), channel)
+	if err := saveChannelConfig(next); err != nil {
+		return err
+	}
+	m.Sequence = next
+	return nil
 }
 
 func (m *Manager) UpdateChannel(id int, channel *Channel) error {
@@ -169,8 +177,13 @@ func (m *Manager) UpdateChannel(id int, channel *Channel) error {
 	}
 	for i, item := range m.Sequence {
 		if item.Id == id {
-			m.Sequence[i] = channel
-			return m.SaveConfig()
+			next := append(Sequence(nil), m.Sequence...)
+			next[i] = channel
+			if err := saveChannelConfig(next); err != nil {
+				return err
+			}
+			m.Sequence = next
+			return nil
 		}
 	}
 	return errors.New("channel not found")
@@ -179,8 +192,13 @@ func (m *Manager) UpdateChannel(id int, channel *Channel) error {
 func (m *Manager) DeleteChannel(id int) error {
 	for i, item := range m.Sequence {
 		if item.Id == id {
-			m.Sequence = append(m.Sequence[:i], m.Sequence[i+1:]...)
-			return m.SaveConfig()
+			next := append(Sequence(nil), m.Sequence[:i]...)
+			next = append(next, m.Sequence[i+1:]...)
+			if err := saveChannelConfig(next); err != nil {
+				return err
+			}
+			m.Sequence = next
+			return nil
 		}
 	}
 	return errors.New("channel not found")
@@ -189,8 +207,14 @@ func (m *Manager) DeleteChannel(id int) error {
 func (m *Manager) ActivateChannel(id int) error {
 	for i, item := range m.Sequence {
 		if item.Id == id {
-			m.Sequence[i].State = true
-			return m.SaveConfig()
+			next := append(Sequence(nil), m.Sequence...)
+			next[i] = cloneChannel(item)
+			next[i].State = true
+			if err := saveChannelConfig(next); err != nil {
+				return err
+			}
+			m.Sequence = next
+			return nil
 		}
 	}
 	return errors.New("channel not found")
@@ -199,11 +223,25 @@ func (m *Manager) ActivateChannel(id int) error {
 func (m *Manager) DeactivateChannel(id int) error {
 	for i, item := range m.Sequence {
 		if item.Id == id {
-			m.Sequence[i].State = false
-			return m.SaveConfig()
+			next := append(Sequence(nil), m.Sequence...)
+			next[i] = cloneChannel(item)
+			next[i].State = false
+			if err := saveChannelConfig(next); err != nil {
+				return err
+			}
+			m.Sequence = next
+			return nil
 		}
 	}
 	return errors.New("channel not found")
+}
+
+func cloneChannel(channel *Channel) *Channel {
+	if channel == nil {
+		return nil
+	}
+	clone := *channel
+	return &clone
 }
 
 func filterRemovedChannels(seq Sequence) (Sequence, int) {

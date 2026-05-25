@@ -65,6 +65,10 @@ type subscriptionPointUsageWindow struct {
 	resetInterval int64
 }
 
+var savePlanConfig = func(manager *PlanManager) error {
+	return manager.SaveConfig()
+}
+
 func NewPlanManager() *PlanManager {
 	manager := &PlanManager{}
 	if err := viper.UnmarshalKey("subscription", manager); err != nil {
@@ -108,9 +112,14 @@ func (c *PlanManager) UpdateConfig(data *PlanManager) error {
 		return err
 	}
 
-	c.Enabled = data.Enabled
-	c.Plans = data.Plans
-	return c.SaveConfig()
+	next := *data
+	if err := savePlanConfig(&next); err != nil {
+		return err
+	}
+
+	c.Enabled = next.Enabled
+	c.Plans = next.Plans
+	return nil
 }
 
 func (c *PlanManager) GetPlan(level int) Plan {

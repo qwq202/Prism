@@ -7,6 +7,10 @@ import (
 	"github.com/spf13/viper"
 )
 
+var saveChargeConfig = func(seq ChargeSequence) error {
+	return utils.SaveConfig("charge", seq)
+}
+
 func NewChargeManager() *ChargeManager {
 	var seq ChargeSequence
 	if err := viper.UnmarshalKey("charge", &seq); err != nil {
@@ -80,7 +84,7 @@ func (m *ChargeManager) GetCharge(model string) *Charge {
 }
 
 func (m *ChargeManager) SaveConfig() error {
-	return utils.SaveConfig("charge", m.Sequence)
+	return saveChargeConfig(m.Sequence)
 }
 
 func (m *ChargeManager) GetMaxId() int {
@@ -99,11 +103,13 @@ func (m *ChargeManager) AddRawRule(charge *Charge) {
 }
 
 func (m *ChargeManager) AddRule(charge Charge) error {
-	m.AddRawRule(&charge)
-	if err := m.SaveConfig(); err != nil {
+	next := m.cloneForMutation()
+	next.AddRawRule(&charge)
+	if err := saveChargeConfig(next.Sequence); err != nil {
 		return err
 	}
 
+	m.Sequence = next.Sequence
 	m.Load()
 	return nil
 }
@@ -118,11 +124,13 @@ func (m *ChargeManager) UpdateRawRule(charge *Charge) {
 }
 
 func (m *ChargeManager) UpdateRule(charge Charge) error {
-	m.UpdateRawRule(&charge)
-	if err := m.SaveConfig(); err != nil {
+	next := m.cloneForMutation()
+	next.UpdateRawRule(&charge)
+	if err := saveChargeConfig(next.Sequence); err != nil {
 		return err
 	}
 
+	m.Sequence = next.Sequence
 	m.Load()
 	return nil
 }
@@ -136,11 +144,13 @@ func (m *ChargeManager) SetRawRule(charge *Charge) {
 }
 
 func (m *ChargeManager) SetRule(charge Charge) error {
-	m.SetRawRule(&charge)
-	if err := m.SaveConfig(); err != nil {
+	next := m.cloneForMutation()
+	next.SetRawRule(&charge)
+	if err := saveChargeConfig(next.Sequence); err != nil {
 		return err
 	}
 
+	m.Sequence = next.Sequence
 	m.Load()
 	return nil
 }
@@ -155,24 +165,28 @@ func (m *ChargeManager) DeleteRawRule(id int) {
 }
 
 func (m *ChargeManager) DeleteRule(id int) error {
-	m.DeleteRawRule(id)
-	if err := m.SaveConfig(); err != nil {
+	next := m.cloneForMutation()
+	next.DeleteRawRule(id)
+	if err := saveChargeConfig(next.Sequence); err != nil {
 		return err
 	}
 
+	m.Sequence = next.Sequence
 	m.Load()
 	return nil
 }
 
 func (m *ChargeManager) SyncRules(charge ChargeSequence, overwrite bool) error {
+	next := m.cloneForMutation()
 	for _, item := range charge {
-		m.SyncRule(item, overwrite)
+		next.SyncRule(cloneChargeRule(item), overwrite)
 	}
 
-	if err := m.SaveConfig(); err != nil {
+	if err := saveChargeConfig(next.Sequence); err != nil {
 		return err
 	}
 
+	m.Sequence = next.Sequence
 	m.Load()
 	return nil
 }
@@ -225,6 +239,29 @@ func (m *ChargeManager) SyncRuleWithoutOverwrite(charge *Charge) {
 
 func (m *ChargeManager) ListRules() ChargeSequence {
 	return m.Sequence
+}
+
+func (m *ChargeManager) cloneForMutation() *ChargeManager {
+	return &ChargeManager{
+		Sequence: cloneChargeSequence(m.Sequence),
+	}
+}
+
+func cloneChargeSequence(seq ChargeSequence) ChargeSequence {
+	clone := make(ChargeSequence, 0, len(seq))
+	for _, item := range seq {
+		clone = append(clone, cloneChargeRule(item))
+	}
+	return clone
+}
+
+func cloneChargeRule(item *Charge) *Charge {
+	if item == nil {
+		return nil
+	}
+	copied := *item
+	copied.Models = append([]string(nil), item.Models...)
+	return &copied
 }
 
 func (m *ChargeManager) Contains(model string) bool {

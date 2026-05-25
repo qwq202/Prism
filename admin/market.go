@@ -42,6 +42,10 @@ type Market struct {
 	Models MarketModelList `json:"models" mapstructure:"models"`
 }
 
+var saveMarketConfig = func(models MarketModelList) error {
+	return utils.SaveConfig("market", models)
+}
+
 func NewMarket() *Market {
 	var models MarketModelList
 	if err := viper.UnmarshalKey("market", &models); err != nil {
@@ -97,10 +101,13 @@ func (m *Market) GetModel(id string) *MarketModel {
 }
 
 func (m *Market) SaveConfig() error {
-	return utils.SaveConfig("market", m.Models)
+	return saveMarketConfig(m.Models)
 }
 
 func (m *Market) SetModels(models MarketModelList) error {
+	if err := saveMarketConfig(models); err != nil {
+		return err
+	}
 	m.Models = models
-	return m.SaveConfig()
+	return nil
 }

@@ -3,6 +3,7 @@ package channel
 import (
 	"chat/globals"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -124,6 +125,46 @@ func TestValidatePlanConfigModels(t *testing.T) {
 
 	if err := validatePlanConfigModels(invalid); err == nil {
 		t.Fatal("expected invalid plan config to be rejected")
+	}
+}
+
+func TestUpdatePlanConfigKeepsRuntimeStateWhenSaveFails(t *testing.T) {
+	originalConduit := ConduitInstance
+	ConduitInstance = nil
+	t.Cleanup(func() {
+		ConduitInstance = originalConduit
+	})
+
+	previousSave := savePlanConfig
+	savePlanConfig = func(*PlanManager) error {
+		return errors.New("simulated save failure")
+	}
+	t.Cleanup(func() {
+		savePlanConfig = previousSave
+	})
+
+	manager := &PlanManager{
+		Enabled: false,
+		Plans: []Plan{
+			{Level: 1, Quota: 10},
+		},
+	}
+	next := &PlanManager{
+		Enabled: true,
+		Plans: []Plan{
+			{Level: 2, Quota: 20},
+		},
+	}
+
+	err := manager.UpdateConfig(next)
+	if err == nil || err.Error() != "simulated save failure" {
+		t.Fatalf("expected simulated save failure, got %v", err)
+	}
+	if manager.Enabled {
+		t.Fatalf("expected enabled flag to remain false")
+	}
+	if len(manager.Plans) != 1 || manager.Plans[0].Level != 1 {
+		t.Fatalf("expected plans to remain unchanged, got %#v", manager.Plans)
 	}
 }
 
