@@ -730,6 +730,14 @@ function UserTable() {
           <Search className={`h-4 w-4`} />
         </Button>
         <Button
+          size={`icon`}
+          classNameWrapper={`flex-shrink-0 ml-2`}
+          onClick={update}
+          aria-label="Refresh users"
+        >
+          <RotateCw className={`h-4 w-4`} />
+        </Button>
+        <Button
           className={`whitespace-nowrap`}
           classNameWrapper={`flex-shrink-0 ml-2`}
           onClick={() => setCreateOpen(true)}
@@ -823,12 +831,6 @@ function UserTable() {
           <p>{t("admin.empty")}</p>
         </div>
       )}
-      <div className={`user-action`}>
-        <div className={`grow`} />
-        <Button variant={`outline`} size={`icon`} onClick={update}>
-          <RotateCw className={`h-4 w-4`} />
-        </Button>
-      </div>
       <div
         className={`fixed bottom-0 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ease-in-out ${
           selected.size > 0
