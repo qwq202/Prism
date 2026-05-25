@@ -769,10 +769,11 @@
   transition: width 0.2s ease-in-out;
 
   .chat-wrapper {
-    display: inline-flex;
+    display: flex;
     flex-direction: column;
     width: 100%;
     height: 100%;
+    min-height: 0;
   }
 
   .tooltip {
@@ -833,13 +834,18 @@
 
   .chat-content {
     overscroll-behavior: none;
-    flex: 1 1;
+    flex: 1 1 0;
+    min-height: 0;
     width: 100%;
     overflow: hidden;
 
+    &.chat-content-placeholder {
+      display: block;
+    }
+
     .chat-messages-wrapper {
       width: 100%;
-      height: 100%;
+      min-height: 100%;
       display: flex;
       flex-direction: column;
       padding: 18px 24px;
@@ -855,7 +861,7 @@
   }
 
   .chat-input {
-    flex-shrink: 0;
+    flex: 0 0 auto;
     width: 100%;
     overflow: hidden;
 

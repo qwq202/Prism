@@ -60,10 +60,17 @@ type InterfaceProps = {
 
 function Interface(props: InterfaceProps) {
   const messages = useMessages();
+  const current = useSelector(selectCurrent);
+  const messageStageFallback = (
+    <div className="chat-content chat-content-placeholder" aria-busy="true" />
+  );
+
   return messages.length > 0 ? (
-    <Suspense fallback={null}>
+    <Suspense fallback={messageStageFallback}>
       <ChatInterface {...props} />
     </Suspense>
+  ) : current !== -1 ? (
+    messageStageFallback
   ) : (
     <ChatSpace />
   );
