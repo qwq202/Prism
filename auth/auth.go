@@ -85,8 +85,22 @@ func ParseToken(c *gin.Context, token string) *User {
 	return nil
 }
 
-func getCode(c *gin.Context, cache *redis.Client, email string) string {
-	code, err := cache.Get(c, fmt.Sprintf("nio:otp:%s", email)).Result()
+func otpKey(email string) string {
+	return fmt.Sprintf("nio:otp:%s", email)
+}
+
+type otpCache interface {
+	Get(ctx context.Context, key string) *redis.StringCmd
+	Set(ctx context.Context, key string, value interface{}, expiration time.Duration) *redis.StatusCmd
+	Del(ctx context.Context, keys ...string) *redis.IntCmd
+}
+
+func getCode(ctx context.Context, cache otpCache, email string) string {
+	if cache == nil {
+		return ""
+	}
+
+	code, err := cache.Get(ctx, otpKey(email)).Result()
 	if err != nil {
 		return ""
 	}
@@ -99,8 +113,8 @@ func constantTimeStringEqual(expected string, actual string) bool {
 	return subtle.ConstantTimeCompare(expectedHash[:], actualHash[:]) == 1 && len(expected) == len(actual)
 }
 
-func checkCode(c *gin.Context, cache *redis.Client, email, code string) bool {
-	storage := getCode(c, cache, email)
+func checkCode(ctx context.Context, cache otpCache, email, code string) bool {
+	storage := getCode(ctx, cache, email)
 	if len(storage) == 0 {
 		return false
 	}
@@ -109,23 +123,25 @@ func checkCode(c *gin.Context, cache *redis.Client, email, code string) bool {
 		return false
 	}
 
-	cache.Del(c, fmt.Sprintf("nio:otp:%s", email))
 	return true
 }
 
-func setCode(c *gin.Context, cache *redis.Client, email, code string) {
-	cache.Set(c, fmt.Sprintf("nio:otp:%s", email), code, 5*time.Minute)
+func deleteCode(ctx context.Context, cache otpCache, email string) {
+	if cache == nil {
+		return
+	}
+	cache.Del(ctx, otpKey(email))
 }
 
-func generateCode(c *gin.Context, cache *redis.Client, email string) string {
-	code := utils.GenerateCode(6)
-	setCode(c, cache, email, code)
-	return code
+func setCode(ctx context.Context, cache otpCache, email, code string) bool {
+	if cache == nil {
+		return false
+	}
+	return cache.Set(ctx, otpKey(email), code, 5*time.Minute).Err() == nil
 }
 
 func Verify(c *gin.Context, email string, checkout bool) error {
 	cache := utils.GetCacheFromContext(c)
-	code := generateCode(c, cache, email)
 
 	if checkout {
 		if err := channel.SystemInstance.IsValidMail(email); err != nil {
@@ -133,7 +149,17 @@ func Verify(c *gin.Context, email string, checkout bool) error {
 		}
 	}
 
-	return channel.SystemInstance.SendVerifyMail(email, code)
+	code := utils.GenerateCode(6)
+	if !setCode(c, cache, email, code) {
+		return errors.New("verification code storage is unavailable")
+	}
+
+	if err := channel.SystemInstance.SendVerifyMail(email, code); err != nil {
+		deleteCode(c, cache, email)
+		return err
+	}
+
+	return nil
 }
 
 func SignUp(c *gin.Context, form RegisterForm) (string, error) {
@@ -193,6 +219,9 @@ func SignUp(c *gin.Context, form RegisterForm) (string, error) {
 	}
 
 	user.CreateInitialQuota(db)
+	if enableVerify {
+		deleteCode(c, cache, email)
+	}
 	return user.GenerateToken()
 }
 
@@ -321,7 +350,7 @@ func Reset(c *gin.Context, form ResetForm) error {
 		return err
 	}
 
-	cache.Del(c, fmt.Sprintf("nio:otp:%s", email))
+	deleteCode(c, cache, email)
 
 	return nil
 }
@@ -380,6 +409,7 @@ func (u *User) UpdateEmail(c *gin.Context, db *sql.DB, cache *redis.Client, emai
 	}
 
 	u.Email = email
+	deleteCode(c, cache, email)
 	return nil
 }
 
@@ -400,7 +430,12 @@ func (u *User) UpdatePasswordWithEmailCode(c *gin.Context, db *sql.DB, cache *re
 		return errors.New("invalid email verification code")
 	}
 
-	return u.UpdatePassword(db, cache, password)
+	if err := u.UpdatePassword(db, cache, password); err != nil {
+		return err
+	}
+
+	deleteCode(c, cache, email)
+	return nil
 }
 
 func (u *User) UpdatePasswordWithOldPassword(db *sql.DB, cache *redis.Client, oldPassword, password string) error {
