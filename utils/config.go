@@ -17,6 +17,7 @@ var configTmpFile = "config/config.tmp.yaml"
 var configBackupFile = "config/config.bak.yaml"
 var configExampleFile = "config.example.yaml"
 var configMutex sync.Mutex
+var renameConfigFile = os.Rename
 
 var redirectRoutes = []string{
 	"/v1",
@@ -54,13 +55,7 @@ func SaveConfig(key string, value interface{}) error {
 		return err
 	}
 
-	if _, err := os.Stat(configFile); err == nil {
-		if removeErr := os.Remove(configFile); removeErr != nil {
-			return removeErr
-		}
-	}
-
-	if err := os.Rename(configTmpFile, configFile); err != nil {
+	if err := renameConfigFile(configTmpFile, configFile); err != nil {
 		return err
 	}
 
