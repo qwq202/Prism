@@ -61,10 +61,11 @@ import { cn } from "@/components/ui/lib/utils.ts";
 import { Switch } from "@/components/ui/switch.tsx";
 import { MultiCombobox } from "@/components/ui/multi-combobox.tsx";
 import { useAllModels, useChannelModels } from "@/admin/hook.tsx";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { selectSupportModels } from "@/store/chat.ts";
 import { JSONEditorProvider } from "@/components/EditorProvider.tsx";
 import { Combobox } from "@/components/ui/combo-box.tsx";
+import { validateToken } from "@/store/auth.ts";
 
 type FormAction = {
   type: string;
@@ -94,6 +95,7 @@ const systemTimeZoneSuggestions = [
 
 function RootDialog() {
   const { t } = useTranslation();
+  const dispatch = useDispatch();
   const [open, setOpen] = useState<boolean>(false);
   const [password, setPassword] = useState<string>("");
   const [repeat, setRepeat] = useState<string>("");
@@ -105,10 +107,9 @@ function RootDialog() {
       setPassword("");
       setRepeat("");
       setOpen(false);
-
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+      if (res.token) {
+        validateToken(dispatch, res.token);
+      }
     }
   };
 

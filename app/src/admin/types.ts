@@ -2,6 +2,7 @@ export type CommonResponse = {
   status: boolean;
   message: string;
   error?: string;
+  token?: string;
 };
 
 export type InfoResponse = {

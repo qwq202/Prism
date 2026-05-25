@@ -66,8 +66,8 @@ import {
 import { Input } from "@/components/ui/input.tsx";
 import PopupDialog, { popupTypes } from "@/components/PopupDialog.tsx";
 import { getNumber, isEnter, parseNumber } from "@/utils/base.ts";
-import { useSelector } from "react-redux";
-import { selectUsername } from "@/store/auth.ts";
+import { useDispatch, useSelector } from "react-redux";
+import { selectUsername, validateToken } from "@/store/auth.ts";
 import { PaginationAction } from "@/components/ui/pagination.tsx";
 import Tips from "@/components/Tips.tsx";
 import {
@@ -128,6 +128,7 @@ function doToast(t: TFunction, resp: CommonResponse) {
 
 function OperationMenu({ user, onRefresh }: OperationMenuProps) {
   const { t } = useTranslation();
+  const dispatch = useDispatch();
 
   const username = useSelector(selectUsername);
 
@@ -168,7 +169,10 @@ function OperationMenu({ user, onRefresh }: OperationMenuProps) {
           doToast(t, resp);
 
           if (resp.status) {
-            username === user.username && location.reload();
+            if (username === user.username) {
+              if (resp.token) validateToken(dispatch, resp.token);
+              else location.reload();
+            }
             onRefresh?.();
           }
 

@@ -599,6 +599,10 @@ type UploadResponse = CommonResponse & {
   url?: string;
 };
 
+type PasswordUpdateResponse = CommonResponse & {
+  token?: string;
+};
+
 export async function uploadFavicon(file: File): Promise<UploadResponse> {
   try {
     const formData = new FormData();
@@ -639,10 +643,10 @@ export async function uploadResource(file: File): Promise<UploadResponse> {
 
 export async function updateRootPassword(
   password: string,
-): Promise<CommonResponse> {
+): Promise<PasswordUpdateResponse> {
   try {
     const response = await axios.post(`/admin/user/root`, { password });
-    return response.data as CommonResponse;
+    return response.data as PasswordUpdateResponse;
   } catch (e) {
     return { status: false, error: getErrorMessage(e) };
   }

@@ -6,6 +6,7 @@ import (
 	"chat/channel"
 	"chat/utils"
 	"context"
+	"database/sql"
 	"fmt"
 	"net"
 	"net/http"
@@ -87,6 +88,20 @@ type ReleaseUsageForm struct {
 
 type UpdateRootPasswordForm struct {
 	Password string `json:"password" binding:"required"`
+}
+
+func freshTokenForCurrentUserID(db *sql.DB, username string, id int64) (string, error) {
+	username = strings.TrimSpace(username)
+	if username == "" || id <= 0 {
+		return "", nil
+	}
+
+	user := auth.GetUserByName(db, username)
+	if user == nil || user.ID != id {
+		return "", nil
+	}
+
+	return user.GenerateTokenSafe(db)
 }
 
 func UpdateMarketAPI(c *gin.Context) {
@@ -368,9 +383,22 @@ func UpdatePasswordAPI(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	resp := gin.H{
 		"status": true,
-	})
+	}
+	token, err := freshTokenForCurrentUserID(db, utils.GetUserFromContext(c), form.Id)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  err.Error(),
+		})
+		return
+	}
+	if token != "" {
+		resp["token"] = token
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
 func UpdateEmailAPI(c *gin.Context) {
@@ -656,9 +684,22 @@ func UpdateRootPasswordAPI(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	resp := gin.H{
 		"status": true,
-	})
+	}
+	if strings.TrimSpace(utils.GetUserFromContext(c)) == "root" {
+		token, err := (&auth.User{Username: "root"}).GenerateTokenSafe(db)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"status": false,
+				"error":  err.Error(),
+			})
+			return
+		}
+		resp["token"] = token
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
 func ListLoggerAPI(c *gin.Context) {
