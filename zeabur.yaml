@@ -197,7 +197,7 @@ spec:
       template: PREBUILT
       spec:
         source:
-          image: programzmh/chatnio
+          image: qunqin45/prism:latest
         ports:
           - id: service
             port: 8094

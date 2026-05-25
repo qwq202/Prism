@@ -88,6 +88,21 @@ func TestComposePinsStatefulDependencyImages(t *testing.T) {
 	}
 }
 
+func TestZeaburTemplateUsesPrismImage(t *testing.T) {
+	data, err := os.ReadFile("zeabur.yaml")
+	if err != nil {
+		t.Fatalf("read zeabur.yaml: %v", err)
+	}
+
+	content := string(data)
+	if strings.Contains(content, "programzmh/chatnio") {
+		t.Fatalf("expected Zeabur template not to deploy the legacy ChatNio image")
+	}
+	if !strings.Contains(content, "image: qunqin45/prism:latest") {
+		t.Fatalf("expected Zeabur template to deploy the maintained Prism image")
+	}
+}
+
 func TestNginxProxyForwardsOriginalRequestContext(t *testing.T) {
 	data, err := os.ReadFile("nginx.conf")
 	if err != nil {
