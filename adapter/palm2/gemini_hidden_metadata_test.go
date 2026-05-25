@@ -51,8 +51,8 @@ func TestGetGeminiContentsReplaySignaturesOnFunctionCalls(t *testing.T) {
 	}
 
 	parts := contents[1].Parts
-	if len(parts) != 3 {
-		t.Fatalf("expected 3 parts (2 function calls + 1 metadata-only), got %d", len(parts))
+	if len(parts) != 2 {
+		t.Fatalf("expected 2 function call parts, got %d", len(parts))
 	}
 
 	if parts[0].FunctionCall == nil || parts[0].FunctionCall.Name != "lookup_weather" {
@@ -69,11 +69,8 @@ func TestGetGeminiContentsReplaySignaturesOnFunctionCalls(t *testing.T) {
 		t.Fatalf("expected second function call to carry second signature, got %#v", parts[1].ThoughtSignature)
 	}
 
-	if parts[2].ThoughtSignature == nil || *parts[2].ThoughtSignature != "sig-overflow" {
-		t.Fatalf("expected overflow signature to be preserved, got %#v", parts[2].ThoughtSignature)
-	}
-	if !parts[2].Thought || parts[2].Text != nil || parts[2].FunctionCall != nil || parts[2].FunctionResponse != nil {
-		t.Fatalf("expected overflow signature part to be metadata-only thought part, got %#v", parts[2])
+	if len(contents[1].Parts) != 2 {
+		t.Fatalf("expected overflow signature to be dropped instead of emitted as metadata-only request part, got %#v", contents[1].Parts)
 	}
 }
 
@@ -133,7 +130,7 @@ func TestGetGeminiContentsWithoutMetadataKeepsLegacySameRoleMerge(t *testing.T) 
 	}
 }
 
-func TestGetGeminiContentsBoundaryOnlyWithSignatureBearingParts(t *testing.T) {
+func TestGetGeminiContentsDoesNotForceBoundaryForDroppedTextSignatures(t *testing.T) {
 	instance := &ChatInstance{}
 	withSignature := []globals.Message{
 		{
@@ -171,8 +168,8 @@ func TestGetGeminiContentsBoundaryOnlyWithSignatureBearingParts(t *testing.T) {
 	withSignatureContents := instance.GetGeminiContents("gemini-3.0-flash", withSignature)
 	withoutSignatureContents := instance.GetGeminiContents("gemini-3.0-flash", withoutSignature)
 
-	if len(withSignatureContents) != 3 {
-		t.Fatalf("expected signature-bearing assistant content to force boundary, got %d contents", len(withSignatureContents))
+	if len(withSignatureContents) != 2 {
+		t.Fatalf("expected dropped text-only signatures to keep legacy same-role merge, got %d contents", len(withSignatureContents))
 	}
 	if len(withoutSignatureContents) != 2 {
 		t.Fatalf("expected legacy merge without signature-bearing parts, got %d contents", len(withoutSignatureContents))
@@ -207,6 +204,69 @@ func TestGetGeminiPartsReplayNotInjectedOutsideAssistantTurns(t *testing.T) {
 	for _, part := range toolParts {
 		if part.ThoughtSignature != nil {
 			t.Fatalf("expected no signature replay on tool turn, got part %#v", part)
+		}
+	}
+}
+
+func TestGetGeminiContentsSkipsLeadingModelInsteadOfEmptyUser(t *testing.T) {
+	instance := &ChatInstance{}
+	messages := []globals.Message{
+		{
+			Role:    globals.Assistant,
+			Content: "orphaned answer from a clipped context window",
+			GeminiHiddenMetadata: &globals.GeminiHiddenMetadata{
+				ThoughtSignatures: []string{"sig-orphan"},
+			},
+		},
+		{
+			Role:    globals.User,
+			Content: "fresh question",
+		},
+	}
+
+	contents := instance.GetGeminiContents("gemini-3.1-flash-lite-preview", messages)
+	if len(contents) != 1 {
+		t.Fatalf("expected leading model turn to be skipped, got %#v", contents)
+	}
+	if contents[0].Role != GeminiUserType {
+		t.Fatalf("expected first content to be user, got %q", contents[0].Role)
+	}
+	if len(contents[0].Parts) != 1 || contents[0].Parts[0].Text == nil || *contents[0].Parts[0].Text != "fresh question" {
+		t.Fatalf("expected fresh user prompt without an empty filler part, got %#v", contents[0].Parts)
+	}
+}
+
+func TestGetGeminiContentsDropsMetadataOnlyAssistantParts(t *testing.T) {
+	instance := &ChatInstance{}
+	messages := []globals.Message{
+		{
+			Role:    globals.User,
+			Content: "first question",
+		},
+		{
+			Role: globals.Assistant,
+			GeminiHiddenMetadata: &globals.GeminiHiddenMetadata{
+				ThoughtSignatures: []string{"sig-only"},
+			},
+		},
+		{
+			Role:    globals.User,
+			Content: "next question",
+		},
+	}
+
+	contents := instance.GetGeminiContents("gemini-3.1-flash-lite-preview", messages)
+	if len(contents) != 1 {
+		t.Fatalf("expected metadata-only assistant turn to be dropped and user turns to merge, got %#v", contents)
+	}
+	for _, content := range contents {
+		for _, part := range content.Parts {
+			if !hasGeminiRequestPartData(part) {
+				t.Fatalf("expected every request part to carry data, got %#v", part)
+			}
+			if part.ThoughtSignature != nil && part.FunctionCall == nil {
+				t.Fatalf("expected signatures only on function call request parts, got %#v", part)
+			}
 		}
 	}
 }

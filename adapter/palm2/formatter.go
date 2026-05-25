@@ -50,6 +50,9 @@ func getMimeType(content string) string {
 
 func getGeminiContent(parts []GeminiChatPart, content string, model string) []GeminiChatPart {
 	if model == globals.GeminiPro {
+		if strings.TrimSpace(content) == "" {
+			return parts
+		}
 		return append(parts, GeminiChatPart{
 			Text: &content,
 		})
@@ -60,7 +63,7 @@ func getGeminiContent(parts []GeminiChatPart, content string, model string) []Ge
 		urls = urls[:geminiMaxImages]
 	}
 
-	if len(raw) > 0 || len(urls) == 0 {
+	if strings.TrimSpace(raw) != "" {
 		parts = append(parts, GeminiChatPart{
 			Text: &raw,
 		})
@@ -169,8 +172,8 @@ func replayGeminiHiddenMetadata(parts []GeminiChatPart, metadata *globals.Gemini
 	index := 0
 	// We only persist a flat signature list, so original per-part placement is unavailable.
 	// For deterministic replay and Gemini function-calling continuity, map signatures to
-	// functionCall parts first (especially the first call), and append any remaining
-	// signatures as metadata-only thought parts instead of mutating unrelated visible parts.
+	// functionCall parts first. Extra signatures cannot be sent as metadata-only request
+	// parts because Vertex AI Express rejects parts with no initialized data oneof.
 	for i := range result {
 		if index >= len(normalized.ThoughtSignatures) {
 			return result
@@ -184,14 +187,40 @@ func replayGeminiHiddenMetadata(parts []GeminiChatPart, metadata *globals.Gemini
 		index++
 	}
 
-	for ; index < len(normalized.ThoughtSignatures); index++ {
-		result = append(result, GeminiChatPart{
-			Thought:          true,
-			ThoughtSignature: utils.ToPtr(normalized.ThoughtSignatures[index]),
-		})
-	}
-
 	return result
+}
+
+func hasGeminiRequestPartData(part GeminiChatPart) bool {
+	if part.Text != nil && strings.TrimSpace(*part.Text) != "" {
+		return true
+	}
+	if part.InlineData != nil && strings.TrimSpace(part.InlineData.Data) != "" {
+		return true
+	}
+	return part.FunctionCall != nil || part.FunctionResponse != nil
+}
+
+func filterGeminiRequestParts(parts []GeminiChatPart) []GeminiChatPart {
+	result := make([]GeminiChatPart, 0, len(parts))
+	for _, part := range parts {
+		if !hasGeminiRequestPartData(part) {
+			continue
+		}
+		result = append(result, part)
+	}
+	return result
+}
+
+func canStartGeminiContents(parts []GeminiChatPart) bool {
+	for _, part := range parts {
+		if part.Text != nil && strings.TrimSpace(*part.Text) != "" {
+			return true
+		}
+		if part.InlineData != nil && strings.TrimSpace(part.InlineData.Data) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func getGeminiParts(model string, history []globals.Message, message globals.Message) []GeminiChatPart {
@@ -215,11 +244,11 @@ func getGeminiParts(model string, history []globals.Message, message globals.Mes
 		parts = getGeminiContent(make([]GeminiChatPart, 0), message.Content, model)
 	}
 
-	if message.Role != globals.Assistant {
-		return parts
+	if message.Role == globals.Assistant {
+		parts = replayGeminiHiddenMetadata(parts, message.GeminiHiddenMetadata)
 	}
 
-	return replayGeminiHiddenMetadata(parts, message.GeminiHiddenMetadata)
+	return filterGeminiRequestParts(parts)
 }
 
 func appendGeminiContent(result []GeminiContent, role string, parts []GeminiChatPart) []GeminiContent {
@@ -382,13 +411,13 @@ func (c *ChatInstance) GetGeminiContents(model string, message []globals.Message
 		}
 
 		role := getGeminiRole(item.Role)
-		if len(result) == 0 && role == GeminiModelType {
-			// gemini model: first message must be user
-
-			result = append(result, GeminiContent{
-				Role:  GeminiUserType,
-				Parts: []GeminiChatPart{{Text: utils.ToPtr("")}},
-			})
+		if len(result) == 0 {
+			if role != GeminiUserType || !canStartGeminiContents(parts) {
+				// Context windows can start in the middle of a conversation after the user
+				// changes the retained context count. Gemini requires the first content
+				// turn to be a real user prompt, so drop orphaned leading model/tool turns.
+				continue
+			}
 		}
 
 		result = appendGeminiContent(result, role, parts)

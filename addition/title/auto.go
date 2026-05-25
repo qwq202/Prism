@@ -5,6 +5,7 @@ import (
 	"chat/channel"
 	"chat/globals"
 	"chat/utils"
+	"regexp"
 	"strings"
 	"unicode/utf8"
 
@@ -14,6 +15,8 @@ import (
 const defaultEmojiPrefix = "💬"
 
 const autoTitlePrompt = "You are a conversation title generator. Create one short conversation title in the same language as the user's conversation. The title must contain at least one emoji, either at the beginning or the end. Return only the final title text. Do not use quotes, markdown, numbering, explanations, or line breaks."
+
+var titleFileBlockPattern = regexp.MustCompile("(?s)```file\\s*\\n\\[\\[[^\\n\\]]+]]\\n.*?\\n```")
 
 func normalizeTitle(raw string) string {
 	title := strings.TrimSpace(raw)
@@ -54,6 +57,13 @@ func containsEmoji(value string) bool {
 	return false
 }
 
+func sanitizeTitleMessageContent(content string) string {
+	content = titleFileBlockPattern.ReplaceAllString(content, " ")
+	content, _ = utils.ExtractImages(content, true)
+	content = strings.Join(strings.Fields(content), " ")
+	return strings.TrimSpace(content)
+}
+
 func buildTitleContext(messages []globals.Message) string {
 	var builder strings.Builder
 
@@ -62,7 +72,7 @@ func buildTitleContext(messages []globals.Message) string {
 			continue
 		}
 
-		content := strings.TrimSpace(message.Content)
+		content := sanitizeTitleMessageContent(message.Content)
 		if content == "" {
 			continue
 		}
