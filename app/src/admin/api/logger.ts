@@ -1,6 +1,7 @@
 import axios from "axios";
 import { CommonResponse } from "@/api/common.ts";
 import { getErrorMessage } from "@/utils/base.ts";
+import { saveBlobAsFile } from "@/utils/dom.ts";
 
 export type Logger = {
   path: string;
@@ -31,25 +32,17 @@ function getDownloadName(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() || "chatnio.log";
 }
 
-export async function downloadLogger(path: string): Promise<void> {
+export async function downloadLogger(path: string): Promise<CommonResponse> {
   try {
-    const response = await axios.get("/admin/logger/download", {
+    const response = await axios.get<Blob>("/admin/logger/download", {
       responseType: "blob",
       params: { path },
     });
-    const url = window.URL.createObjectURL(response.data);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", getDownloadName(path));
-    document.body.appendChild(link);
-    try {
-      link.click();
-    } finally {
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    }
+    saveBlobAsFile(getDownloadName(path), response.data);
+    return { status: true };
   } catch (e) {
     console.warn(e);
+    return { status: false, error: getErrorMessage(e) };
   }
 }
 

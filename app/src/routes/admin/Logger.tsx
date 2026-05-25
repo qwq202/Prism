@@ -43,7 +43,10 @@ function LoggerItem({ path, size, onUpdate }: LoggerItemProps) {
         <Button
           variant="outline"
           size="sm"
-          onClick={async () => downloadLogger(path)}
+          onClick={async () => {
+            const resp = await downloadLogger(path);
+            if (!resp.status) withNotify(t, resp);
+          }}
           title={t("admin.logger.download")}
         >
           <Download className="w-4 h-4" />
@@ -53,7 +56,7 @@ function LoggerItem({ path, size, onUpdate }: LoggerItemProps) {
           size="sm"
           onClick={async () => {
             const resp = await deleteLogger(path);
-            if (resp) onUpdate();
+            if (resp.status) onUpdate();
             withNotify(t, resp, true);
           }}
           title={t("admin.logger.delete")}
