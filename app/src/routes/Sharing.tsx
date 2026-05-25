@@ -31,6 +31,7 @@ import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import { useConversationActions } from "@/store/chat.ts";
 import { toast } from "sonner";
 import Emoji from "@/components/Emoji";
+import { getErrorMessage } from "@/utils/base.ts";
 
 type SharingFormProps = {
   refer?: string;
@@ -59,15 +60,17 @@ function SharingForm({ data }: SharingFormProps) {
     setTimeout(() => {
       if (!container.current) return;
       toJpeg(container.current)
-        .then((blob) => {
-          saveImageAsFile(`${extractMessage(data.name, 12)}.png`, blob);
+        .then((dataUrl) => {
+          saveImageAsFile(`${extractMessage(data.name, 12)}.jpg`, dataUrl);
           toast.success(t("message.saving-image-success"), {
             description: t("message.saving-image-success-prompt"),
           });
         })
         .catch((reason) => {
           toast.error(t("message.saving-image-failed"), {
-            description: t("message.saving-image-failed-prompt", { reason }),
+            description: t("message.saving-image-failed-prompt", {
+              reason: getErrorMessage(reason),
+            }),
           });
         });
     }, 10);
@@ -194,7 +197,7 @@ function SharingForm({ data }: SharingFormProps) {
                   new Promise<void>((resolve) => {
                     setModel(data?.model);
                     resolve();
-                  })
+                  }),
                 ]);
                 console.debug(
                   `[sharing] switch to conversation (name: ${data.name}, model: ${data.model})`,

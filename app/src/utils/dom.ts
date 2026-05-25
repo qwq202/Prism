@@ -19,11 +19,14 @@ async function _copyClipboard(text: string) {
   el.focus();
   el.select();
   el.setSelectionRange(0, text.length);
-  document.execCommand("copy");
+  const copied = document.execCommand("copy");
   document.body.removeChild(el);
+  if (!copied) {
+    throw new Error("Copy command failed");
+  }
 }
 
-export async function copyClipboard(text: string) {
+export async function copyClipboard(text: string): Promise<boolean> {
   /**
    * Copy text to clipboard
    * @param text Text to copy
@@ -34,8 +37,10 @@ export async function copyClipboard(text: string) {
 
   try {
     await _copyClipboard(text);
+    return true;
   } catch (e) {
     console.warn(e);
+    return false;
   }
 }
 

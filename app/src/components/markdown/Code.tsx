@@ -66,8 +66,9 @@ function Code({
         className={`markdown-syntax-header`}
         onClick={async () => {
           const text = children?.toString() || "";
-          await copyClipboard(text);
-          setCopied(true);
+          if (await copyClipboard(text)) {
+            setCopied(true);
+          }
         }}
       >
         {copied ? (

@@ -372,10 +372,14 @@ function SidebarConversationList({
                   variant={`default`}
                   size={`icon`}
                   onClick={async () => {
-                    await copyClipboard(shared);
-                    toast.success(t("share.copied"), {
-                      description: t("share.copied-description"),
-                    });
+                    const copied = await copyClipboard(shared);
+                    if (copied) {
+                      toast.success(t("share.copied"), {
+                        description: t("share.copied-description"),
+                      });
+                    } else {
+                      toast.error(t("copied.failed"));
+                    }
                   }}
                 >
                   <Copy className={`h-4 w-4`} />
