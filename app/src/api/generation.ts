@@ -82,16 +82,21 @@ export class GenerationManager {
       return;
     }
 
+    if (message.end) {
+      if (message.hash) {
+        this.onFinished?.(message.hash);
+      } else {
+        this.onError?.(message.error || message.message || "generation failed");
+      }
+      this.setProcessing(false);
+      return;
+    }
+
     this.message += message.message;
     this.onMessage?.({
       message: this.message,
       quota: message.quota,
     });
-
-    if (message.end) {
-      this.onFinished?.(message.hash);
-      this.setProcessing(false);
-    }
   }
 
   public generate(prompt: string, model: string) {
@@ -112,10 +117,16 @@ export class GenerationManager {
             `[generation] failed to parse websocket message: ${getErrorMessage(e)}`,
           );
           this.onError?.("invalid websocket message");
+          this.connection?.close();
           this.setProcessing(false);
         }
       };
+      this.connection.onerror = () => {
+        this.onError?.("websocket connection error");
+        this.setProcessing(false);
+      };
       this.connection.onclose = () => {
+        if (this.processing) this.onError?.("websocket connection closed");
         this.setProcessing(false);
       };
     }

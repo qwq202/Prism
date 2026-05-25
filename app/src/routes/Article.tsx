@@ -25,6 +25,7 @@ import { getMemory } from "@/utils/memory.ts";
 import { Progress } from "@/components/ui/progress.tsx";
 import { cn } from "@/components/ui/lib/utils.ts";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/utils/base.ts";
 
 type ProgressProps = {
   current: number;
@@ -37,6 +38,7 @@ function GenerateProgress({
   quota,
 }: ProgressProps & { quota: number }) {
   const { t } = useTranslation();
+  const progress = total > 0 ? (100 * current) / total : 0;
 
   return (
     <div className={`article-progress w-full mb-4`}>
@@ -59,7 +61,7 @@ function GenerateProgress({
           </>
         )}
       </p>
-      <Progress value={(100 * current) / total} />
+      <Progress value={progress} />
       <div
         className={`article-quota flex flex-row mt-4 border border-input rounded-md py-1 px-3 select-none w-max items-center mx-auto`}
       >
@@ -94,41 +96,87 @@ function ArticleContent() {
   }
 
   function generate() {
+    if (!title.trim() || !prompt.trim()) return;
+
     setProgress(true);
     const connection = new WebSocket(`${websocketEndpoint}/article/create`);
+    let settled = false;
+
+    const fail = (reason?: string, close = true) => {
+      if (settled) return;
+      settled = true;
+      toast.error(t("article.generate-failed"), {
+        description: reason
+          ? `${t("article.generate-failed-prompt")} (${reason})`
+          : t("article.generate-failed-prompt"),
+      });
+      setProgress(false);
+      if (close) connection.close();
+    };
 
     connection.onopen = () => {
       connection.send(
         JSON.stringify({
           token: getMemory(tokenField),
           web,
-          title,
-          prompt,
+          title: title.trim(),
+          prompt: prompt.trim(),
           model,
         }),
       );
     };
 
     connection.onmessage = (e) => {
-      const data = JSON.parse(e.data);
+      try {
+        const data = JSON.parse(e.data) as {
+          hash?: string;
+          data?: ProgressProps & { quota?: number };
+          error?: string;
+        };
 
-      data.data && data.data.quota && setQuota(quota + data.data.quota);
-      if (!data.hash) setState(data.data as ProgressProps);
-      else {
-        toast.success(t("article.generate-success"), {
-          description: t("article.generate-success-prompt"),
-        });
-        setHash(data.hash);
+        if (data.error) {
+          fail(data.error);
+          return;
+        }
+
+        if (typeof data.hash === "string") {
+          if (data.hash.length === 0) {
+            fail("empty download hash");
+            return;
+          }
+
+          settled = true;
+          toast.success(t("article.generate-success"), {
+            description: t("article.generate-success-prompt"),
+          });
+          setHash(data.hash);
+          return;
+        }
+
+        if (data.data) {
+          if (typeof data.data.quota === "number") {
+            setQuota((current) => current + data.data!.quota!);
+          }
+          setState({
+            current: data.data.current,
+            total: data.data.total,
+          });
+          return;
+        }
+
+        fail("invalid websocket message");
+      } catch (error) {
+        fail(getErrorMessage(error));
       }
     };
 
     connection.onerror = (e: Event) => {
       console.debug(`[article] error during generation: ${e}`);
-      toast.error(t("article.generate-failed"), {
-        description: `${t("article.generate-failed-prompt")} (${e.toString()})`,
-      });
-      setProgress(false);
-      connection.close();
+      fail(e.toString());
+    };
+
+    connection.onclose = () => {
+      fail("websocket connection closed", false);
     };
   }
 
@@ -200,7 +248,7 @@ function ArticleContent() {
         variant={`default`}
         className={`mt-5 w-full mx-auto`}
         onClick={generate}
-        disabled={progress || !title}
+        disabled={progress || !title.trim() || !prompt.trim()}
       >
         {t("article.generate")}
       </Button>
