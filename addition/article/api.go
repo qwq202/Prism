@@ -4,8 +4,9 @@ import (
 	"chat/auth"
 	"chat/globals"
 	"chat/utils"
-	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -31,8 +32,7 @@ func ProjectTarDownloadAPI(c *gin.Context) {
 		return
 	}
 
-	c.Writer.Header().Add("Content-Disposition", "attachment; filename=article.tar.gz")
-	c.File(fmt.Sprintf("storage/article/%s.tar.gz", hash))
+	downloadProjectFile(c, filepath.Join("storage", "article", hash+".tar.gz"), "article.tar.gz")
 }
 
 func ProjectZipDownloadAPI(c *gin.Context) {
@@ -42,8 +42,18 @@ func ProjectZipDownloadAPI(c *gin.Context) {
 		return
 	}
 
-	c.Writer.Header().Add("Content-Disposition", "attachment; filename=article.zip")
-	c.File(fmt.Sprintf("storage/article/%s.zip", hash))
+	downloadProjectFile(c, filepath.Join("storage", "article", hash+".zip"), "article.zip")
+}
+
+func downloadProjectFile(c *gin.Context, path string, filename string) {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+
+	c.Writer.Header().Set("Content-Disposition", "attachment; filename="+filename)
+	c.File(path)
 }
 
 func GenerateAPI(c *gin.Context) {
