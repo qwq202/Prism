@@ -110,7 +110,7 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
   const { t } = useTranslation();
   const model = useSelector(selectModel);
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const nextTaskId = useRef(0);
 
   const [tasks, taskDispatch] = useReducer(fileTaskReducer, {
     tasks: [],
@@ -158,7 +158,6 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
         return;
       }
 
-      setLoading(true);
       for (const file of files) {
         if (!file) continue;
         if (file.size > MaxFileSize) {
@@ -168,7 +167,8 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
             }),
           });
         } else {
-          const id = Date.now();
+          nextTaskId.current += 1;
+          const id = nextTaskId.current;
           taskDispatch({
             type: "add",
             payload: { id, file, progress: 0 },
@@ -211,7 +211,6 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
           });
         }
       }
-      setLoading(false);
     },
     [addFile, canUploadImage, currentModelInfo, t],
   );
@@ -303,7 +302,7 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
               >
                 {canUploadImage && (
                   <FileInput
-                    loading={loading}
+                    loading={tasks.tasks.length > 0}
                     id={"file"}
                     className={"file"}
                     handleEvent={triggerFile}
@@ -604,7 +603,10 @@ function FileInput({ id, loading, className, handleEvent }: FileInputProps) {
         id={id}
         type="file"
         className={className}
-        onChange={(e) => handleEvent(Array.from(e.target?.files || []))}
+        onChange={(e) => {
+          handleEvent(Array.from(e.target?.files || []));
+          e.currentTarget.value = "";
+        }}
         accept="image/*"
         style={{ display: "none" }}
         multiple={true}
