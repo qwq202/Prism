@@ -104,6 +104,20 @@ func freshTokenForCurrentUserID(db *sql.DB, username string, id int64) (string, 
 	return user.GenerateTokenSafe(db)
 }
 
+func currentUserMatchesID(c *gin.Context, db *sql.DB, id int64) bool {
+	if id <= 0 {
+		return false
+	}
+
+	username := strings.TrimSpace(utils.GetUserFromContext(c))
+	if username == "" {
+		return false
+	}
+
+	current := auth.GetUserByName(db, username)
+	return current != nil && current.ID == id
+}
+
 func UpdateMarketAPI(c *gin.Context) {
 	var form MarketModelList
 	if err := c.ShouldBindJSON(&form); err != nil {
@@ -439,6 +453,14 @@ func SetAdminAPI(c *gin.Context) {
 		return
 	}
 
+	if currentUserMatchesID(c, db, form.Id) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": "cannot change current user admin status",
+		})
+		return
+	}
+
 	err := setAdmin(db, form.Id, form.Admin)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
@@ -461,6 +483,14 @@ func BanAPI(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  false,
 			"message": err.Error(),
+		})
+		return
+	}
+
+	if form.Ban && currentUserMatchesID(c, db, form.Id) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": "cannot ban current user",
 		})
 		return
 	}
@@ -561,6 +591,15 @@ func BatchUserAPI(c *gin.Context) {
 	if len(form.Ids) == 0 {
 		c.JSON(http.StatusOK, gin.H{"status": false, "message": "no users selected"})
 		return
+	}
+
+	if form.Action == "ban" {
+		for _, id := range form.Ids {
+			if currentUserMatchesID(c, db, id) {
+				c.JSON(http.StatusOK, gin.H{"status": false, "message": "cannot ban current user"})
+				return
+			}
+		}
 	}
 
 	quota := float32(0)

@@ -432,6 +432,7 @@ function OperationMenu({ user, onRefresh }: OperationMenuProps) {
 
 function UserTable() {
   const { t } = useTranslation();
+  const username = useSelector(selectUsername);
   const [data, setData] = useState<UserForm>({
     total: 0,
     data: [],
@@ -460,6 +461,12 @@ function UserTable() {
     ).length;
   }, [filter]);
 
+  const selectableUserIds = useMemo(() => {
+    return new Set(
+      data.data.filter((user) => user.username !== username).map((u) => u.id),
+    );
+  }, [data.data, username]);
+
   async function update() {
     setLoading(true);
     const resp = await getUserList(page, search, filter);
@@ -485,7 +492,8 @@ function UserTable() {
   }
 
   const allChecked =
-    data.data.length > 0 && data.data.every((u) => selected.has(u.id));
+    selectableUserIds.size > 0 &&
+    Array.from(selectableUserIds).every((id) => selected.has(id));
   const batchActionClass = "h-10 w-24 px-3 text-sm shrink-0";
   const batchQuotaInputClass = "h-10 w-24 text-sm shrink-0";
 
@@ -544,11 +552,13 @@ function UserTable() {
     if (allChecked) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(data.data.map((u) => u.id)));
+      setSelected(new Set(selectableUserIds));
     }
   }
 
   function toggleOne(id: number) {
+    if (!selectableUserIds.has(id)) return;
+
     setSelected((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -755,6 +765,7 @@ function UserTable() {
                   <TableCell>
                     <Checkbox
                       checked={selected.has(user.id)}
+                      disabled={user.username === username}
                       onCheckedChange={() => toggleOne(user.id)}
                     />
                   </TableCell>
