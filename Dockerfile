@@ -65,7 +65,7 @@ COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
 # Volumes
-VOLUME ["/config", "/logs", "/storage"]
+VOLUME ["/config", "/logs", "/storage", "/db"]
 
 # Expose port
 EXPOSE 8094
