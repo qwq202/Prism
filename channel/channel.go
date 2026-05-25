@@ -205,10 +205,10 @@ func (c *Channel) ProcessError(err error) error {
 	}
 	content := err.Error()
 
-	if strings.Contains(content, c.GetEndpoint()) {
+	if endpoint := strings.TrimSpace(c.GetEndpoint()); endpoint != "" && strings.Contains(content, endpoint) {
 		// hide the endpoint
 		replacer := fmt.Sprintf("channel://%d", c.GetId())
-		content = strings.Replace(content, c.GetEndpoint(), replacer, -1)
+		content = strings.Replace(content, endpoint, replacer, -1)
 	}
 
 	if domain := c.GetDomain(); len(strings.TrimSpace(domain)) > 0 && strings.Contains(content, domain) {

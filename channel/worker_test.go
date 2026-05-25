@@ -2,8 +2,10 @@ package channel
 
 import (
 	adaptercommon "chat/adapter/common"
+	"chat/connection"
 	"chat/globals"
 	"chat/utils"
+	"strings"
 	"testing"
 )
 
@@ -199,5 +201,57 @@ func TestCacheHashForChatPropsKeepsClaudeMetadataOnMiniMax(t *testing.T) {
 
 	if got, want := cacheHashForChatProps(withMetadata), cacheHashForChatProps(plain); got == want {
 		t.Fatalf("expected minimax cache hash to retain claude hidden metadata sensitivity")
+	}
+}
+
+func TestNewChatRequestResetsRetryCounterPerChannel(t *testing.T) {
+	_, cache := openPlanTestCache(t)
+
+	previousCache := connection.Cache
+	connection.Cache = cache
+	t.Cleanup(func() {
+		connection.Cache = previousCache
+	})
+
+	previousConduit := ConduitInstance
+	ConduitInstance = &Manager{
+		Sequence: Sequence{
+			{
+				Id:       1,
+				Name:     "broken-a",
+				Type:     "unknown-test",
+				State:    true,
+				Models:   []string{"retry-model"},
+				Priority: 1,
+				Retry:    2,
+			},
+			{
+				Id:       2,
+				Name:     "broken-b",
+				Type:     "unknown-test",
+				State:    true,
+				Models:   []string{"retry-model"},
+				Priority: 2,
+				Retry:    2,
+			},
+		},
+		PreflightSequence: map[string]Sequence{},
+	}
+	ConduitInstance.Load()
+	t.Cleanup(func() {
+		ConduitInstance = previousConduit
+	})
+
+	props := &adaptercommon.ChatProps{
+		Model:         "retry-model",
+		OriginalModel: "retry-model",
+	}
+	err := NewChatRequest("default", props, nil)
+	if err == nil || !strings.Contains(err.Error(), "unknown channel type") {
+		t.Fatalf("expected unknown channel error, got %v", err)
+	}
+
+	if props.Current != 2 {
+		t.Fatalf("expected second channel to receive a fresh retry counter, got %d", props.Current)
 	}
 }
