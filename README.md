@@ -211,7 +211,7 @@ docker pull qunqin45/prism:latest
 4. **如何修改或找回 Root 初始密码？**
    - 首次空数据库启动时，如果没有设置 `ROOT_INITIAL_PASSWORD` 或 `root.initial_password`，请在服务启动日志中查看随机初始密码。
    - 登录后请点击右上角头像或侧边栏底部用户框进入后台管理, 点击系统设置下常规设置操作栏的 修改 Root 密码 进行修改。或者选择在 用户管理 中选定 root 用户进行修改密码操作。
-   - 如果已经无法登录，可在容器或二进制运行环境中执行 `prism root <new-password>` 重置。
+   - 如果已经无法登录，可执行 `docker compose exec chatnio prism root <new-password>` 重置；使用 `docker run --name prism ...` 部署时可执行 `docker exec prism prism root <new-password>`。二进制部署则执行你的程序文件名加 `root <new-password>`，例如 `./chat root <new-password>`。
 5. **系统设置中的后端域名是什么？**
    - 后端域名是指后端 API 服务的地址, 默认为你访问站点后加 `/api` 的地址, 如 `https://example.com/api` 。
    - 如果设置为非 *SERVE_STATIC* 模式, 开启前后端分离部署, 请将后端域名设置为你的后端 API 服务地址, 如 `https://api.example.com`。
