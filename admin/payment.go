@@ -32,11 +32,18 @@ type PaymentPaginationForm struct {
 }
 
 func getPaymentOrdersForm(db *sql.DB, page int64, search string) PaymentPaginationForm {
+	if page < 0 {
+		page = 0
+	}
+
 	var total int64
+	likeSearch := "%" + search + "%"
 	if err := globals.QueryRowDb(db, `
-		SELECT COUNT(*) FROM payment_orders
-		WHERE order_id LIKE ? OR username LIKE ?
-	`, "%"+search+"%", "%"+search+"%").Scan(&total); err != nil {
+		SELECT COUNT(*)
+		FROM payment_orders p
+		LEFT JOIN auth a ON a.id = p.user_id
+		WHERE p.order_id LIKE ? OR p.username LIKE ? OR a.username LIKE ?
+	`, likeSearch, likeSearch, likeSearch).Scan(&total); err != nil {
 		return PaymentPaginationForm{Status: false, Message: err.Error()}
 	}
 
@@ -47,10 +54,10 @@ func getPaymentOrdersForm(db *sql.DB, page int64, search string) PaymentPaginati
 		       p.state, p.created_at, p.updated_at
 		FROM payment_orders p
 		LEFT JOIN auth a ON a.id = p.user_id
-		WHERE p.order_id LIKE ? OR p.username LIKE ?
+		WHERE p.order_id LIKE ? OR p.username LIKE ? OR a.username LIKE ?
 		ORDER BY p.id DESC
 		LIMIT ? OFFSET ?
-	`, "%"+search+"%", "%"+search+"%", pagination, page*pagination)
+	`, likeSearch, likeSearch, likeSearch, pagination, page*pagination)
 	if err != nil {
 		return PaymentPaginationForm{Status: false, Message: err.Error()}
 	}
@@ -74,6 +81,9 @@ func getPaymentOrdersForm(db *sql.DB, page int64, search string) PaymentPaginati
 			o.UpdatedAt = *t
 		}
 		orders = append(orders, o)
+	}
+	if err := rows.Err(); err != nil {
+		return PaymentPaginationForm{Status: false, Message: err.Error()}
 	}
 
 	if orders == nil {
