@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"chat/globals"
+	"context"
 	"fmt"
 	"image"
 	imagedraw "image/draw"
@@ -11,7 +12,9 @@ import (
 	"image/png"
 	"io"
 	"math"
+	"net"
 	"net/http"
+	"net/netip"
 	neturl "net/url"
 	"os"
 	"path"
@@ -26,7 +29,7 @@ const (
 	remoteImageFetchTimeout       = 30 * time.Second
 )
 
-var remoteImageHTTPClient = &http.Client{Timeout: remoteImageFetchTimeout}
+var remoteImageHTTPClient = newRemoteImageHTTPClient()
 
 type Image struct {
 	Object  image.Image
@@ -38,13 +41,142 @@ func remoteImageSizeError(maxBytes int64) error {
 	return fmt.Errorf("remote image exceeds %dMB limit", maxBytes/1024/1024)
 }
 
-func openRemoteImageResponse(source string) (*http.Response, error) {
+func isUnsafeRemoteImageAddr(addr netip.Addr) bool {
+	addr = addr.Unmap()
+	if !addr.IsValid() {
+		return true
+	}
+
+	if addr.IsUnspecified() ||
+		addr.IsLoopback() ||
+		addr.IsPrivate() ||
+		addr.IsLinkLocalUnicast() ||
+		addr.IsLinkLocalMulticast() ||
+		addr.IsInterfaceLocalMulticast() ||
+		addr.IsMulticast() {
+		return true
+	}
+
+	if addr.Is4() {
+		octets := addr.As4()
+		if octets[0] == 100 && octets[1] >= 64 && octets[1] <= 127 {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isUnsafeRemoteImageHost(host string) bool {
+	host = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(host)), ".")
+	if host == "" ||
+		host == "localhost" ||
+		strings.HasSuffix(host, ".localhost") ||
+		strings.HasSuffix(host, ".local") ||
+		strings.Contains(host, "%") {
+		return true
+	}
+
+	if addr, err := netip.ParseAddr(host); err == nil {
+		return isUnsafeRemoteImageAddr(addr)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	if err != nil {
+		return false
+	}
+	for _, ip := range addrs {
+		addr, ok := netip.AddrFromSlice(ip.IP)
+		if !ok || isUnsafeRemoteImageAddr(addr) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func validateRemoteImageURL(source string) (*neturl.URL, error) {
 	instance, err := neturl.Parse(strings.TrimSpace(source))
 	if err != nil || instance == nil || instance.Host == "" {
 		return nil, fmt.Errorf("invalid image url")
 	}
 	if instance.Scheme != "http" && instance.Scheme != "https" {
 		return nil, fmt.Errorf("unsupported image url scheme")
+	}
+	if instance.User != nil {
+		return nil, fmt.Errorf("image url credentials are not allowed")
+	}
+	if isUnsafeRemoteImageHost(instance.Hostname()) {
+		return nil, fmt.Errorf("local or private image urls are not allowed")
+	}
+
+	return instance, nil
+}
+
+func remoteImageDialContext(ctx context.Context, network string, address string) (net.Conn, error) {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, err
+	}
+	if isUnsafeRemoteImageHost(host) {
+		return nil, fmt.Errorf("local or private image urls are not allowed")
+	}
+
+	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	if err != nil {
+		return nil, err
+	}
+	if len(addrs) == 0 {
+		return nil, fmt.Errorf("image url host has no ip addresses")
+	}
+
+	target := ""
+	for _, ip := range addrs {
+		addr, ok := netip.AddrFromSlice(ip.IP)
+		if !ok || isUnsafeRemoteImageAddr(addr) {
+			return nil, fmt.Errorf("local or private image urls are not allowed")
+		}
+
+		addr = addr.Unmap()
+		if target != "" {
+			continue
+		}
+		if network == "tcp4" && !addr.Is4() {
+			continue
+		}
+		if network == "tcp6" && !addr.Is6() {
+			continue
+		}
+		target = net.JoinHostPort(addr.String(), port)
+	}
+	if target == "" {
+		return nil, fmt.Errorf("image url host has no compatible ip addresses")
+	}
+
+	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
+	return dialer.DialContext(ctx, network, target)
+}
+
+func newRemoteImageHTTPClient() *http.Client {
+	return &http.Client{
+		Timeout: remoteImageFetchTimeout,
+		Transport: &http.Transport{
+			Proxy:       http.ProxyFromEnvironment,
+			DialContext: remoteImageDialContext,
+		},
+		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+			_, err := validateRemoteImageURL(req.URL.String())
+			return err
+		},
+	}
+}
+
+func openRemoteImageResponse(source string) (*http.Response, error) {
+	instance, err := validateRemoteImageURL(source)
+	if err != nil {
+		return nil, err
 	}
 
 	req, err := http.NewRequest(http.MethodGet, instance.String(), nil)
