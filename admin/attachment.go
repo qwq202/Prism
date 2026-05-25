@@ -20,6 +20,11 @@ type AttachmentFile struct {
 	ReferenceCount int64  `json:"reference_count"`
 }
 
+func attachmentDeleteForced(c *gin.Context) bool {
+	force := strings.ToLower(strings.TrimSpace(c.Query("force")))
+	return force == "true" || force == "1"
+}
+
 func loadAttachmentReferenceCount(db *sql.DB) map[string]int64 {
 	rows, err := globals.QueryDb(db, `SELECT data FROM conversation`)
 	if err != nil {
@@ -87,6 +92,17 @@ func DeleteAttachmentAPI(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status": false,
 			"error":  "attachment name is required",
+		})
+		return
+	}
+
+	referenceCount := loadAttachmentReferenceCount(utils.GetDBFromContext(c))[name]
+	if referenceCount > 0 && !attachmentDeleteForced(c) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":          false,
+			"error":           "attachment is still referenced",
+			"referenced":      true,
+			"reference_count": referenceCount,
 		})
 		return
 	}

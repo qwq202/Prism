@@ -60,7 +60,7 @@ function AdminAttachment() {
     );
     if (!confirmed) return;
 
-    const res = await deleteAttachment(item.name);
+    const res = await deleteAttachment(item.name, item.referenced);
     withNotify(t, res, true);
     if (res.status) await sync();
   };

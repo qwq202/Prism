@@ -37,10 +37,13 @@ export async function listAttachments(): Promise<AttachmentListResponse> {
   }
 }
 
-export async function deleteAttachment(name: string): Promise<CommonResponse> {
+export async function deleteAttachment(
+  name: string,
+  force = false,
+): Promise<CommonResponse> {
   try {
     const response = await axios.post("/admin/attachment/delete", null, {
-      params: { name },
+      params: { name, force },
     });
     return response.data as CommonResponse;
   } catch (e) {
