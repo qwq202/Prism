@@ -1092,8 +1092,8 @@
     "batch-success": "已成功操作 {{count}} 个用户",
     "ban": "封禁",
     "unban": "解封",
-    "default-password": "密码修改提示",
-    "default-password-prompt": "您的管理员密码为默认密码，为了您的账号安全，请尽快修改密码。（前往后台管理 - 系统设置 - 修改 Root 密码）",
+    "default-password": "密码安全提醒",
+    "default-password-prompt": "您的 Root 管理员密码命中了已知不安全的初始密码。为了账号安全，请尽快修改密码。（前往后台管理 - 系统设置 - 修改 Root 密码）",
     "identity": {
       "normal": "普通用户",
       "api_paid": "其他付费用户",

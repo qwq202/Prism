@@ -44,7 +44,7 @@ function getPostLoginRedirect(state: unknown): string {
   return from;
 }
 
-const defaultRootPasswords = new Set(["chatnio123456", "coai123456"]);
+const knownUnsafeRootPasswords = new Set(["chatnio123456", "coai123456"]);
 
 function base64urlToBuffer(value: string): ArrayBuffer {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
@@ -174,7 +174,7 @@ function Login() {
 
       if (
         form.username.trim() === "root" &&
-        defaultRootPasswords.has(form.password.trim())
+        knownUnsafeRootPasswords.has(form.password.trim())
       ) {
         toast.warning(t("admin.default-password"), {
           description: t("admin.default-password-prompt"),

@@ -866,8 +866,8 @@
     "batch-success": "已成功操作 {{count}} 個使用者",
     "ban": "封鎖",
     "unban": "解除封鎖",
-    "default-password": "密碼變更提示",
-    "default-password-prompt": "您的管理員密碼為預設密碼，為了您的帳戶安全，請盡快變更密碼。（前往後台管理 - 系統設定 - 變更 Root 密碼）",
+    "default-password": "密碼安全提醒",
+    "default-password-prompt": "您的 Root 管理員密碼命中了已知不安全的初始密碼。為了帳戶安全，請盡快變更密碼。（前往後台管理 - 系統設定 - 變更 Root 密碼）",
     "chatnio-format-only": "此格式為 Prism 獨有格式",
     "identity": {
       "normal": "一般使用者",
