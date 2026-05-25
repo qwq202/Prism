@@ -4,7 +4,12 @@ import React, { useState } from "react";
 import { cn } from "@/components/ui/lib/utils.ts";
 import Avatar from "@/components/Avatar.tsx";
 import { useDispatch, useSelector } from "react-redux";
-import { logout, selectAuthenticated, selectUsername } from "@/store/auth.ts";
+import {
+  logout,
+  selectAuthenticated,
+  selectUsername,
+  validateToken,
+} from "@/store/auth.ts";
 import { Badge } from "@/components/ui/badge.tsx";
 import { useClipboard } from "@/utils/dom.ts";
 import { useGroup } from "@/utils/groups.ts";
@@ -410,6 +415,9 @@ function Account() {
     withNotify(t, resp, true, t("account.password-updated"));
 
     if (resp.status) {
+      if (resp.token) {
+        validateToken(dispatch, resp.token);
+      }
       setPasswordDialogOpen(false);
       setPasswordForm({ oldPassword: "", password: "", repassword: "" });
     }

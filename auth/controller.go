@@ -325,8 +325,9 @@ func UpdateAccountPasswordAPI(c *gin.Context) {
 		return
 	}
 
+	db := utils.GetDBFromContext(c)
 	if err := user.UpdatePasswordWithOldPassword(
-		utils.GetDBFromContext(c),
+		db,
 		utils.GetCacheFromContext(c),
 		form.OldPassword,
 		form.Password,
@@ -338,8 +339,18 @@ func UpdateAccountPasswordAPI(c *gin.Context) {
 		return
 	}
 
+	token, err := user.GenerateTokenSafe(db)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  err.Error(),
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status": true,
+		"token":  token,
 	})
 }
 

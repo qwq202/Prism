@@ -88,6 +88,10 @@ export type AccountPasswordForm = {
   password: string;
 };
 
+export type AccountPasswordResponse = VerifyResponse & {
+  token?: string;
+};
+
 export type PasskeyCredentialInfo = {
   id: number;
   name: string;
@@ -289,10 +293,10 @@ export async function updateAccountEmail(
 
 export async function updateAccountPassword(
   data: AccountPasswordForm,
-): Promise<VerifyResponse> {
+): Promise<AccountPasswordResponse> {
   try {
     const response = await axios.post("/account/password", data);
-    return response.data as VerifyResponse;
+    return response.data as AccountPasswordResponse;
   } catch (e) {
     return {
       status: false,
