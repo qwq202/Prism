@@ -9,12 +9,17 @@ export const quotaSlice = createSlice({
   },
   reducers: {
     setQuota: (state, action) => {
-      state.quota = action.payload as number;
+      const quota = Number(action.payload);
+      if (Number.isFinite(quota)) {
+        state.quota = quota;
+      }
     },
   },
   extraReducers: (builder) => {
     builder.addCase(refreshQuota.fulfilled, (state, action) => {
-      state.quota = action.payload as number;
+      if (action.payload !== null) {
+        state.quota = action.payload;
+      }
     });
   },
 });
