@@ -34,6 +34,9 @@ func TestRegisterStaticRouteSetsCacheHeaders(t *testing.T) {
 	}
 	writeTestFile(t, filepath.Join(dist, "index.html"), "<html><head><title>Prism</title></head><body>chatnio</body></html>")
 	writeTestFile(t, filepath.Join(dist, "site.webmanifest"), `{"name":"Prism"}`)
+	writeTestFile(t, filepath.Join(dist, "manifest.json"), `{"index.html":{"file":"assets/index.123.js"}}`)
+	writeTestFile(t, filepath.Join(dist, "service.js"), "self.addEventListener('activate', function () {});")
+	writeTestFile(t, filepath.Join(dist, "workbox.js"), "navigator.serviceWorker.register('/service.js');")
 	writeTestFile(t, filepath.Join(dist, "assets", "app.123.js"), "console.log('ok');")
 	if err := os.Chdir(root); err != nil {
 		t.Fatalf("chdir temp root: %v", err)
@@ -51,6 +54,9 @@ func TestRegisterStaticRouteSetsCacheHeaders(t *testing.T) {
 		{name: "spa fallback", path: "/settings/profile", cacheControl: staticPageCacheControl},
 		{name: "manifest", path: "/site.webmanifest", cacheControl: staticManifestCacheControl},
 		{name: "direct cached manifest", path: "/site.cache.webmanifest", cacheControl: staticManifestCacheControl},
+		{name: "vite manifest", path: "/manifest.json", cacheControl: staticManifestCacheControl},
+		{name: "service worker", path: "/service.js", cacheControl: staticManifestCacheControl},
+		{name: "service worker registrar", path: "/workbox.js", cacheControl: staticManifestCacheControl},
 		{name: "fingerprinted asset", path: "/assets/app.123.js", cacheControl: staticImmutableCacheControl},
 	}
 

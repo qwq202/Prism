@@ -193,7 +193,8 @@ func applyStaticCacheHeaders(c *gin.Context) {
 	switch {
 	case path == "/" || path == "/index.html" || path == "/index.cache.html":
 		setStaticPageCacheHeaders(c)
-	case path == "/site.webmanifest" || path == "/site.cache.webmanifest":
+	case path == "/manifest.json" || path == "/service.js" || path == "/workbox.js" ||
+		path == "/site.webmanifest" || path == "/site.cache.webmanifest":
 		c.Header("Cache-Control", staticManifestCacheControl)
 	case strings.HasPrefix(path, "/assets/"):
 		c.Header("Cache-Control", staticImmutableCacheControl)
