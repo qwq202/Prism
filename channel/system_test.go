@@ -119,3 +119,106 @@ func TestPasskeyGettersReturnValidBrowserEnums(t *testing.T) {
 		t.Fatalf("expected invalid authenticator attachment to default, got %q", got)
 	}
 }
+
+func TestValidateStorageConfigRejectsIncompleteRemoteMode(t *testing.T) {
+	tests := []struct {
+		name      string
+		config    SystemConfig
+		wantError string
+	}{
+		{
+			name: "s3 missing bucket",
+			config: SystemConfig{
+				Common: commonState{
+					StorageMode: "s3",
+					S3: s3StorageState{
+						Region:    "us-east-1",
+						AccessKey: "access-key",
+						SecretKey: "secret-key",
+					},
+				},
+			},
+			wantError: "s3 storage is not fully configured",
+		},
+		{
+			name: "r2 missing account id",
+			config: SystemConfig{
+				Common: commonState{
+					StorageMode: "r2",
+					R2: r2StorageState{
+						Bucket:    "bucket",
+						AccessKey: "access-key",
+						SecretKey: "secret-key",
+					},
+				},
+			},
+			wantError: "r2 storage is not fully configured",
+		},
+		{
+			name: "local ignores remote drafts",
+			config: SystemConfig{
+				Common: commonState{
+					StorageMode: "local",
+					S3: s3StorageState{
+						PublicBaseURL: "https://cdn.example.com",
+					},
+				},
+			},
+		},
+		{
+			name: "complete r2",
+			config: SystemConfig{
+				Common: commonState{
+					StorageMode: "r2",
+					R2: r2StorageState{
+						AccountID: "account-id",
+						Bucket:    "bucket",
+						AccessKey: "access-key",
+						SecretKey: "secret-key",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.ValidateStorageConfig()
+			if tt.wantError == "" {
+				if err != nil {
+					t.Fatalf("expected storage config to pass, got %v", err)
+				}
+				return
+			}
+			if err == nil || err.Error() != tt.wantError {
+				t.Fatalf("expected error %q, got %v", tt.wantError, err)
+			}
+		})
+	}
+}
+
+func TestUpdateConfigRejectsIncompleteRemoteStorageBeforeMutating(t *testing.T) {
+	current := &SystemConfig{
+		Common: commonState{
+			StorageMode: "local",
+		},
+	}
+	next := &SystemConfig{
+		Common: commonState{
+			StorageMode: "s3",
+			S3: s3StorageState{
+				Region:    "us-east-1",
+				AccessKey: "access-key",
+				SecretKey: "secret-key",
+			},
+		},
+	}
+
+	err := current.UpdateConfig(next)
+	if err == nil || err.Error() != "s3 storage is not fully configured" {
+		t.Fatalf("expected incomplete s3 config error, got %v", err)
+	}
+	if current.GetStorageMode() != "local" {
+		t.Fatalf("expected existing storage mode to remain local, got %q", current.GetStorageMode())
+	}
+}

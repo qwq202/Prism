@@ -261,6 +261,9 @@ func (c *SystemConfig) UpdateConfig(data *SystemConfig) error {
 	if err := utils.ValidateStoragePublicBaseURL(next.GetStorageR2PublicBaseURL()); err != nil {
 		return err
 	}
+	if err := next.ValidateStorageConfig(); err != nil {
+		return err
+	}
 
 	c.General = next.General
 	c.Site = next.Site
@@ -555,6 +558,21 @@ func (c *SystemConfig) IsR2StorageConfigured() bool {
 		c.GetStorageR2Bucket() != "" &&
 		c.GetStorageR2AccessKey() != "" &&
 		c.GetStorageR2SecretKey() != ""
+}
+
+func (c *SystemConfig) ValidateStorageConfig() error {
+	switch c.GetRawStorageMode() {
+	case "s3":
+		if !c.IsS3StorageConfigured() {
+			return fmt.Errorf("s3 storage is not fully configured")
+		}
+	case "r2":
+		if !c.IsR2StorageConfigured() {
+			return fmt.Errorf("r2 storage is not fully configured")
+		}
+	}
+
+	return nil
 }
 
 func (c *SystemConfig) AcceptImageStore() bool {
