@@ -22,7 +22,7 @@ import {
   ShoppingCart,
 } from "lucide-react";
 import { deeptrainEndpoint, useDeeptrain } from "@/conf/env.ts";
-import { quotaSelector } from "@/store/quota.ts";
+import { quotaSelector, refreshQuota } from "@/store/quota.ts";
 import { getPlanName, getPlanPrice } from "@/conf/subscription.tsx";
 import { Plans } from "@/api/types.tsx";
 import { subscriptionDataSelector } from "@/store/globals.ts";
@@ -238,12 +238,14 @@ export function Upgrade({ level, current, isYearly }: UpgradeProps) {
           </DialogClose>
           <Button
             unClickable
+            loading
             className={`mb-1.5`}
             onClick={async () => {
               const res = await callBuyAction(t, month, level, quota);
               if (res) {
                 setOpen(false);
                 dispatch(refreshSubscription());
+                dispatch(refreshQuota());
               }
             }}
           >
@@ -341,6 +343,7 @@ export function Upgrade({ level, current, isYearly }: UpgradeProps) {
               if (res) {
                 setOpen(false);
                 dispatch(refreshSubscription());
+                dispatch(refreshQuota());
               }
             }}
           >
