@@ -21,6 +21,7 @@ export const authSlice = createSlice({
       state.token = token;
       axios.defaults.headers.common["Authorization"] = token;
       if (token.length > 0) setMemory(tokenField, token);
+      else forgetMemory(tokenField);
     },
     setAuthenticated: (state, action) => {
       state.authenticated = action.payload as boolean;
@@ -53,11 +54,23 @@ export const authSlice = createSlice({
       state.token = "";
       state.authenticated = false;
       state.username = "";
+      state.admin = false;
       axios.defaults.headers.common["Authorization"] = "";
       forgetMemory(tokenField);
     },
   },
 });
+
+function clearInvalidToken(dispatch: AppDispatch) {
+  dispatch(authSlice.actions.logout());
+  dispatch(
+    authSlice.actions.updateData({
+      authenticated: false,
+      username: "",
+      admin: false,
+    }),
+  );
+}
 
 export function validateToken(
   dispatch: AppDispatch,
@@ -65,41 +78,34 @@ export function validateToken(
   hook?: () => void,
 ) {
   token = token.trim();
-  dispatch(setToken(token));
 
   if (token.length === 0) {
-    dispatch(
-      updateData({
-        authenticated: false,
-        username: "",
-        admin: false,
-      }),
-    );
-
+    clearInvalidToken(dispatch);
     return;
-  } else
-    doState()
-      .then((data) => {
-        dispatch(
-          updateData({
-            authenticated: data.status,
-            username: data.user,
-            admin: data.admin,
-          }),
-        );
+  }
 
-        hook && hook();
-      })
-      .catch((err) => {
-        console.debug(err);
-        dispatch(
-          updateData({
-            authenticated: false,
-            username: "",
-            admin: false,
-          }),
-        );
-      });
+  dispatch(setToken(token));
+  doState()
+    .then((data) => {
+      if (!data.status) {
+        clearInvalidToken(dispatch);
+        return;
+      }
+
+      dispatch(
+        updateData({
+          authenticated: true,
+          username: data.user,
+          admin: data.admin,
+        }),
+      );
+
+      hook && hook();
+    })
+    .catch((err) => {
+      console.debug(err);
+      clearInvalidToken(dispatch);
+    });
 }
 
 export const selectAuthenticated = (state: RootState) =>

@@ -1,4 +1,3 @@
-import { tokenField } from "@/conf/bootstrap.ts";
 import { useCallback, useEffect, useReducer } from "react";
 import Loader from "@/components/Loader.tsx";
 import "@/assets/pages/auth.less";
@@ -7,7 +6,6 @@ import { useDispatch } from "react-redux";
 import router from "@/router.tsx";
 import { useTranslation } from "react-i18next";
 import { getQueryParam } from "@/utils/path.ts";
-import { setMemory } from "@/utils/memory.ts";
 import { appLogo, appName, useDeeptrain } from "@/conf/env.ts";
 import PrismLogo from "@/components/PrismLogo.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
@@ -91,8 +89,6 @@ function DeepAuth() {
       setTimeout(goAuth, 2500);
       return;
     }
-
-    setMemory(tokenField, token);
 
     doLogin({ token })
       .then((data) => {
