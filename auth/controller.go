@@ -429,6 +429,7 @@ func SubscriptionAPI(c *gin.Context) {
 			"refresh_at":    "1970-01-01 00:00:00",
 			"usage":         channel.UsageMap{},
 		})
+		return
 	}
 
 	c.JSON(200, gin.H{
