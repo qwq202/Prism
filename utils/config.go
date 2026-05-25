@@ -35,28 +35,34 @@ func SaveConfig(key string, value interface{}) error {
 	configMutex.Lock()
 	defer configMutex.Unlock()
 
-	if err := viper.WriteConfigAs(configBackupFile); err != nil {
+	current := viper.New()
+	current.SetConfigFile(configFile)
+	if err := current.ReadInConfig(); err != nil {
 		return err
 	}
 
-	if err := viper.ReadInConfig(); err != nil {
+	if err := current.WriteConfigAs(configBackupFile); err != nil {
 		return err
 	}
 
-	currentConfig := viper.AllSettings()
-
+	currentConfig := current.AllSettings()
 	currentConfig[key] = value
 
+	next := viper.New()
+	next.SetConfigFile(configTmpFile)
 	for k, v := range currentConfig {
-		viper.Set(k, v)
+		next.Set(k, v)
 	}
-
-	if err := viper.WriteConfigAs(configTmpFile); err != nil {
+	if err := next.WriteConfigAs(configTmpFile); err != nil {
 		return err
 	}
 
 	if err := renameConfigFile(configTmpFile, configFile); err != nil {
 		return err
+	}
+
+	for k, v := range currentConfig {
+		viper.Set(k, v)
 	}
 
 	return nil

@@ -1,6 +1,9 @@
 package channel
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestSystemConfigNormalizeUsesRuntimeSafeValues(t *testing.T) {
 	conf := &SystemConfig{
@@ -220,5 +223,45 @@ func TestUpdateConfigRejectsIncompleteRemoteStorageBeforeMutating(t *testing.T) 
 	}
 	if current.GetStorageMode() != "local" {
 		t.Fatalf("expected existing storage mode to remain local, got %q", current.GetStorageMode())
+	}
+}
+
+func TestUpdateConfigKeepsRuntimeStateWhenSaveFails(t *testing.T) {
+	current := &SystemConfig{
+		General: generalState{
+			Backend:  "https://old.example.com",
+			TimeZone: "UTC",
+		},
+		Common: commonState{
+			StorageMode: "local",
+		},
+	}
+	next := &SystemConfig{
+		General: generalState{
+			Backend:  "https://new.example.com",
+			TimeZone: "Asia/Tokyo",
+		},
+		Common: commonState{
+			StorageMode: "local",
+		},
+	}
+
+	previousSave := saveSystemConfig
+	saveSystemConfig = func(*SystemConfig) error {
+		return errors.New("simulated save failure")
+	}
+	t.Cleanup(func() {
+		saveSystemConfig = previousSave
+	})
+
+	err := current.UpdateConfig(next)
+	if err == nil || err.Error() != "simulated save failure" {
+		t.Fatalf("expected simulated save failure, got %v", err)
+	}
+	if current.GetBackend() != "https://old.example.com" {
+		t.Fatalf("expected runtime backend to remain unchanged, got %q", current.GetBackend())
+	}
+	if current.GetTimeZone() != "UTC" {
+		t.Fatalf("expected runtime timezone to remain unchanged, got %q", current.GetTimeZone())
 	}
 }

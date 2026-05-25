@@ -12,6 +12,10 @@ import (
 
 const defaultSystemTimeZone = "Asia/Shanghai"
 
+var saveSystemConfig = func(config *SystemConfig) error {
+	return config.SaveConfig()
+}
+
 type ApiInfo struct {
 	Title        string   `json:"title"`
 	Logo         string   `json:"logo"`
@@ -265,21 +269,13 @@ func (c *SystemConfig) UpdateConfig(data *SystemConfig) error {
 		return err
 	}
 
-	c.General = next.General
-	c.Site = next.Site
-	c.Mail = next.Mail
-	c.Auth = next.Auth
-	c.Search = next.Search
-	c.Task = next.Task
-	c.Common = next.Common
-
-	utils.ApplySeo(c.General.Title, c.General.Logo)
-	utils.ApplyPWAManifest(c.General.PWAManifest)
-
-	if err := c.SaveConfig(); err != nil {
+	if err := saveSystemConfig(&next); err != nil {
 		return err
 	}
 
+	*c = next
+	utils.ApplySeo(c.General.Title, c.General.Logo)
+	utils.ApplyPWAManifest(c.General.PWAManifest)
 	c.Load()
 	return nil
 }

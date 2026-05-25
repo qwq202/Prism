@@ -116,6 +116,11 @@ func TestSaveConfigKeepsExistingConfigWhenReplaceFails(t *testing.T) {
 	if string(content) != originalContent {
 		t.Fatalf("expected original config to remain unchanged, got %q", string(content))
 	}
+
+	channels := viper.GetStringSlice("channel")
+	if len(channels) != 0 {
+		t.Fatalf("expected runtime config to remain unchanged, got %#v", channels)
+	}
 }
 
 func withTempConfigFiles(t *testing.T, content string) {
