@@ -224,11 +224,38 @@ func filterRemovedChannels(seq Sequence) (Sequence, int) {
 }
 
 func validateChannelType(channel *Channel) error {
-	if channel != nil && isRemovedChannelType(channel.Type) {
-		return fmt.Errorf("channel type %s has been removed", channel.Type)
+	if channel == nil {
+		return errors.New("channel is required")
+	}
+
+	channelType := channel.Type
+	if isRemovedChannelType(channelType) {
+		return fmt.Errorf("channel type %s has been removed", channelType)
+	}
+	if !isKnownChannelType(channelType) {
+		return fmt.Errorf("unknown channel type %s", channelType)
 	}
 
 	return nil
+}
+
+func isKnownChannelType(channelType string) bool {
+	switch channelType {
+	case globals.OpenAIChannelType,
+		globals.OpenAIResponsesChannelType,
+		globals.XAIChannelType,
+		globals.AzureOpenAIChannelType,
+		globals.ClaudeChannelType,
+		globals.GLMCodingPlanCNChannelType,
+		globals.MiniMaxTokenPlanCNChannelType,
+		globals.XiaomiTokenPlanCNChannelType,
+		globals.PalmChannelType,
+		globals.GeminiEnterpriseAgentPlatformChannelType,
+		globals.DeepseekChannelType:
+		return true
+	default:
+		return false
+	}
 }
 
 func isRemovedChannelType(channelType string) bool {
