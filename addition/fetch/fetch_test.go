@@ -70,3 +70,19 @@ func TestExecuteToolCallBlocksLocalNetworkURL(t *testing.T) {
 		t.Fatalf("expected local network rejection, got %#v", result)
 	}
 }
+
+func TestValidateURLRejectsUnsafeTargets(t *testing.T) {
+	unsafeTargets := []string{
+		"ftp://example.com/file",
+		"https://user:pass@example.com/private",
+		"http://service.local/private",
+		"http://100.64.0.1/private",
+		"http://[fe80::1%25lo0]/private",
+	}
+
+	for _, target := range unsafeTargets {
+		if err := validateURL(target); err == nil {
+			t.Fatalf("expected %q to be rejected", target)
+		}
+	}
+}

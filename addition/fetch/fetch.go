@@ -218,6 +218,9 @@ func validateURL(rawURL string) error {
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return fmt.Errorf("only http and https URLs are supported")
 	}
+	if parsed.User != nil {
+		return fmt.Errorf("URL credentials are not allowed")
+	}
 
 	host := parsed.Hostname()
 	if host == "" {
@@ -260,7 +263,11 @@ func secureTransport() *http.Transport {
 
 func isBlockedHost(host string) bool {
 	host = strings.TrimSpace(strings.TrimSuffix(strings.ToLower(host), "."))
-	if host == "" || host == "localhost" || strings.HasSuffix(host, ".localhost") {
+	if host == "" ||
+		host == "localhost" ||
+		strings.HasSuffix(host, ".localhost") ||
+		strings.HasSuffix(host, ".local") ||
+		strings.Contains(host, "%") {
 		return true
 	}
 
@@ -284,6 +291,10 @@ func isBlockedIP(ip net.IP) bool {
 	if ip == nil {
 		return true
 	}
+	if v4 := ip.To4(); v4 != nil && v4[0] == 100 && v4[1] >= 64 && v4[1] <= 127 {
+		return true
+	}
+
 	return ip.IsLoopback() ||
 		ip.IsPrivate() ||
 		ip.IsLinkLocalUnicast() ||
