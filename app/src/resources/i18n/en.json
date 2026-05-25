@@ -348,6 +348,7 @@
     "migrate-success-prompt": "You have successfully changed your subscription plan.",
     "failed": "Subscription failed",
     "failed-prompt": "Failed to subscribe. Please make sure you have enough balance.",
+    "failed-reason-prompt": "Subscription failed: {{reason}}",
     "migrate-failed": "Plan change failed",
     "migrate-failed-prompt": "Your subscription plan change failed.",
     "plan-usage": "{{name}} uses {{times}} times per month",

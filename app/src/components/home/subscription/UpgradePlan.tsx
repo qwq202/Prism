@@ -87,6 +87,10 @@ function getDiscountPercent(data: Plans, base: number, month: number): number | 
   return null;
 }
 
+function getSubscriptionFailureReason(error?: string): string {
+  return error?.trim() ?? "";
+}
+
 type UpgradeProps = {
   level: number;
   current: number;
@@ -107,12 +111,15 @@ async function callBuyAction(
       }),
     });
   } else {
+    const reason = getSubscriptionFailureReason(res.error);
     toast.error(t("sub.failed"), {
-      description: useDeeptrain
-        ? t("sub.failed-prompt")
-        : t("sub.failed-quota-prompt", {
-            quota: current.toFixed(2),
-          }),
+      description: reason
+        ? t("sub.failed-reason-prompt", { reason })
+        : useDeeptrain
+          ? t("sub.failed-prompt")
+          : t("sub.failed-quota-prompt", {
+              quota: current.toFixed(2),
+            }),
 
       action: useDeeptrain
         ? {
@@ -139,8 +146,11 @@ async function callMigrateAction(t: TFunction, level: number): Promise<boolean> 
       description: t("sub.migrate-success-prompt"),
     });
   } else {
+    const reason = getSubscriptionFailureReason(res.error);
     toast.error(t("sub.migrate-failed"), {
-      description: t("sub.sub-migrate-failed-prompt", { reason: res.error }),
+      description: reason
+        ? t("sub.sub-migrate-failed-prompt", { reason })
+        : t("sub.migrate-failed-prompt"),
     });
   }
   return res.status;

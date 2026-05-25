@@ -348,6 +348,7 @@
     "migrate-success-prompt": "サブスクリプションプランが正常に変更されました。",
     "failed": "サブスクリプションに失敗しました",
     "failed-prompt": "サブスクリプションに失敗しました。十分な残高があることを確認してください。",
+    "failed-reason-prompt": "サブスクリプションに失敗しました：{{reason}}",
     "migrate-failed": "変更できませんでした",
     "migrate-failed-prompt": "サブスクリプションの変更に失敗しました。",
     "plan-usage": "{{name}}は月に{{times}}回使用",

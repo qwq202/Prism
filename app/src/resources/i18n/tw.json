@@ -429,6 +429,7 @@
     "migrate-success-prompt": "您已成功變更訂閱方案。",
     "failed": "訂閱失敗",
     "failed-prompt": "訂閱失敗，請確認您有足夠的餘額。",
+    "failed-reason-prompt": "訂閱失敗，原因：{{reason}}",
     "failed-quota-prompt": "訂閱失敗，您的餘額不足 ({{quota}} 點數)",
     "migrate-failed": "變更失敗",
     "sub-migrate-failed-prompt": "您的訂閱變更失敗，原因：{{reason}}",

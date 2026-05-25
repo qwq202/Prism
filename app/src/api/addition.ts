@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getErrorMessage } from "@/utils/base.ts";
 type QuotaResponse = {
   status: boolean;
   error: string;
@@ -98,6 +99,6 @@ export async function buySubscription(
     return resp.data as BuySubscriptionResponse;
   } catch (e) {
     console.debug(e);
-    return { status: false, error: "network error" };
+    return { status: false, error: getErrorMessage(e) };
   }
 }

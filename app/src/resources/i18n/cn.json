@@ -602,6 +602,7 @@
     "migrate-success-prompt": "您已成功变更订阅计划。",
     "failed": "订阅失败",
     "failed-prompt": "订阅失败，请确保您有足够的余额。",
+    "failed-reason-prompt": "订阅失败，原因：{{reason}}",
     "failed-quota-prompt": "订阅失败，您的余额不足 ({{quota}} 点数)",
     "migrate-failed": "变更失败",
     "sub-migrate-failed-prompt": "您的订阅变更失败，原因：{{reason}}",
