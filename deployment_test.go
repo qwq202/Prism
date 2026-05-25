@@ -60,3 +60,25 @@ func TestDockerEnvExampleDocumentsComposeVariables(t *testing.T) {
 		}
 	}
 }
+
+func TestNginxProxyForwardsOriginalRequestContext(t *testing.T) {
+	data, err := os.ReadFile("nginx.conf")
+	if err != nil {
+		t.Fatalf("read nginx.conf: %v", err)
+	}
+
+	content := string(data)
+	if strings.Contains(content, "proxy_set_header Host 127.0.0.1") {
+		t.Fatalf("expected nginx proxy sample to preserve the public Host header")
+	}
+	for _, directive := range []string{
+		"proxy_set_header Host $host;",
+		"proxy_set_header X-Forwarded-Host $host;",
+		"proxy_set_header X-Forwarded-Proto $scheme;",
+		"proxy_set_header X-Forwarded-Port $server_port;",
+	} {
+		if !strings.Contains(content, directive) {
+			t.Fatalf("expected nginx proxy sample to include %q", directive)
+		}
+	}
+}
