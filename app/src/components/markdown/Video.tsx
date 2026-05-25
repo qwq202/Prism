@@ -47,16 +47,27 @@ export default function Video({
   const blobUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+    setVideoUrl(null);
+
     if (!src) {
       setState(VideoState.Error);
-      return;
+      return () => {
+        controller.abort();
+      };
     }
 
     const fetchVideo = async () => {
       try {
         setState(VideoState.Loading);
         const headers: HeadersInit = {
-          "Content-Type": "video/mp4",
+          Accept: "video/*",
         };
 
         if (token) {
@@ -66,6 +77,7 @@ export default function Video({
         const response = await fetch(src, {
           method: "GET",
           headers,
+          signal: controller.signal,
         });
 
         if (!response.ok) {
@@ -75,14 +87,16 @@ export default function Video({
         const blob = await response.blob();
         const blobUrl = URL.createObjectURL(blob);
 
-        if (blobUrlRef.current) {
-          URL.revokeObjectURL(blobUrlRef.current);
+        if (cancelled) {
+          URL.revokeObjectURL(blobUrl);
+          return;
         }
-        
+
         blobUrlRef.current = blobUrl;
         setVideoUrl(blobUrl);
         setState(VideoState.Loaded);
       } catch (error) {
+        if (cancelled || controller.signal.aborted) return;
         console.error("[Video] Failed to load video:", error);
         setState(VideoState.Error);
       }
@@ -91,6 +105,8 @@ export default function Video({
     fetchVideo();
 
     return () => {
+      cancelled = true;
+      controller.abort();
       if (blobUrlRef.current) {
         URL.revokeObjectURL(blobUrlRef.current);
         blobUrlRef.current = null;
