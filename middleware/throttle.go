@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"chat/globals"
 	"chat/utils"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -65,12 +66,8 @@ func ThrottleMiddleware() gin.HandlerFunc {
 			rate, err := limiter.RateLimit(cache, ip, path)
 
 			if err != nil {
-				c.JSON(200, gin.H{
-					"status": false,
-					"reason": err.Error(),
-					"error":  err.Error(),
-				})
-				c.Abort()
+				globals.Warn(fmt.Sprintf("[middleware] rate limiter skipped for %s from %s: %s", path, ip, err.Error()))
+				c.Next()
 				return
 			}
 
