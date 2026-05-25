@@ -5,12 +5,16 @@ import (
 	"chat/globals"
 	"chat/utils"
 	"database/sql"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/spf13/viper"
 )
@@ -45,6 +49,30 @@ func openAuthSecurityTestDB(t *testing.T) *sql.DB {
 	return db
 }
 
+func newAuthSecurityTestContext(t *testing.T, db *sql.DB) *gin.Context {
+	t.Helper()
+
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	c.Set("db", db)
+
+	cache := redis.NewClient(&redis.Options{
+		Addr:         "127.0.0.1:1",
+		MaxRetries:   -1,
+		DialTimeout:  time.Millisecond,
+		ReadTimeout:  time.Millisecond,
+		WriteTimeout: time.Millisecond,
+	})
+	t.Cleanup(func() {
+		_ = cache.Close()
+	})
+	c.Set("cache", cache)
+
+	return c
+}
+
 func TestGenerateTokenOmitsPasswordHash(t *testing.T) {
 	previousSecret := viper.GetString("secret")
 	viper.Set("secret", strings.Repeat("s", 32))
@@ -52,9 +80,10 @@ func TestGenerateTokenOmitsPasswordHash(t *testing.T) {
 		viper.Set("secret", previousSecret)
 	})
 
+	passwordHash := utils.Sha2Encrypt("password")
 	token, err := (&User{
 		Username: "alice",
-		Password: utils.Sha2Encrypt("password"),
+		Password: passwordHash,
 	}).GenerateToken()
 	if err != nil {
 		t.Fatalf("generate token: %v", err)
@@ -73,6 +102,12 @@ func TestGenerateTokenOmitsPasswordHash(t *testing.T) {
 	}
 	if _, ok := claims["password"]; ok {
 		t.Fatalf("expected token claims to omit password hash")
+	}
+	if claims["session"] == "" {
+		t.Fatalf("expected token to include a session fingerprint")
+	}
+	if claims["session"] == passwordHash {
+		t.Fatalf("expected session fingerprint not to expose password hash")
 	}
 }
 
@@ -154,6 +189,63 @@ func TestConstantTimeStringEqualRequiresSameValueAndLength(t *testing.T) {
 	}
 	if constantTimeStringEqual("123456", "0123456") {
 		t.Fatalf("expected equal hash comparison to still require same original length")
+	}
+}
+
+func TestPasswordChangeInvalidatesSessionToken(t *testing.T) {
+	db := openAuthSecurityTestDB(t)
+
+	var oldHash string
+	if err := globals.QueryRowDb(db, "SELECT password FROM auth WHERE username = ?", "root").Scan(&oldHash); err != nil {
+		t.Fatalf("fetch root password hash: %v", err)
+	}
+
+	user := &User{
+		Username: "root",
+		Password: oldHash,
+	}
+	token, err := user.GenerateToken()
+	if err != nil {
+		t.Fatalf("generate token: %v", err)
+	}
+
+	c := newAuthSecurityTestContext(t, db)
+	if parsed := ParseToken(c, token); parsed == nil {
+		t.Fatalf("expected token to validate before password change")
+	}
+
+	if err := user.UpdatePassword(db, utils.GetCacheFromContext(c), "newsecret123"); err != nil {
+		t.Fatalf("update password: %v", err)
+	}
+
+	if parsed := ParseToken(c, token); parsed != nil {
+		t.Fatalf("expected old token to be rejected after password change")
+	}
+
+	nextToken, err := user.GenerateToken()
+	if err != nil {
+		t.Fatalf("generate next token: %v", err)
+	}
+	if parsed := ParseToken(c, nextToken); parsed == nil {
+		t.Fatalf("expected fresh token to validate after password change")
+	}
+}
+
+func TestTokenWithoutSessionFingerprintIsRejected(t *testing.T) {
+	db := openAuthSecurityTestDB(t)
+
+	instance := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"username": "root",
+		"exp":      time.Now().Add(time.Hour).Unix(),
+	})
+	token, err := instance.SignedString([]byte(viper.GetString("secret")))
+	if err != nil {
+		t.Fatalf("generate token: %v", err)
+	}
+
+	c := newAuthSecurityTestContext(t, db)
+	if parsed := ParseToken(c, token); parsed != nil {
+		t.Fatalf("expected token without session fingerprint to be rejected")
 	}
 }
 

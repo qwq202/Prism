@@ -83,7 +83,7 @@ func rootToken(t *testing.T, db *sql.DB) (int64, string) {
 		t.Fatalf("expected root user")
 	}
 
-	token, err := user.GenerateToken()
+	token, err := user.GenerateTokenSafe(db)
 	if err != nil {
 		t.Fatalf("generate root token: %v", err)
 	}

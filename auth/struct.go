@@ -13,6 +13,7 @@ type User struct {
 	Email        string     `json:"email"`
 	BindID       int64      `json:"bind_id"`
 	Password     string     `json:"password"`
+	SessionHash  string     `json:"-"`
 	Token        string     `json:"token"`
 	Admin        bool       `json:"is_admin"`
 	Level        int        `json:"level"`

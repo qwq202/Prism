@@ -5,9 +5,11 @@ import (
 	"chat/globals"
 	"chat/utils"
 	"context"
+	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -57,6 +59,9 @@ func parseTokenClaims(claims jwt.MapClaims, now time.Time) (*User, bool) {
 	}
 	if password, ok := claims["password"].(string); ok {
 		user.Password = password
+	}
+	if session, ok := claims["session"].(string); ok {
+		user.SessionHash = strings.TrimSpace(session)
 	}
 
 	return user, true
@@ -257,7 +262,7 @@ func DeepLogin(c *gin.Context, token string) (string, error) {
 
 		u := &User{
 			Username: user.Username,
-			Password: password,
+			Password: hash,
 		}
 
 		u.CreateInitialQuota(db)
@@ -273,6 +278,7 @@ func DeepLogin(c *gin.Context, token string) (string, error) {
 	}
 	u := &User{
 		Username: user.Username,
+		Password: password,
 	}
 
 	if u.IsBanned(db) {
@@ -332,7 +338,10 @@ func (u *User) UpdatePassword(db *sql.DB, cache *redis.Client, password string) 
 		return err
 	}
 
-	cache.Del(context.Background(), fmt.Sprintf("nio:user:%s", u.Username))
+	u.Password = hash
+	if cache != nil {
+		cache.Del(context.Background(), fmt.Sprintf("nio:user:%s", u.Username))
+	}
 
 	return nil
 }
@@ -424,45 +433,60 @@ func (u *User) Validate(c *gin.Context) bool {
 	cache := utils.GetCacheFromContext(c)
 	db := utils.GetDBFromContext(c)
 
-	if u.Password != "" {
+	if u.Password == "" && u.SessionHash == "" {
+		return false
+	}
+
+	storedPassword := ""
+	if cache != nil {
 		if password, err := cache.Get(c, fmt.Sprintf("nio:user:%s", u.Username)).Result(); err == nil && len(password) > 0 {
-			if u.Password != password {
-				return false
+			storedPassword = password
+		}
+	}
+	if storedPassword == "" {
+		if err := globals.QueryRowDb(db, "SELECT password FROM auth WHERE username = ?", u.Username).Scan(&storedPassword); err != nil {
+			if err != sql.ErrNoRows {
+				globals.Warn(fmt.Sprintf("validate user password error: %s", err.Error()))
 			}
-
-			return !u.IsBanned(db)
+			return false
 		}
 	}
 
-	var count int
-	var err error
-	if u.Password != "" {
-		err = globals.QueryRowDb(db, "SELECT COUNT(*) FROM auth WHERE username = ? AND password = ?", u.Username, u.Password).Scan(&count)
-	} else {
-		err = globals.QueryRowDb(db, "SELECT COUNT(*) FROM auth WHERE username = ?", u.Username).Scan(&count)
+	if u.Password != "" && !constantTimeStringEqual(storedPassword, u.Password) {
+		return false
 	}
-	if err != nil || count == 0 {
-		if err != nil {
-			globals.Warn(fmt.Sprintf("validate user error: %s", err.Error()))
-		}
+	if u.SessionHash != "" && !constantTimeStringEqual(sessionHashForPassword(storedPassword), u.SessionHash) {
 		return false
 	}
 
-	if u.IsBanned(db) {
-		return false
+	if cache != nil {
+		cache.Set(c, fmt.Sprintf("nio:user:%s", u.Username), storedPassword, 30*time.Minute)
 	}
 
-	if u.Password != "" {
-		cache.Set(c, fmt.Sprintf("nio:user:%s", u.Username), u.Password, 30*time.Minute)
+	return !u.IsBanned(db)
+}
+
+func sessionHashForPassword(password string) string {
+	password = strings.TrimSpace(password)
+	if password == "" {
+		return ""
 	}
-	return true
+
+	mac := hmac.New(sha256.New, []byte(viper.GetString("secret")))
+	_, _ = mac.Write([]byte(password))
+	return hex.EncodeToString(mac.Sum(nil))
 }
 
 func (u *User) GenerateToken() (string, error) {
-	instance := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+	claims := jwt.MapClaims{
 		"username": u.Username,
 		"exp":      time.Now().Add(time.Hour * 24 * 30).Unix(),
-	})
+	}
+	if session := sessionHashForPassword(u.Password); session != "" {
+		claims["session"] = session
+	}
+
+	instance := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	token, err := instance.SignedString([]byte(viper.GetString("secret")))
 	if err != nil {
 		return "", err
@@ -473,6 +497,19 @@ func (u *User) GenerateToken() (string, error) {
 }
 
 func (u *User) GenerateTokenSafe(db *sql.DB) (string, error) {
+	if len(u.Username) == 0 || len(u.Password) == 0 {
+		if u.ID > 0 {
+			if err := globals.QueryRowDb(db, "SELECT username, password FROM auth WHERE id = ?", u.ID).Scan(&u.Username, &u.Password); err != nil {
+				return "", err
+			}
+		} else if u.Username != "" {
+			if err := globals.QueryRowDb(db, "SELECT password FROM auth WHERE username = ?", u.Username).Scan(&u.Password); err != nil {
+				return "", err
+			}
+		} else {
+			return "", errors.New("missing user identity")
+		}
+	}
 	if len(u.Username) == 0 {
 		if err := globals.QueryRowDb(db, "SELECT username FROM auth WHERE id = ?", u.ID).Scan(&u.Username); err != nil {
 			return "", err
