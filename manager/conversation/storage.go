@@ -53,10 +53,14 @@ func isDuplicateConversationIDError(err error) bool {
 		strings.Contains(lower, "unique constraint failed")
 }
 
-func loadGlobalConversationAttachmentNames(db *sql.DB) map[string]struct{} {
+func loadGlobalConversationAttachmentNames(db *sql.DB) (map[string]struct{}, error) {
+	if db == nil {
+		return nil, fmt.Errorf("database is not initialized")
+	}
+
 	rows, err := globals.QueryDb(db, `SELECT data FROM conversation`)
 	if err != nil {
-		return map[string]struct{}{}
+		return nil, err
 	}
 	defer func(rows *sql.Rows) {
 		_ = rows.Close()
@@ -64,27 +68,38 @@ func loadGlobalConversationAttachmentNames(db *sql.DB) map[string]struct{} {
 
 	result := map[string]struct{}{}
 	for rows.Next() {
-		var data string
+		var data sql.NullString
 		if err := rows.Scan(&data); err != nil {
+			return nil, err
+		}
+		if !data.Valid {
 			continue
 		}
 
-		for _, name := range utils.ExtractAttachmentNames(data) {
+		for _, name := range utils.ExtractAttachmentNames(data.String) {
 			result[name] = struct{}{}
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
-	return result
+	return result, nil
 }
 
 func cleanupOrphanStoredAttachments(db *sql.DB) {
+	referenced, err := loadGlobalConversationAttachmentNames(db)
+	if err != nil {
+		globals.Warn(fmt.Sprintf("[conversation] load attachment references error: %s", err.Error()))
+		return
+	}
+
 	storedNames, err := utils.ListStoredAttachmentNames()
 	if err != nil {
 		globals.Warn(fmt.Sprintf("[conversation] list stored attachments error: %s", err.Error()))
 		return
 	}
 
-	referenced := loadGlobalConversationAttachmentNames(db)
 	for _, name := range storedNames {
 		if _, ok := referenced[name]; ok {
 			continue
