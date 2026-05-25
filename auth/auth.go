@@ -140,8 +140,11 @@ func setCode(ctx context.Context, cache otpCache, email, code string) bool {
 	return cache.Set(ctx, otpKey(email), code, 5*time.Minute).Err() == nil
 }
 
-func Verify(c *gin.Context, email string, checkout bool) error {
-	cache := utils.GetCacheFromContext(c)
+func validateVerificationEmail(db *sql.DB, email string, checkout bool, reset bool) error {
+	email = strings.TrimSpace(email)
+	if !validateEmail(email) {
+		return errors.New("invalid email format")
+	}
 
 	if checkout {
 		if err := channel.SystemInstance.IsValidMail(email); err != nil {
@@ -149,6 +152,21 @@ func Verify(c *gin.Context, email string, checkout bool) error {
 		}
 	}
 
+	if reset && !IsEmailExist(db, email) {
+		return errors.New("email is not registered")
+	}
+
+	return nil
+}
+
+func Verify(c *gin.Context, email string, checkout bool, reset bool) error {
+	email = strings.TrimSpace(email)
+	db := utils.GetDBFromContext(c)
+	if err := validateVerificationEmail(db, email, checkout, reset); err != nil {
+		return err
+	}
+
+	cache := utils.GetCacheFromContext(c)
 	code := utils.GenerateCode(6)
 	if !setCode(c, cache, email, code) {
 		return errors.New("verification code storage is unavailable")

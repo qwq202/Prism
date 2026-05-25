@@ -18,8 +18,9 @@ type RegisterForm struct {
 }
 
 type VerifyForm struct {
-	Email    string `form:"email" binding:"required"`
-	Checkout bool   `form:"checkout"`
+	Email    string `form:"email" json:"email" binding:"required"`
+	Checkout bool   `form:"checkout" json:"checkout"`
+	Reset    bool   `form:"reset" json:"reset"`
 }
 
 type LoginForm struct {
@@ -240,7 +241,7 @@ func VerifyAPI(c *gin.Context) {
 		return
 	}
 
-	if err := Verify(c, form.Email, form.Checkout); err != nil {
+	if err := Verify(c, form.Email, form.Checkout, form.Reset); err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"status": false,
 			"error":  err.Error(),

@@ -59,3 +59,23 @@ func TestCheckCodeDoesNotConsumeOTPBeforeMutationSucceeds(t *testing.T) {
 		t.Fatalf("expected consumed otp to be rejected")
 	}
 }
+
+func TestValidateVerificationEmailForResetRequiresRegisteredEmail(t *testing.T) {
+	db := openAuthSecurityTestDB(t)
+
+	if err := validateVerificationEmail(db, "not-an-email", false, true); err == nil {
+		t.Fatalf("expected invalid email to be rejected")
+	}
+
+	if err := validateVerificationEmail(db, "missing@example.com", false, true); err == nil {
+		t.Fatalf("expected reset verification for unregistered email to be rejected")
+	}
+
+	if err := validateVerificationEmail(db, "root@example.com", false, true); err != nil {
+		t.Fatalf("expected reset verification for registered email to pass: %v", err)
+	}
+
+	if err := validateVerificationEmail(db, "missing@example.com", false, false); err != nil {
+		t.Fatalf("expected non-reset verification to allow unregistered test email: %v", err)
+	}
+}

@@ -32,7 +32,7 @@ function Forgot() {
     repassword: "",
   });
 
-  const onVerify = async () => await sendCode(t, form.email);
+  const onVerify = async () => await sendCode(t, form.email, false, true);
 
   const onSubmit = async () => {
     if (

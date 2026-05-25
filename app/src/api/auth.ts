@@ -59,6 +59,8 @@ export type RegisterResponse = {
 
 export type VerifyForm = {
   email: string;
+  checkout?: boolean;
+  reset?: boolean;
 };
 
 export type VerifyResponse = {
@@ -250,11 +252,13 @@ export async function doRegister(
 export async function doVerify(
   email: string,
   checkout?: boolean,
+  reset?: boolean,
 ): Promise<VerifyResponse> {
   try {
     const response = await axios.post("/verify", {
       email,
       checkout,
+      reset,
     } as VerifyForm);
     return response.data as VerifyResponse;
   } catch (e) {
@@ -361,10 +365,11 @@ export async function sendCode(
   t: TFunction,
   email: string,
   checkout?: boolean,
+  reset?: boolean,
 ): Promise<boolean> {
   if (email.trim().length === 0 || !isEmailValid(email)) return false;
 
-  const res = await doVerify(email, checkout);
+  const res = await doVerify(email, checkout, reset);
   if (!res.status)
     toast.error(t("auth.send-code-failed"), {
       description: t("auth.send-code-failed-prompt", {
