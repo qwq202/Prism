@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/go-redis/redis/v8"
-	"github.com/goccy/go-json"
 	"github.com/spf13/viper"
 )
 
@@ -39,12 +38,14 @@ func GetBalance(username string) float32 {
 		"sign":     utils.Sha2Encrypt(username + order + viper.GetString("auth.sign")),
 	})
 
-	if err != nil || res == nil || res.(map[string]interface{})["status"] == false {
+	if err != nil {
 		return 0.
 	}
 
-	converter, _ := json.Marshal(res)
-	resp, _ := utils.Unmarshal[BalanceResponse](converter)
+	resp, ok := decodeDeeptrainResponse[BalanceResponse](res)
+	if !ok {
+		return 0.
+	}
 	return resp.Balance
 }
 
@@ -65,12 +66,14 @@ func Pay(username string, amount float32) bool {
 		"sign":     utils.Sha2Encrypt(username + order + viper.GetString("auth.sign")),
 	})
 
-	if err != nil || res == nil || res.(map[string]interface{})["status"] == false {
+	if err != nil {
 		return false
 	}
 
-	converter, _ := json.Marshal(res)
-	resp, _ := utils.Unmarshal[PaymentResponse](converter)
+	resp, ok := decodeDeeptrainResponse[PaymentResponse](res)
+	if !ok {
+		return false
+	}
 	return resp.Type
 }
 

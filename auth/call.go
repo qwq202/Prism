@@ -20,6 +20,27 @@ func useDeeptrain() bool {
 	return viper.GetBool("auth.use_deeptrain")
 }
 
+func decodeDeeptrainResponse[T any](res interface{}) (*T, bool) {
+	payload, ok := res.(map[string]interface{})
+	if !ok {
+		return nil, false
+	}
+	status, ok := payload["status"].(bool)
+	if !ok || !status {
+		return nil, false
+	}
+
+	converter, err := json.Marshal(payload)
+	if err != nil {
+		return nil, false
+	}
+	resp, err := utils.Unmarshal[T](converter)
+	if err != nil {
+		return nil, false
+	}
+	return &resp, true
+}
+
 func Validate(token string) *ValidateUserResponse {
 	res, err := utils.Post(getDeeptrainApi("/app/validate"), map[string]string{
 		"Content-Type": "application/json",
@@ -29,11 +50,13 @@ func Validate(token string) *ValidateUserResponse {
 		"hash":     utils.Sha2Encrypt(token + viper.GetString("auth.salt")),
 	})
 
-	if err != nil || res == nil || res.(map[string]interface{})["status"] == false {
+	if err != nil {
 		return nil
 	}
 
-	converter, _ := json.Marshal(res)
-	resp, _ := utils.Unmarshal[ValidateUserResponse](converter)
-	return &resp
+	resp, ok := decodeDeeptrainResponse[ValidateUserResponse](res)
+	if !ok {
+		return nil
+	}
+	return resp
 }

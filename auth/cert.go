@@ -2,7 +2,6 @@ package auth
 
 import (
 	"chat/utils"
-	"github.com/goccy/go-json"
 	"github.com/spf13/viper"
 )
 
@@ -21,11 +20,13 @@ func Cert(username string) *CertResponse {
 		"hash":     utils.Sha2Encrypt(username + viper.GetString("auth.salt")),
 	})
 
-	if err != nil || res == nil || res.(map[string]interface{})["status"] == false {
+	if err != nil {
 		return nil
 	}
 
-	converter, _ := json.Marshal(res)
-	resp, _ := utils.Unmarshal[CertResponse](converter)
-	return &resp
+	resp, ok := decodeDeeptrainResponse[CertResponse](res)
+	if !ok {
+		return nil
+	}
+	return resp
 }
