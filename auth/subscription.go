@@ -176,6 +176,26 @@ func CountSubscriptionPrize(level int, month int) float32 {
 	return base
 }
 
+func refundLocalSubscriptionPayment(db *sql.DB, user *User, amount float32) bool {
+	if amount <= 0 {
+		return true
+	}
+	return user.IncreaseQuota(db, amount*10)
+}
+
+func subscriptionUpdateFailureError(db *sql.DB, user *User, amount float32) error {
+	if useDeeptrain() {
+		return errors.New("payment succeeded but failed to update subscription")
+	}
+	if amount <= 0 {
+		return errors.New("failed to update subscription")
+	}
+	if refundLocalSubscriptionPayment(db, user, amount) {
+		return errors.New("failed to update subscription; quota has been refunded")
+	}
+	return errors.New("quota payment succeeded but failed to update subscription and refund quota")
+}
+
 func BuySubscription(db *sql.DB, cache *redis.Client, user *User, level int, month int) error {
 	if disableSubscription() {
 		return errors.New("subscription feature does not enable of this site")
@@ -197,7 +217,7 @@ func BuySubscription(db *sql.DB, cache *redis.Client, user *User, level int, mon
 		if user.Pay(db, cache, money) {
 			// migrate subscription
 			if !user.AddSubscription(db, month, level) {
-				return errors.New("payment succeeded but failed to update subscription")
+				return subscriptionUpdateFailureError(db, user, money)
 			}
 
 			if before == 0 {
@@ -220,7 +240,7 @@ func BuySubscription(db *sql.DB, cache *redis.Client, user *User, level int, mon
 		money := user.CountUpgradePrice(db, level)
 		if user.Pay(db, cache, money) {
 			if !user.SetSubscriptionLevel(db, level) {
-				return errors.New("payment succeeded but failed to update subscription")
+				return subscriptionUpdateFailureError(db, user, money)
 			}
 			return nil
 		}

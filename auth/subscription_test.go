@@ -30,7 +30,7 @@ func TestCalculateDowngradeExpiredAtScalesPaidPlanExpiry(t *testing.T) {
 	}
 }
 
-func TestBuySubscriptionReturnsErrorWhenLocalUpdateFailsAfterPayment(t *testing.T) {
+func TestBuySubscriptionRefundsQuotaWhenLocalUpdateFailsAfterPayment(t *testing.T) {
 	db := openAuthSecurityTestDB(t)
 	user := GetUserByName(db, "root")
 	if user == nil {
@@ -58,10 +58,10 @@ func TestBuySubscriptionReturnsErrorWhenLocalUpdateFailsAfterPayment(t *testing.
 	})
 
 	err := BuySubscription(db, nil, user, 1, 1)
-	if err == nil || err.Error() != "payment succeeded but failed to update subscription" {
+	if err == nil || err.Error() != "failed to update subscription; quota has been refunded" {
 		t.Fatalf("expected local subscription update failure, got %v", err)
 	}
-	if quota := user.GetQuota(db); quota != 10 {
-		t.Fatalf("expected payment quota to be deducted before update failure, got %f", quota)
+	if quota := user.GetQuota(db); quota != 20 {
+		t.Fatalf("expected local payment quota to be refunded after update failure, got %f", quota)
 	}
 }
