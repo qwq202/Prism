@@ -91,7 +91,13 @@ func (u *User) AddSubscription(db *sql.DB, month int, level int) bool {
 		INSERT INTO subscription (user_id, expired_at, total_month, level) VALUES (?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE expired_at = ?, total_month = total_month + ?, level = ?
 	`, u.GetID(db), date, month, level, date, month, level)
-	return err == nil
+	if err != nil {
+		return false
+	}
+
+	u.Subscription = &expiredAt
+	u.Level = level
+	return true
 }
 
 func (u *User) DowngradePlan(db *sql.DB, target int) error {
@@ -109,6 +115,10 @@ func (u *User) DowngradePlan(db *sql.DB, target int) error {
 	)
 	date := utils.ConvertSqlTime(expiredAt)
 	_, err := globals.ExecDb(db, "UPDATE subscription SET level = ?, expired_at = ? WHERE user_id = ?", target, date, u.GetID(db))
+	if err == nil {
+		u.Level = target
+		u.Subscription = &expiredAt
+	}
 
 	return err
 }
@@ -145,7 +155,12 @@ func (u *User) CountUpgradePrice(db *sql.DB, target int) float32 {
 
 func (u *User) SetSubscriptionLevel(db *sql.DB, level int) bool {
 	_, err := globals.ExecDb(db, "UPDATE subscription SET level = ? WHERE user_id = ?", level, u.GetID(db))
-	return err == nil
+	if err != nil {
+		return false
+	}
+
+	u.Level = level
+	return true
 }
 
 func CountSubscriptionPrize(level int, month int) float32 {
@@ -181,7 +196,9 @@ func BuySubscription(db *sql.DB, cache *redis.Client, user *User, level int, mon
 		money := CountSubscriptionPrize(level, month)
 		if user.Pay(db, cache, money) {
 			// migrate subscription
-			user.AddSubscription(db, month, level)
+			if !user.AddSubscription(db, month, level) {
+				return errors.New("payment succeeded but failed to update subscription")
+			}
 
 			if before == 0 {
 				// new subscription
@@ -202,7 +219,9 @@ func BuySubscription(db *sql.DB, cache *redis.Client, user *User, level int, mon
 		// upgrade subscription
 		money := user.CountUpgradePrice(db, level)
 		if user.Pay(db, cache, money) {
-			user.SetSubscriptionLevel(db, level)
+			if !user.SetSubscriptionLevel(db, level) {
+				return errors.New("payment succeeded but failed to update subscription")
+			}
 			return nil
 		}
 	}

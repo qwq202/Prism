@@ -97,7 +97,9 @@ func BuyQuota(db *sql.DB, cache *redis.Client, user *User, quota int) error {
 	}
 
 	if user.Pay(db, cache, money) {
-		user.IncreaseQuota(db, float32(quota))
+		if !user.IncreaseQuota(db, float32(quota)) {
+			return errors.New("payment succeeded but failed to update quota")
+		}
 		return nil
 	}
 
