@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
 )
 
@@ -144,12 +145,31 @@ type SystemConfig struct {
 
 func NewSystemConfig() *SystemConfig {
 	conf := &SystemConfig{}
-	if err := viper.UnmarshalKey("system", conf); err != nil {
+	if err := viper.UnmarshalKey("system", conf, systemConfigDecoderOption); err != nil {
 		panic(err)
 	}
 
 	conf.Load()
 	return conf
+}
+
+func systemConfigDecoderOption(config *mapstructure.DecoderConfig) {
+	config.MatchName = systemConfigMatchName
+}
+
+func systemConfigMatchName(mapKey, fieldName string) bool {
+	if strings.EqualFold(mapKey, fieldName) {
+		return true
+	}
+
+	return normalizeConfigMatchName(mapKey) == normalizeConfigMatchName(fieldName)
+}
+
+func normalizeConfigMatchName(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	value = strings.ReplaceAll(value, "_", "")
+	value = strings.ReplaceAll(value, "-", "")
+	return value
 }
 
 func (c *SystemConfig) Load() {

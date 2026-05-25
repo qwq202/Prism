@@ -3,7 +3,85 @@ package channel
 import (
 	"errors"
 	"testing"
+
+	"github.com/spf13/viper"
 )
+
+func TestSystemConfigUnmarshalLoadsSnakeCaseKeys(t *testing.T) {
+	loader := viper.New()
+	loader.Set("system", map[string]any{
+		"general": map[string]any{
+			"backend":      " https://app.example.com/ ",
+			"pwa_manifest": `{"name":"Prism"}`,
+			"debug_mode":   true,
+		},
+		"site": map[string]any{
+			"close_register": true,
+			"buy_link":       "https://billing.example.com",
+			"auth_footer":    true,
+		},
+		"search": map[string]any{
+			"api_key":     "search-key",
+			"crop_len":    800,
+			"max_results": 7,
+		},
+		"common": map[string]any{
+			"image_store":             true,
+			"prompt_store":            true,
+			"orphan_cleanup_enabled":  true,
+			"orphan_cleanup_interval": 45,
+			"storage_mode":            "s3",
+			"s3": map[string]any{
+				"endpoint":         "https://s3.example.com/",
+				"region":           "us-east-1",
+				"bucket":           "prism-files",
+				"access_key":       "access-key",
+				"secret_key":       "secret-key",
+				"public_base_url":  "https://cdn.example.com/",
+				"force_path_style": true,
+			},
+			"r2": map[string]any{
+				"account_id":      "r2-account",
+				"jurisdiction":    "EU",
+				"bucket":          "prism-r2",
+				"access_key":      "r2-access",
+				"secret_key":      "r2-secret",
+				"public_base_url": "https://pub.example.r2.dev/",
+			},
+		},
+	})
+
+	var conf SystemConfig
+	if err := loader.UnmarshalKey("system", &conf, systemConfigDecoderOption); err != nil {
+		t.Fatalf("unmarshal system config: %v", err)
+	}
+
+	if conf.General.PWAManifest != `{"name":"Prism"}` || !conf.General.DebugMode {
+		t.Fatalf("expected snake_case general keys to load, got %#v", conf.General)
+	}
+	if !conf.Site.CloseRegister || conf.Site.BuyLink != "https://billing.example.com" || !conf.Site.AuthFooter {
+		t.Fatalf("expected snake_case site keys to load, got %#v", conf.Site)
+	}
+	if conf.Search.ApiKey != "search-key" || conf.Search.CropLen != 800 || conf.Search.MaxResults != 7 {
+		t.Fatalf("expected snake_case search keys to load, got %#v", conf.Search)
+	}
+	if !conf.Common.ImageStore || !conf.Common.PromptStore ||
+		!conf.Common.OrphanCleanupEnabled || conf.Common.OrphanCleanupInterval != 45 ||
+		conf.Common.StorageMode != "s3" {
+		t.Fatalf("expected snake_case common keys to load, got %#v", conf.Common)
+	}
+	if conf.Common.S3.AccessKey != "access-key" ||
+		conf.Common.S3.SecretKey != "secret-key" ||
+		conf.Common.S3.PublicBaseURL != "https://cdn.example.com/" ||
+		!conf.Common.S3.ForcePathStyle {
+		t.Fatalf("expected snake_case s3 keys to load, got %#v", conf.Common.S3)
+	}
+	if conf.Common.R2.AccountID != "r2-account" ||
+		conf.Common.R2.AccessKey != "r2-access" ||
+		conf.Common.R2.PublicBaseURL != "https://pub.example.r2.dev/" {
+		t.Fatalf("expected snake_case r2 keys to load, got %#v", conf.Common.R2)
+	}
+}
 
 func TestSystemConfigNormalizeUsesRuntimeSafeValues(t *testing.T) {
 	conf := &SystemConfig{
