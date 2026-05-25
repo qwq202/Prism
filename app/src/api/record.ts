@@ -1,5 +1,6 @@
 import { CommonResponse } from "@/api/common.ts";
 import axios from "axios";
+import { getErrorMessage } from "@/utils/base.ts";
 
 export type Record = {
   id: number;
@@ -81,7 +82,7 @@ export async function listRecords(
   } catch (e) {
     return {
       status: false,
-      message: (e as Error).message,
+      message: getErrorMessage(e),
     };
   }
 }
@@ -95,7 +96,7 @@ export async function getRecordStats(
   } catch (e) {
     return {
       status: false,
-      message: (e as Error).message,
+      message: getErrorMessage(e),
     };
   }
 }

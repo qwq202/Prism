@@ -1,5 +1,6 @@
 import axios from "axios";
 import { Message } from "./types.tsx";
+import { getErrorMessage } from "@/utils/base.ts";
 
 export type SharingForm = {
   status: boolean;
@@ -47,7 +48,7 @@ export async function shareConversation(
     const resp = await axios.post("/conversation/share", { id, refs });
     return resp.data;
   } catch (e) {
-    return { status: false, message: (e as Error).message, data: "" };
+    return { status: false, message: getErrorMessage(e), data: "" };
   }
 }
 
@@ -58,7 +59,7 @@ export async function viewConversation(hash: string): Promise<ViewForm> {
   } catch (e) {
     return {
       status: false,
-      message: (e as Error).message,
+      message: getErrorMessage(e),
       data: null,
     };
   }
@@ -71,7 +72,7 @@ export async function listSharing(): Promise<ListSharingResponse> {
   } catch (e) {
     return {
       status: false,
-      message: (e as Error).message,
+      message: getErrorMessage(e),
     };
   }
 }
@@ -85,7 +86,7 @@ export async function deleteSharing(
   } catch (e) {
     return {
       status: false,
-      message: (e as Error).message,
+      message: getErrorMessage(e),
     };
   }
 }

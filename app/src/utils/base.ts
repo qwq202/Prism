@@ -59,7 +59,29 @@ export function splitList(value: string, separators: string[]): string[] {
   return result;
 }
 
+function getResponseErrorMessage(error: unknown): string | undefined {
+  const responseData = (error as { response?: { data?: unknown } })?.response
+    ?.data;
+
+  if (!responseData) return undefined;
+  if (typeof responseData === "string" && responseData.trim().length > 0) {
+    return responseData;
+  }
+
+  if (typeof responseData !== "object") return undefined;
+
+  const data = responseData as Record<string, unknown>;
+  const message = data.error ?? data.message;
+  if (typeof message === "string" && message.trim().length > 0) {
+    return message;
+  }
+
+  return undefined;
+}
+
 export function getErrorMessage(error: unknown): string {
+  const responseMessage = getResponseErrorMessage(error);
+  if (responseMessage) return responseMessage;
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
   return JSON.stringify(error);

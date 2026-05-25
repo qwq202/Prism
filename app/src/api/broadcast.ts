@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getErrorMessage } from "@/utils/base.ts";
 import { getMemory, setMemory } from "@/utils/memory.ts";
 
 export type Broadcast = {
@@ -103,7 +104,7 @@ export async function createBroadcast(
     console.warn(e);
     return {
       status: false,
-      error: (e as Error).message,
+      error: getErrorMessage(e),
     };
   }
 }
@@ -118,7 +119,7 @@ export async function removeBroadcast(
     console.warn(e);
     return {
       status: false,
-      error: (e as Error).message,
+      error: getErrorMessage(e),
     };
   }
 }
@@ -144,7 +145,7 @@ export async function updateBroadcast(
     console.warn(e);
     return {
       status: false,
-      error: (e as Error).message,
+      error: getErrorMessage(e),
     };
   }
 }
