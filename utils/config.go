@@ -23,6 +23,12 @@ var redirectRoutes = []string{
 	"/attachments",
 }
 
+const (
+	staticPageCacheControl      = "no-store"
+	staticManifestCacheControl  = "no-cache"
+	staticImmutableCacheControl = "public, max-age=31536000, immutable"
+)
+
 func SaveConfig(key string, value interface{}) error {
 	// save config to file with mutex lock
 	configMutex.Lock()
@@ -153,6 +159,11 @@ func RegisterStaticRoute(engine *gin.Engine) {
 	ApplySeo(viper.GetString("system.general.title"), viper.GetString("system.general.logo"))
 	ApplyPWAManifest(viper.GetString("system.general.pwamanifest"))
 
+	engine.Use(func(c *gin.Context) {
+		applyStaticCacheHeaders(c)
+		c.Next()
+	})
+
 	engine.GET("/", func(c *gin.Context) {
 		c.File("./app/dist/index.cache.html")
 	})
@@ -163,16 +174,32 @@ func RegisterStaticRoute(engine *gin.Engine) {
 
 	engine.Use(static.Serve("/", static.LocalFile("./app/dist", true)))
 	engine.NoRoute(func(c *gin.Context) {
+		setStaticPageCacheHeaders(c)
 		c.File("./app/dist/index.cache.html")
 	})
 
 	for _, route := range redirectRoutes {
 		engine.Any(fmt.Sprintf("%s/*path", route), func(c *gin.Context) {
 			c.Request.URL.Path = "/api" + c.Request.URL.Path
-			fmt.Println(c.Request.URL.Path)
 			engine.HandleContext(c)
 		})
 	}
 
 	fmt.Println(`[service] start serving static files from ~/app/dist`)
+}
+
+func applyStaticCacheHeaders(c *gin.Context) {
+	path := c.Request.URL.Path
+	switch {
+	case path == "/" || path == "/index.html" || path == "/index.cache.html":
+		setStaticPageCacheHeaders(c)
+	case path == "/site.webmanifest" || path == "/site.cache.webmanifest":
+		c.Header("Cache-Control", staticManifestCacheControl)
+	case strings.HasPrefix(path, "/assets/"):
+		c.Header("Cache-Control", staticImmutableCacheControl)
+	}
+}
+
+func setStaticPageCacheHeaders(c *gin.Context) {
+	c.Header("Cache-Control", staticPageCacheControl)
 }
