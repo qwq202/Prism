@@ -61,6 +61,33 @@ func TestDockerEnvExampleDocumentsComposeVariables(t *testing.T) {
 	}
 }
 
+func TestComposePinsStatefulDependencyImages(t *testing.T) {
+	for _, path := range []string{"docker-compose.yaml", "docker-compose.watch.yaml"} {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+
+		content := string(data)
+		for _, forbidden := range []string{
+			"image: mysql:latest",
+			"image: redis:latest",
+		} {
+			if strings.Contains(content, forbidden) {
+				t.Fatalf("%s should not use floating stateful dependency image %q", path, forbidden)
+			}
+		}
+		for _, pinned := range []string{
+			"image: mysql:8.0",
+			"image: redis:7-alpine",
+		} {
+			if !strings.Contains(content, pinned) {
+				t.Fatalf("%s should pin %q for predictable upgrades", path, pinned)
+			}
+		}
+	}
+}
+
 func TestNginxProxyForwardsOriginalRequestContext(t *testing.T) {
 	data, err := os.ReadFile("nginx.conf")
 	if err != nil {

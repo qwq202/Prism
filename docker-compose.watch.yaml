@@ -1,6 +1,6 @@
 services:
   mysql:
-    image: mysql:latest
+    image: mysql:8.0
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-root}"
@@ -22,7 +22,7 @@ services:
       - chatnio-network
 
   redis:
-    image: redis:latest
+    image: redis:7-alpine
     restart: always
     expose:
       - "6379"
