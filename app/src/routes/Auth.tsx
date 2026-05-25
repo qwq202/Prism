@@ -314,6 +314,7 @@ function Login() {
               <Input
                 placeholder={t("auth.username-or-email-placeholder")}
                 value={form.username}
+                autoComplete="username"
                 onChange={(e) =>
                   dispatch({ type: "update:username", payload: e.target.value })
                 }
@@ -333,6 +334,7 @@ function Login() {
                 placeholder={t("auth.password-placeholder")}
                 value={form.password}
                 type={"password"}
+                autoComplete="current-password"
                 onChange={(e) =>
                   dispatch({ type: "update:password", payload: e.target.value })
                 }

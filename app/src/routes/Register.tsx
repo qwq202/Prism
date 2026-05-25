@@ -58,6 +58,7 @@ function Preflight({ form, dispatch, setNext }: CompProps) {
       <Input
         placeholder={t("auth.username-placeholder")}
         value={form.username}
+        autoComplete="username"
         onChange={(e) =>
           dispatch({
             type: "update:username",
@@ -80,6 +81,7 @@ function Preflight({ form, dispatch, setNext }: CompProps) {
         placeholder={t("auth.password-placeholder")}
         value={form.password}
         type={"password"}
+        autoComplete="new-password"
         onChange={(e) =>
           dispatch({
             type: "update:password",
@@ -101,6 +103,7 @@ function Preflight({ form, dispatch, setNext }: CompProps) {
         placeholder={t("auth.check-password-placeholder")}
         value={form.repassword}
         type={"password"}
+        autoComplete="new-password"
         onChange={(e) =>
           dispatch({
             type: "update:repassword",
@@ -171,8 +174,10 @@ function Verify({ form, dispatch, setNext }: CompProps) {
         <EmailRequire content={form.email} hideOnEmpty={true} />
       </Label>
       <Input
+        type="email"
         placeholder={t("auth.email-placeholder")}
         value={form.email}
+        autoComplete="email"
         onChange={(e) =>
           dispatch({
             type: "update:email",
@@ -194,6 +199,7 @@ function Verify({ form, dispatch, setNext }: CompProps) {
               : t("auth.code-disabled-placeholder")
           }
           value={form.code}
+          autoComplete="one-time-code"
           onChange={(e) =>
             dispatch({
               type: "update:code",

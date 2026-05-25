@@ -80,8 +80,10 @@ function Forgot() {
                 <EmailRequire content={form.email} hideOnEmpty={true} />
               </Label>
               <Input
+                type="email"
                 placeholder={t("auth.email-placeholder")}
                 value={form.email}
+                autoComplete="email"
                 onChange={(e) =>
                   dispatch({
                     type: "update:email",
@@ -98,6 +100,7 @@ function Forgot() {
                 <Input
                   placeholder={t("auth.code-placeholder")}
                   value={form.code}
+                  autoComplete="one-time-code"
                   onChange={(e) =>
                     dispatch({
                       type: "update:code",
@@ -130,6 +133,7 @@ function Forgot() {
                 placeholder={t("auth.password-placeholder")}
                 value={form.password}
                 type={"password"}
+                autoComplete="new-password"
                 onChange={(e) =>
                   dispatch({ type: "update:password", payload: e.target.value })
                 }
@@ -148,6 +152,7 @@ function Forgot() {
                 placeholder={t("auth.check-password-placeholder")}
                 value={form.repassword}
                 type={"password"}
+                autoComplete="new-password"
                 onChange={(e) =>
                   dispatch({
                     type: "update:repassword",

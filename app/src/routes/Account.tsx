@@ -563,8 +563,10 @@ function Account() {
                           </span>
                         </div>
                         <Input
+                          type="email"
                           placeholder={t("account.new-email")}
                           value={emailForm.email}
+                          autoComplete="email"
                           onChange={(e) =>
                             setEmailForm((prev) => ({
                               ...prev,
@@ -629,6 +631,7 @@ function Account() {
                           type="password"
                           placeholder={t("account.old-password")}
                           value={passwordForm.oldPassword}
+                          autoComplete="current-password"
                           onChange={(e) =>
                             setPasswordForm((prev) => ({
                               ...prev,
@@ -640,6 +643,7 @@ function Account() {
                           type="password"
                           placeholder={t("account.new-password")}
                           value={passwordForm.password}
+                          autoComplete="new-password"
                           onChange={(e) =>
                             setPasswordForm((prev) => ({
                               ...prev,
@@ -651,6 +655,7 @@ function Account() {
                           type="password"
                           placeholder={t("account.confirm-new-password")}
                           value={passwordForm.repassword}
+                          autoComplete="new-password"
                           onChange={(e) =>
                             setPasswordForm((prev) => ({
                               ...prev,

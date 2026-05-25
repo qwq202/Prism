@@ -132,12 +132,14 @@ function RootDialog() {
               type={`password`}
               placeholder={t("admin.system.updateRootPlaceholder")}
               value={password}
+              autoComplete="new-password"
               onChange={(e) => setPassword(e.target.value)}
             />
             <Input
               type={`password`}
               placeholder={t("admin.system.updateRootRepeatPlaceholder")}
               value={repeat}
+              autoComplete="new-password"
               onChange={(e) => setRepeat(e.target.value)}
             />
           </DialogDescription>

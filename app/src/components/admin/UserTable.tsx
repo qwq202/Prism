@@ -684,17 +684,21 @@ function UserTable() {
               <Input
                 placeholder={t("admin.username")}
                 value={createForm.username}
+                autoComplete="off"
                 onChange={(e) => updateCreateForm("username", e.target.value)}
               />
               <Input
+                type="email"
                 placeholder={t("admin.email")}
                 value={createForm.email}
+                autoComplete="off"
                 onChange={(e) => updateCreateForm("email", e.target.value)}
               />
               <Input
                 type="password"
                 placeholder={t("auth.password")}
                 value={createForm.password}
+                autoComplete="new-password"
                 onChange={(e) => updateCreateForm("password", e.target.value)}
                 onKeyDown={async (e) => {
                   if (isEnter(e)) await createUser();
