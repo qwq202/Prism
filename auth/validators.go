@@ -23,7 +23,7 @@ func validatePassword(password string) bool {
 	return isInRange(password, 6, 36)
 }
 
-func validateEmail(email string) bool {
+func ValidateEmailAddress(email string) bool {
 	email = strings.TrimSpace(email)
 	if !isInRange(email, 1, 255) {
 		return false
@@ -57,6 +57,10 @@ func validateEmail(email string) bool {
 	}
 
 	return tldExp.MatchString(labels[len(labels)-1])
+}
+
+func validateEmail(email string) bool {
+	return ValidateEmailAddress(email)
 }
 
 func validateCode(code string) bool {

@@ -86,6 +86,14 @@ func TestCreateUserRejectsDuplicateUsername(t *testing.T) {
 	}
 }
 
+func TestCreateUserRejectsMalformedEmailDomain(t *testing.T) {
+	db := openAdminUserTestDB(t)
+
+	if err := createUser(db, "alice", "alice@example", "secret123"); err == nil {
+		t.Fatalf("expected malformed email domain to be rejected")
+	}
+}
+
 func TestPasswordMigrationRequiresExistingUser(t *testing.T) {
 	db := openAdminUserTestDB(t)
 
@@ -139,6 +147,9 @@ func TestEmailMigrationValidatesUserAndAddress(t *testing.T) {
 	}
 	if err := emailMigration(db, aliceID, "not-an-email"); err == nil {
 		t.Fatalf("expected invalid email to be rejected")
+	}
+	if err := emailMigration(db, aliceID, "alice@example"); err == nil {
+		t.Fatalf("expected malformed email domain to be rejected")
 	}
 	if err := emailMigration(db, aliceID, "bob@example.com"); err == nil {
 		t.Fatalf("expected duplicate email to be rejected")

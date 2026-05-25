@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"chat/auth"
 	"chat/channel"
 	"chat/globals"
 	"chat/utils"
@@ -9,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"net/mail"
 	"strings"
 	"time"
 
@@ -155,11 +155,7 @@ func validateNewUser(username string, email string, password string) error {
 	if len(password) < 6 || len(password) > 36 {
 		return fmt.Errorf("password length must be between 6 and 36")
 	}
-	if len(email) < 1 || len(email) > 255 {
-		return fmt.Errorf("invalid email format")
-	}
-	addr, err := mail.ParseAddress(email)
-	if err != nil || addr.Address != email {
+	if !auth.ValidateEmailAddress(email) {
 		return fmt.Errorf("invalid email format")
 	}
 
@@ -329,11 +325,7 @@ func emailMigration(db *sql.DB, id int64, email string) error {
 		return fmt.Errorf("invalid user id")
 	}
 	email = strings.TrimSpace(email)
-	if len(email) < 1 || len(email) > 255 {
-		return fmt.Errorf("invalid email format")
-	}
-	addr, err := mail.ParseAddress(email)
-	if err != nil || addr.Address != email {
+	if !auth.ValidateEmailAddress(email) {
 		return fmt.Errorf("invalid email format")
 	}
 
@@ -352,7 +344,7 @@ func emailMigration(db *sql.DB, id int64, email string) error {
 		return fmt.Errorf("email is already taken")
 	}
 
-	_, err = globals.ExecDb(db, `
+	_, err := globals.ExecDb(db, `
 		UPDATE auth SET email = ? WHERE id = ?
 	`, email, id)
 
