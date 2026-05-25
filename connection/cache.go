@@ -39,8 +39,8 @@ func ConnectRedis() *redis.Client {
 	}
 
 	if viper.GetBool("debug") {
-		Cache.FlushAll(context.Background())
-		globals.Debug(fmt.Sprintf("[connection] flush redis cache (host: %s)", viper.GetString("redis.host")))
+		Cache.FlushDB(context.Background())
+		globals.Debug(fmt.Sprintf("[connection] flush redis db %d (host: %s)", viper.GetInt("redis.db"), viper.GetString("redis.host")))
 	}
 	return Cache
 }
