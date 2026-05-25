@@ -157,7 +157,7 @@ function OperationMenu({ user, onRefresh }: OperationMenuProps) {
     <>
       <PopupDialog
         destructive={true}
-        type={popupTypes.Text}
+        type={popupTypes.Password}
         title={t("admin.password-action")}
         name={t("auth.password")}
         description={t("admin.password-action-desc")}

@@ -87,6 +87,22 @@ function PopupField({
         />
       );
 
+    case popupTypes.Password:
+      return (
+        <Input
+          type="password"
+          autoComplete="new-password"
+          onChange={(e) => {
+            setValue(
+              onValueChange ? onValueChange(e.target.value) : e.target.value,
+            );
+          }}
+          value={value}
+          placeholder={placeholder}
+          {...componentProps}
+        />
+      );
+
     case popupTypes.Clock:
       return <CalendarComp value={value} onValueChange={(v) => setValue(v)} />;
 

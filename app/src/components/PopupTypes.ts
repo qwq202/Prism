@@ -1,5 +1,6 @@
 export const popupTypes = {
   Text: "text",
+  Password: "password",
   Number: "number",
   Switch: "switch",
   Clock: "clock",
