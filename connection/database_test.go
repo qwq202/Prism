@@ -4,7 +4,9 @@ import (
 	"chat/globals"
 	"chat/utils"
 	"database/sql"
+	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -51,6 +53,41 @@ func fetchRootPasswordHash(t *testing.T, db *sql.DB) string {
 	}
 
 	return hash
+}
+
+func expectPanicContaining(t *testing.T, want string, run func()) {
+	t.Helper()
+
+	defer func() {
+		value := recover()
+		if value == nil {
+			t.Fatalf("expected panic containing %q", want)
+		}
+		if got := fmt.Sprint(value); !strings.Contains(got, want) {
+			t.Fatalf("expected panic containing %q, got %q", want, got)
+		}
+	}()
+
+	run()
+}
+
+func TestCreateUserTablePanicsOnSchemaError(t *testing.T) {
+	db := openConnectionTestDB(t)
+	if err := db.Close(); err != nil {
+		t.Fatalf("close db: %v", err)
+	}
+
+	expectPanicContaining(t, "create auth table failed", func() {
+		CreateUserTable(db)
+	})
+}
+
+func TestMigrateDatabasePanicsOnMigrationError(t *testing.T) {
+	db := openConnectionTestDB(t)
+
+	expectPanicContaining(t, "database migration failed", func() {
+		migrateDatabaseOrPanic(db)
+	})
 }
 
 func TestInitRootUserUsesConfiguredInitialPassword(t *testing.T) {

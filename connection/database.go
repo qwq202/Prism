@@ -116,13 +116,33 @@ func ConnectDatabase() *sql.DB {
 	CreatePaymentOrdersTable(db)
 	CreateMemoryTable(db)
 
-	if err := doMigration(db); err != nil {
-		fmt.Println(fmt.Sprintf("migration error: %s", err))
-	}
+	migrateDatabaseOrPanic(db)
 
 	DB = db
 
 	return db
+}
+
+func panicDatabaseSetup(step string, err error) {
+	if err == nil {
+		return
+	}
+
+	message := fmt.Sprintf("[connection] %s failed: %s", step, err.Error())
+	globals.Error(message)
+	panic(message)
+}
+
+func migrateDatabaseOrPanic(db *sql.DB) {
+	if err := doMigration(db); err != nil {
+		_ = db.Close()
+		panicDatabaseSetup("database migration", err)
+	}
+}
+
+func mustCreateTable(db *sql.DB, name string, query string) {
+	_, err := globals.ExecDb(db, query)
+	panicDatabaseSetup(fmt.Sprintf("create %s table", name), err)
 }
 
 func InitRootUser(db *sql.DB) {
@@ -130,8 +150,7 @@ func InitRootUser(db *sql.DB) {
 	var count int
 	err := globals.QueryRowDb(db, "SELECT COUNT(*) FROM auth").Scan(&count)
 	if err != nil {
-		globals.Warn(fmt.Sprintf("[service] failed to query user count: %s", err.Error()))
-		return
+		panicDatabaseSetup("query root user count", err)
 	}
 
 	if count == 0 {
@@ -144,15 +163,14 @@ func InitRootUser(db *sql.DB) {
 
 		hash, err := utils.HashPassword(password)
 		if err != nil {
-			globals.Warn(fmt.Sprintf("[service] failed to hash root password: %s", err.Error()))
-			return
+			panicDatabaseSetup("hash initial root password", err)
 		}
 		_, err = globals.ExecDb(db, `
 			INSERT INTO auth (username, password, email, is_admin, bind_id, token)
 			VALUES (?, ?, ?, ?, ?, ?)
 		`, defaultRootUsername, hash, "root@example.com", true, 0, defaultRootUsername)
 		if err != nil {
-			globals.Warn(fmt.Sprintf("[service] failed to create root user: %s", err.Error()))
+			panicDatabaseSetup("create initial root user", err)
 		}
 	} else {
 		globals.Debug(fmt.Sprintf("[service] %d user(s) found, skip creating root user", count))
@@ -160,7 +178,7 @@ func InitRootUser(db *sql.DB) {
 }
 
 func CreateUserTable(db *sql.DB) {
-	_, err := globals.ExecDb(db, `
+	mustCreateTable(db, "auth", `
 		CREATE TABLE IF NOT EXISTS auth (
 		  id INT PRIMARY KEY AUTO_INCREMENT,
 		  bind_id INT UNIQUE,
@@ -172,15 +190,12 @@ func CreateUserTable(db *sql.DB) {
 		  is_banned BOOLEAN DEFAULT FALSE
 		);
 	`)
-	if err != nil {
-		fmt.Println(err)
-	}
 
 	InitRootUser(db)
 }
 
 func CreatePackageTable(db *sql.DB) {
-	_, err := globals.ExecDb(db, `
+	mustCreateTable(db, "package", `
 		CREATE TABLE IF NOT EXISTS package (
 		  id INT PRIMARY KEY AUTO_INCREMENT,
 		  user_id INT,
@@ -190,13 +205,10 @@ func CreatePackageTable(db *sql.DB) {
 		  UNIQUE KEY (user_id, type)
 		);
 	`)
-	if err != nil {
-		fmt.Println(err)
-	}
 }
 
 func CreateQuotaTable(db *sql.DB) {
-	_, err := globals.ExecDb(db, `
+	mustCreateTable(db, "quota", `
 		CREATE TABLE IF NOT EXISTS quota (
 		  id INT PRIMARY KEY AUTO_INCREMENT,
 		  user_id INT UNIQUE,
@@ -207,13 +219,10 @@ func CreateQuotaTable(db *sql.DB) {
 		  FOREIGN KEY (user_id) REFERENCES auth(id)
 		);
 	`)
-	if err != nil {
-		fmt.Println(err)
-	}
 }
 
 func CreateConversationTable(db *sql.DB) {
-	_, err := globals.ExecDb(db, `
+	mustCreateTable(db, "conversation", `
 		CREATE TABLE IF NOT EXISTS conversation (
 		  id INT PRIMARY KEY AUTO_INCREMENT,
 		  user_id INT,
@@ -226,13 +235,10 @@ func CreateConversationTable(db *sql.DB) {
 		  UNIQUE KEY (user_id, conversation_id)
 		);
 	`)
-	if err != nil {
-		fmt.Println(err)
-	}
 }
 
 func CreateMemoryTable(db *sql.DB) {
-	_, err := globals.ExecDb(db, `
+	mustCreateTable(db, "memories", `
 		CREATE TABLE IF NOT EXISTS memories (
 		  id INT PRIMARY KEY AUTO_INCREMENT,
 		  user_id INT NOT NULL,
@@ -250,13 +256,10 @@ func CreateMemoryTable(db *sql.DB) {
 		  FOREIGN KEY (user_id) REFERENCES auth(id)
 		);
 	`)
-	if err != nil {
-		fmt.Println(err)
-	}
 }
 
 func CreateMaskTable(db *sql.DB) {
-	_, err := globals.ExecDb(db, `
+	mustCreateTable(db, "mask", `
 		CREATE TABLE IF NOT EXISTS mask (
 		  id INT PRIMARY KEY AUTO_INCREMENT,
 		  user_id INT,
@@ -269,14 +272,11 @@ func CreateMaskTable(db *sql.DB) {
 		  FOREIGN KEY (user_id) REFERENCES auth(id)
 		);
 	`)
-	if err != nil {
-		fmt.Println(err)
-	}
 }
 
 func CreateSharingTable(db *sql.DB) {
 	// refs is an array of message id, separated by comma (-1 means all messages)
-	_, err := globals.ExecDb(db, `
+	mustCreateTable(db, "sharing", `
 		CREATE TABLE IF NOT EXISTS sharing (
 		  id INT PRIMARY KEY AUTO_INCREMENT,
 		  hash CHAR(32) UNIQUE,
@@ -287,13 +287,10 @@ func CreateSharingTable(db *sql.DB) {
 		  FOREIGN KEY (user_id) REFERENCES auth(id)
 		);
 	`)
-	if err != nil {
-		fmt.Println(err)
-	}
 }
 
 func CreateSubscriptionTable(db *sql.DB) {
-	_, err := globals.ExecDb(db, `
+	mustCreateTable(db, "subscription", `
 		CREATE TABLE IF NOT EXISTS subscription (
 		  id INT PRIMARY KEY AUTO_INCREMENT,
 		  level INT DEFAULT 1,
@@ -306,13 +303,10 @@ func CreateSubscriptionTable(db *sql.DB) {
 		  FOREIGN KEY (user_id) REFERENCES auth(id)
 		);
 	`)
-	if err != nil {
-		fmt.Println(err)
-	}
 }
 
 func CreatePasskeyCredentialTable(db *sql.DB) {
-	_, err := globals.ExecDb(db, `
+	mustCreateTable(db, "passkey_credential", `
 		CREATE TABLE IF NOT EXISTS passkey_credential (
 		  id INT PRIMARY KEY AUTO_INCREMENT,
 		  user_id INT NOT NULL,
@@ -327,13 +321,10 @@ func CreatePasskeyCredentialTable(db *sql.DB) {
 		  FOREIGN KEY (user_id) REFERENCES auth(id)
 		);
 	`)
-	if err != nil {
-		fmt.Println(err)
-	}
 }
 
 func CreateInvitationTable(db *sql.DB) {
-	_, err := globals.ExecDb(db, `
+	mustCreateTable(db, "invitation", `
 		CREATE TABLE IF NOT EXISTS invitation (
 		  id INT PRIMARY KEY AUTO_INCREMENT,
 		  code VARCHAR(255) UNIQUE,
@@ -347,13 +338,10 @@ func CreateInvitationTable(db *sql.DB) {
 		  FOREIGN KEY (used_id) REFERENCES auth(id)
 		);
 	`)
-	if err != nil {
-		fmt.Println(err)
-	}
 }
 
 func CreateRedeemTable(db *sql.DB) {
-	_, err := globals.ExecDb(db, `
+	mustCreateTable(db, "redeem", `
 		CREATE TABLE IF NOT EXISTS redeem (
 		  id INT PRIMARY KEY AUTO_INCREMENT,
 		  code VARCHAR(255) UNIQUE,
@@ -363,13 +351,10 @@ func CreateRedeemTable(db *sql.DB) {
 		  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
 	`)
-	if err != nil {
-		fmt.Println(err)
-	}
 }
 
 func CreateBroadcastTable(db *sql.DB) {
-	_, err := globals.ExecDb(db, `
+	mustCreateTable(db, "broadcast", `
 		CREATE TABLE IF NOT EXISTS broadcast (
 		  id INT PRIMARY KEY AUTO_INCREMENT,
 		  poster_id INT,
@@ -378,13 +363,10 @@ func CreateBroadcastTable(db *sql.DB) {
 		  FOREIGN KEY (poster_id) REFERENCES auth(id)
 		);
 	`)
-	if err != nil {
-		fmt.Println(err)
-	}
 }
 
 func CreateBillingTable(db *sql.DB) {
-	_, err := globals.ExecDb(db, `
+	mustCreateTable(db, "billing", `
 		CREATE TABLE IF NOT EXISTS billing (
 		  id INT PRIMARY KEY AUTO_INCREMENT,
 		  user_id INT,
@@ -405,13 +387,10 @@ func CreateBillingTable(db *sql.DB) {
 		  FOREIGN KEY (user_id) REFERENCES auth(id)
 		);
 	`)
-	if err != nil {
-		fmt.Println(err)
-	}
 }
 
 func CreatePaymentOrdersTable(db *sql.DB) {
-	_, err := globals.ExecDb(db, `
+	mustCreateTable(db, "payment_orders", `
 		CREATE TABLE IF NOT EXISTS payment_orders (
 		  id INT PRIMARY KEY AUTO_INCREMENT,
 		  user_id INT,
@@ -428,7 +407,4 @@ func CreatePaymentOrdersTable(db *sql.DB) {
 		  FOREIGN KEY (user_id) REFERENCES auth(id)
 		);
 	`)
-	if err != nil {
-		fmt.Println(err)
-	}
 }
