@@ -8,7 +8,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog.tsx";
-import Markdown from "@/components/Markdown.tsx";
+import Markdown from "@/components/LazyMarkdown.tsx";
 import { useTranslation } from "react-i18next";
 import { TwitchIcon } from "lucide-react";
 

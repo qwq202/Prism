@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
 import { selectAuthenticated } from "@/store/auth.ts";
 import { infoAuthFooterSelector, infoFooterSelector } from "@/store/info.ts";
-import Markdown from "@/components/Markdown.tsx";
+import Markdown from "@/components/LazyMarkdown.tsx";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { ArrowRight, Megaphone } from "lucide-react";

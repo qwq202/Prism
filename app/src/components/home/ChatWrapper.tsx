@@ -2,10 +2,12 @@ import { useTranslation } from "react-i18next";
 import {
   useCallback,
   useEffect,
+  lazy,
   useMemo,
   useReducer,
   useRef,
   useState,
+  Suspense,
 } from "react";
 import FileAction, {
   type FileProviderAction,
@@ -22,7 +24,6 @@ import {
   useWorking,
 } from "@/store/chat.ts";
 import { formatMessage } from "@/utils/processor.ts";
-import ChatInterface from "@/components/home/ChatInterface.tsx";
 import { clearHistoryState, getQueryParam } from "@/utils/path.ts";
 import { forgetMemory, popMemory } from "@/utils/memory.ts";
 import { alignSelector } from "@/store/settings.ts";
@@ -50,6 +51,8 @@ import { toast } from "sonner";
 import { VoiceAction } from "@/components/VoiceProvider.tsx";
 import { AnimatePresence, motion } from "framer-motion";
 
+const ChatInterface = lazy(() => import("@/components/home/ChatInterface.tsx"));
+
 type InterfaceProps = {
   scrollable: boolean;
   setTarget: (instance: HTMLElement | null) => void;
@@ -57,7 +60,13 @@ type InterfaceProps = {
 
 function Interface(props: InterfaceProps) {
   const messages = useMessages();
-  return messages.length > 0 ? <ChatInterface {...props} /> : <ChatSpace />;
+  return messages.length > 0 ? (
+    <Suspense fallback={null}>
+      <ChatInterface {...props} />
+    </Suspense>
+  ) : (
+    <ChatSpace />
+  );
 }
 
 function fileReducer(state: FileArray, action: FileProviderAction): FileArray {

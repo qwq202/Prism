@@ -17,12 +17,12 @@ function ReloadPrompt() {
     setTimeout(() => {
       toast.success(t("service.update-success"), {
         description: (
-          <p>
+          <div className="flex items-center">
             <Badge variant={`outline`} className={`font-medium mr-1`}>
               v{version}
             </Badge>
             {t("service.update-success-prompt")}
-          </p>
+          </div>
         ),
       });
     }, 2500);

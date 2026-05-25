@@ -11,7 +11,7 @@ import {
   DialogAction,
 } from "@/components/ui/dialog";
 import { ArrowRight, Bell, Check, Megaphone } from "lucide-react";
-import Markdown from "@/components/Markdown.tsx";
+import Markdown from "@/components/LazyMarkdown.tsx";
 import { cn } from "@/components/ui/lib/utils.ts";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import { useEffectAsync } from "@/utils/hook.ts";
