@@ -3,17 +3,17 @@ services:
     image: mysql:5.7.44
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: chatnio
-      MYSQL_USER: chatnio
-      MYSQL_PASSWORD: chatnio123456!
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-root}"
+      MYSQL_DATABASE: "${MYSQL_DATABASE:-chatnio}"
+      MYSQL_USER: "${MYSQL_USER:-chatnio}"
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD:-chatnio123456!}"
       TZ: Asia/Shanghai
     expose:
       - "3306"
     volumes:
       - ./db:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-proot"]
+      test: ["CMD-SHELL", 'mysqladmin ping -h 127.0.0.1 -u root -p"$${MYSQL_ROOT_PASSWORD}"']
       interval: 10s
       timeout: 5s
       retries: 10
@@ -53,13 +53,15 @@ services:
         hard: 65535
     environment:
       MYSQL_HOST: mysql
-      MYSQL_USER: chatnio
-      MYSQL_PASSWORD: chatnio123456!
-      MYSQL_DB: chatnio
+      MYSQL_USER: "${MYSQL_USER:-chatnio}"
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD:-chatnio123456!}"
+      MYSQL_DB: "${MYSQL_DATABASE:-chatnio}"
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ""
       REDIS_DB: 0
+      SECRET: "${SECRET:-}"
+      ROOT_INITIAL_PASSWORD: "${ROOT_INITIAL_PASSWORD:-}"
       SERVE_STATIC: "true"
     volumes:
       - ./config:/config

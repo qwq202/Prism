@@ -127,6 +127,8 @@ docker compose up -d # 运行服务
 # 如需使用 watchtower 自动更新, 请使用 docker compose -f docker-compose.watch.yaml up -d 替代
 ```
 
+如需自定义数据库密码、镜像标签、`SECRET` 或首次 `root` 初始密码，可先复制 `.env.example` 为 `.env` 并按需修改；`.env` 已被 `.gitignore` 忽略，请不要提交真实密码。
+
 版本更新（_开启 Watchtower 自动更新的情况下, 无需手动更新_）：
 ```shell
 docker compose down
@@ -139,6 +141,7 @@ docker compose up -d
 > - 配置文件挂载目录项目 ~/**config**
 > - 首次启动会自动在 `./config/config.yaml` 中生成随机 `secret`；如需自行托管密钥, 请设置至少 32 位随机字符串。
 > - 首次空数据库启动会自动创建 `root` 管理员。可在环境变量 `ROOT_INITIAL_PASSWORD` 或配置项 `root.initial_password` 中预设 6-36 位初始密码；未设置时请通过 `docker compose logs` 查看随机初始密码。
+> - MySQL 容器首次初始化后会把账号密码写入 `./db` 数据目录；已有数据目录时再修改 `.env` 中的 MySQL 密码不会自动迁移旧数据库账号，请先手动改库内密码或重新初始化数据目录。
 
 部署后自检：
 ```shell
