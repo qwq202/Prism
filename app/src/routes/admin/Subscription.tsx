@@ -809,10 +809,13 @@ function PlanConfig() {
 
   const refresh = async (ignoreUpdate?: boolean) => {
     setLoading(true);
-    const res = await getPlanConfig();
-    if (!ignoreUpdate) await update();
-    formDispatch({ type: "set", payload: res });
-    setLoading(false);
+    try {
+      const res = await getPlanConfig();
+      if (!ignoreUpdate) await update();
+      formDispatch({ type: "set", payload: res });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const save = async (data?: PlanConfig) => {

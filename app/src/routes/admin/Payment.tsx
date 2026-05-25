@@ -29,6 +29,7 @@ import { mobile } from "@/utils/device.ts";
 import { cn } from "@/components/ui/lib/utils.ts";
 import { copyClipboard } from "@/utils/dom.ts";
 import { toast } from "sonner";
+import { withNotify } from "@/api/common.ts";
 
 function PaymentStatusBadge({ state }: { state: boolean }) {
   const { t } = useTranslation();
@@ -50,12 +51,17 @@ function PaymentTable() {
 
   const sync = async (p = page, s = search) => {
     setLoading(true);
-    const resp = await getPaymentOrders(p, s);
-    if (resp.status && resp.data) {
-      setOrders(resp.data ?? []);
-      setTotal(resp.total ?? 1);
+    try {
+      const resp = await getPaymentOrders(p, s);
+      if (resp.status && resp.data) {
+        setOrders(resp.data ?? []);
+        setTotal(resp.total ?? 1);
+      } else {
+        withNotify(t, resp);
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffectAsync(async () => {
@@ -69,23 +75,25 @@ function PaymentTable() {
 
   const handleRecheck = async (order: PaymentOrder) => {
     setRecheckingId(order.order_id);
-    const resp = await recheckOrderStatus(order.order_id, order.service);
-    setRecheckingId(null);
+    try {
+      const resp = await recheckOrderStatus(order.order_id, order.service);
+      if (!resp.status) {
+        withNotify(t, resp);
+        return;
+      }
 
-    if (!resp.status) {
-      toast.error(resp.error ?? "Failed");
-      return;
-    }
-
-    if (resp.is_changed) {
-      toast.success(t("admin.pay.check-result-diff"), {
-        description: t("admin.pay.check-result-diff-prompt"),
-      });
-      await sync();
-    } else {
-      toast.info(t("admin.pay.check-result-same"), {
-        description: t("admin.pay.check-result-same-prompt"),
-      });
+      if (resp.is_changed) {
+        toast.success(t("admin.pay.check-result-diff"), {
+          description: t("admin.pay.check-result-diff-prompt"),
+        });
+        await sync();
+      } else {
+        toast.info(t("admin.pay.check-result-same"), {
+          description: t("admin.pay.check-result-same-prompt"),
+        });
+      }
+    } finally {
+      setRecheckingId(null);
     }
   };
 

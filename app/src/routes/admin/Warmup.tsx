@@ -16,6 +16,8 @@ import axios from "axios";
 import { copyClipboard } from "@/utils/dom.ts";
 import { toast } from "sonner";
 import Markdown from "@/components/Markdown.tsx";
+import { getErrorMessage } from "@/utils/base.ts";
+import { withNotify } from "@/api/common.ts";
 
 type WarmupResult = {
   url: string;
@@ -23,12 +25,25 @@ type WarmupResult = {
   error?: string;
 };
 
-async function warmupUrls(urls: string[]): Promise<WarmupResult[]> {
+type WarmupResponse = {
+  status: boolean;
+  error?: string;
+  results: WarmupResult[];
+};
+
+async function warmupUrls(urls: string[]): Promise<WarmupResponse> {
   try {
     const resp = await axios.post("/admin/warmup", { urls });
-    return resp.data?.results ?? [];
+    return {
+      status: true,
+      results: resp.data?.results ?? [],
+    };
   } catch (e) {
-    return [];
+    return {
+      status: false,
+      error: getErrorMessage(e),
+      results: [],
+    };
   }
 }
 
@@ -75,17 +90,24 @@ function AdminWarmup() {
     }
     setLoading(true);
     setResults([]);
-    const res = await warmupUrls(urls);
-    setResults(res);
-    setLoading(false);
+    try {
+      const res = await warmupUrls(urls);
+      if (!res.status) {
+        withNotify(t, res);
+        return;
+      }
 
-    const success = res.filter((r) => !r.error && r.status >= 200 && r.status < 300).length;
-    toast.success(
-      t("admin.cdn.warmup-complete", {
-        success,
-        total: res.length,
-      }),
-    );
+      setResults(res.results);
+      const success = res.results.filter((r) => !r.error && r.status >= 200 && r.status < 300).length;
+      toast.success(
+        t("admin.cdn.warmup-complete", {
+          success,
+          total: res.results.length,
+        }),
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCopyUrls = () => {

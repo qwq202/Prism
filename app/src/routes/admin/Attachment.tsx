@@ -36,13 +36,16 @@ function AdminAttachment() {
   const sync = async () => {
     if (loading) return;
     setLoading(true);
-    const res = await listAttachments();
-    if (res.status) {
-      setData(res.data);
-    } else {
-      withNotify(t, res);
+    try {
+      const res = await listAttachments();
+      if (res.status) {
+        setData(res.data);
+      } else {
+        withNotify(t, res);
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffectAsync(async () => {

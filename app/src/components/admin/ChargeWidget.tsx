@@ -895,12 +895,18 @@ function ChargeWidget() {
 
   async function refresh(ignoreUpdate?: boolean) {
     setLoading(true);
-    const resp = await listCharge();
-    if (!ignoreUpdate) await update();
+    try {
+      const resp = await listCharge();
+      if (!ignoreUpdate) await update();
 
-    setLoading(false);
-    withNotify(t, resp);
-    setData(resp.data);
+      if (resp.status) {
+        setData(resp.data);
+      } else {
+        withNotify(t, resp);
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffectAsync(async () => await refresh(true), []);

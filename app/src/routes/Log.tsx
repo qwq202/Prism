@@ -54,6 +54,7 @@ import {
 } from "@/utils/record-time.ts";
 import { useSelector } from "react-redux";
 import { infoTimeZoneSelector } from "@/store/info.ts";
+import { withNotify } from "@/api/common.ts";
 
 type LogFilters = {
   type: RecordType;
@@ -375,26 +376,35 @@ function Log() {
   const syncRecords = useCallback(
     async (targetPage = page, targetQuery = query) => {
       setLoading(true);
-      const resp = await listRecords(targetPage, {
-        ...targetQuery,
-        self: true,
-        show_channel: false,
-      });
-      if (resp.status && resp.data) {
-        setRecords(resp.data.records ?? []);
-        setTotal(resp.data.total ?? 1);
+      try {
+        const resp = await listRecords(targetPage, {
+          ...targetQuery,
+          self: true,
+          show_channel: false,
+        });
+        if (resp.status && resp.data) {
+          setRecords(resp.data.records ?? []);
+          setTotal(resp.data.total ?? 1);
+        } else {
+          withNotify(t, resp);
+        }
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     },
-    [page, query],
+    [page, query, t],
   );
 
   const syncStats = useCallback(async () => {
     setStatsLoading(true);
-    const resp = await getRecordStats({ self: true });
-    if (resp.status && resp.data) setStats(resp.data);
-    setStatsLoading(false);
-  }, []);
+    try {
+      const resp = await getRecordStats({ self: true });
+      if (resp.status && resp.data) setStats(resp.data);
+      else withNotify(t, resp);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [t]);
 
   useEffect(() => {
     void syncStats();

@@ -49,6 +49,7 @@ import { cn } from "@/components/ui/lib/utils.ts";
 import { formatRecordTime } from "@/utils/record-time.ts";
 import { useSelector } from "react-redux";
 import { infoTimeZoneSelector } from "@/store/info.ts";
+import { withNotify } from "@/api/common.ts";
 
 const defaultRecordQuery: RecordQuery = {
   type: RecordType.All,
@@ -162,15 +163,20 @@ function RecordTable() {
 
   const sync = async (p = page, q = query) => {
     setLoading(true);
-    const resp = await listRecords(p, {
-      ...q,
-      show_channel: true,
-    });
-    if (resp.status && resp.data) {
-      setRecords(resp.data.records ?? []);
-      setTotal(resp.data.total ?? 1);
+    try {
+      const resp = await listRecords(p, {
+        ...q,
+        show_channel: true,
+      });
+      if (resp.status && resp.data) {
+        setRecords(resp.data.records ?? []);
+        setTotal(resp.data.total ?? 1);
+      } else {
+        withNotify(t, resp);
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffectAsync(async () => {
@@ -356,6 +362,7 @@ function AdminRecord() {
   useEffectAsync(async () => {
     const resp = await getRecordStats();
     if (resp.status && resp.data) setStats(resp.data);
+    else withNotify(t, resp);
   }, []);
 
   return (
