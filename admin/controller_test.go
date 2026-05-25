@@ -2,9 +2,12 @@ package admin
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -41,6 +44,48 @@ func TestWarmupAPIRejectsTooManyUrls(t *testing.T) {
 	}
 	if body.Status || body.Message != "too many urls" {
 		t.Fatalf("expected too many urls rejection, got %#v", body)
+	}
+}
+
+func TestValidateWarmupURLRejectsUnsafeTargets(t *testing.T) {
+	unsafeTargets := []string{
+		"",
+		"file:///etc/passwd",
+		"ftp://example.com/file",
+		"https://user:pass@example.com",
+		"http://localhost:8080",
+		"http://service.local",
+		"http://127.0.0.1:8080",
+		"http://10.0.0.1",
+		"http://172.16.0.1",
+		"http://192.168.0.1",
+		"http://100.64.0.1",
+		"http://169.254.169.254",
+		"http://[::1]",
+	}
+
+	for _, target := range unsafeTargets {
+		if _, err := validateWarmupURL(target); err == nil {
+			t.Fatalf("expected warmup url %q to be rejected", target)
+		}
+	}
+}
+
+func TestValidateWarmupURLAllowsPublicHTTPTargets(t *testing.T) {
+	for _, target := range []string{
+		"https://example.com",
+		"http://example.com/assets/app.js",
+	} {
+		if _, err := validateWarmupURL(target); err != nil {
+			t.Fatalf("expected warmup url %q to be allowed: %v", target, err)
+		}
+	}
+}
+
+func TestWarmupDialContextRejectsPrivateLiteralIPBeforeDialing(t *testing.T) {
+	_, err := warmupDialContext(context.Background(), "tcp", net.JoinHostPort("127.0.0.1", "80"))
+	if err == nil || !strings.Contains(err.Error(), "unsupported url host") {
+		t.Fatalf("expected private warmup host to be rejected before dialing, got %v", err)
 	}
 }
 

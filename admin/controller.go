@@ -5,7 +5,12 @@ import (
 	"chat/auth"
 	"chat/channel"
 	"chat/utils"
+	"context"
+	"fmt"
+	"net"
 	"net/http"
+	"net/netip"
+	neturl "net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -730,6 +735,7 @@ type WarmupForm struct {
 
 const (
 	maxWarmupUrls        = 100
+	maxWarmupURLLength   = 2048
 	maxWarmupConcurrency = 8
 )
 
@@ -739,14 +745,145 @@ type WarmupResult struct {
 	Error  string `json:"error,omitempty"`
 }
 
-func warmupUrl(target string) WarmupResult {
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Get(target)
+func isUnsafeWarmupAddr(addr netip.Addr) bool {
+	addr = addr.Unmap()
+	if !addr.IsValid() {
+		return true
+	}
+
+	if addr.IsUnspecified() ||
+		addr.IsLoopback() ||
+		addr.IsPrivate() ||
+		addr.IsLinkLocalUnicast() ||
+		addr.IsLinkLocalMulticast() ||
+		addr.IsInterfaceLocalMulticast() ||
+		addr.IsMulticast() {
+		return true
+	}
+
+	if addr.Is4() {
+		octets := addr.As4()
+		if octets[0] == 100 && octets[1] >= 64 && octets[1] <= 127 {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isUnsafeWarmupHost(host string) bool {
+	host = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(host)), ".")
+	if host == "" ||
+		host == "localhost" ||
+		strings.HasSuffix(host, ".localhost") ||
+		strings.HasSuffix(host, ".local") ||
+		strings.Contains(host, "%") {
+		return true
+	}
+
+	if addr, err := netip.ParseAddr(host); err == nil {
+		return isUnsafeWarmupAddr(addr)
+	}
+
+	return false
+}
+
+func validateWarmupURL(target string) (*neturl.URL, error) {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return nil, fmt.Errorf("url is required")
+	}
+	if len(target) > maxWarmupURLLength {
+		return nil, fmt.Errorf("url is too long")
+	}
+
+	parsed, err := neturl.Parse(target)
 	if err != nil {
-		return WarmupResult{Url: target, Status: 0, Error: err.Error()}
+		return nil, fmt.Errorf("invalid url")
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return nil, fmt.Errorf("unsupported url scheme")
+	}
+	if parsed.User != nil {
+		return nil, fmt.Errorf("url credentials are not allowed")
+	}
+	if isUnsafeWarmupHost(parsed.Hostname()) {
+		return nil, fmt.Errorf("unsupported url host")
+	}
+
+	return parsed, nil
+}
+
+func warmupDialContext(ctx context.Context, network string, address string) (net.Conn, error) {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, err
+	}
+	if isUnsafeWarmupHost(host) {
+		return nil, fmt.Errorf("unsupported url host")
+	}
+
+	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	if err != nil {
+		return nil, err
+	}
+	if len(addrs) == 0 {
+		return nil, fmt.Errorf("url host has no ip addresses")
+	}
+
+	target := ""
+	for _, ip := range addrs {
+		addr, ok := netip.AddrFromSlice(ip.IP)
+		if !ok || isUnsafeWarmupAddr(addr) {
+			return nil, fmt.Errorf("unsupported url host")
+		}
+
+		addr = addr.Unmap()
+		if target != "" {
+			continue
+		}
+		if network == "tcp4" && !addr.Is4() {
+			continue
+		}
+		if network == "tcp6" && !addr.Is6() {
+			continue
+		}
+		target = net.JoinHostPort(addr.String(), port)
+	}
+	if target == "" {
+		return nil, fmt.Errorf("url host has no compatible ip addresses")
+	}
+
+	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
+	return dialer.DialContext(ctx, network, target)
+}
+
+func warmupHTTPClient() *http.Client {
+	return &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			Proxy:       http.ProxyFromEnvironment,
+			DialContext: warmupDialContext,
+		},
+		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+			_, err := validateWarmupURL(req.URL.String())
+			return err
+		},
+	}
+}
+
+func warmupUrl(target string) WarmupResult {
+	parsed, err := validateWarmupURL(target)
+	if err != nil {
+		return WarmupResult{Url: strings.TrimSpace(target), Status: 0, Error: err.Error()}
+	}
+
+	resp, err := warmupHTTPClient().Get(parsed.String())
+	if err != nil {
+		return WarmupResult{Url: parsed.String(), Status: 0, Error: err.Error()}
 	}
 	defer resp.Body.Close()
-	return WarmupResult{Url: target, Status: resp.StatusCode}
+	return WarmupResult{Url: parsed.String(), Status: resp.StatusCode}
 }
 
 func WarmupAPI(c *gin.Context) {
