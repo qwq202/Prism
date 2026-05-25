@@ -87,7 +87,10 @@ func AttachmentLocalPath(name string) string {
 }
 
 func AttachmentPublicURL(name string) string {
-	if publicBaseURL := getStoragePublicBaseURL(); publicBaseURL != "" {
+	current := currentStorageConfig()
+	if publicBaseURL := strings.TrimSpace(current.PublicBaseURL); publicBaseURL != "" &&
+		remoteStorageMode(current.Mode) &&
+		storageReadyWithConfig(current) {
 		return fmt.Sprintf("%s/%s", strings.TrimSuffix(publicBaseURL, "/"), AttachmentObjectKey(name))
 	}
 
@@ -145,7 +148,12 @@ func r2StorageReady() bool {
 }
 
 func getStoragePublicBaseURL() string {
-	return strings.TrimSpace(currentStorageConfig().PublicBaseURL)
+	current := currentStorageConfig()
+	if !remoteStorageMode(current.Mode) || !storageReadyWithConfig(current) {
+		return ""
+	}
+
+	return strings.TrimSpace(current.PublicBaseURL)
 }
 
 func getR2Endpoint() string {
@@ -286,6 +294,9 @@ func ValidateStoragePublicBaseURL(publicBaseURL string) error {
 func storageReadyWithConfig(config storageClientConfig) bool {
 	switch strings.ToLower(strings.TrimSpace(config.Mode)) {
 	case "s3", "r2":
+		if strings.EqualFold(strings.TrimSpace(config.Mode), "r2") && strings.TrimSpace(config.Endpoint) == "" {
+			return false
+		}
 		return strings.TrimSpace(config.Bucket) != "" &&
 			strings.TrimSpace(config.Region) != "" &&
 			strings.TrimSpace(config.AccessKey) != "" &&
@@ -295,8 +306,26 @@ func storageReadyWithConfig(config storageClientConfig) bool {
 	}
 }
 
+func remoteStorageMode(mode string) bool {
+	return Contains(strings.ToLower(strings.TrimSpace(mode)), []string{"s3", "r2"})
+}
+
+func ensureStorageReadyWithConfig(config storageClientConfig) error {
+	if !remoteStorageMode(config.Mode) {
+		return nil
+	}
+	if storageReadyWithConfig(config) {
+		return nil
+	}
+
+	return fmt.Errorf("%s storage is not fully configured", strings.ToLower(strings.TrimSpace(config.Mode)))
+}
+
 func newS3ClientWithConfig(ctx context.Context, config storageClientConfig) (*s3.Client, error) {
-	if !storageReadyWithConfig(config) || !Contains(config.Mode, []string{"s3", "r2"}) {
+	if err := ensureStorageReadyWithConfig(config); err != nil {
+		return nil, err
+	}
+	if !remoteStorageMode(config.Mode) {
 		return nil, fmt.Errorf("%s storage is not configured", config.Mode)
 	}
 
@@ -332,7 +361,7 @@ func storageBucket() string {
 
 func storageModeReady() bool {
 	current := currentStorageConfig()
-	return Contains(current.Mode, []string{"s3", "r2"}) && storageReadyWithConfig(current)
+	return remoteStorageMode(current.Mode) && storageReadyWithConfig(current)
 }
 
 func normalizeContentType(contentType string) string {
@@ -497,7 +526,12 @@ func StoreImage(source string) string {
 	}
 
 	name := attachmentNameForSource(source, contentType)
-	if storageModeReady() && !strings.EqualFold(strings.TrimSpace(globals.StorageMode), "local") {
+	current := currentStorageConfig()
+	if remoteStorageMode(current.Mode) {
+		if err := ensureStorageReadyWithConfig(current); err != nil {
+			globals.Warn(fmt.Sprintf("[utils] image storage skipped: %s", err.Error()))
+			return source
+		}
 		if err := writeAttachmentS3(context.Background(), name, data, contentType); err != nil {
 			globals.Warn(fmt.Sprintf("[utils] upload image error: %s", err.Error()))
 			return source
@@ -521,7 +555,11 @@ func StoreAttachmentData(filename string, data []byte, contentType string) (stri
 	}
 
 	name := attachmentNameForUpload(filename, data, contentType)
-	if storageModeReady() && !strings.EqualFold(strings.TrimSpace(globals.StorageMode), "local") {
+	current := currentStorageConfig()
+	if remoteStorageMode(current.Mode) {
+		if err := ensureStorageReadyWithConfig(current); err != nil {
+			return "", err
+		}
 		if err := writeAttachmentS3(context.Background(), name, data, contentType); err != nil {
 			return "", err
 		}
