@@ -15,6 +15,8 @@ redis:
 
 secret: replace_with_a_random_32_byte_string
 serve_static: true
+root:
+  initial_password: ""
 
 server:
   port: 8094

@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
@@ -15,6 +16,22 @@ import (
 )
 
 var DB *sql.DB
+
+const defaultRootUsername = "root"
+
+func getInitialRootPassword() (string, bool) {
+	password := strings.TrimSpace(viper.GetString("root.initial_password"))
+	if password == "" {
+		return utils.GenerateChar(24), false
+	}
+
+	if len(password) < 6 || len(password) > 36 {
+		globals.Warn("[service] root.initial_password must be 6-36 characters; generated a random root password instead")
+		return utils.GenerateChar(24), false
+	}
+
+	return password, true
+}
 
 func InitMySQLSafe() *sql.DB {
 	ConnectDatabase()
@@ -118,8 +135,14 @@ func InitRootUser(db *sql.DB) {
 	}
 
 	if count == 0 {
-		globals.Debug("[service] no user found, creating root user (username: root, password: chatnio123456, email: root@example.com)")
-		hash, err := utils.HashPassword("chatnio123456")
+		password, configured := getInitialRootPassword()
+		if configured {
+			globals.Warn("[service] no user found, creating root user with configured root.initial_password; change it after first login")
+		} else {
+			globals.Warn(fmt.Sprintf("[service] no user found, creating root user with generated password (username: %s, password: %s); save it now or reset it with `prism root <new-password>`", defaultRootUsername, password))
+		}
+
+		hash, err := utils.HashPassword(password)
 		if err != nil {
 			globals.Warn(fmt.Sprintf("[service] failed to hash root password: %s", err.Error()))
 			return
@@ -127,7 +150,7 @@ func InitRootUser(db *sql.DB) {
 		_, err = globals.ExecDb(db, `
 			INSERT INTO auth (username, password, email, is_admin, bind_id, token)
 			VALUES (?, ?, ?, ?, ?, ?)
-		`, "root", hash, "root@example.com", true, 0, "root")
+		`, defaultRootUsername, hash, "root@example.com", true, 0, defaultRootUsername)
 		if err != nil {
 			globals.Warn(fmt.Sprintf("[service] failed to create root user: %s", err.Error()))
 		}

@@ -110,7 +110,7 @@
 
 ## 📦 部署方式
 > [!TIP]
-> **部署成功后, 管理员账号为 `root`, 密码默认为 `chatnio123456`**
+> **首次空数据库启动会自动创建管理员账号 `root`。如未设置 `ROOT_INITIAL_PASSWORD` 或 `root.initial_password`，系统会生成随机初始密码并输出到首次启动日志。**
 
 ### ⚡ Docker Compose 安装 (推荐)
 > [!NOTE]
@@ -138,6 +138,7 @@ docker compose up -d
 > - Redis 数据库挂载目录项目 ~/**redis**
 > - 配置文件挂载目录项目 ~/**config**
 > - 首次启动会自动在 `./config/config.yaml` 中生成随机 `secret`；如需自行托管密钥, 请设置至少 32 位随机字符串。
+> - 首次空数据库启动会自动创建 `root` 管理员。可在环境变量 `ROOT_INITIAL_PASSWORD` 或配置项 `root.initial_password` 中预设 6-36 位初始密码；未设置时请通过 `docker compose logs` 查看随机初始密码。
 
 部署后自检：
 ```shell
@@ -167,12 +168,14 @@ docker run -d --name prism \
    -e REDIS_HOST=localhost \
    -e REDIS_PORT=6379 \
    -e SECRET=replace_with_a_random_32_byte_string \
+   -e ROOT_INITIAL_PASSWORD=replace_with_a_strong_initial_password \
    -e SERVE_STATIC=true \
    qunqin45/prism:latest
 ```
 
 > - *--network host* 指使用宿主机网络, 使 Docker 容器使用宿主机的网络, 可自行修改
 > - SECRET: JWT 密钥, 自行生成随机字符串修改
+> - ROOT_INITIAL_PASSWORD: 空数据库首次启动时的 `root` 初始密码，长度 6-36 位；也可以不设置并从启动日志读取随机密码
 > - SERVE_STATIC: 是否启用静态文件服务 (正常情况下不需要更改此项)
 > - *-v ~/config:/config* 挂载配置文件, *-v ~/logs:/logs* 挂载日志文件, *-v ~/storage:/storage* 挂载附加功能的生成文件
 > - 需配置 MySQL 和 Redis 服务, 请自行参考上方信息修改环境变量
@@ -202,8 +205,10 @@ docker pull qunqin45/prism:latest
 3. **我的机器为 ARM 架构, 该项目支持 ARM 架构吗？**
    - 当前公开镜像 `qunqin45/prism:latest` 由 GitHub Actions 自动构建并发布 `linux/amd64` 版本。
    - ARM 机器可在本机源码构建，或自行使用 BuildX 构建 `linux/arm64` 镜像；如果你使用 x86 机器编译, 请使用 `GOARCH=arm64 go build -o prism` 进行交叉编译并上传至 ARM 机器上运行。
-4. **如何修改 Root 默认密码？**
-   - 请点击右上角头像或侧边栏底部用户框进入后台管理, 点击系统设置下常规设置操作栏的 修改 Root 密码 进行修改。或者选择在 用户管理 中选定 root 用户进行修改密码操作。
+4. **如何修改或找回 Root 初始密码？**
+   - 首次空数据库启动时，如果没有设置 `ROOT_INITIAL_PASSWORD` 或 `root.initial_password`，请在服务启动日志中查看随机初始密码。
+   - 登录后请点击右上角头像或侧边栏底部用户框进入后台管理, 点击系统设置下常规设置操作栏的 修改 Root 密码 进行修改。或者选择在 用户管理 中选定 root 用户进行修改密码操作。
+   - 如果已经无法登录，可在容器或二进制运行环境中执行 `prism root <new-password>` 重置。
 5. **系统设置中的后端域名是什么？**
    - 后端域名是指后端 API 服务的地址, 默认为你访问站点后加 `/api` 的地址, 如 `https://example.com/api` 。
    - 如果设置为非 *SERVE_STATIC* 模式, 开启前后端分离部署, 请将后端域名设置为你的后端 API 服务地址, 如 `https://api.example.com`。

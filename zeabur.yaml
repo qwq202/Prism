@@ -57,7 +57,7 @@ spec:
 
     ## 🧪 部署
     1. 填入你想要绑定的域名，并点击部署。
-    2. 部署成功后，默认管理用户名为 `root`，管理密码为 `chatnio123456`，请根据提示尽快更换初始密码。
+    2. 首次空数据库启动会自动创建管理用户 `root`。如未设置 `ROOT_INITIAL_PASSWORD`，请在首次启动日志中查看随机初始密码，并尽快更换。
 
     更多更新功能和部署手册请查看 👉 [CoAI.Dev (Github)](https://github.com/coaidev/coai)
   services:
@@ -259,6 +259,6 @@ localization:
 
       ## 🧪 部署
       1. 填入你想要绑定的域名，并点击部署。
-      2. 部署成功后，默认管理用户名为 `root`，管理密码为 `chatnio123456`，请根据提示尽快更换初始密码。
+      2. 首次空数据库启动会自动创建管理用户 `root`。如未设置 `ROOT_INITIAL_PASSWORD`，请在首次启动日志中查看随机初始密码，并尽快更换。
 
       更多更新功能和部署手册请查看 👉 [CoAI.Dev (Github)](https://github.com/coaidev/coai)
