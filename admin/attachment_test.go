@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -120,5 +121,31 @@ func TestDeleteAttachmentAllowsReferencedWithForce(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(workingDir, utils.AttachmentLocalPath(name))); !os.IsNotExist(err) {
 		t.Fatalf("expected forced delete to remove attachment, got %v", err)
+	}
+}
+
+func TestListAttachmentsReturnsRFC3339UpdatedAt(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	_, name := setupAttachmentDeleteTest(t)
+	modTime := time.Date(2026, 5, 25, 10, 30, 45, 0, time.FixedZone("CST", 8*60*60))
+	if err := os.Chtimes(utils.AttachmentLocalPath(name), modTime, modTime); err != nil {
+		t.Fatalf("set attachment mod time: %v", err)
+	}
+
+	items, err := ListAttachments(openAdminUserTestDB(t))
+	if err != nil {
+		t.Fatalf("list attachments: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 attachment, got %d (%#v)", len(items), items)
+	}
+
+	parsed, err := time.Parse(time.RFC3339, items[0].UpdatedAt)
+	if err != nil {
+		t.Fatalf("expected RFC3339 updated_at, got %q: %v", items[0].UpdatedAt, err)
+	}
+	if !parsed.Equal(modTime) {
+		t.Fatalf("expected updated_at %s, got %s", modTime.Format(time.RFC3339), items[0].UpdatedAt)
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -62,7 +63,7 @@ func ListAttachments(db *sql.DB) ([]AttachmentFile, error) {
 		result = append(result, AttachmentFile{
 			Name:           item.Name,
 			Size:           item.Size,
-			UpdatedAt:      item.UpdatedAt.Format("2006-01-02 15:04:05"),
+			UpdatedAt:      item.UpdatedAt.Format(time.RFC3339),
 			StorageMode:    strings.ToLower(strings.TrimSpace(item.StorageMode)),
 			PublicURL:      item.PublicURL,
 			Referenced:     count > 0,
