@@ -225,11 +225,14 @@ func TestStorageConfig(c *gin.Context) {
 		},
 	})
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":  err == nil,
-		"error":   utils.GetError(err),
-		"message": "storage test passed",
-	})
+	response := gin.H{
+		"status": err == nil,
+		"error":  utils.GetError(err),
+	}
+	if err == nil {
+		response["message"] = "storage test passed"
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 func GetPlanConfig(c *gin.Context) {

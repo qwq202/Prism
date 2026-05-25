@@ -1,9 +1,15 @@
 package channel
 
 import (
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"strings"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 )
 
@@ -342,4 +348,73 @@ func TestUpdateConfigKeepsRuntimeStateWhenSaveFails(t *testing.T) {
 	if current.GetTimeZone() != "UTC" {
 		t.Fatalf("expected runtime timezone to remain unchanged, got %q", current.GetTimeZone())
 	}
+}
+
+func TestTestStorageConfigReturnsSuccessMessageOnlyOnSuccess(t *testing.T) {
+	previousWorkingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working dir: %v", err)
+	}
+	if err := os.Chdir(t.TempDir()); err != nil {
+		t.Fatalf("chdir temp dir: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(previousWorkingDir); err != nil {
+			t.Fatalf("restore working dir: %v", err)
+		}
+	})
+
+	response := callTestStorageConfig(t, `{"common":{"storage_mode":"local"}}`)
+	if response["status"] != true {
+		t.Fatalf("expected local storage test to pass, got %#v", response)
+	}
+	if response["message"] != "storage test passed" {
+		t.Fatalf("expected success message, got %#v", response)
+	}
+}
+
+func TestTestStorageConfigDoesNotReturnSuccessMessageOnFailure(t *testing.T) {
+	response := callTestStorageConfig(t, `{
+		"common": {
+			"storage_mode": "s3",
+			"s3": {
+				"region": "us-east-1",
+				"bucket": "prism-files",
+				"access_key": "access-key",
+				"secret_key": "secret-key",
+				"public_base_url": "cdn.example.com"
+			}
+		}
+	}`)
+	if response["status"] != false {
+		t.Fatalf("expected invalid storage test to fail, got %#v", response)
+	}
+	if response["error"] == "" {
+		t.Fatalf("expected failure error, got %#v", response)
+	}
+	if _, ok := response["message"]; ok {
+		t.Fatalf("did not expect success message on failure, got %#v", response)
+	}
+}
+
+func callTestStorageConfig(t *testing.T, body string) map[string]any {
+	t.Helper()
+
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodPost, "/admin/config/test/storage", strings.NewReader(body))
+	context.Request.Header.Set("Content-Type", "application/json")
+
+	TestStorageConfig(context)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", recorder.Code, recorder.Body.String())
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	return response
 }
