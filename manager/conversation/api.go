@@ -29,6 +29,14 @@ type UpdateConversationModelForm struct {
 	Model string `json:"model"`
 }
 
+type DeleteConversationForm struct {
+	Id int64 `json:"id"`
+}
+
+type DeleteSharingForm struct {
+	Hash string `json:"hash"`
+}
+
 type DeleteMaskForm struct {
 	Id int `json:"id" binding:"required"`
 }
@@ -48,6 +56,28 @@ func disableConversationResponseCache(c *gin.Context) {
 	c.Header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
 	c.Header("Pragma", "no-cache")
 	c.Header("Expires", "0")
+}
+
+func getDeleteConversationID(c *gin.Context) (int64, error) {
+	if c.Request.Method == http.MethodPost {
+		var form DeleteConversationForm
+		if err := c.ShouldBindJSON(&form); err == nil {
+			return form.Id, nil
+		}
+	}
+
+	return strconv.ParseInt(c.Query("id"), 10, 64)
+}
+
+func getDeleteSharingHash(c *gin.Context) string {
+	if c.Request.Method == http.MethodPost {
+		var form DeleteSharingForm
+		if err := c.ShouldBindJSON(&form); err == nil {
+			return strings.TrimSpace(form.Hash)
+		}
+	}
+
+	return strings.TrimSpace(c.Query("hash"))
 }
 
 func ListAPI(c *gin.Context) {
@@ -120,7 +150,7 @@ func DeleteAPI(c *gin.Context) {
 	}
 
 	db := utils.GetDBFromContext(c)
-	id, err := strconv.ParseInt(c.Query("id"), 10, 64)
+	id, err := getDeleteConversationID(c)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  false,
@@ -398,7 +428,7 @@ func DeleteSharingAPI(c *gin.Context) {
 	}
 
 	db := utils.GetDBFromContext(c)
-	hash := strings.TrimSpace(c.Query("hash"))
+	hash := getDeleteSharingHash(c)
 	if hash == "" {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  false,

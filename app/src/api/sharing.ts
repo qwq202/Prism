@@ -81,7 +81,7 @@ export async function deleteSharing(
   hash: string,
 ): Promise<DeleteSharingResponse> {
   try {
-    const resp = await axios.get(`/conversation/share/delete?hash=${hash}`);
+    const resp = await axios.post("/conversation/share/delete", { hash });
     return resp.data as DeleteSharingResponse;
   } catch (e) {
     return {

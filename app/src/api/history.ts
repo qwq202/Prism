@@ -185,10 +185,13 @@ export async function loadConversation(
 
 export async function deleteConversation(id: number): Promise<boolean> {
   try {
-    const resp = await axios.get("/conversation/delete", {
-      headers: noCacheHeaders,
-      params: { id, _: Date.now() },
-    });
+    const resp = await axios.post(
+      "/conversation/delete",
+      { id },
+      {
+        headers: noCacheHeaders,
+      },
+    );
     return resp.data.status;
   } catch (e) {
     console.warn(e);
@@ -234,10 +237,13 @@ export async function retitleConversation(id: number): Promise<CommonResponse> {
 
 export async function deleteAllConversations(): Promise<boolean> {
   try {
-    const resp = await axios.get("/conversation/clean", {
-      headers: noCacheHeaders,
-      params: { _: Date.now() },
-    });
+    const resp = await axios.post(
+      "/conversation/clean",
+      {},
+      {
+        headers: noCacheHeaders,
+      },
+    );
     return resp.data.status;
   } catch (e) {
     console.warn(e);

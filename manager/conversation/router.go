@@ -10,6 +10,8 @@ func Register(app *gin.RouterGroup) {
 		router.POST("/rename", RenameAPI)
 		router.POST("/retitle", RetitleAPI)
 		router.POST("/model", UpdateModelAPI)
+		router.POST("/delete", DeleteAPI)
+		router.POST("/clean", CleanAPI)
 		router.GET("/delete", DeleteAPI)
 		router.GET("/clean", CleanAPI)
 
@@ -17,6 +19,7 @@ func Register(app *gin.RouterGroup) {
 		router.POST("/share", ShareAPI)
 		router.GET("/view", ViewAPI)
 		router.GET("/share/list", ListSharingAPI)
+		router.POST("/share/delete", DeleteSharingAPI)
 		router.GET("/share/delete", DeleteSharingAPI)
 
 		router.GET("/mask/view", LoadMaskAPI)
