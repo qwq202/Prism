@@ -12,7 +12,7 @@ func TestExtractAssistantMessageFromBufferPlainTextResponse(t *testing.T) {
 		Content: "hello world",
 	})
 
-	message := extractAssistantMessageFromBuffer(buffer, false)
+	message := extractAssistantMessageFromBuffer(buffer, false, false)
 
 	if message.Role != globals.Assistant {
 		t.Fatalf("expected role %q, got %q", globals.Assistant, message.Role)
@@ -43,7 +43,7 @@ func TestExtractAssistantMessageFromBufferToolCallOnlyResponse(t *testing.T) {
 		ToolCall: &toolCalls,
 	})
 
-	message := extractAssistantMessageFromBuffer(buffer, false)
+	message := extractAssistantMessageFromBuffer(buffer, false, false)
 
 	if message.Content != "" {
 		t.Fatalf("expected empty text content for tool-call-only response, got %q", message.Content)
@@ -65,7 +65,7 @@ func TestExtractAssistantMessageFromBufferPreservesReasoningContent(t *testing.T
 		ReasoningContent: utils.ToPtr("planning"),
 	})
 
-	message := extractAssistantMessageFromBuffer(buffer, false)
+	message := extractAssistantMessageFromBuffer(buffer, false, false)
 
 	if message.Content != "<think>\nplanning\n</think>\n\nfinal answer" {
 		t.Fatalf("expected visible content to be preserved, got %q", message.Content)
@@ -118,7 +118,7 @@ func TestExtractAssistantMessageFromBufferPreservesVisibleTextAndToolCalls(t *te
 		Content: "已经帮你记住了。",
 	})
 
-	message := extractAssistantMessageFromBuffer(buffer, false)
+	message := extractAssistantMessageFromBuffer(buffer, false, false)
 
 	if message.Content != "已经帮你记住了。" {
 		t.Fatalf("expected visible assistant content to be preserved, got %q", message.Content)
@@ -141,7 +141,7 @@ func TestExtractAssistantMessageFromBufferMetadataOnlyResponse(t *testing.T) {
 		},
 	})
 
-	message := extractAssistantMessageFromBuffer(buffer, false)
+	message := extractAssistantMessageFromBuffer(buffer, false, false)
 
 	if message.Content != "" {
 		t.Fatalf("expected metadata-only response to keep empty content, got %q", message.Content)
@@ -166,7 +166,7 @@ func TestExtractAssistantMessageFromBufferPreservesClaudeMetadata(t *testing.T) 
 		},
 	})
 
-	message := extractAssistantMessageFromBuffer(buffer, false)
+	message := extractAssistantMessageFromBuffer(buffer, false, false)
 
 	if message.Content != "" {
 		t.Fatalf("expected claude metadata-only response to keep empty content, got %q", message.Content)
@@ -204,7 +204,7 @@ func TestExtractAssistantMessageFromBufferInterruptedDropsFunctionPayloads(t *te
 		},
 	})
 
-	message := extractAssistantMessageFromBuffer(buffer, true)
+	message := extractAssistantMessageFromBuffer(buffer, true, false)
 
 	if message.Content != "partial visible text" {
 		t.Fatalf("expected visible text to remain on interrupted response, got %q", message.Content)

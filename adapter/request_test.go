@@ -105,6 +105,34 @@ func TestSanitizeChatMessagesForRequestStripsContextClearMarker(t *testing.T) {
 	}
 }
 
+func TestSanitizeChatMessagesForRequestStripsPersistedDisplayMetadata(t *testing.T) {
+	props := &adaptercommon.ChatProps{
+		OriginalModel: "deepseek-v3",
+		Message: []globals.Message{
+			{
+				Role:    globals.Assistant,
+				Content: "hello",
+				Quota:   9,
+				Plan:    true,
+			},
+		},
+	}
+
+	restore := sanitizeChatMessagesForRequest(requestTestChannelConfig{
+		channelType:    globals.DeepseekChannelType,
+		reflectedModel: "deepseek-v3",
+	}, props)
+
+	if props.Message[0].Quota != 0 || props.Message[0].Plan {
+		t.Fatalf("expected persisted display metadata to be stripped, got %#v", props.Message[0])
+	}
+
+	restore()
+	if props.Message[0].Quota != 9 || !props.Message[0].Plan {
+		t.Fatalf("expected original display metadata to be restored, got %#v", props.Message[0])
+	}
+}
+
 func TestSanitizeChatMessagesForRequestStripsNonGeminiMetadata(t *testing.T) {
 	props := &adaptercommon.ChatProps{
 		OriginalModel: "gpt-4o",

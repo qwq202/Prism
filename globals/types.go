@@ -60,6 +60,8 @@ type Message struct {
 	ReasoningContent     *string               `json:"reasoning_content,omitempty"`      // only for deepseek reasoner models
 	GeminiHiddenMetadata *GeminiHiddenMetadata `json:"gemini_hidden_metadata,omitempty"` // hidden gemini metadata for replay
 	ClaudeHiddenMetadata *ClaudeHiddenMetadata `json:"claude_hidden_metadata,omitempty"` // hidden claude thinking metadata for replay
+	Quota                float32               `json:"quota,omitempty"`                  // persisted display cost
+	Plan                 bool                  `json:"plan,omitempty"`                   // whether the cost used subscription quota
 	ContextCleared       bool                  `json:"context_cleared,omitempty"`        // internal marker for context window resets
 }
 

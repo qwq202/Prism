@@ -802,7 +802,7 @@ func createToolChatTask(
 			return hit, err, interrupted
 		}
 
-		assistant := extractAssistantMessageFromBuffer(roundBuffer, false)
+		assistant := extractAssistantMessageFromBuffer(roundBuffer, false, false)
 		if assistant.ToolCalls == nil || len(*assistant.ToolCalls) == 0 {
 			syncToolFinalMetadata(liveBuffer, roundBuffer)
 			return hit, nil, false
@@ -1080,7 +1080,7 @@ func createChatTask(
 	}
 }
 
-func extractAssistantMessageFromBuffer(buffer *utils.Buffer, interrupted bool) globals.Message {
+func extractAssistantMessageFromBuffer(buffer *utils.Buffer, interrupted bool, plan bool) globals.Message {
 	if buffer.IsEmpty() {
 		geminiHiddenMetadata := buffer.GetGeminiHiddenMetadata()
 		claudeHiddenMetadata := buffer.GetClaudeHiddenMetadata()
@@ -1104,6 +1104,10 @@ func extractAssistantMessageFromBuffer(buffer *utils.Buffer, interrupted bool) g
 		Content:              buffer.ReadWithDefault(defaultMessage),
 		GeminiHiddenMetadata: buffer.GetGeminiHiddenMetadata(),
 		ClaudeHiddenMetadata: buffer.GetClaudeHiddenMetadata(),
+		Plan:                 plan,
+	}
+	if buffer.GetCharge() != nil {
+		message.Quota = buffer.GetQuota()
 	}
 
 	// Interrupted streams may contain partial/incomplete tool payloads.
@@ -1211,7 +1215,7 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 	}
 
 	if interrupted {
-		return extractAssistantMessageFromBuffer(buffer, true)
+		return extractAssistantMessageFromBuffer(buffer, true, plan)
 	}
 
 	if buffer.IsEmpty() {
@@ -1225,14 +1229,14 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 			conn.Send(globals.ChatSegmentResponse{
 				End: true,
 			})
-			return extractAssistantMessageFromBuffer(buffer, interrupted)
+			return extractAssistantMessageFromBuffer(buffer, interrupted, plan)
 		}
 
 		conn.Send(globals.ChatSegmentResponse{
 			Message: defaultMessage,
 			End:     true,
 		})
-		return extractAssistantMessageFromBuffer(buffer, interrupted)
+		return extractAssistantMessageFromBuffer(buffer, interrupted, plan)
 	}
 
 	conn.Send(globals.ChatSegmentResponse{
@@ -1241,5 +1245,5 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 		Plan:  plan,
 	})
 
-	return extractAssistantMessageFromBuffer(buffer, interrupted)
+	return extractAssistantMessageFromBuffer(buffer, interrupted, plan)
 }

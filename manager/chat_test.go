@@ -3,9 +3,21 @@ package manager
 import (
 	"chat/globals"
 	"chat/manager/conversation"
+	"chat/utils"
 	"testing"
 	"time"
 )
+
+type chatTestCharge struct{}
+
+func (chatTestCharge) GetType() string             { return globals.TimesBilling }
+func (chatTestCharge) GetModels() []string         { return nil }
+func (chatTestCharge) GetInput() float32           { return 0 }
+func (chatTestCharge) GetOutput() float32          { return 9 }
+func (chatTestCharge) SupportAnonymous() bool      { return true }
+func (chatTestCharge) IsBilling() bool             { return true }
+func (chatTestCharge) IsBillingType(t string) bool { return t == globals.TimesBilling }
+func (chatTestCharge) GetLimit() float32           { return 9 }
 
 func TestLatestMessageContentHandlesEmptySegment(t *testing.T) {
 	if content, ok := latestMessageContent(nil); ok || content != "" {
@@ -18,6 +30,19 @@ func TestLatestMessageContentHandlesEmptySegment(t *testing.T) {
 	})
 	if !ok || content != "latest" {
 		t.Fatalf("expected latest message content, got content=%q ok=%v", content, ok)
+	}
+}
+
+func TestExtractAssistantMessageFromBufferPersistsBillingMetadata(t *testing.T) {
+	buffer := utils.NewBuffer(globals.GPT3Turbo, nil, chatTestCharge{})
+	buffer.Write("hello")
+
+	message := extractAssistantMessageFromBuffer(buffer, false, true)
+	if message.Quota != 9 {
+		t.Fatalf("expected quota 9 to be persisted, got %f", message.Quota)
+	}
+	if !message.Plan {
+		t.Fatalf("expected plan billing marker to be persisted")
 	}
 }
 

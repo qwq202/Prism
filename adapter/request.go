@@ -67,6 +67,14 @@ func stripInternalMessageMetadata(messages []globals.Message) ([]globals.Message
 			sanitized[idx].ContextCleared = false
 			changed = true
 		}
+		if message.Quota != 0 {
+			sanitized[idx].Quota = 0
+			changed = true
+		}
+		if message.Plan {
+			sanitized[idx].Plan = false
+			changed = true
+		}
 	}
 
 	if !changed {
