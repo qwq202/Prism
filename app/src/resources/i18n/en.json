@@ -547,6 +547,7 @@
     "hide-model": "Hide Model Selection",
     "hide-toolbar": "Hide toolbar by default",
     "hide-toolbar-text": "Hide toolbar text",
+    "show-quota": "Show quota",
     "collapse-thinking": "Collapse thinking content by default",
     "theme": "Themes",
     "light": "Light",

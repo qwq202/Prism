@@ -56,6 +56,7 @@ function SettingsDialog() {
   const align = useSelector(settings.alignSelector);
   const hideToolbar = useSelector(settings.hideToolbarSelector);
   const hideToolbarText = useSelector(settings.hideToolbarTextSelector);
+  const showQuota = useSelector(settings.showQuotaSelector);
   const collapseThinking = useSelector(settings.collapseThinkingSelector);
   const context = useSelector(settings.contextSelector);
   const sender = useSelector(settings.senderSelector);
@@ -240,6 +241,17 @@ function SettingsDialog() {
                       checked={hideToolbarText}
                       onCheckedChange={(state: boolean) => {
                         dispatch(settings.setHideToolbarText(state));
+                      }}
+                    />
+                  </div>
+                  <div className={`item`}>
+                    <div className={`name`}>{t("settings.show-quota")}</div>
+                    <div className={`grow`} />
+                    <Checkbox
+                      className={`value`}
+                      checked={showQuota}
+                      onCheckedChange={(state: boolean) => {
+                        dispatch(settings.setShowQuota(state));
                       }}
                     />
                   </div>

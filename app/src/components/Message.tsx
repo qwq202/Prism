@@ -35,6 +35,7 @@ import ModelAvatar from "@/components/ModelAvatar.tsx";
 import { selectSupportModels } from "@/store/chat.ts";
 import { ToolCallStatus } from "@/components/ToolCallStatus";
 import { parseThinkContent } from "@/utils/thinking";
+import { showQuotaSelector } from "@/store/settings.ts";
 
 type MessageProps = {
   index: number;
@@ -92,9 +93,15 @@ type MessageQuotaProps = {
 
 function MessageQuota({ message }: MessageQuotaProps) {
   const [detail, setDetail] = useState(false);
+  const showQuota = useSelector(showQuotaSelector);
   const quota = Number(message.quota);
 
-  if (message.role === UserRole || !Number.isFinite(quota) || quota <= 0) {
+  if (
+    !showQuota ||
+    message.role === UserRole ||
+    !Number.isFinite(quota) ||
+    quota <= 0
+  ) {
     return null;
   }
 

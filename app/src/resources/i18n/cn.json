@@ -807,6 +807,7 @@
     "hide-model": "隐藏模型选择区",
     "hide-toolbar": "默认隐藏工具栏",
     "hide-toolbar-text": "隐藏工具栏文字",
+    "show-quota": "显示点数",
     "collapse-thinking": "默认折叠思考内容",
     "memory": "内存占用",
     "max-tokens": "最大回复 Token 数",

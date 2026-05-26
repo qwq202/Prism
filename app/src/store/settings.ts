@@ -28,6 +28,7 @@ export const initialSettings = {
   hide_model: false,
   hide_toolbar: false,
   hide_toolbar_text: true,
+  show_quota: true,
   collapse_thinking: true,
   persona_style: "default",
   persona_warmth: "default",
@@ -149,6 +150,7 @@ export const settingsSlice = createSlice({
     hide_model: getBooleanMemory("hide_model", false), // hide model
     hide_toolbar: getBooleanMemory("hide_toolbar", false), // hide toolbar
     hide_toolbar_text: getBooleanMemory("hide_toolbar_text", true), // hide toolbar text
+    show_quota: getBooleanMemory("show_quota", true), // show message quota
     collapse_thinking: getBooleanMemory(
       "collapse_thinking",
       initialSettings.collapse_thinking,
@@ -259,6 +261,10 @@ export const settingsSlice = createSlice({
       state.hide_toolbar_text = action.payload as boolean;
       setBooleanMemory("hide_toolbar_text", action.payload);
     },
+    setShowQuota: (state, action) => {
+      state.show_quota = action.payload as boolean;
+      setBooleanMemory("show_quota", action.payload);
+    },
     setCollapseThinking: (state, action) => {
       state.collapse_thinking = action.payload as boolean;
       setBooleanMemory("collapse_thinking", action.payload);
@@ -322,6 +328,7 @@ export const settingsSlice = createSlice({
       state.hide_model = initialSettings.hide_model;
       state.hide_toolbar = initialSettings.hide_toolbar;
       state.hide_toolbar_text = initialSettings.hide_toolbar_text;
+      state.show_quota = initialSettings.show_quota;
       state.collapse_thinking = initialSettings.collapse_thinking;
       state.persona_style = initialSettings.persona_style;
       state.persona_warmth = initialSettings.persona_warmth;
@@ -350,6 +357,7 @@ export const settingsSlice = createSlice({
       setBooleanMemory("hide_model", initialSettings.hide_model);
       setBooleanMemory("hide_toolbar", initialSettings.hide_toolbar);
       setBooleanMemory("hide_toolbar_text", initialSettings.hide_toolbar_text);
+      setBooleanMemory("show_quota", initialSettings.show_quota);
       setBooleanMemory("collapse_thinking", initialSettings.collapse_thinking);
       setMemory("persona_style", initialSettings.persona_style);
       setMemory("persona_warmth", initialSettings.persona_warmth);
@@ -392,6 +400,7 @@ export const {
   setHideModel,
   setHideToolbar,
   setHideToolbarText,
+  setShowQuota,
   setCollapseThinking,
   setPersonaStyle,
   setPersonaWarmth,
@@ -435,6 +444,8 @@ export const hideToolbarSelector = (state: RootState): boolean =>
   state.settings.hide_toolbar;
 export const hideToolbarTextSelector = (state: RootState): boolean =>
   state.settings.hide_toolbar_text;
+export const showQuotaSelector = (state: RootState): boolean =>
+  state.settings.show_quota;
 export const collapseThinkingSelector = (state: RootState): boolean =>
   state.settings.collapse_thinking;
 export const personaStyleSelector = (state: RootState): string =>

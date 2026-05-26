@@ -547,6 +547,7 @@
     "hide-model": "モデルの選択を非表示にする",
     "hide-toolbar": "デフォルトでツールバーを非表示にする",
     "hide-toolbar-text": "ツールバーのテキストを非表示にする",
+    "show-quota": "ポイントを表示",
     "collapse-thinking": "思考内容をデフォルトで折りたたむ",
     "theme": "テーマ",
     "light": "明るい色:",
