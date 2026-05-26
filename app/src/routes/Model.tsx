@@ -371,13 +371,13 @@ function ModelCardMetrics({ metrics }: { metrics?: ModelUsageStats }) {
   const status = getCardMetricStatus(metrics);
 
   return (
-    <div className="absolute right-3 top-3 z-10 hidden w-[7.1rem] select-none md:block">
-      <div className="grid grid-cols-[2.1rem_2.9rem_1.3rem] items-start gap-1.5 text-center">
+    <div className="absolute right-3 top-3 z-10 hidden w-[7.25rem] select-none md:block">
+      <div className="grid grid-cols-[2.7rem_2.75rem_1.25rem] items-start gap-1 text-center">
         <div className="min-w-0">
           <div className="truncate text-[10px] font-medium leading-none text-muted-foreground/80">
             {t("market.metrics-card-latency")}
           </div>
-          <div className="mt-1 truncate font-mono text-xs font-semibold leading-none text-foreground/60">
+          <div className="mt-1 whitespace-nowrap font-mono text-xs font-semibold leading-none text-foreground/60">
             {formatCardLatency(metrics)}
           </div>
         </div>
@@ -490,7 +490,7 @@ function ModelItem({
     >
       <ModelCardMetrics metrics={metrics} />
       <motion.div
-        className={`model-info-wrapper w-full h-max flex flex-row md:pr-[7.5rem]`}
+        className={`model-info-wrapper w-full h-max flex flex-row md:pr-[8rem]`}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: index * 0.1 + 0.2 }}
@@ -517,7 +517,7 @@ function ModelItem({
         </div>
       </motion.div>
       <motion.div
-        className={`model-description text-sm my-1.5 ml-1 md:pr-[7.5rem]`}
+        className={`model-description text-sm my-1.5 ml-1 md:pr-[8rem]`}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: index * 0.1 + 0.5 }}
