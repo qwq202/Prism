@@ -119,6 +119,7 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
   const { t } = useTranslation();
   const model = useSelector(selectModel);
   const [open, setOpen] = useState(false);
+  const [previewFile, setPreviewFile] = useState<FileObject | null>(null);
   const nextTaskId = useRef(0);
 
   const [tasks, taskDispatch] = useReducer(fileTaskReducer, {
@@ -321,7 +322,11 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
               transition={{ duration: 0.3 }}
             >
               <AnimatePresence key="files">
-                <FileList value={files} removeFile={removeFile} />
+                <FileList
+                  value={files}
+                  removeFile={removeFile}
+                  previewFile={setPreviewFile}
+                />
               </AnimatePresence>
               <AnimatePresence key="tasks">
                 {tasks.tasks.map((task, index) => (
@@ -354,6 +359,14 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
           </DialogDescription>
         </DialogHeader>
       </DialogContent>
+      <FilePreviewDialog
+        file={previewFile}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPreviewFile(null);
+          }
+        }}
+      />
     </Dialog>
   );
 }
@@ -533,9 +546,12 @@ function FileBadge({ name }: FileBadgeProps) {
 type FileListProps = {
   value: FileArray;
   removeFile: (index: number) => void;
+  previewFile: (file: FileObject) => void;
 };
 
-function FileList({ value, removeFile }: FileListProps) {
+function FileList({ value, removeFile, previewFile }: FileListProps) {
+  const { t } = useTranslation();
+
   if (value.length === 0) return null;
 
   const listVariants = {
@@ -565,6 +581,16 @@ function FileList({ value, removeFile }: FileListProps) {
             exit="hidden"
             variants={itemVariants}
             transition={{ delay: index * 0.1 }}
+            role="button"
+            tabIndex={0}
+            onClick={() => previewFile(file)}
+            onKeyDown={(event) => {
+              if (event.target !== event.currentTarget) return;
+              if (event.key !== "Enter" && event.key !== " ") return;
+
+              event.preventDefault();
+              previewFile(file);
+            }}
           >
             <div className="flex pt-1 flex-col items-center w-full h-fit">
               <FileIconObject name={file.name} />
@@ -582,6 +608,8 @@ function FileList({ value, removeFile }: FileListProps) {
                 {((file.size || file.content.length) / 1024).toFixed(2)}KB
               </span>
               <button
+                type="button"
+                aria-label={t("remove")}
                 className="absolute group w-fit h-fit top-1 right-1 p-0.5 rounded-full hover:bg-secondary/10 transition-colors duration-200 md:top-2 md:right-2 md:p-1"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -597,6 +625,37 @@ function FileList({ value, removeFile }: FileListProps) {
         ))}
       </AnimatePresence>
     </motion.div>
+  );
+}
+
+type FilePreviewDialogProps = {
+  file: FileObject | null;
+  onOpenChange: (open: boolean) => void;
+};
+
+function FilePreviewDialog({ file, onOpenChange }: FilePreviewDialogProps) {
+  const { t } = useTranslation();
+
+  return (
+    <Dialog open={Boolean(file)} onOpenChange={onOpenChange}>
+      <DialogContent className="flex-dialog md:max-w-[min(90vw,900px)]">
+        <DialogHeader>
+          <DialogTitle className="flex flex-row items-center select-none">
+            <Paperclip className="h-4 w-4 mr-2" />
+            {file?.name ?? t("file.file")}
+          </DialogTitle>
+        </DialogHeader>
+        {file && (
+          <div className="flex max-h-[70vh] min-h-48 items-center justify-center overflow-auto rounded-md bg-muted/30 p-2">
+            <img
+              src={file.content}
+              alt={file.name}
+              className="max-h-[68vh] max-w-full rounded-sm object-contain"
+            />
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
