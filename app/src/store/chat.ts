@@ -364,6 +364,23 @@ function isStreamingConversation(conversation: ConversationSerialized): boolean 
   return last?.role === AssistantRole && last.end === false;
 }
 
+function hasAssistantStreamPayload(message: StreamMessage): boolean {
+  return (
+    (message.message ?? "").length > 0 ||
+    Boolean(message.keyword) ||
+    Boolean(message.tool_call)
+  );
+}
+
+function hasAssistantStreamUpdate(message: StreamMessage): boolean {
+  return (
+    hasAssistantStreamPayload(message) ||
+    message.end === true ||
+    (typeof message.quota === "number" && message.quota > 0) ||
+    message.plan === true
+  );
+}
+
 function parseConversationVersion(
   value: string | undefined,
 ): number | undefined {
@@ -915,13 +932,18 @@ const chatSlice = createSlice({
       };
       const conversation = state.conversations[id];
       if (!conversation) return;
+      const content = message.message ?? "";
+      const hasPayload = hasAssistantStreamPayload(message);
+      const hasUpdate = hasAssistantStreamUpdate(message);
+      const last = conversation.messages[conversation.messages.length - 1];
+      const hasAssistantTarget = last?.role === AssistantRole;
+
+      if (!hasAssistantTarget && !hasPayload) return;
+      if (hasAssistantTarget && !hasUpdate) return;
+
       markConversationPending(conversation);
 
-      if (
-        conversation.messages.length === 0 ||
-        conversation.messages[conversation.messages.length - 1].role !==
-          AssistantRole
-      ) {
+      if (!hasAssistantTarget) {
         if (model) {
           conversation.model = model;
         }
@@ -937,10 +959,12 @@ const chatSlice = createSlice({
       }
 
       const instance = conversation.messages[conversation.messages.length - 1];
-      if (message.message.length > 0) instance.content += message.message;
+      if (content.length > 0) instance.content += content;
       if (!instance.model && model) instance.model = model;
       if (message.keyword) instance.keyword = message.keyword;
-      if (message.quota) instance.quota = message.quota;
+      if (typeof message.quota === "number" && message.quota > 0) {
+        instance.quota = message.quota;
+      }
       if (message.tool_call) {
         instance.tool_calls = upsertToolCall(
           instance.tool_calls,
@@ -951,7 +975,9 @@ const chatSlice = createSlice({
         instance.end = message.end;
         instance.tool_calls = finalizePendingToolCalls(instance.tool_calls);
       }
-      instance.plan = message.plan;
+      if (hasPayload || message.end === true || message.plan === true) {
+        instance.plan = message.plan;
+      }
     },
     removeMessage: (state, action) => {
       const { id, idx } = action.payload as { id: number; idx: number };

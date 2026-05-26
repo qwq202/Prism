@@ -92,44 +92,44 @@ type MessageQuotaProps = {
 
 function MessageQuota({ message }: MessageQuotaProps) {
   const [detail, setDetail] = useState(false);
+  const quota = Number(message.quota);
 
-  if (message.role === UserRole) return null;
+  if (message.role === UserRole || !Number.isFinite(quota) || quota <= 0) {
+    return null;
+  }
 
   return (
-    message.quota &&
-    message.quota !== 0 && (
+    <motion.div
+      className={cn("message-quota", message.plan && "subscription")}
+      onClick={() => setDetail(!detail)}
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+    >
       <motion.div
-        className={cn("message-quota", message.plan && "subscription")}
-        onClick={() => setDetail(!detail)}
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.3, ease: "easeOut" }}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+        initial={{ rotate: 0 }}
+        animate={{ rotate: detail ? 360 : 0 }}
+        transition={{ duration: 0.5, ease: "easeInOut" }}
       >
-        <motion.div
-          initial={{ rotate: 0 }}
-          animate={{ rotate: detail ? 360 : 0 }}
-          transition={{ duration: 0.5, ease: "easeInOut" }}
-        >
-          {message.plan ? (
-            <CalendarCheck2 className={`h-4 w-4 icon`} />
-          ) : detail ? (
-            <CloudCog className={`h-4 w-4 icon`} />
-          ) : (
-            <Cloud className={`h-4 w-4 icon`} />
-          )}
-        </motion.div>
-        <motion.span
-          className={`quota`}
-          initial={{ y: 10, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.3 }}
-        >
-          {(message.quota < 0 ? 0 : message.quota).toFixed(detail ? 6 : 2)}
-        </motion.span>
+        {message.plan ? (
+          <CalendarCheck2 className={`h-4 w-4 icon`} />
+        ) : detail ? (
+          <CloudCog className={`h-4 w-4 icon`} />
+        ) : (
+          <Cloud className={`h-4 w-4 icon`} />
+        )}
       </motion.div>
-    )
+      <motion.span
+        className={`quota`}
+        initial={{ y: 10, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.2, duration: 0.3 }}
+      >
+        {quota.toFixed(detail ? 6 : 2)}
+      </motion.span>
+    </motion.div>
   );
 }
 
