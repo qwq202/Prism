@@ -19,6 +19,73 @@ type RehypePlugin = NonNullable<
 
 const rehypeRawPlugin = rehypeRaw as unknown as RehypePlugin;
 
+type HastNode = {
+  type?: string;
+  tagName?: string;
+  value?: string;
+  properties?: Record<string, unknown>;
+  children?: HastNode[];
+};
+
+const markdownHtmlBreakPlugin = (() => {
+  const skipTags = new Set(["code", "pre"]);
+
+  function splitHtmlBreaks(node: HastNode): HastNode[] {
+    const value = node.value ?? "";
+    const breakPattern = /<br\s*\/?>/gi;
+    const parts: HastNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = breakPattern.exec(value)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push({
+          type: "text",
+          value: value.slice(lastIndex, match.index),
+        });
+      }
+
+      parts.push({
+        type: "element",
+        tagName: "br",
+        properties: {},
+        children: [],
+      });
+      lastIndex = match.index + match[0].length;
+    }
+
+    if (lastIndex < value.length) {
+      parts.push({ type: "text", value: value.slice(lastIndex) });
+    }
+
+    return parts.length > 0 ? parts : [node];
+  }
+
+  function transform(node: HastNode) {
+    if (node.type === "element" && node.tagName && skipTags.has(node.tagName)) {
+      return;
+    }
+    if (!node.children) return;
+
+    node.children = node.children.flatMap((child) => {
+      transform(child);
+      if (
+        child.type === "text" &&
+        child.value &&
+        /<br\s*\/?>/i.test(child.value)
+      ) {
+        return splitHtmlBreaks(child);
+      }
+
+      return [child];
+    });
+  }
+
+  return function rehypeMarkdownHtmlBreaks() {
+    return (tree: HastNode) => transform(tree);
+  };
+})() as RehypePlugin;
+
 type MarkdownProps = {
   children: string;
   className?: string;
@@ -45,7 +112,7 @@ function MarkdownContent({
   const rehypePlugins = useMemo(() => {
     const plugins: NonNullable<
       React.ComponentProps<typeof ReactMarkdown>["rehypePlugins"]
-    > = [rehypeKatex];
+    > = [rehypeKatex, markdownHtmlBreakPlugin];
     return acceptHtml ? [...plugins, rehypeRawPlugin] : plugins;
   }, [acceptHtml]);
 
