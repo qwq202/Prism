@@ -25,7 +25,7 @@ func TestCreateStopSignalEmitsStopAndCancelsPolling(t *testing.T) {
 	conn := NewConnection(nil, false, "", 2)
 	conn.Write(&conversation.FormMessage{Type: StopType})
 
-	stopSignal, cancel := createStopSignal(conn)
+	stopSignal, cancel := createStopSignal(conn, nil)
 	defer cancel()
 
 	select {
@@ -38,4 +38,63 @@ func TestCreateStopSignalEmitsStopAndCancelsPolling(t *testing.T) {
 	}
 
 	cancel()
+}
+
+func TestCreateStopSignalHandlesRemoveWithoutStopping(t *testing.T) {
+	conn := NewConnection(nil, false, "", 3)
+	conn.Write(&conversation.FormMessage{Type: RemoveType, Message: "2"})
+
+	removed := make(chan int, 1)
+	stopSignal, cancel := createStopSignal(conn, func(index int) {
+		removed <- index
+	})
+	defer cancel()
+
+	select {
+	case index := <-removed:
+		if index != 2 {
+			t.Fatalf("expected remove index 2, got %d", index)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatalf("timed out waiting for remove handler")
+	}
+
+	select {
+	case stopped := <-stopSignal:
+		if stopped {
+			t.Fatalf("remove event should not stop chat request")
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatalf("timed out waiting for non-stop signal")
+	}
+}
+
+func TestCreateStopSignalConsumesStopAfterRemove(t *testing.T) {
+	conn := NewConnection(nil, false, "", 3)
+	conn.Write(&conversation.FormMessage{Type: RemoveType, Message: "1"})
+	conn.Write(&conversation.FormMessage{Type: StopType})
+
+	removed := make(chan int, 1)
+	stopSignal, cancel := createStopSignal(conn, func(index int) {
+		removed <- index
+	})
+	defer cancel()
+
+	select {
+	case index := <-removed:
+		if index != 1 {
+			t.Fatalf("expected remove index 1, got %d", index)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatalf("timed out waiting for remove handler")
+	}
+
+	select {
+	case stopped := <-stopSignal:
+		if !stopped {
+			t.Fatalf("expected stop signal after queued remove event")
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatalf("timed out waiting for stop signal")
+	}
 }

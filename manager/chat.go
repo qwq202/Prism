@@ -243,7 +243,9 @@ type partialChunk struct {
 	Error error
 }
 
-func createStopSignal(conn *Connection) (<-chan bool, context.CancelFunc) {
+type removeSignalHandler func(index int)
+
+func createStopSignal(conn *Connection, onRemove removeSignalHandler) (<-chan bool, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(context.Background())
 	stopSignal := make(chan bool, 1)
 	go func(conn *Connection, stopSignal chan bool) {
@@ -261,7 +263,26 @@ func createStopSignal(conn *Connection) (<-chan bool, context.CancelFunc) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				state := conn.PeekStop() != nil // check the stop state
+				state := false
+				for {
+					form := conn.PeekStop()
+					if form == nil {
+						break
+					}
+					if form.Type == StopType {
+						state = true
+						break
+					}
+					if form.Type == RemoveType && onRemove != nil {
+						// Remove can race with restart; persist it without interrupting the new response.
+						id, err := getId(form.Message)
+						if err != nil {
+							globals.Warn(fmt.Sprintf("failed to parse remove event while polling chat controls: %s", err.Error()))
+							continue
+						}
+						onRemove(id)
+					}
+				}
 
 				if state {
 					select {
@@ -284,6 +305,19 @@ func createStopSignal(conn *Connection) (<-chan bool, context.CancelFunc) {
 	}(conn, stopSignal)
 
 	return stopSignal, cancel
+}
+
+func createRemoveSignalHandler(db *sql.DB, instance *conversation.Conversation) removeSignalHandler {
+	return func(index int) {
+		if instance == nil || db == nil {
+			return
+		}
+		removed := instance.RemoveMessage(index)
+		if removed.Role == "" {
+			return
+		}
+		instance.SaveConversation(db)
+	}
 }
 
 func cloneChatPropsWithBuffer(props *adaptercommon.ChatProps, buffer *utils.Buffer) *adaptercommon.ChatProps {
@@ -396,10 +430,11 @@ func createRoundTask(
 	group string,
 	props *adaptercommon.ChatProps,
 	plan bool,
+	onRemove removeSignalHandler,
 ) (hit bool, err error, interrupted bool) {
 	chunkChan := make(chan partialChunk, 24)
 	interruptSignal := make(chan error, 1)
-	stopSignal, stopPolling := createStopSignal(conn)
+	stopSignal, stopPolling := createStopSignal(conn, onRemove)
 
 	defer func() {
 		stopPolling()
@@ -762,7 +797,7 @@ func createToolChatTask(
 
 		streamBuffer := liveBuffer
 
-		hit, err, interrupted = createRoundTask(conn, user, roundBuffer, streamBuffer, db, cache, group, props, plan)
+		hit, err, interrupted = createRoundTask(conn, user, roundBuffer, streamBuffer, db, cache, group, props, plan, createRemoveSignalHandler(db, instance))
 		if err != nil || interrupted {
 			return hit, err, interrupted
 		}
@@ -834,7 +869,7 @@ func createToolChatTask(
 		true,
 	)
 
-	hit, err, interrupted = createRoundTask(conn, user, finalBuffer, liveBuffer, db, cache, group, props, plan)
+	hit, err, interrupted = createRoundTask(conn, user, finalBuffer, liveBuffer, db, cache, group, props, plan, createRemoveSignalHandler(db, instance))
 	if err != nil || interrupted {
 		return hit, err, interrupted
 	}
@@ -857,7 +892,7 @@ func createChatTask(
 ) (hit bool, err error, interrupted bool) {
 	chunkChan := make(chan partialChunk, 24) // the channel to send the chunk data
 	interruptSignal := make(chan error, 1)   // the signal to interrupt the chat task routine
-	stopSignal, stopPolling := createStopSignal(conn)
+	stopSignal, stopPolling := createStopSignal(conn, createRemoveSignalHandler(db, instance))
 
 	defer func() {
 		stopPolling()
@@ -1140,7 +1175,7 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 			hit, err, interrupted = createToolChatTask(conn, user, buffer, db, cache, model, group, instance, segment, plan, memCtx, tools, maxToolRounds)
 		} else {
 			props := buildChatProps(conn, instance, model, segment, buffer, memCtx.MemoryPrompt, memCtx.RecentChatsPrompt, nil, nil, false)
-			hit, err, interrupted = createRoundTask(conn, user, buffer, buffer, db, cache, group, props, plan)
+			hit, err, interrupted = createRoundTask(conn, user, buffer, buffer, db, cache, group, props, plan, createRemoveSignalHandler(db, instance))
 		}
 	}
 
