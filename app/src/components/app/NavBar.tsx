@@ -21,10 +21,11 @@ import { appLogo } from "@/conf/env.ts";
 import PrismLogo from "@/components/PrismLogo.tsx";
 import { refreshQuota } from "@/store/quota.ts";
 import { refreshSubscription } from "@/store/subscription.ts";
-import { useEffectAsync } from "@/utils/hook.ts";
 import { AppDispatch, clearCronJobs, createCronJob } from "@/store";
 import { openDialog } from "@/store/settings.ts";
 import { ThemeToggle } from "@/components/ThemeProviderComponent.tsx";
+import { infoTimeZoneSelector } from "@/store/info.ts";
+import { refreshWalletUsageSummary } from "@/store/record.ts";
 
 function NavMenu() {
   const username = useSelector(selectUsername);
@@ -53,15 +54,22 @@ function NavBar() {
   }, [dispatch]);
   const auth = useSelector(selectAuthenticated);
   const init = useSelector(selectInit);
+  const timeZone = useSelector(infoTimeZoneSelector);
 
-  useEffectAsync(async () => {
+  useEffect(() => {
     if (!auth) return;
 
     const quotaTask = createCronJob(dispatch, refreshQuota, 30, true);
     const planTask = createCronJob(dispatch, refreshSubscription, 30, true);
+    const walletStatsTask = createCronJob(
+      dispatch,
+      () => refreshWalletUsageSummary(timeZone),
+      60,
+      true,
+    );
 
-    return () => clearCronJobs([quotaTask, planTask]);
-  }, [auth]);
+    return () => clearCronJobs([quotaTask, planTask, walletStatsTask]);
+  }, [auth, dispatch, timeZone]);
 
   return (
     <nav className={`navbar`}>
