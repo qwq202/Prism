@@ -112,6 +112,7 @@ export type ConversationSerialized = {
   messages: Message[];
   updated_at?: string;
   local_pending_until?: number;
+  local_modified_at?: number;
 };
 
 export type ConnectionEvent = {
@@ -305,8 +306,15 @@ function reconcileConversationHistory(
 function shouldReplaceConversation(
   currentConversation: ConversationSerialized | undefined,
   incoming: ConversationInstance,
+  requestedAt?: number,
 ): boolean {
   if (!currentConversation) return true;
+  if (
+    requestedAt !== undefined &&
+    (currentConversation.local_modified_at ?? 0) > requestedAt
+  ) {
+    return false;
+  }
 
   const currentVersion = parseConversationVersion(
     currentConversation.updated_at,
@@ -341,7 +349,9 @@ function shouldReplaceConversation(
 }
 
 function markConversationPending(conversation: ConversationSerialized) {
-  conversation.local_pending_until = Date.now() + localMutationProtectionMs;
+  const now = Date.now();
+  conversation.local_modified_at = now;
+  conversation.local_pending_until = now + localMutationProtectionMs;
 }
 
 function hasPendingLocalMutation(conversation: ConversationSerialized): boolean {
@@ -1020,6 +1030,29 @@ const chatSlice = createSlice({
 
       state.conversations[id] = conversation;
     },
+    setRemoteConversation: (state, action) => {
+      const { conversation, id, requestedAt } = action.payload as {
+        conversation: ConversationInstance;
+        id: number;
+        requestedAt?: number;
+      };
+
+      if (
+        !shouldReplaceConversation(
+          state.conversations[id],
+          conversation,
+          requestedAt,
+        )
+      ) {
+        return;
+      }
+
+      state.conversations[id] = {
+        model: conversation.model,
+        messages: conversation.message,
+        updated_at: conversation.updated_at,
+      };
+    },
     deleteConversation: (state, action) => {
       const id = action.payload as number;
 
@@ -1303,6 +1336,7 @@ export const {
   raiseConversation,
   importConversation,
   setConversation,
+  setRemoteConversation,
   deleteConversation,
   deleteAllConversation,
   preflightHistory,
@@ -1374,11 +1408,11 @@ export function useConversationActions() {
 
   const refreshConversationDetail = async (
     id: number,
-    currentConversation: ConversationSerialized | undefined,
     options?: { activate?: boolean },
   ) => {
     if (id === -1) return;
     const activate = options?.activate ?? true;
+    const requestedAt = Date.now();
 
     const result = await fetchConversation(id);
     if (result.status === "not_found") {
@@ -1390,19 +1424,11 @@ export function useConversationActions() {
     if (result.status !== "ok") return;
 
     const data = result.conversation;
-    if (!shouldReplaceConversation(currentConversation, data)) {
-      if (activate) dispatch(setCurrent(id));
-      return;
-    }
-
     dispatch(
-      setConversation({
-        conversation: {
-          model: data.model,
-          messages: data.message,
-          updated_at: data.updated_at,
-        },
+      setRemoteConversation({
+        conversation: data,
         id,
+        requestedAt,
       }),
     );
     dispatch(
@@ -1463,7 +1489,7 @@ export function useConversationActions() {
 
     if (!refreshRemote) return;
 
-    await refreshConversationDetail(id, restoredConversation, {
+    await refreshConversationDetail(id, {
       activate: true,
     });
   };
@@ -1530,7 +1556,7 @@ export function useConversationActions() {
         !resp.fromCache &&
         current !== -1
       ) {
-        await refreshConversationDetail(current, conversations[current], {
+        await refreshConversationDetail(current, {
           activate: false,
         });
       }
