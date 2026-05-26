@@ -1,16 +1,20 @@
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input.tsx";
 import {
+  Activity,
   ArrowDownToDot,
   ArrowRightLeft,
   ArrowUpFromDot,
   Award,
   Bolt,
+  CheckCircle2,
+  Clock3,
   Cloud,
   Cpu,
   DollarSign,
   EyeIcon,
   Gem,
+  Gauge,
   Github,
   Globe,
   Image,
@@ -61,6 +65,14 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import Tips from "@/components/Tips";
 import Icon from "@/components/utils/Icon";
+import {
+  getModelUsageStats,
+  getModelsUsageStats,
+} from "@/api/model-metrics.ts";
+import type {
+  ModelUsageStats,
+  ModelUsageTrendPoint,
+} from "@/api/model-metrics.ts";
 
 const tagIcons: { [key: string]: React.ReactNode } = {
   official: <Award />,
@@ -197,6 +209,7 @@ type ModelProps = Omit<
   forwardRef?: React.Ref<HTMLDivElement>;
   showPricing?: boolean;
   show1mPricing?: boolean;
+  metrics?: ModelUsageStats;
   index: number;
   onModelSelect: (model: Model) => void;
 };
@@ -294,6 +307,145 @@ function PriceColumn({
   }
 }
 
+function formatCardLatency(
+  metrics: ModelUsageStats | null | undefined,
+): string {
+  if (!metrics || !hasMetricSamples(metrics) || metrics.success_count === 0) {
+    return "--";
+  }
+  if (metrics.avg_latency < 1) {
+    return `${Math.round(metrics.avg_latency * 1000)}ms`;
+  }
+  return `${metrics.avg_latency.toFixed(metrics.avg_latency >= 10 ? 1 : 2)}s`;
+}
+
+function formatCardThroughput(
+  metrics: ModelUsageStats | null | undefined,
+): string {
+  if (!metrics || !hasMetricSamples(metrics) || metrics.success_count === 0) {
+    return "--";
+  }
+  const value =
+    metrics.tps >= 100
+      ? metrics.tps.toFixed(0)
+      : metrics.tps >= 10
+      ? metrics.tps.toFixed(1)
+      : metrics.tps.toFixed(2);
+  return `${value}tps`;
+}
+
+function getCardMetricStatus(metrics: ModelUsageStats | undefined) {
+  if (!metrics || !hasMetricSamples(metrics)) return "empty";
+  if (metrics.availability >= 0.99 && metrics.success_rate >= 0.98) {
+    return "good";
+  }
+  if (metrics.availability >= 0.95 && metrics.success_rate >= 0.9) {
+    return "warn";
+  }
+  return "bad";
+}
+
+function ModelCardStatusBars({ status }: { status: string }) {
+  return (
+    <div className="flex h-4 items-end justify-center gap-0.5 pt-0.5">
+      {[0, 1, 2].map((item) => (
+        <span
+          key={item}
+          className={cn(
+            "w-1 rounded-full bg-muted transition-colors",
+            item === 0 && "h-2",
+            item === 1 && "h-3",
+            item === 2 && "h-4",
+            status === "good" && "bg-emerald-500",
+            status === "warn" && item < 2 && "bg-amber-500",
+            status === "bad" && item === 2 && "bg-rose-500",
+          )}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ModelCardMetrics({ metrics }: { metrics?: ModelUsageStats }) {
+  const { t } = useTranslation();
+  const status = getCardMetricStatus(metrics);
+
+  return (
+    <div className="absolute right-3 top-3 z-10 hidden w-[7.1rem] select-none md:block">
+      <div className="grid grid-cols-[2.1rem_2.9rem_1.3rem] items-start gap-1.5 text-center">
+        <div className="min-w-0">
+          <div className="truncate text-[10px] font-medium leading-none text-muted-foreground/80">
+            {t("market.metrics-card-latency")}
+          </div>
+          <div className="mt-1 truncate font-mono text-xs font-semibold leading-none text-foreground/60">
+            {formatCardLatency(metrics)}
+          </div>
+        </div>
+        <div className="min-w-0">
+          <div className="truncate text-[10px] font-medium leading-none text-muted-foreground/80">
+            {t("market.metrics-card-throughput")}
+          </div>
+          <div className="mt-1 truncate font-mono text-xs font-semibold leading-none text-foreground/60">
+            {formatCardThroughput(metrics)}
+          </div>
+        </div>
+        <div className="min-w-0">
+          <div className="truncate text-[10px] font-medium leading-none text-muted-foreground/80">
+            {t("market.metrics-card-status")}
+          </div>
+          <ModelCardStatusBars status={status} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModelTagIcons({ tags, pro }: { tags: string[]; pro: boolean }) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-1">
+      {pro && (
+        <Tips
+          content={t("tag.badges.plan-included-tip")}
+          trigger={
+            <Gem className="h-5 w-5 rounded-sm bg-amber-500/20 p-1 text-amber-600" />
+          }
+        />
+      )}
+      {tags
+        .filter((tag) => !notDisplayTags.includes(tag))
+        .map((tag, index) => (
+          <Tips
+            key={index}
+            content={t(`tag.${tag}`)}
+            trigger={
+              tagIcons[tag] ? (
+                <Icon
+                  icon={tagIcons[tag]}
+                  className={cn("h-5 w-5 rounded-sm bg-primary/5 p-1", {
+                    "bg-amber-500/20 text-amber-600": tag === "official",
+                    "bg-blue-500/20 text-blue-600": tag === "multi-modal",
+                    "bg-green-500/20 text-green-600": tag === "web",
+                    "bg-purple-500/20 text-purple-600": tag === "high-quality",
+                    "bg-red-500/20 text-red-600": tag === "high-price",
+                    "bg-gray-500/20 text-gray-600": tag === "open-source",
+                    "bg-indigo-500/20 text-indigo-600":
+                      tag === "image-generation",
+                    "bg-yellow-500/20 text-yellow-600": tag === "fast",
+                    "bg-orange-500/20 text-orange-600": tag === "unstable",
+                    "bg-teal-500/20 text-teal-600": tag === "high-context",
+                    "bg-emerald-500/20 text-emerald-600": tag === "free",
+                  })}
+                />
+              ) : undefined
+            }
+          />
+        ))}
+    </div>
+  );
+}
+
 function ModelItem({
   model,
   className,
@@ -301,6 +453,7 @@ function ModelItem({
   forwardRef,
   showPricing,
   show1mPricing,
+  metrics,
   index,
   onModelSelect,
   ...props
@@ -335,8 +488,9 @@ function ModelItem({
       transition={{ duration: 0.5, delay: index * 0.1 }}
       whileHover={{ scale: 1.05 }}
     >
+      <ModelCardMetrics metrics={metrics} />
       <motion.div
-        className={`model-info-wrapper w-full h-max flex flex-row`}
+        className={`model-info-wrapper w-full h-max flex flex-row md:pr-[7.5rem]`}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: index * 0.1 + 0.2 }}
@@ -360,59 +514,10 @@ function ModelItem({
           >
             <span className="model-name-text">{model.name}</span>
           </div>
-          {/* <Tips
-            content={model.id}
-            trigger={<Tag className={`w-5 h-5 p-1 bg-primary/5 rounded-sm`} />}
-          /> */}
-          {pro && (
-            <Tips
-              content={t("tag.badges.plan-included-tip")}
-              trigger={
-                <Gem
-                  className={`w-5 h-5 p-1 rounded-sm ml-1 text-amber-600 bg-amber-500/20`}
-                />
-              }
-            />
-          )}
-          {tags
-            .filter((tag) => !notDisplayTags.includes(tag))
-            .map((tag, index) => (
-              <Tips
-                key={index}
-                content={t(`tag.${tag}`)}
-                trigger={
-                  tagIcons[tag] ? (
-                    <Icon
-                      icon={tagIcons[tag]}
-                      className={cn(
-                        `w-5 h-5 p-1 rounded-sm ml-1 bg-primary/5`,
-                        {
-                          "text-amber-600 bg-amber-500/20": tag === "official",
-                          "text-blue-600 bg-blue-500/20": tag === "multi-modal",
-                          "text-green-600 bg-green-500/20": tag === "web",
-                          "text-purple-600 bg-purple-500/20":
-                            tag === "high-quality",
-                          "text-red-600 bg-red-500/20": tag === "high-price",
-                          "text-gray-600 bg-gray-500/20": tag === "open-source",
-                          "text-indigo-600 bg-indigo-500/20":
-                            tag === "image-generation",
-                          "text-yellow-600 bg-yellow-500/20": tag === "fast",
-                          "text-orange-600 bg-orange-500/20":
-                            tag === "unstable",
-                          "text-teal-600 bg-teal-500/20":
-                            tag === "high-context",
-                          "text-emerald-600 bg-emerald-500/20": tag === "free",
-                        },
-                      )}
-                    />
-                  ) : undefined
-                }
-              />
-            ))}
         </div>
       </motion.div>
       <motion.div
-        className={`model-description text-sm my-1.5 ml-1`}
+        className={`model-description text-sm my-1.5 ml-1 md:pr-[7.5rem]`}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: index * 0.1 + 0.5 }}
@@ -445,7 +550,8 @@ function ModelItem({
       )}
 
       <div className="flex flex-row mt-1.5">
-        <div className="flex-grow" />
+        <ModelTagIcons tags={tags} pro={pro} />
+        <div className="flex-grow min-w-2" />
         <motion.span
           className={`clickable w-fit h-fit p-1 border hover:border-hover transition-all rounded-md`}
           whileHover={{ scale: 1.05 }}
@@ -493,10 +599,18 @@ type MarketPlaceProps = {
   onSelect: (model: Model) => void;
 };
 
-function MarketPlace({ search, showPricing, show1mPricing, onSelect}: MarketPlaceProps) {
+function MarketPlace({
+  search,
+  showPricing,
+  show1mPricing,
+  onSelect,
+}: MarketPlaceProps) {
   const { t } = useTranslation();
   const select = useSelector(selectModel);
   const supportModels = useSelector(selectSupportModels);
+  const [metricsMap, setMetricsMap] = useState<Record<string, ModelUsageStats>>(
+    {},
+  );
 
   const models = useMemo(() => {
     if (search.length === 0) return supportModels;
@@ -521,6 +635,40 @@ function MarketPlace({ search, showPricing, show1mPricing, onSelect}: MarketPlac
       );
     });
   }, [supportModels, search, t]);
+  const visibleModelIds = useMemo(
+    () => models.map((model) => model.id),
+    [models],
+  );
+  const visibleModelIdsKey = useMemo(
+    () => visibleModelIds.join("\n"),
+    [visibleModelIds],
+  );
+
+  useEffect(() => {
+    let ignore = false;
+    if (visibleModelIds.length === 0) {
+      setMetricsMap({});
+      return () => {
+        ignore = true;
+      };
+    }
+
+    const chunks: string[][] = [];
+    for (let index = 0; index < visibleModelIds.length; index += 50) {
+      chunks.push(visibleModelIds.slice(index, index + 50));
+    }
+
+    Promise.all(chunks.map((chunk) => getModelsUsageStats(chunk))).then(
+      (results) => {
+        if (ignore) return;
+        setMetricsMap(Object.assign({}, ...results));
+      },
+    );
+
+    return () => {
+      ignore = true;
+    };
+  }, [visibleModelIds, visibleModelIdsKey]);
 
   return (
     <motion.div
@@ -537,11 +685,264 @@ function MarketPlace({ search, showPricing, show1mPricing, onSelect}: MarketPlac
             className={cn(select === model.id && "active")}
             showPricing={showPricing}
             show1mPricing={show1mPricing}
+            metrics={metricsMap[model.id]}
             index={index}
             onModelSelect={onSelect}
           />
         ))}
       </AnimatePresence>
+    </motion.div>
+  );
+}
+
+function hasMetricSamples(
+  metrics: ModelUsageStats | null,
+): metrics is ModelUsageStats {
+  return !!metrics && metrics.request_count > 0;
+}
+
+function formatMetricTPS(metrics: ModelUsageStats | null): string {
+  if (!hasMetricSamples(metrics) || metrics.success_count === 0) return "--";
+  if (metrics.tps >= 100) return metrics.tps.toFixed(0);
+  if (metrics.tps >= 10) return metrics.tps.toFixed(1);
+  return metrics.tps.toFixed(2);
+}
+
+function formatMetricLatency(metrics: ModelUsageStats | null): string {
+  if (!hasMetricSamples(metrics) || metrics.success_count === 0) return "--";
+  if (metrics.avg_latency < 1) {
+    return `${Math.round(metrics.avg_latency * 1000)} ms`;
+  }
+  return `${metrics.avg_latency.toFixed(metrics.avg_latency >= 10 ? 1 : 2)} s`;
+}
+
+function formatMetricPercent(
+  metrics: ModelUsageStats | null,
+  value: number | undefined,
+): string {
+  if (!hasMetricSamples(metrics) || value === undefined) return "--";
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatMetricCount(
+  metrics: ModelUsageStats | null,
+  value: number | undefined,
+): string {
+  if (!hasMetricSamples(metrics) || value === undefined) return "--";
+  return `${value}/${metrics.request_count}`;
+}
+
+type ModelMetricCardProps = {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  sub: string;
+  loading: boolean;
+  iconClassName?: string;
+};
+
+function ModelMetricCard({
+  icon,
+  label,
+  value,
+  sub,
+  loading,
+  iconClassName,
+}: ModelMetricCardProps) {
+  return (
+    <div className="min-h-[88px] rounded-lg border bg-muted/20 p-3">
+      <div className="mb-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span className="truncate">{label}</span>
+        <span
+          className={cn(
+            "flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-background",
+            iconClassName,
+          )}
+        >
+          {icon}
+        </span>
+      </div>
+      {loading ? (
+        <div className="space-y-2">
+          <div className="h-6 w-16 animate-pulse rounded bg-muted" />
+          <div className="h-3 w-20 animate-pulse rounded bg-muted/70" />
+        </div>
+      ) : (
+        <>
+          <div className="text-2xl font-bold leading-none text-foreground">
+            {value}
+          </div>
+          <div className="mt-1 truncate text-xs text-muted-foreground">
+            {sub}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function TrendSparkline({
+  points,
+  kind,
+}: {
+  points: ModelUsageTrendPoint[];
+  kind: "latency" | "availability";
+}) {
+  const width = 100;
+  const height = 36;
+  const pad = 3;
+  const values = points.map((point) =>
+    point.requests > 0
+      ? kind === "latency"
+        ? point.avg_latency
+        : point.availability
+      : null,
+  );
+  const active = values.filter((value): value is number => value !== null);
+
+  if (active.length === 0) {
+    return (
+      <div className="h-12 rounded-md border border-dashed border-border bg-muted/20" />
+    );
+  }
+
+  const minValue = kind === "availability" ? 0 : Math.min(...active);
+  const maxValue = kind === "availability" ? 1 : Math.max(...active);
+  const span = maxValue - minValue;
+  const normalize = (value: number) =>
+    span === 0 ? 0.5 : (value - minValue) / span;
+  const pointText = values
+    .map((value, index) => {
+      const x =
+        points.length <= 1 ? width / 2 : (index / (points.length - 1)) * width;
+      const y =
+        height - pad - normalize(value ?? minValue) * (height - pad * 2);
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    })
+    .join(" ");
+
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+      className="h-12 w-full overflow-visible"
+    >
+      <path
+        d={`M 0 ${height - pad} H ${width}`}
+        className="stroke-muted"
+        strokeWidth="1"
+        fill="none"
+      />
+      <polyline
+        points={pointText}
+        className="stroke-current"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
+function ModelMetricsPanel({
+  metrics,
+  loading,
+}: {
+  metrics: ModelUsageStats | null;
+  loading: boolean;
+}) {
+  const { t } = useTranslation();
+  const noData = t("market.metrics-no-data");
+  const hours = metrics?.window_hours ?? 24;
+  const availableCount = metrics
+    ? metrics.request_count - metrics.availability_failures
+    : undefined;
+
+  return (
+    <motion.div
+      className="space-y-3"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.14, duration: 0.18 }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Activity className="h-4 w-4 text-primary" />
+          {t("market.metrics-title")}
+        </div>
+        <span className="shrink-0 text-xs text-muted-foreground">
+          {t("market.metrics-window", { hours })}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2.5">
+        <ModelMetricCard
+          icon={<Gauge className="h-3.5 w-3.5" />}
+          label={t("market.metrics-tps")}
+          value={formatMetricTPS(metrics)}
+          sub={
+            hasMetricSamples(metrics) ? t("market.metrics-tps-unit") : noData
+          }
+          loading={loading}
+          iconClassName="text-sky-600 dark:text-sky-400"
+        />
+        <ModelMetricCard
+          icon={<Clock3 className="h-3.5 w-3.5" />}
+          label={t("market.metrics-avg-latency")}
+          value={formatMetricLatency(metrics)}
+          sub={
+            hasMetricSamples(metrics)
+              ? t("market.metrics-window", { hours })
+              : noData
+          }
+          loading={loading}
+          iconClassName="text-amber-600 dark:text-amber-400"
+        />
+        <ModelMetricCard
+          icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+          label={t("market.metrics-success-rate")}
+          value={formatMetricPercent(metrics, metrics?.success_rate)}
+          sub={formatMetricCount(metrics, metrics?.success_count)}
+          loading={loading}
+          iconClassName="text-emerald-600 dark:text-emerald-400"
+        />
+        <ModelMetricCard
+          icon={<Activity className="h-3.5 w-3.5" />}
+          label={t("market.metrics-availability")}
+          value={formatMetricPercent(metrics, metrics?.availability)}
+          sub={formatMetricCount(metrics, availableCount)}
+          loading={loading}
+          iconClassName="text-indigo-600 dark:text-indigo-400"
+        />
+      </div>
+
+      <div className="space-y-3 rounded-lg border bg-muted/15 p-3">
+        <div>
+          <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+            <span>{t("market.metrics-latency-trend")}</span>
+            <span>{formatMetricLatency(metrics)}</span>
+          </div>
+          <div className="text-sky-600 dark:text-sky-400">
+            <TrendSparkline
+              points={metrics?.latency_trend ?? []}
+              kind="latency"
+            />
+          </div>
+        </div>
+        <div>
+          <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+            <span>{t("market.metrics-availability-trend")}</span>
+            <span>{formatMetricPercent(metrics, metrics?.availability)}</span>
+          </div>
+          <div className="text-emerald-600 dark:text-emerald-400">
+            <TrendSparkline
+              points={metrics?.availability_trend ?? []}
+              kind="availability"
+            />
+          </div>
+        </div>
+      </div>
     </motion.div>
   );
 }
@@ -561,6 +962,8 @@ function ModelDetailPanel({
   const auth = useSelector(selectAuthenticated);
   const level = useSelector(levelSelector);
   const subscriptionData = useSelector(subscriptionDataSelector);
+  const [metrics, setMetrics] = useState<ModelUsageStats | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState<boolean>(true);
 
   const state = useMemo(() => list.includes(model.id), [model, list]);
   const pro = useMemo(
@@ -576,6 +979,24 @@ function ModelDetailPanel({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
+
+  useEffect(() => {
+    let ignore = false;
+    setMetricsLoading(true);
+    setMetrics(null);
+
+    getModelUsageStats(model.id)
+      .then((data) => {
+        if (!ignore) setMetrics(data);
+      })
+      .finally(() => {
+        if (!ignore) setMetricsLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [model.id]);
 
   const handleUse = () => {
     if (!auth && model.auth) {
@@ -645,7 +1066,11 @@ function ModelDetailPanel({
               <motion.div
                 className="absolute inset-0 rounded-full border-2 border-primary/30"
                 animate={{ scale: [1, 1.18, 1], opacity: [0.6, 0, 0.6] }}
-                transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+                transition={{
+                  duration: 2.4,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
               />
               <div className="relative z-10 rounded-full border-2 border-background shadow-lg overflow-hidden">
                 <ModelAvatar model={model} size={64} />
@@ -675,7 +1100,9 @@ function ModelDetailPanel({
               transition={{ delay: 0.09, duration: quickEnter }}
             >
               <Tag className="w-2.5 h-2.5" />
-              <span className="truncate max-w-[240px] font-mono">{model.id}</span>
+              <span className="truncate max-w-[240px] font-mono">
+                {model.id}
+              </span>
             </motion.div>
 
             {/* tags row */}
@@ -686,33 +1113,46 @@ function ModelDetailPanel({
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.12, duration: quickEnter }}
               >
-                {tags.filter((tag) => tagIcons[tag]).map((tag, idx) => (
-                  <motion.span
-                    key={idx}
-                    className={cn(
-                      "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
-                      {
-                        "text-amber-600 dark:text-amber-400 bg-amber-100/80 dark:bg-amber-900/30": tag === "official",
-                        "text-blue-600 dark:text-blue-400 bg-blue-100/80 dark:bg-blue-900/30": tag === "multi-modal",
-                        "text-green-600 dark:text-green-400 bg-green-100/80 dark:bg-green-900/30": tag === "web",
-                        "text-purple-600 dark:text-purple-400 bg-purple-100/80 dark:bg-purple-900/30": tag === "high-quality",
-                        "text-red-600 dark:text-red-400 bg-red-100/80 dark:bg-red-900/30": tag === "high-price",
-                        "text-muted-foreground bg-muted/60": tag === "open-source",
-                        "text-indigo-600 dark:text-indigo-400 bg-indigo-100/80 dark:bg-indigo-900/30": tag === "image-generation",
-                        "text-yellow-600 dark:text-yellow-400 bg-yellow-100/80 dark:bg-yellow-900/30": tag === "fast",
-                        "text-orange-600 dark:text-orange-400 bg-orange-100/80 dark:bg-orange-900/30": tag === "unstable",
-                        "text-teal-600 dark:text-teal-400 bg-teal-100/80 dark:bg-teal-900/30": tag === "high-context",
-                        "text-emerald-600 dark:text-emerald-400 bg-emerald-100/80 dark:bg-emerald-900/30": tag === "free",
-                      }
-                    )}
-                    initial={{ opacity: 0, scale: 0.75 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.14 + idx * 0.03, duration: 0.16 }}
-                  >
-                    <Icon icon={tagIcons[tag]} className="w-2.5 h-2.5" />
-                    {t(`tag.${tag}`)}
-                  </motion.span>
-                ))}
+                {tags
+                  .filter((tag) => tagIcons[tag])
+                  .map((tag, idx) => (
+                    <motion.span
+                      key={idx}
+                      className={cn(
+                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
+                        {
+                          "text-amber-600 dark:text-amber-400 bg-amber-100/80 dark:bg-amber-900/30":
+                            tag === "official",
+                          "text-blue-600 dark:text-blue-400 bg-blue-100/80 dark:bg-blue-900/30":
+                            tag === "multi-modal",
+                          "text-green-600 dark:text-green-400 bg-green-100/80 dark:bg-green-900/30":
+                            tag === "web",
+                          "text-purple-600 dark:text-purple-400 bg-purple-100/80 dark:bg-purple-900/30":
+                            tag === "high-quality",
+                          "text-red-600 dark:text-red-400 bg-red-100/80 dark:bg-red-900/30":
+                            tag === "high-price",
+                          "text-muted-foreground bg-muted/60":
+                            tag === "open-source",
+                          "text-indigo-600 dark:text-indigo-400 bg-indigo-100/80 dark:bg-indigo-900/30":
+                            tag === "image-generation",
+                          "text-yellow-600 dark:text-yellow-400 bg-yellow-100/80 dark:bg-yellow-900/30":
+                            tag === "fast",
+                          "text-orange-600 dark:text-orange-400 bg-orange-100/80 dark:bg-orange-900/30":
+                            tag === "unstable",
+                          "text-teal-600 dark:text-teal-400 bg-teal-100/80 dark:bg-teal-900/30":
+                            tag === "high-context",
+                          "text-emerald-600 dark:text-emerald-400 bg-emerald-100/80 dark:bg-emerald-900/30":
+                            tag === "free",
+                        },
+                      )}
+                      initial={{ opacity: 0, scale: 0.75 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.14 + idx * 0.03, duration: 0.16 }}
+                    >
+                      <Icon icon={tagIcons[tag]} className="w-2.5 h-2.5" />
+                      {t(`tag.${tag}`)}
+                    </motion.span>
+                  ))}
               </motion.div>
             )}
           </div>
@@ -733,6 +1173,8 @@ function ModelDetailPanel({
               </motion.p>
             )}
 
+            <ModelMetricsPanel metrics={metrics} loading={metricsLoading} />
+
             {/* pricing cards */}
             {model.price && model.price.type === "token-billing" && (
               <motion.div
@@ -749,7 +1191,9 @@ function ModelDetailPanel({
                   <p className="text-2xl font-bold text-foreground leading-none">
                     {parseFloat((model.price.input * unitValue).toPrecision(8))}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">{t("quota")} / {unitLabel} tokens</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {t("quota")} / {unitLabel} tokens
+                  </p>
                 </div>
                 <div className="rounded-xl border bg-gradient-to-br from-violet-50/60 dark:from-violet-950/30 to-transparent p-3.5">
                   <div className="flex items-center gap-1.5 text-violet-600 dark:text-violet-400 mb-2">
@@ -757,9 +1201,13 @@ function ModelDetailPanel({
                     <span className="text-xs font-medium">{t("output")}</span>
                   </div>
                   <p className="text-2xl font-bold text-foreground leading-none">
-                    {parseFloat((model.price.output * unitValue).toPrecision(8))}
+                    {parseFloat(
+                      (model.price.output * unitValue).toPrecision(8),
+                    )}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">{t("quota")} / {unitLabel} tokens</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {t("quota")} / {unitLabel} tokens
+                  </p>
                 </div>
               </motion.div>
             )}
@@ -800,14 +1248,19 @@ function ModelDetailPanel({
             whileHover={{ scale: 1.08 }}
             whileTap={{ scale: 0.92 }}
             onClick={() =>
-              dispatch(state ? removeModelList(model.id) : addModelList(model.id))
+              dispatch(
+                state ? removeModelList(model.id) : addModelList(model.id),
+              )
             }
           >
             <Star className={cn("w-4 h-4", state && "fill-current")} />
           </motion.button>
           <motion.button
             className="flex-grow flex items-center justify-center gap-2 h-10 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold shadow-sm"
-            whileHover={{ scale: 1.02, boxShadow: "0 4px 16px rgb(0 0 0 / 0.15)" }}
+            whileHover={{
+              scale: 1.02,
+              boxShadow: "0 4px 16px rgb(0 0 0 / 0.15)",
+            }}
             whileTap={{ scale: 0.98 }}
             onClick={handleUse}
           >
@@ -892,72 +1345,72 @@ function Model() {
 
   return (
     <>
-    <ScrollArea className={`model-market`}>
-      <motion.div
-        className={`market-wrapper`}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5 }}
-      >
+      <ScrollArea className={`model-market`}>
         <motion.div
-          className="absolute inset-0 overflow-hidden pointer-events-none"
+          className={`market-wrapper`}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 1 }}
+          transition={{ duration: 0.5 }}
         >
-          {[...Array(50)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute bg-primary/10 rounded-full"
-              style={{
-                width: Math.random() * 4 + 1 + "px",
-                height: Math.random() * 4 + 1 + "px",
-                top: Math.random() * 100 + "%",
-                left: Math.random() * 100 + "%",
-              }}
-              animate={{
-                y: [0, Math.random() * 100 - 50],
-                x: [0, Math.random() * 100 - 50],
-                opacity: [0.7, 0],
-              }}
-              transition={{
-                duration: Math.random() * 10 + 10,
-                repeat: Infinity,
-                ease: "linear",
-              }}
-            />
-          ))}
+          <motion.div
+            className="absolute inset-0 overflow-hidden pointer-events-none"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1 }}
+          >
+            {[...Array(50)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute bg-primary/10 rounded-full"
+                style={{
+                  width: Math.random() * 4 + 1 + "px",
+                  height: Math.random() * 4 + 1 + "px",
+                  top: Math.random() * 100 + "%",
+                  left: Math.random() * 100 + "%",
+                }}
+                animate={{
+                  y: [0, Math.random() * 100 - 50],
+                  x: [0, Math.random() * 100 - 50],
+                  opacity: [0.7, 0],
+                }}
+                transition={{
+                  duration: Math.random() * 10 + 10,
+                  repeat: Infinity,
+                  ease: "linear",
+                }}
+              />
+            ))}
+          </motion.div>
+          <MarketHeader />
+          <SearchBar
+            text={searchText}
+            onTextChange={setSearchText}
+            tags={searchTags}
+            onTagsChange={setSearchTags}
+            displayPricing={displayPricing}
+            onDisplayPricingChange={setDisplayPricing}
+            show1mPricing={show1mPricing}
+            onShow1mPricingChange={setShow1mPricing}
+          />
+          <MarketPlace
+            search={search}
+            showPricing={displayPricing}
+            show1mPricing={show1mPricing}
+            onSelect={setSelectedModel}
+          />
+          <MarketFooter />
         </motion.div>
-        <MarketHeader />
-        <SearchBar
-          text={searchText}
-          onTextChange={setSearchText}
-          tags={searchTags}
-          onTagsChange={setSearchTags}
-          displayPricing={displayPricing}
-          onDisplayPricingChange={setDisplayPricing}
-          show1mPricing={show1mPricing}
-          onShow1mPricingChange={setShow1mPricing}
-        />
-        <MarketPlace
-          search={search}
-          showPricing={displayPricing}
-          show1mPricing={show1mPricing}
-          onSelect={setSelectedModel}
-        />
-        <MarketFooter />
-      </motion.div>
-    </ScrollArea>
-    <AnimatePresence>
-      {selectedModel && (
-        <ModelDetailPanel
-          key="model-detail"
-          model={selectedModel}
-          onClose={() => setSelectedModel(null)}
-          show1mPricing={show1mPricing}
-        />
-      )}
-    </AnimatePresence>
+      </ScrollArea>
+      <AnimatePresence>
+        {selectedModel && (
+          <ModelDetailPanel
+            key="model-detail"
+            model={selectedModel}
+            onClose={() => setSelectedModel(null)}
+            show1mPricing={show1mPricing}
+          />
+        )}
+      </AnimatePresence>
     </>
   );
 }

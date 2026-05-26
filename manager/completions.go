@@ -5,6 +5,7 @@ import (
 	"chat/addition/web"
 	"chat/admin"
 	"chat/auth"
+	"chat/billing"
 	"chat/channel"
 	"chat/globals"
 	"chat/utils"
@@ -54,6 +55,7 @@ func NativeChatHandler(c *gin.Context, user *auth.User, model string, message []
 	)
 
 	admin.AnalyseRequest(model, buffer, err)
+	billing.RecordModelUsageMetric(db, model, buffer, err)
 	if err != nil {
 		auth.RevertSubscriptionUsage(db, cache, user, model)
 		return err.Error(), 0

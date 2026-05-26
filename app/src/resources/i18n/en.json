@@ -79,7 +79,20 @@
     "switch-bookmark": "Workbench",
     "remove-bookmark": "Model removed from menu bar",
     "add-bookmark": "Model added to menu bar",
-    "show-1m-pricing": "1M tokens"
+    "show-1m-pricing": "1M tokens",
+    "metrics-title": "Live performance",
+    "metrics-window": "Last {{hours}} hours",
+    "metrics-no-data": "No usage data yet",
+    "metrics-tps": "TPS",
+    "metrics-tps-unit": "tokens/s",
+    "metrics-avg-latency": "Avg latency",
+    "metrics-success-rate": "Success rate",
+    "metrics-availability": "Availability",
+    "metrics-latency-trend": "Latency trend",
+    "metrics-availability-trend": "Availability trend",
+    "metrics-card-latency": "Latency",
+    "metrics-card-throughput": "Throughput",
+    "metrics-card-status": "Status"
   },
   "conversation": {
     "title": "Conversation",

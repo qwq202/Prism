@@ -79,7 +79,20 @@
     "switch-bookmark": "Верстак",
     "remove-bookmark": "Модель удалена из строки меню",
     "add-bookmark": "Модель добавлена в строку меню",
-    "show-1m-pricing": "1M токенов"
+    "show-1m-pricing": "1M токенов",
+    "metrics-title": "Фактическая работа",
+    "metrics-window": "Последние {{hours}} ч",
+    "metrics-no-data": "Нет данных использования",
+    "metrics-tps": "TPS",
+    "metrics-tps-unit": "tokens/s",
+    "metrics-avg-latency": "Средняя задержка",
+    "metrics-success-rate": "Успешность",
+    "metrics-availability": "Доступность",
+    "metrics-latency-trend": "Тренд задержки",
+    "metrics-availability-trend": "Тренд доступности",
+    "metrics-card-latency": "Задержка",
+    "metrics-card-throughput": "Пропускная",
+    "metrics-card-status": "Статус"
   },
   "conversation": {
     "title": "Разговор",

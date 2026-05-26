@@ -79,7 +79,20 @@
     "switch-bookmark": "作業台",
     "remove-bookmark": "メニューバーからモデルを削除しました",
     "add-bookmark": "モデルがメニューバーに追加されました",
-    "show-1m-pricing": "100万トークン"
+    "show-1m-pricing": "100万トークン",
+    "metrics-title": "実績",
+    "metrics-window": "直近 {{hours}} 時間",
+    "metrics-no-data": "使用データがありません",
+    "metrics-tps": "TPS",
+    "metrics-tps-unit": "tokens/s",
+    "metrics-avg-latency": "平均遅延",
+    "metrics-success-rate": "成功率",
+    "metrics-availability": "可用性",
+    "metrics-latency-trend": "遅延トレンド",
+    "metrics-availability-trend": "可用性トレンド",
+    "metrics-card-latency": "遅延",
+    "metrics-card-throughput": "スループット",
+    "metrics-card-status": "状態"
   },
   "conversation": {
     "title": "ダイアログ",

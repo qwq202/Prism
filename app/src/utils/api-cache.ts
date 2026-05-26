@@ -122,15 +122,14 @@ function isRealtimePath(path: string): boolean {
     "/memory/list",
     "/admin/logger/console",
     "/v1/market",
+    "/v1/model-metrics",
     "/v1/models",
     "/v1/plans",
     "/v1/charge",
   ].some((item) => path.startsWith(item));
 }
 
-function hasNoCacheRequestHeader(
-  config: InternalAxiosRequestConfig,
-): boolean {
+function hasNoCacheRequestHeader(config: InternalAxiosRequestConfig): boolean {
   const cacheControl = getHeaderValue(config.headers, "Cache-Control")
     .toLowerCase()
     .split(",")

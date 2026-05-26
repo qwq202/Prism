@@ -19,11 +19,14 @@ func validSqlError(err error) bool {
 	lower := strings.ToLower(content)
 
 	// Error 1060: Duplicate column name
+	// Error 1061: Duplicate key name
 	// Error 1050: Table already exists
 	// SQLite: duplicate column name
 
 	return !(strings.Contains(content, "Error 1060") ||
+		strings.Contains(content, "Error 1061") ||
 		strings.Contains(content, "Error 1050") ||
+		strings.Contains(lower, "already exists") ||
 		strings.Contains(lower, "duplicate column name"))
 }
 
@@ -163,6 +166,13 @@ func doMysqlMigration(execer migrationExecer) error {
 		return err
 	}
 
+	if err := execSql(execer, `
+		ALTER TABLE model_usage_metrics
+		ADD INDEX idx_model_usage_metrics_model_created_at (model, created_at);
+	`); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -245,6 +255,13 @@ func doSqliteMigration(execer migrationExecer) error {
 	if err := execSql(execer, `
 		ALTER TABLE passkey_credential
 		ADD COLUMN sign_count INT DEFAULT 0;
+	`); err != nil {
+		return err
+	}
+
+	if err := execSql(execer, `
+		CREATE INDEX IF NOT EXISTS idx_model_usage_metrics_model_created_at
+		ON model_usage_metrics (model, created_at);
 	`); err != nil {
 		return err
 	}

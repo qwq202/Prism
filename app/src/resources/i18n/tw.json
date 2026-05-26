@@ -156,7 +156,20 @@
     "switch-model-desc": "已切換至模型",
     "switch-bookmark": "工作台",
     "remove-bookmark": "已將模型從功能表列移除",
-    "add-bookmark": "已將模型新增至功能表欄"
+    "add-bookmark": "已將模型新增至功能表欄",
+    "metrics-title": "真實表現",
+    "metrics-window": "最近 {{hours}} 小時",
+    "metrics-no-data": "暫無呼叫資料",
+    "metrics-tps": "TPS",
+    "metrics-tps-unit": "tokens/s",
+    "metrics-avg-latency": "平均延遲",
+    "metrics-success-rate": "成功率",
+    "metrics-availability": "可用率",
+    "metrics-latency-trend": "延遲趨勢",
+    "metrics-availability-trend": "可用率趨勢",
+    "metrics-card-latency": "延遲",
+    "metrics-card-throughput": "吞吐",
+    "metrics-card-status": "狀態"
   },
   "conversation": {
     "title": "對話",

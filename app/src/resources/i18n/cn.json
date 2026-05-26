@@ -218,7 +218,20 @@
     "switch-model-desc": "已切换至模型",
     "switch-bookmark": "工作台",
     "remove-bookmark": "已将模型从菜单栏移除",
-    "add-bookmark": "已将模型添加至菜单栏"
+    "add-bookmark": "已将模型添加至菜单栏",
+    "metrics-title": "真实表现",
+    "metrics-window": "最近 {{hours}} 小时",
+    "metrics-no-data": "暂无调用数据",
+    "metrics-tps": "TPS",
+    "metrics-tps-unit": "tokens/s",
+    "metrics-avg-latency": "平均延迟",
+    "metrics-success-rate": "成功率",
+    "metrics-availability": "可用率",
+    "metrics-latency-trend": "延迟趋势",
+    "metrics-availability-trend": "可用率趋势",
+    "metrics-card-latency": "延迟",
+    "metrics-card-throughput": "吞吐",
+    "metrics-card-status": "状态"
   },
   "conversation": {
     "title": "对话",

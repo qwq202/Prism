@@ -3,7 +3,9 @@ package generation
 import (
 	adaptercommon "chat/adapter/common"
 	"chat/admin"
+	"chat/billing"
 	"chat/channel"
+	"chat/connection"
 	"chat/globals"
 	"chat/utils"
 	"fmt"
@@ -27,6 +29,7 @@ func CreateGeneration(group, model, prompt, path string, hook func(buffer *utils
 	})
 
 	admin.AnalyseRequest(model, buffer, err)
+	billing.RecordModelUsageMetric(connection.DB, model, buffer, err)
 	if err != nil {
 		return err
 	}

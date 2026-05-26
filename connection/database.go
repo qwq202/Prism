@@ -113,6 +113,7 @@ func ConnectDatabase() *sql.DB {
 	CreateRedeemTable(db)
 	CreateBroadcastTable(db)
 	CreateBillingTable(db)
+	CreateModelUsageMetricsTable(db)
 	CreatePaymentOrdersTable(db)
 	CreateMemoryTable(db)
 
@@ -385,6 +386,22 @@ func CreateBillingTable(db *sql.DB) {
 		  channel_name VARCHAR(255),
 		  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		  FOREIGN KEY (user_id) REFERENCES auth(id)
+		);
+	`)
+}
+
+func CreateModelUsageMetricsTable(db *sql.DB) {
+	mustCreateTable(db, "model_usage_metrics", `
+		CREATE TABLE IF NOT EXISTS model_usage_metrics (
+		  id INT PRIMARY KEY AUTO_INCREMENT,
+		  model VARCHAR(255) NOT NULL,
+		  success BOOLEAN DEFAULT FALSE,
+		  error_type VARCHAR(50),
+		  input_tokens INT DEFAULT 0,
+		  output_tokens INT DEFAULT 0,
+		  duration FLOAT DEFAULT 0,
+		  error TEXT,
+		  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
 	`)
 }

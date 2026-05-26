@@ -1184,6 +1184,7 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 	}
 
 	admin.AnalyseRequest(model, buffer, err)
+	billing.RecordModelUsageMetric(db, model, buffer, err)
 	if adapter.IsAvailableError(err) {
 		globals.Warn(fmt.Sprintf("%s (model: %s, client: %s)", err, model, conn.GetCtx().ClientIP()))
 
