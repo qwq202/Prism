@@ -34,7 +34,8 @@ const store = configureStore({
 });
 
 let chatCacheTimer: ReturnType<typeof setTimeout> | undefined;
-let lastChatCacheSignature = "";
+let lastChatHistoryCacheSignature = "";
+let lastChatConversationCacheSignature = "";
 
 store.subscribe(() => {
   if (chatCacheTimer) clearTimeout(chatCacheTimer);
@@ -50,24 +51,33 @@ store.subscribe(() => {
           updated_at: currentConversation.updated_at,
         }
       : null;
-    const signature = JSON.stringify({
-      history: cacheableHistory.map((item) => ({
+    const historySignature = JSON.stringify(
+      cacheableHistory.map((item) => ({
         id: item.id,
         name: item.name,
         model: item.model,
         shared: item.shared,
         updated_at: item.updated_at,
       })),
-      current,
-      currentConversation: cacheableConversation,
-    });
+    );
 
-    if (signature === lastChatCacheSignature) return;
-    lastChatCacheSignature = signature;
+    if (historySignature !== lastChatHistoryCacheSignature) {
+      lastChatHistoryCacheSignature = historySignature;
+      void setCachedConversationList(cacheableHistory);
+    }
 
-    void setCachedConversationList(cacheableHistory);
     if (current !== -1 && cacheableConversation) {
-      void setCachedConversation(current, cacheableConversation);
+      const conversationSignature = JSON.stringify({
+        current,
+        conversation: cacheableConversation,
+      });
+
+      if (conversationSignature !== lastChatConversationCacheSignature) {
+        lastChatConversationCacheSignature = conversationSignature;
+        void setCachedConversation(current, cacheableConversation);
+      }
+    } else if (lastChatConversationCacheSignature !== "") {
+      lastChatConversationCacheSignature = "";
     }
   }, 500);
 });

@@ -112,7 +112,7 @@ export type ConversationSerialized = {
   messages: Message[];
   updated_at?: string;
   local_pending_until?: number;
-  local_modified_at?: number;
+  local_revision?: number;
 };
 
 export type ConnectionEvent = {
@@ -306,15 +306,11 @@ function reconcileConversationHistory(
 function shouldReplaceConversation(
   currentConversation: ConversationSerialized | undefined,
   incoming: ConversationInstance,
-  requestedAt?: number,
+  requestedRevision: number,
 ): boolean {
   if (!currentConversation) return true;
-  if (
-    requestedAt !== undefined &&
-    (currentConversation.local_modified_at ?? 0) > requestedAt
-  ) {
+  if (getConversationLocalRevision(currentConversation) !== requestedRevision)
     return false;
-  }
 
   const currentVersion = parseConversationVersion(
     currentConversation.updated_at,
@@ -349,13 +345,18 @@ function shouldReplaceConversation(
 }
 
 function markConversationPending(conversation: ConversationSerialized) {
-  const now = Date.now();
-  conversation.local_modified_at = now;
-  conversation.local_pending_until = now + localMutationProtectionMs;
+  conversation.local_revision = getConversationLocalRevision(conversation) + 1;
+  conversation.local_pending_until = Date.now() + localMutationProtectionMs;
 }
 
 function hasPendingLocalMutation(conversation: ConversationSerialized): boolean {
   return (conversation.local_pending_until ?? 0) > Date.now();
+}
+
+function getConversationLocalRevision(
+  conversation: ConversationSerialized | undefined,
+): number {
+  return conversation?.local_revision ?? 0;
 }
 
 function isStreamingConversation(conversation: ConversationSerialized): boolean {
@@ -1031,17 +1032,17 @@ const chatSlice = createSlice({
       state.conversations[id] = conversation;
     },
     setRemoteConversation: (state, action) => {
-      const { conversation, id, requestedAt } = action.payload as {
+      const { conversation, id, requestedRevision } = action.payload as {
         conversation: ConversationInstance;
         id: number;
-        requestedAt?: number;
+        requestedRevision: number;
       };
 
       if (
         !shouldReplaceConversation(
           state.conversations[id],
           conversation,
-          requestedAt,
+          requestedRevision,
         )
       ) {
         return;
@@ -1052,6 +1053,59 @@ const chatSlice = createSlice({
         messages: conversation.message,
         updated_at: conversation.updated_at,
       };
+
+      const index = state.history.findIndex((item) => item.id === id);
+      const previous = index >= 0 ? state.history[index] : undefined;
+      const next = {
+        id,
+        name: conversation.name || previous?.name || "",
+        message: previous?.message ?? [],
+        model: conversation.model ?? previous?.model,
+        shared: conversation.shared ?? previous?.shared,
+        updated_at: conversation.updated_at ?? previous?.updated_at,
+      };
+
+      if (index >= 0) {
+        state.history[index] = next;
+        return;
+      }
+
+      state.history = [next, ...state.history];
+    },
+    deleteRemoteConversation: (state, action) => {
+      const { id, requestedRevision } = action.payload as {
+        id: number;
+        requestedRevision: number;
+      };
+
+      if (id === -1) return;
+
+      const conversation = state.conversations[id];
+      if (
+        conversation &&
+        (getConversationLocalRevision(conversation) !== requestedRevision ||
+          isStreamingConversation(conversation))
+      ) {
+        return;
+      }
+
+      state.history = state.history.filter((item) => item.id !== id);
+
+      if (state.current === id) {
+        state.current = -1;
+        state.messages = [];
+        state.mask_item = null;
+        setNumberMemory("history_conversation", -1);
+      }
+
+      if (getNumberMemory("history_conversation", -1) === id) {
+        setNumberMemory("history_conversation", -1);
+      }
+
+      if (!state.conversations[id]) return;
+
+      closeConversationConnection(id);
+      delete state.conversations[id];
     },
     deleteConversation: (state, action) => {
       const id = action.payload as number;
@@ -1337,6 +1391,7 @@ export const {
   importConversation,
   setConversation,
   setRemoteConversation,
+  deleteRemoteConversation,
   deleteConversation,
   deleteAllConversation,
   preflightHistory,
@@ -1412,13 +1467,11 @@ export function useConversationActions() {
   ) => {
     if (id === -1) return;
     const activate = options?.activate ?? true;
-    const requestedAt = Date.now();
+    const requestedRevision = getConversationLocalRevision(conversations[id]);
 
     const result = await fetchConversation(id);
     if (result.status === "not_found") {
-      await clearCachedConversation(id);
-      await removeCachedConversationFromList(id);
-      dispatch(deleteConversation(id));
+      dispatch(deleteRemoteConversation({ id, requestedRevision }));
       return;
     }
     if (result.status !== "ok") return;
@@ -1428,17 +1481,7 @@ export function useConversationActions() {
       setRemoteConversation({
         conversation: data,
         id,
-        requestedAt,
-      }),
-    );
-    dispatch(
-      upsertHistory({
-        id: data.id,
-        name: data.name,
-        message: [],
-        model: data.model,
-        shared: data.shared,
-        updated_at: data.updated_at,
+        requestedRevision,
       }),
     );
     if (activate) dispatch(setCurrent(id));
