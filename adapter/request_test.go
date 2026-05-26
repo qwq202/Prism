@@ -4,6 +4,7 @@ import (
 	adaptercommon "chat/adapter/common"
 	"chat/globals"
 	"chat/utils"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -50,6 +51,31 @@ func (c requestTestChannelConfig) GetId() int {
 
 func (c requestTestChannelConfig) GetProxy() globals.ProxyConfig {
 	return globals.ProxyConfig{}
+}
+
+func TestClientInterruptErrorsAreSkipped(t *testing.T) {
+	for _, err := range []error{
+		errors.New("signal"),
+		errors.New("interrupted"),
+		errors.New("gemini error: interrupted"),
+	} {
+		if IsAvailableError(err) {
+			t.Fatalf("expected %q to be unavailable for retry", err.Error())
+		}
+		if !IsSkipError(err) {
+			t.Fatalf("expected %q to be skipped by channel error accounting", err.Error())
+		}
+	}
+}
+
+func TestNonInterruptErrorsRemainAvailable(t *testing.T) {
+	err := errors.New("gemini error: internal error encountered")
+	if !IsAvailableError(err) {
+		t.Fatalf("expected non-interrupt error to be available for retry")
+	}
+	if IsSkipError(err) {
+		t.Fatalf("expected non-interrupt error to count against channel")
+	}
 }
 
 func TestSanitizeChatMessagesForRequestStripsContextClearMarker(t *testing.T) {

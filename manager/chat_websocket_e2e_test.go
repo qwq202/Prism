@@ -346,8 +346,8 @@ func TestChatAPIWebsocketStopAndRestartPersistedHistory(t *testing.T) {
 		t.Fatalf("unexpected restarted tool payload: %#v", call)
 	}
 
-	if got := atomic.LoadInt32(env.requestCount); got < 2 {
-		t.Fatalf("expected stop + restart to issue two upstream requests, got %d", got)
+	if got := atomic.LoadInt32(env.requestCount); got != 2 {
+		t.Fatalf("expected stop + restart to issue exactly two upstream requests without retrying the interruption, got %d", got)
 	}
 }
 

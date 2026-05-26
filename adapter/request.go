@@ -245,12 +245,24 @@ func sanitizeChatMessagesForRequest(conf globals.ChannelConfig, props *adapterco
 	}
 }
 
+func isClientInterruptError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	content := err.Error()
+	return content == "signal" ||
+		strings.Contains(content, "signal") ||
+		content == "interrupted" ||
+		strings.Contains(content, "interrupted")
+}
+
 func IsAvailableError(err error) bool {
-	return err != nil && (err.Error() != "signal" && !strings.Contains(err.Error(), "signal"))
+	return err != nil && !isClientInterruptError(err)
 }
 
 func IsSkipError(err error) bool {
-	return err == nil || (err.Error() == "signal" || strings.Contains(err.Error(), "signal"))
+	return err == nil || isClientInterruptError(err)
 }
 
 func isQPSOverLimit(model string, err error) bool {
