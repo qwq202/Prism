@@ -92,9 +92,12 @@ function getPath(config: InternalAxiosRequestConfig): string {
 }
 
 function isSafePostPath(path: string): boolean {
-  return ["/record/view", "/record/stats", "/admin/analytics/channel"].some(
-    (item) => path === item,
-  );
+  return [
+    "/record/view",
+    "/record/stats",
+    "/record/usage-summary",
+    "/admin/analytics/channel",
+  ].some((item) => path === item);
 }
 
 function isMutatingGetPath(path: string): boolean {
@@ -161,8 +164,10 @@ function isCacheable(config: InternalAxiosRequestConfig): boolean {
 function isMutation(config: InternalAxiosRequestConfig | undefined): boolean {
   if (!config) return false;
   const method = (config.method || "get").toLowerCase();
+  const path = getPath(config);
+  if (method === "post") return !isSafePostPath(path);
   if (!["get", "head", "options"].includes(method)) return true;
-  return isMutatingGetPath(getPath(config));
+  return isMutatingGetPath(path);
 }
 
 function getCacheKey(config: InternalAxiosRequestConfig): string {

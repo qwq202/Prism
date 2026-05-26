@@ -95,6 +95,7 @@ type UpgradeProps = {
   level: number;
   current: number;
   isYearly?: boolean;
+  compact?: boolean;
 };
 
 async function callBuyAction(
@@ -156,7 +157,7 @@ async function callMigrateAction(t: TFunction, level: number): Promise<boolean> 
   return res.status;
 }
 
-export function Upgrade({ level, current, isYearly }: UpgradeProps) {
+export function Upgrade({ level, current, isYearly, compact }: UpgradeProps) {
   const { t } = useTranslation();
   const expired = useSelector(expiredSelector);
   const [open, setOpen] = React.useState(false);
@@ -180,14 +181,18 @@ export function Upgrade({ level, current, isYearly }: UpgradeProps) {
     }
   }, [isYearly]);
 
+  const triggerClass = compact ? "action" : "action w-full";
+  const triggerWrapper = compact ? undefined : "w-full";
+
   return current === 0 || current === level ? (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button
           tapScale={0.975}
-          classNameWrapper="w-full"
-          className={`action w-full`}
+          classNameWrapper={triggerWrapper}
+          className={triggerClass}
           variant={`default`}
+          size={compact ? "sm" : "default"}
         >
           <Icon icon={<ShoppingCart />} className="h-4 w-4 mr-1.5" />
           {isCurrent ? t("sub.renew") : t("sub.subscribe")}
@@ -259,10 +264,11 @@ export function Upgrade({ level, current, isYearly }: UpgradeProps) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button
-          className={`action w-full`}
+          className={triggerClass}
           variant={isUpgrade ? `default` : `outline`}
           tapScale={0.975}
-          classNameWrapper="w-full"
+          classNameWrapper={triggerWrapper}
+          size={compact ? "sm" : "default"}
         >
           <Icon
             icon={isUpgrade ? <ArrowUpCircle /> : <ArrowDownCircle />}

@@ -23,6 +23,10 @@ const personalizationRoute = lazyFactor(
   () => import("@/routes/Personalization.tsx"),
 );
 const walletRoute = lazyFactor(() => import("@/routes/Wallet.tsx"));
+const subscriptionRoute = lazyFactor(() => import("@/routes/Subscription.tsx"));
+const subscriptionGuideRoute = lazyFactor(
+  () => import("@/routes/SubscriptionGuide.tsx"),
+);
 const accountRoute = lazyFactor(() => import("@/routes/Account.tsx"));
 const logRoute = lazyFactor(() => import("@/routes/Log.tsx"));
 
@@ -94,6 +98,16 @@ const router = createBrowserRouter([
         id: "wallet",
         path: "wallet",
         element: withSuspense(walletRoute),
+      },
+      {
+        id: "subscription",
+        path: "subscription",
+        element: withSuspense(subscriptionRoute),
+      },
+      {
+        id: "subscription-guide",
+        path: "subscription-guide",
+        element: withSuspense(subscriptionGuideRoute),
       },
       {
         id: "log",

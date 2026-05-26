@@ -27,6 +27,16 @@ type RecordStatsForm struct {
 	Self bool `json:"self"`
 }
 
+type RecordUsageSummaryForm struct {
+	UserId    int64  `json:"user_id"`
+	Username  string `json:"username"`
+	StartTime string `json:"start_time"`
+	EndTime   string `json:"end_time"`
+	TokenName string `json:"token_name"`
+	Model     string `json:"model"`
+	Self      bool   `json:"self"`
+}
+
 func RecordViewAPI(c *gin.Context) {
 	user := auth.RequireAuth(c)
 	if user == nil {
@@ -54,6 +64,42 @@ func RecordViewAPI(c *gin.Context) {
 		Self:        form.Self,
 	})
 
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": true,
+		"data":   data,
+	})
+}
+
+func RecordUsageSummaryAPI(c *gin.Context) {
+	user := auth.RequireAuth(c)
+	if user == nil {
+		return
+	}
+
+	db := utils.GetDBFromContext(c)
+	isAdmin := user.IsAdmin(db)
+	userId := auth.GetId(db, user)
+
+	var form RecordUsageSummaryForm
+	_ = c.ShouldBindJSON(&form)
+
+	data, err := GetRecordUsageSummary(db, isAdmin, userId, RecordQuery{
+		UserId:    form.UserId,
+		Username:  form.Username,
+		StartTime: form.StartTime,
+		EndTime:   form.EndTime,
+		TokenName: form.TokenName,
+		Model:     form.Model,
+		Self:      form.Self,
+	})
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  false,

@@ -69,6 +69,20 @@ type RecordStats struct {
 	Tpm          int64   `json:"tpm"`
 }
 
+type RecordUsageModel struct {
+	Name  string  `json:"name"`
+	Value float64 `json:"value"`
+	Count int64   `json:"count"`
+}
+
+type RecordUsageSummary struct {
+	ModelCount   int64              `json:"model_count"`
+	TopModel     string             `json:"top_model"`
+	AverageQuota float64            `json:"average_quota"`
+	MaxQuota     float64            `json:"max_quota"`
+	Models       []RecordUsageModel `json:"models"`
+}
+
 func recordStorageLocation() *time.Location {
 	return channel.GetSystemTimeZoneLocation()
 }
@@ -243,6 +257,74 @@ func GetUserRecordStats(db *sql.DB, userId int64) (RecordStats, error) {
 	}
 
 	return stats, nil
+}
+
+func GetRecordUsageSummary(db *sql.DB, isAdmin bool, userId int64, query RecordQuery) (RecordUsageSummary, error) {
+	query.Type = "consume"
+	filterArgs, err := buildRecordFilterArgs(isAdmin, userId, query)
+	if err != nil {
+		return RecordUsageSummary{}, err
+	}
+
+	var requestCount int64
+	var totalQuota float64
+	var maxQuota float64
+	summaryQuery := `
+		SELECT COUNT(*), COALESCE(SUM(b.quota), 0), COALESCE(MAX(b.quota), 0)
+		FROM billing b
+		LEFT JOIN auth a ON a.id = b.user_id
+	` + recordFilterWhereSQL + `
+		  AND b.quota > 0
+	`
+	if err := globals.QueryRowDb(db, summaryQuery, filterArgs...).Scan(&requestCount, &totalQuota, &maxQuota); err != nil {
+		return RecordUsageSummary{}, err
+	}
+
+	rows, err := globals.QueryDb(db, `
+		SELECT COALESCE(NULLIF(TRIM(b.model), ''), '--') AS model,
+		       COALESCE(SUM(b.quota), 0) AS quota,
+		       COUNT(*) AS count
+		FROM billing b
+		LEFT JOIN auth a ON a.id = b.user_id
+	`+recordFilterWhereSQL+`
+		  AND b.quota > 0
+		GROUP BY COALESCE(NULLIF(TRIM(b.model), ''), '--')
+		ORDER BY quota DESC, count DESC, model ASC
+	`, filterArgs...)
+	if err != nil {
+		return RecordUsageSummary{}, err
+	}
+	defer rows.Close()
+
+	models := make([]RecordUsageModel, 0)
+	for rows.Next() {
+		var model RecordUsageModel
+		if err := rows.Scan(&model.Name, &model.Value, &model.Count); err != nil {
+			return RecordUsageSummary{}, err
+		}
+		models = append(models, model)
+	}
+	if err := rows.Err(); err != nil {
+		return RecordUsageSummary{}, err
+	}
+
+	var averageQuota float64
+	if requestCount > 0 {
+		averageQuota = totalQuota / float64(requestCount)
+	}
+
+	topModel := "--"
+	if len(models) > 0 {
+		topModel = models[0].Name
+	}
+
+	return RecordUsageSummary{
+		ModelCount:   int64(len(models)),
+		TopModel:     topModel,
+		AverageQuota: averageQuota,
+		MaxQuota:     maxQuota,
+		Models:       models,
+	}, nil
 }
 
 func ListRecords(db *sql.DB, isAdmin bool, userId int64, page int64, query RecordQuery) (RecordData, error) {

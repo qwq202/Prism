@@ -44,6 +44,20 @@ func seedBillingRecord(
 	createdAt string,
 ) {
 	t.Helper()
+	seedBillingRecordWithQuota(t, db, username, recordType, tokenName, model, 1.25, createdAt)
+}
+
+func seedBillingRecordWithQuota(
+	t *testing.T,
+	db *sql.DB,
+	username string,
+	recordType string,
+	tokenName string,
+	model string,
+	quota float64,
+	createdAt string,
+) {
+	t.Helper()
 
 	if _, err := globals.ExecDb(db, `
 		INSERT INTO billing (
@@ -51,7 +65,7 @@ func seedBillingRecord(
 			input_tokens, output_tokens, quota, duration,
 			detail, prompts, response_prompts, channel, channel_name, created_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, 1, username, recordType, tokenName, model, 10, 20, 1.25, 0.8, "", "", "", 0, "", createdAt); err != nil {
+	`, 1, username, recordType, tokenName, model, 10, 20, quota, 0.8, "", "", "", 0, "", createdAt); err != nil {
 		t.Fatalf("insert billing record: %v", err)
 	}
 }
@@ -198,6 +212,40 @@ func TestCreateRecordPersistsBeforeReturning(t *testing.T) {
 	now := time.Now().In(recordStorageLocation())
 	if diff := now.Sub(createdAt); diff < -5*time.Second || diff > 5*time.Second {
 		t.Fatalf("expected created_at to be written in record storage zone near now, got %s, now %s", createdAtRaw, now.Format("2006-01-02 15:04:05"))
+	}
+}
+
+func TestGetRecordUsageSummaryAggregatesFilteredConsumeRecords(t *testing.T) {
+	db := openBillingTestDB(t)
+
+	seedBillingRecordWithQuota(t, db, "root", "consume", "web", "gemini-3.5-flash", 9, "2026-05-26 15:46:51")
+	seedBillingRecordWithQuota(t, db, "root", "consume", "api", "gemini-3.5-flash", 3, "2026-05-25 10:00:00")
+	seedBillingRecordWithQuota(t, db, "root", "consume", "web", "mimo-v2.5", 5, "2026-05-24 10:00:00")
+	seedBillingRecordWithQuota(t, db, "root", "consume", "web", "old-model", 99, "2026-05-10 10:00:00")
+	seedBillingRecordWithQuota(t, db, "root", "topup", "web", "gemini-3.5-flash", 100, "2026-05-26 16:00:00")
+
+	summary, err := GetRecordUsageSummary(db, false, 1, RecordQuery{
+		StartTime: "2026-05-24",
+		EndTime:   "2026-05-26",
+	})
+	if err != nil {
+		t.Fatalf("get usage summary: %v", err)
+	}
+
+	if summary.ModelCount != 2 {
+		t.Fatalf("expected 2 models, got %d (%#v)", summary.ModelCount, summary.Models)
+	}
+	if summary.TopModel != "gemini-3.5-flash" {
+		t.Fatalf("expected gemini as top model, got %q", summary.TopModel)
+	}
+	if summary.MaxQuota != 9 {
+		t.Fatalf("expected max quota 9, got %v", summary.MaxQuota)
+	}
+	if summary.AverageQuota != float64(17)/3 {
+		t.Fatalf("expected average quota %v, got %v", float64(17)/3, summary.AverageQuota)
+	}
+	if len(summary.Models) != 2 || summary.Models[0].Name != "gemini-3.5-flash" || summary.Models[0].Value != 12 {
+		t.Fatalf("expected gemini aggregate first, got %#v", summary.Models)
 	}
 }
 

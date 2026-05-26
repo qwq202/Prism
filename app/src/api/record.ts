@@ -34,6 +34,20 @@ export type RecordStats = {
   tpm: number;
 };
 
+export type RecordUsageModel = {
+  name: string;
+  value: number;
+  count: number;
+};
+
+export type RecordUsageSummary = {
+  model_count: number;
+  top_model: string;
+  average_quota: number;
+  max_quota: number;
+  models: RecordUsageModel[];
+};
+
 export type RecordQuery = {
   user_id?: number;
   username?: string;
@@ -52,6 +66,10 @@ type ListRecordsResponse = CommonResponse & {
 
 type RecordStatsResponse = CommonResponse & {
   data?: RecordStats;
+};
+
+type RecordUsageSummaryResponse = CommonResponse & {
+  data?: RecordUsageSummary;
 };
 
 export enum RecordType {
@@ -93,6 +111,20 @@ export async function getRecordStats(
   try {
     const resp = await axios.post(`/record/stats`, options ?? {});
     return resp.data as RecordStatsResponse;
+  } catch (e) {
+    return {
+      status: false,
+      message: getErrorMessage(e),
+    };
+  }
+}
+
+export async function getRecordUsageSummary(
+  options?: Omit<RecordQuery, "show_channel" | "type">,
+): Promise<RecordUsageSummaryResponse> {
+  try {
+    const resp = await axios.post(`/record/usage-summary`, options ?? {});
+    return resp.data as RecordUsageSummaryResponse;
   } catch (e) {
     return {
       status: false,

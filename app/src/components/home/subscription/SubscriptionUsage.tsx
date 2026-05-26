@@ -1,4 +1,5 @@
 import { ValuableProgress } from "@/components/ui/progress.tsx";
+import { cn } from "@/components/ui/lib/utils.ts";
 import { useTranslation } from "react-i18next";
 import { Ban } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -14,6 +15,7 @@ type UsageProps = {
   blockedBy?: string;
   absoluteReset?: boolean;
   fallbackResetLabel?: string;
+  variant?: "default" | "card" | "flat";
 };
 
 function formatResetIn(
@@ -54,6 +56,7 @@ function SubscriptionUsage({
   blockedBy,
   absoluteReset,
   fallbackResetLabel,
+  variant = "default",
 }: UsageProps) {
   const { t, i18n } = useTranslation();
   const [now, setNow] = useState(() => Date.now());
@@ -74,27 +77,32 @@ function SubscriptionUsage({
     : fallbackResetLabel ?? "";
   const isBlocked = !!blockedBy;
 
+  const wrapperClass = cn(
+    "inline-flex flex-col relative",
+    variant === "card" &&
+      "rounded-lg border border-border/60 bg-background p-4 shadow-sm sub-column-wrapper",
+    variant === "flat" && "sub-column-wrapper",
+    variant === "default" && "sub-column-wrapper",
+    isBlocked && "opacity-50",
+  );
+
+  const isRich = variant === "card" || variant === "flat";
+
   if (isPoints) {
     const pct = isInfinity
       ? 100
       : Math.max(0, Math.round((1 - usage.used / usage.total) * 100));
     return (
-      <div
-        className={`sub-column-wrapper inline-flex flex-col relative ${
-          isBlocked ? "opacity-50" : ""
-        }`}
-      >
-        <div className="sub-column">
+      <div className={wrapperClass}>
+        <div className={cn("sub-column", isRich && "flex-col items-start gap-1 mb-3")}>
           <div className="flex items-center text-sm text-secondary gap-1">
             {name}
-            {isBlocked && (
-              <Ban className="h-3 w-3 text-destructive/70 shrink-0" />
-            )}
+            {isBlocked && <Ban className="h-3 w-3 text-destructive/70 shrink-0" />}
           </div>
-          <div className="grow" />
-          <div className="sub-value font-medium text-md">
+          {!isRich && <div className="grow" />}
+          <div className={cn("sub-value font-medium text-md", isRich && "text-2xl font-semibold tracking-tight")}>
             {isInfinity ? (
-              <p className="text-xs font-semibold">
+              <p className={isRich ? "text-base" : "text-xs font-semibold"}>
                 {t("sub.points-unlimited")}
               </p>
             ) : (
@@ -104,20 +112,19 @@ function SubscriptionUsage({
         </div>
         {!isInfinity && (
           <ValuableProgress
-            className="w-full h-2"
+            className={cn("w-full", isRich ? "h-1.5" : "h-2")}
+            classNameIndicator={isRich ? "bg-foreground/80" : undefined}
             value={usage.total - usage.used}
             max={usage.total}
           />
         )}
         {isBlocked ? (
-          <p className="text-xs text-destructive/70 mt-1">
+          <p className="text-xs text-destructive/70 mt-2">
             {t("sub.blocked-by", { name: blockedBy })}
           </p>
         ) : resetLabel ? (
-          <p className="text-xs text-muted-foreground mt-1">
-            {absoluteReset
-              ? t("sub.reset-at", { time: resetLabel })
-              : resetLabel}
+          <p className="text-xs text-muted-foreground mt-2">
+            {absoluteReset ? t("sub.reset-at", { time: resetLabel }) : resetLabel}
           </p>
         ) : null}
       </div>
@@ -130,11 +137,11 @@ function SubscriptionUsage({
   const remaining = isInfinity ? 0 : Math.max(0, usage.total - used);
 
   return (
-    <div className="sub-column-wrapper inline-flex flex-col">
-      <div className="sub-column">
+    <div className={wrapperClass}>
+      <div className={cn("sub-column", isRich && "flex-col items-start gap-1 mb-3")}>
         <div className="flex items-center text-sm text-secondary">{name}</div>
-        <div className="grow" />
-        <div className="sub-value font-medium text-md">
+        {!isRich && <div className="grow" />}
+        <div className={cn("sub-value font-medium text-md", isRich && "text-2xl font-semibold tracking-tight")}>
           {isInfinity ? (
             <p>{t("sub.times-unlimited")}</p>
           ) : (
@@ -149,14 +156,13 @@ function SubscriptionUsage({
       </div>
       {hasFiniteTotal && (
         <ValuableProgress
-          className="w-full h-2"
+          className={cn("w-full", isRich ? "h-1.5" : "h-2")}
+          classNameIndicator={isRich ? "bg-foreground/80" : undefined}
           value={remaining}
           max={usage.total}
         />
       )}
-      {resetLabel && (
-        <p className="text-xs text-muted-foreground mt-1">{resetLabel}</p>
-      )}
+      {resetLabel && <p className="text-xs text-muted-foreground mt-2">{resetLabel}</p>}
     </div>
   );
 }
