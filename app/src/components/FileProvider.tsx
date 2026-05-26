@@ -55,6 +55,15 @@ import { Progress } from "./ui/progress.tsx";
 const MaxFileSize = 1024 * 1024 * 100; // 100MB File Size Limit
 const MaxPromptSize = 10 * 1024; // 10KB Prompt Size Limit (to avoid token overflow)
 
+function getClipboardImageFiles(clipboardData: DataTransfer | null): File[] {
+  if (!clipboardData) return [];
+
+  return Array.from(clipboardData.items)
+    .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => Boolean(file));
+}
+
 type FileTask = {
   id: number;
   file: File;
@@ -215,6 +224,31 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
     [addFile, canUploadImage, currentModelInfo, t],
   );
 
+  const handlePasteImages = useCallback(
+    (clipboardData: DataTransfer | null) => {
+      const pastedImages = getClipboardImageFiles(clipboardData);
+      if (pastedImages.length === 0) return false;
+
+      void triggerFile(pastedImages);
+      return true;
+    },
+    [triggerFile],
+  );
+
+  useEffect(() => {
+    if (!open || !canUploadImage) return;
+
+    const onPaste = (event: ClipboardEvent) => {
+      if (event.defaultPrevented) return;
+      if (handlePasteImages(event.clipboardData)) {
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [canUploadImage, handlePasteImages, open]);
+
   useEffect(() => {
     blobEvent.bind(async (file: File | File[]) => {
       if (!canUploadImage) {
@@ -264,7 +298,14 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
       >
         <Paperclip className={`h-4 w-4`} />
       </ChatAction>
-      <DialogContent className={`file-dialog flex-dialog`}>
+      <DialogContent
+        className={`file-dialog flex-dialog`}
+        onPaste={(event) => {
+          if (handlePasteImages(event.clipboardData)) {
+            event.preventDefault();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="flex flex-row items-center">
             {t("file.file")}
