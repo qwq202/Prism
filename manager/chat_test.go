@@ -1,11 +1,22 @@
 package manager
 
 import (
+	"chat/auth"
+	"chat/connection"
 	"chat/globals"
 	"chat/manager/conversation"
 	"chat/utils"
+	"database/sql"
+	"math"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type chatTestCharge struct{}
@@ -18,6 +29,54 @@ func (chatTestCharge) SupportAnonymous() bool      { return true }
 func (chatTestCharge) IsBilling() bool             { return true }
 func (chatTestCharge) IsBillingType(t string) bool { return t == globals.TimesBilling }
 func (chatTestCharge) GetLimit() float32           { return 9 }
+
+func openChatQuotaTestDB(t *testing.T) *sql.DB {
+	t.Helper()
+
+	previousSqlite := globals.SqliteEngine
+	globals.SqliteEngine = true
+	t.Cleanup(func() {
+		globals.SqliteEngine = previousSqlite
+	})
+
+	db, err := sql.Open("sqlite3", filepath.Join(t.TempDir(), "chat-quota.db"))
+	if err != nil {
+		t.Fatalf("open sqlite db: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	connection.CreateUserTable(db)
+	connection.CreateQuotaTable(db)
+
+	return db
+}
+
+func newCollectQuotaTestContext(t *testing.T, db *sql.DB) *gin.Context {
+	t.Helper()
+
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	c.Set("db", db)
+
+	cache := redis.NewClient(&redis.Options{
+		Addr:         "127.0.0.1:1",
+		MaxRetries:   -1,
+		DialTimeout:  time.Millisecond,
+		ReadTimeout:  time.Millisecond,
+		WriteTimeout: time.Millisecond,
+	})
+	t.Cleanup(func() {
+		_ = cache.Close()
+	})
+	c.Set("cache", cache)
+
+	return c
+}
 
 func TestLatestMessageContentHandlesEmptySegment(t *testing.T) {
 	if content, ok := latestMessageContent(nil); ok || content != "" {
@@ -43,6 +102,29 @@ func TestExtractAssistantMessageFromBufferPersistsBillingMetadata(t *testing.T) 
 	}
 	if !message.Plan {
 		t.Fatalf("expected plan billing marker to be persisted")
+	}
+}
+
+func TestCollectQuotaRecordsDebtWhenFinalCostExceedsBalance(t *testing.T) {
+	db := openChatQuotaTestDB(t)
+	user := auth.GetUserByName(db, "root")
+	if user == nil {
+		t.Fatalf("expected root user")
+	}
+	if !user.SetQuota(db, 1) {
+		t.Fatalf("set quota")
+	}
+
+	buffer := utils.NewBuffer(globals.GPT3Turbo, nil, chatTestCharge{})
+	buffer.Write("hello")
+
+	CollectQuota(newCollectQuotaTestContext(t, db), user, buffer, false, nil)
+
+	if got := user.GetQuota(db); math.Abs(float64(got-(-8))) > 0.001 {
+		t.Fatalf("expected quota debt -8, got %f", got)
+	}
+	if got := user.GetUsedQuota(db); math.Abs(float64(got-9)) > 0.001 {
+		t.Fatalf("expected used quota 9, got %f", got)
 	}
 }
 

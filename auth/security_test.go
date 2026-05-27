@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"chat/channel"
 	"chat/connection"
 	"chat/globals"
 	"chat/utils"
@@ -278,6 +279,39 @@ func TestUseQuotaDeductsQuotaAndUsedAtomically(t *testing.T) {
 	}
 	if got := user.GetUsedQuota(db); got != 3 {
 		t.Fatalf("expected failed usage to keep used quota 3, got %f", got)
+	}
+}
+
+func TestCanEnableModelRequiresMinimumBillingQuota(t *testing.T) {
+	db := openAuthSecurityTestDB(t)
+	user := GetUserByName(db, "root")
+	if user == nil {
+		t.Fatalf("expected root user")
+	}
+
+	if !user.SetQuota(db, 0) {
+		t.Fatalf("set quota")
+	}
+
+	previousCharge := channel.ChargeInstance
+	channel.ChargeInstance = &channel.ChargeManager{
+		Models: map[string]*channel.Charge{
+			"paid-model": {
+				Type:   globals.TimesBilling,
+				Output: 9,
+			},
+		},
+	}
+	t.Cleanup(func() {
+		channel.ChargeInstance = previousCharge
+	})
+
+	err := CanEnableModel(db, user, "paid-model", nil)
+	if err == nil {
+		t.Fatalf("expected paid model to be blocked with zero quota")
+	}
+	if !strings.Contains(err.Error(), "user quota is not enough error") {
+		t.Fatalf("expected not enough quota error, got %q", err.Error())
 	}
 }
 

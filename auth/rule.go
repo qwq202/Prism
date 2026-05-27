@@ -56,12 +56,22 @@ func CanEnableModel(db *sql.DB, user *User, model string, messages []globals.Mes
 		return fmt.Errorf(ErrNotAuthenticated, model)
 	}
 
+	// Get user's current quota
+	quota := user.GetQuota(db)
+	minimumCost := charge.GetLimit()
+	if minimumCost > 0 && quota < minimumCost {
+		return fmt.Errorf(
+			ErrNotEnoughQuota,
+			model,
+			formatQuotaValue(minimumCost),
+			formatQuotaValue(quota),
+		)
+	}
+
 	// Calculate estimated input cost
 	inputTokens := utils.NumTokensFromMessages(messages, model, false)
 	estimatedInputCost := float32(inputTokens) / 1000 * charge.GetInput()
 
-	// Get user's current quota
-	quota := user.GetQuota(db)
 	if quota < estimatedInputCost {
 		return fmt.Errorf(
 			ErrEstimatedCost,

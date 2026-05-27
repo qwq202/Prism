@@ -226,14 +226,18 @@ func CollectQuota(c *gin.Context, user *auth.User, buffer *utils.Buffer, uncount
 
 	if uncountable {
 		if !auth.FinalizeSubscriptionUsage(db, utils.GetCacheFromContext(c), user, buffer.GetModel(), quota) {
-			if !user.UseQuota(db, quota) {
-				user.ForceUseQuota(db, quota)
-			}
+			collectUserQuota(db, user, quota)
 		}
 		return
 	}
 
-	user.UseQuota(db, quota)
+	collectUserQuota(db, user, quota)
+}
+
+func collectUserQuota(db *sql.DB, user *auth.User, quota float32) {
+	if !user.UseQuota(db, quota) {
+		user.ForceUseQuota(db, quota)
+	}
 }
 
 type partialChunk struct {
