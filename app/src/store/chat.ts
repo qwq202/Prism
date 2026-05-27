@@ -1352,6 +1352,14 @@ const chatSlice = createSlice({
     setMaskItem: (state, action) => {
       state.mask_item = action.payload as Mask;
     },
+    startMaskedConversation: (state, action) => {
+      state.current = -1;
+      state.messages = [];
+      state.history = state.history.filter((item) => item.id !== -1);
+      state.conversations[-1] = { ...defaultConversation };
+      state.mask_item = action.payload as Mask;
+      setNumberMemory("history_conversation", -1);
+    },
     clearMaskItem: (state) => {
       state.mask_item = null;
     },
@@ -1405,6 +1413,7 @@ export const {
   setCustomMasks,
   setSupportModels,
   setMaskItem,
+  startMaskedConversation,
   clearMaskItem,
   fillMaskItem,
   createMessage,
@@ -1664,11 +1673,7 @@ export function useConversationActions() {
       return resp.conversations;
     },
     mask: (mask: Mask) => {
-      dispatch(setMaskItem(mask));
-
-      if (current !== -1) {
-        dispatch(setCurrent(-1));
-      }
+      dispatch(startMaskedConversation(mask));
     },
     selected: (model?: string) => {
       dispatch(setModel(model ?? ""));
