@@ -88,7 +88,6 @@ import { toast } from "sonner";
 import { Badge } from "../ui/badge";
 import type { TFunction } from "i18next";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
-import { Progress } from "@/components/ui/progress.tsx";
 
 type OperationMenuProps = {
   user: UserData;
@@ -153,35 +152,34 @@ function getWindowUnit(t: TFunction, window: UserSubscriptionWindowData): string
   return window.unit || t("admin.subscription-window-points");
 }
 
-function getProgressClass(percent: number): string {
-  if (percent <= 15) return "bg-destructive";
-  if (percent <= 40) return "bg-amber-500";
-  return "bg-emerald-500";
-}
-
-function formatWindowRemaining(
+function formatWindowInterval(
   t: TFunction,
   window: UserSubscriptionWindowData,
 ): string {
-  const unit = getWindowUnit(t, window);
-  if (window.total < 0 || window.remaining < 0) {
-    return t("admin.subscription-window-unlimited");
+  if (window.id === "plan_points_weekly") return "week";
+
+  const interval = window.reset_interval ?? 0;
+  if (window.id === "plan_points" && interval > 0) {
+    if (interval % 86_400 === 0) return `${interval / 86_400}d`;
+    if (interval % 3_600 === 0) return `${interval / 3_600}h`;
+    if (interval % 60 === 0) return `${interval / 60}m`;
+    return `${interval}s`;
   }
-  return `${formatWindowNumber(window.remaining)} ${unit}`;
+
+  return getWindowLabel(t, window);
 }
 
-function formatWindowUsedTotal(
+function formatWindowSummary(
   t: TFunction,
   window: UserSubscriptionWindowData,
 ): string {
   const unit = getWindowUnit(t, window);
-  const used = formatWindowNumber(window.used);
-  const total =
-    window.total < 0
-      ? t("admin.subscription-window-unlimited")
-      : `${formatWindowNumber(window.total)} ${unit}`;
-
-  return `${used} / ${total}`;
+  const percent = clampPercent(window.remaining_percent);
+  const interval = formatWindowInterval(t, window);
+  if (window.total < 0 || window.remaining < 0) {
+    return `${interval} ${t("admin.subscription-window-unlimited")} ${unit} ${formatWindowNumber(percent)}%`;
+  }
+  return `${interval} ${formatWindowNumber(window.remaining)} ${unit} ${formatWindowNumber(percent)}%`;
 }
 
 function SubscriptionWindowsCell({ user }: { user: UserData }) {
@@ -193,34 +191,13 @@ function SubscriptionWindowsCell({ user }: { user: UserData }) {
   }
 
   return (
-    <div className="min-w-[15rem] space-y-2">
-      {windows.map((window) => {
-        const percent = clampPercent(window.remaining_percent);
-        return (
-          <div key={window.id} className="space-y-1">
-            <div className="flex items-center justify-between gap-3 text-xs">
-              <span className="max-w-[8rem] truncate font-medium">
-                {getWindowLabel(t, window)}
-              </span>
-              <span className="shrink-0 tabular-nums text-muted-foreground">
-                {formatWindowRemaining(t, window)} /{" "}
-                {formatWindowNumber(percent)}%
-              </span>
-            </div>
-            <Progress
-              value={percent}
-              className="h-1.5"
-              classNameIndicator={getProgressClass(percent)}
-            />
-            <div className="flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
-              <span>{t("admin.subscription-window-used")}</span>
-              <span className="tabular-nums">
-                {formatWindowUsedTotal(t, window)}
-              </span>
-            </div>
-          </div>
-        );
-      })}
+    <div className="max-w-[16rem] text-xs leading-5 text-muted-foreground">
+      {windows.map((window, index) => (
+        <span key={window.id} className="tabular-nums">
+          {formatWindowSummary(t, window)}
+          {index < windows.length - 1 ? ", " : null}
+        </span>
+      ))}
     </div>
   );
 }
