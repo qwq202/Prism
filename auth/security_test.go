@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
+	"github.com/golang-jwt/jwt/v4"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/spf13/viper"
 )

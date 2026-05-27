@@ -8,12 +8,12 @@ import { useTranslation } from "react-i18next";
 import { useMemo, useState } from "react";
 import { useEffectAsync } from "@/utils/hook.ts";
 import {
-  Logger,
   listLoggers,
   downloadLogger,
   deleteLogger,
   getLoggerConsole,
 } from "@/admin/api/logger.ts";
+import type { Logger } from "@/admin/api/logger.ts";
 import { getSizeUnit } from "@/utils/base.ts";
 import { Download, RotateCcw, Terminal, Trash } from "lucide-react";
 import { withNotify } from "@/api/common.ts";

@@ -2,7 +2,7 @@
 # License: Apache-2.0
 # Description: Dockerfile for chatnio
 
-FROM --platform=$TARGETPLATFORM golang:1.24-alpine AS backend
+FROM --platform=$TARGETPLATFORM golang:1.25-alpine AS backend
 
 WORKDIR /backend
 COPY . .
@@ -25,14 +25,19 @@ RUN apk update && \
 # Build backend
 RUN go build -o chat -a -ldflags="-extldflags=-static" .
 
-FROM node:18 AS frontend
+FROM node:22-alpine AS frontend
 
 WORKDIR /app
+COPY ./app/package.json ./app/pnpm-lock.yaml ./app/pnpm-workspace.yaml ./
+COPY ./app/patches ./patches
+
+RUN corepack enable && \
+    corepack prepare pnpm@11.0.3 --activate && \
+    pnpm install --frozen-lockfile
+
 COPY ./app .
 
-RUN npm install -g pnpm && \
-    pnpm install && \
-    pnpm run build && \
+RUN pnpm run build && \
     rm -rf node_modules src
 
 
