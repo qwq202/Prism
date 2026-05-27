@@ -226,7 +226,7 @@ func CollectQuota(c *gin.Context, user *auth.User, buffer *utils.Buffer, uncount
 
 	if uncountable {
 		if !auth.FinalizeSubscriptionUsage(db, utils.GetCacheFromContext(c), user, buffer.GetModel(), quota) {
-			collectUserQuota(db, user, quota)
+			globals.Warn(fmt.Sprintf("failed to finalize subscription usage (model: %s, quota: %.4f)", buffer.GetModel(), quota))
 		}
 		return
 	}

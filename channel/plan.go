@@ -432,13 +432,21 @@ func (p *Plan) GetWeeklyPointUsageForm(user globals.AuthLike, cache *redis.Clien
 }
 
 func (p *Plan) CanUseWeeklyPool(user globals.AuthLike, cache *redis.Client, model string) bool {
+	return p.CanUseWeeklyPoolForQuota(user, cache, model, 0)
+}
+
+func (p *Plan) CanUseWeeklyPoolForQuota(user globals.AuthLike, cache *redis.Client, model string, quota float32) bool {
 	if !p.HasWeeklyPool() || !p.IncludesModel(model) {
 		return false
 	}
 	if p.IsWeeklyPoolInfinity() {
 		return true
 	}
-	return p.GetWeeklyPointUsage(user, cache) < p.WeeklyQuota
+	remaining := p.WeeklyQuota - p.GetWeeklyPointUsage(user, cache)
+	if quota <= 0 {
+		return remaining > 0
+	}
+	return remaining >= quota
 }
 
 func (p *Plan) ConsumeWeeklyPool(user globals.AuthLike, cache *redis.Client, model string, quota float32) bool {
@@ -456,13 +464,24 @@ func (p *Plan) ConsumeWeeklyPool(user globals.AuthLike, cache *redis.Client, mod
 }
 
 func (p *Plan) CanUsePointPool(user globals.AuthLike, cache *redis.Client, model string) bool {
+	return p.CanUsePointPoolForQuota(user, cache, model, 0)
+}
+
+func (p *Plan) CanUsePointPoolForQuota(user globals.AuthLike, cache *redis.Client, model string, quota float32) bool {
 	if !p.HasPointPool() || !p.IncludesModel(model) {
 		return false
 	}
-	if !p.IsPointPoolInfinity() && p.GetPointUsage(user, cache) >= p.Quota {
-		return false
+	if !p.IsPointPoolInfinity() {
+		remaining := p.Quota - p.GetPointUsage(user, cache)
+		if quota <= 0 {
+			if remaining <= 0 {
+				return false
+			}
+		} else if remaining < quota {
+			return false
+		}
 	}
-	if p.HasWeeklyPool() && !p.CanUseWeeklyPool(user, cache, model) {
+	if p.HasWeeklyPool() && !p.CanUseWeeklyPoolForQuota(user, cache, model, quota) {
 		return false
 	}
 	return true
@@ -625,9 +644,9 @@ func (p *PlanItem) Release(user globals.AuthLike, cache *redis.Client) bool {
 	return releaseSubscriptionUsage(cache, user, p.Id, 0)
 }
 
-func (p *Plan) IncreaseUsage(user globals.AuthLike, cache *redis.Client, model string) bool {
+func (p *Plan) IncreaseUsage(user globals.AuthLike, cache *redis.Client, model string, minimumQuota float32) bool {
 	if p.HasPointPool() {
-		return p.CanUsePointPool(user, cache, model)
+		return p.CanUsePointPoolForQuota(user, cache, model, minimumQuota)
 	}
 
 	for _, usage := range p.Items {

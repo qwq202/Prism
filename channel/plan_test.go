@@ -194,6 +194,12 @@ func TestPlanSharedPointPoolUsesCustomResetInterval(t *testing.T) {
 		!plan.ConsumePointPool(user, cache, "gpt-5.1", 1.0) {
 		t.Fatalf("expected shared point pool consumption to be accepted")
 	}
+	if plan.CanUsePointPoolForQuota(user, cache, "gpt-5.1", 0.5) {
+		t.Fatalf("expected preflight to reject a request above remaining point quota")
+	}
+	if !plan.CanUsePointPoolForQuota(user, cache, "gpt-5.1", 0.25) {
+		t.Fatalf("expected preflight to accept a request within remaining point quota")
+	}
 	if plan.ConsumePointPool(user, cache, "gpt-5.1", 0.5) {
 		t.Fatalf("expected over-limit shared point pool consumption to be rejected")
 	}

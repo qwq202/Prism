@@ -2,6 +2,7 @@ package manager
 
 import (
 	"chat/auth"
+	"chat/channel"
 	"chat/connection"
 	"chat/globals"
 	"chat/manager/conversation"
@@ -50,6 +51,7 @@ func openChatQuotaTestDB(t *testing.T) *sql.DB {
 
 	connection.CreateUserTable(db)
 	connection.CreateQuotaTable(db)
+	connection.CreateSubscriptionTable(db)
 
 	return db
 }
@@ -125,6 +127,57 @@ func TestCollectQuotaRecordsDebtWhenFinalCostExceedsBalance(t *testing.T) {
 	}
 	if got := user.GetUsedQuota(db); math.Abs(float64(got-9)) > 0.001 {
 		t.Fatalf("expected used quota 9, got %f", got)
+	}
+}
+
+func TestCollectQuotaDoesNotFallbackToUserQuotaWhenSubscriptionFinalizeFails(t *testing.T) {
+	db := openChatQuotaTestDB(t)
+	user := auth.GetUserByName(db, "root")
+	if user == nil {
+		t.Fatalf("expected root user")
+	}
+	if !user.SetQuota(db, 1) {
+		t.Fatalf("set quota")
+	}
+
+	previousPlan := channel.PlanInstance
+	channel.PlanInstance = &channel.PlanManager{
+		Enabled: true,
+		Plans: []channel.Plan{
+			{
+				Level: 1,
+				Quota: 1,
+				Items: []channel.PlanItem{
+					{Id: "included", Models: []string{globals.GPT3Turbo}},
+				},
+			},
+		},
+	}
+	t.Cleanup(func() {
+		channel.PlanInstance = previousPlan
+	})
+
+	_, err := globals.ExecDb(
+		db,
+		"INSERT INTO subscription (user_id, level, expired_at) VALUES (?, ?, ?)",
+		user.GetID(db),
+		1,
+		time.Now().Add(24*time.Hour).Format("2006-01-02 15:04:05"),
+	)
+	if err != nil {
+		t.Fatalf("insert subscription: %v", err)
+	}
+
+	buffer := utils.NewBuffer(globals.GPT3Turbo, nil, chatTestCharge{})
+	buffer.Write("hello")
+
+	CollectQuota(newCollectQuotaTestContext(t, db), user, buffer, true, nil)
+
+	if got := user.GetQuota(db); math.Abs(float64(got-1)) > 0.001 {
+		t.Fatalf("expected user quota to remain 1 after subscription finalize failure, got %f", got)
+	}
+	if got := user.GetUsedQuota(db); math.Abs(float64(got)) > 0.001 {
+		t.Fatalf("expected used quota to remain 0 after subscription finalize failure, got %f", got)
 	}
 }
 

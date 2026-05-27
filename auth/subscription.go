@@ -249,12 +249,12 @@ func BuySubscription(db *sql.DB, cache *redis.Client, user *User, level int, mon
 	return errors.New("not enough money")
 }
 
-func HandleSubscriptionUsage(db *sql.DB, cache *redis.Client, user *User, model string) bool {
+func HandleSubscriptionUsage(db *sql.DB, cache *redis.Client, user *User, model string, minimumQuota float32) bool {
 	if disableSubscription() {
 		return false
 	}
 	plan := user.GetPlan(db)
-	return plan.IncreaseUsage(user, cache, model)
+	return plan.IncreaseUsage(user, cache, model, minimumQuota)
 }
 
 func RevertSubscriptionUsage(db *sql.DB, cache *redis.Client, user *User, model string) bool {
