@@ -60,7 +60,7 @@ function BarItem({ icon, path, name }: BarItemProps) {
   };
 
   return (
-    <div className={`inline-flex flex-col`}>
+    <div className={`inline-flex w-14 flex-col items-center`}>
       <TooltipProvider delayDuration={100}>
         <Tooltip open={open} onOpenChange={setOpen}>
           <TooltipTrigger asChild>
@@ -84,6 +84,7 @@ function BarItem({ icon, path, name }: BarItemProps) {
       <div
         className={cn(
           `toolbar-text text-secondary text-center text-xs mt-1.5 cursor-pointer select-none`,
+          `w-full overflow-hidden text-ellipsis whitespace-nowrap`,
           active && `text-common`,
           hidden && `hidden`,
         )}
