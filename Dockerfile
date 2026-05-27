@@ -29,7 +29,6 @@ FROM node:22-alpine AS frontend
 
 WORKDIR /app
 COPY ./app/package.json ./app/pnpm-lock.yaml ./app/pnpm-workspace.yaml ./
-COPY ./app/patches ./patches
 
 RUN corepack enable && \
     corepack prepare pnpm@11.0.3 --activate && \
