@@ -138,7 +138,7 @@ function ConversationItem({
       }}
     >
       <MessageSquare
-        className={`h-6 w-6 p-1 mr-1 text-secondary bg-input/25 rounded-sm`}
+        className={`h-6 w-6 p-1 mr-1 text-muted-foreground bg-muted/60 rounded-sm`}
       />
       <div className={`title`}>{displayTitle}</div>
       <DropdownMenu
@@ -170,7 +170,7 @@ function ConversationItem({
             {conversation.id}
 
             <MessagesSquare
-              className={`inline h-3.5 w-3.5 ml-auto translate-y-0.5 text-secondary`}
+              className={`inline h-3.5 w-3.5 ml-auto translate-y-0.5 text-muted-foreground`}
             />
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
