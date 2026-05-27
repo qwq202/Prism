@@ -60,7 +60,7 @@ function BarItem({ icon, path, name }: BarItemProps) {
   };
 
   return (
-    <div className={`inline-flex w-14 flex-col items-center`}>
+    <div className={`inline-flex w-10 flex-col items-center`}>
       <TooltipProvider delayDuration={100}>
         <Tooltip open={open} onOpenChange={setOpen}>
           <TooltipTrigger asChild>
