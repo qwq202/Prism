@@ -9,7 +9,7 @@ import {
   Gift,
 } from "lucide-react";
 import { cn } from "@/components/ui/lib/utils.ts";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { Link } from "react-router-dom";
 import {
@@ -18,6 +18,7 @@ import {
   levelSelector,
   usageSelector,
   refreshSelector,
+  refreshSubscription,
 } from "@/store/subscription.ts";
 import { subscriptionDataSelector } from "@/store/globals.ts";
 import { quotaSelector, refreshQuota } from "@/store/quota.ts";
@@ -122,6 +123,7 @@ function RedeemDialog({ open, onOpenChange }: RedeemDialogProps) {
 
 function WalletPage() {
   const { t } = useTranslation();
+  const dispatch: AppDispatch = useDispatch();
   const quota = useSelector(quotaSelector);
   const subscription = useSelector(isSubscribedSelector);
   const level = useSelector(levelSelector);
@@ -141,6 +143,11 @@ function WalletPage() {
     [subscriptionData, level],
   );
   const hasSubscriptionData = subscriptionData.length > 0;
+
+  useEffect(() => {
+    void dispatch(refreshQuota());
+    void dispatch(refreshSubscription());
+  }, [dispatch]);
 
   return (
     <ScrollArea className="w-full h-full bg-muted/25">

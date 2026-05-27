@@ -128,10 +128,8 @@ export default function WalletStats() {
   );
 
   useEffect(() => {
-    if (!refreshing && (!loaded || loadedTimeZone !== timeZone)) {
-      void dispatch(refreshWalletUsageSummary(timeZone));
-    }
-  }, [dispatch, loaded, loadedTimeZone, refreshing, timeZone]);
+    void dispatch(refreshWalletUsageSummary(timeZone));
+  }, [dispatch, timeZone]);
 
   useEffect(() => {
     function handleCacheUpdate(event: Event) {

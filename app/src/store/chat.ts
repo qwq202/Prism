@@ -7,7 +7,7 @@ import {
   UserRole,
 } from "@/api/types.tsx";
 import { Message } from "@/api/types.tsx";
-import type { AppDispatch, RootState } from "./index.ts";
+import { AppDispatch, RootState } from "./index.ts";
 import {
   getArrayMemory,
   getBooleanMemory,
@@ -43,9 +43,6 @@ import { useDispatch, useSelector } from "react-redux";
 import { useMemo } from "react";
 import { ConnectionStack, StreamMessage } from "@/api/connection.ts";
 import { useTranslation } from "react-i18next";
-import { infoTimeZoneSelector } from "@/store/info.ts";
-import { refreshQuota } from "@/store/quota.ts";
-import { refreshWalletUsageSummary } from "@/store/record.ts";
 import {
   buildPersonalizationInstruction,
   contextSelector,
@@ -69,7 +66,6 @@ import {
   topKSelector,
   topPSelector,
 } from "@/store/settings.ts";
-import { refreshSubscription } from "@/store/subscription.ts";
 
 function resolveOpenAIReasoningEffortForRequest(
   supportModels: Model[],
@@ -382,14 +378,6 @@ function hasAssistantStreamUpdate(message: StreamMessage): boolean {
     message.end === true ||
     (typeof message.quota === "number" && message.quota > 0) ||
     message.plan === true
-  );
-}
-
-function shouldRefreshWalletAfterStream(message: StreamMessage): boolean {
-  return (
-    message.end === true &&
-    ((typeof message.quota === "number" && message.quota > 0) ||
-      message.plan === true)
   );
 }
 
@@ -1690,12 +1678,11 @@ export function useConversationActions() {
 
 export function useMessageActions() {
   const { t } = useTranslation();
-  const dispatch = useDispatch<AppDispatch>();
+  const dispatch = useDispatch();
   const { refresh } = useConversationActions();
   const current = useSelector(selectCurrent);
   const conversations = useSelector(selectConversations);
   const mask = useSelector(selectMaskItem);
-  const timeZone = useSelector(infoTimeZoneSelector);
 
   const model = useSelector(selectModel);
   const web = useSelector(selectWeb);
@@ -1972,11 +1959,6 @@ export function useMessageActions() {
     receive: async (id: number, message: StreamMessage) => {
       const conversationModel = conversations[id]?.model;
       dispatch(updateMessage({ id, message, model: conversationModel }));
-      if (shouldRefreshWalletAfterStream(message)) {
-        void dispatch(refreshQuota());
-        void dispatch(refreshSubscription());
-        void dispatch(refreshWalletUsageSummary(timeZone));
-      }
       if (message.title) {
         dispatch(renameHistory({ id, name: message.title }));
       }
