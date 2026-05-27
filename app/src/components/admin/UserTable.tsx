@@ -156,7 +156,7 @@ function formatWindowInterval(
   t: TFunction,
   window: UserSubscriptionWindowData,
 ): string {
-  if (window.id === "plan_points_weekly") return "week";
+  if (window.id === "plan_points_weekly") return "周";
 
   const interval = window.reset_interval ?? 0;
   if (window.id === "plan_points" && interval > 0) {
@@ -192,11 +192,10 @@ function SubscriptionWindowsCell({ user }: { user: UserData }) {
 
   return (
     <div className="max-w-[16rem] text-xs leading-5 text-muted-foreground">
-      {windows.map((window, index) => (
-        <span key={window.id} className="tabular-nums">
+      {windows.map((window) => (
+        <div key={window.id} className="whitespace-nowrap tabular-nums">
           {formatWindowSummary(t, window)}
-          {index < windows.length - 1 ? ", " : null}
-        </span>
+        </div>
       ))}
     </div>
   );
