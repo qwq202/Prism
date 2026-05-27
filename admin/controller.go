@@ -345,9 +345,10 @@ func UserPaginationAPI(c *gin.Context) {
 	}
 
 	db := utils.GetDBFromContext(c)
+	cache := utils.GetCacheFromContext(c)
 
 	search := strings.TrimSpace(c.Query("search"))
-	c.JSON(http.StatusOK, getUsersForm(db, page, search))
+	c.JSON(http.StatusOK, getUsersForm(db, cache, page, search))
 }
 
 func CreateUserAPI(c *gin.Context) {

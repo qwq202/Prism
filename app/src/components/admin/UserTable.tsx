@@ -5,6 +5,7 @@ import {
   UserData,
   UserForm,
   UserResponse,
+  UserSubscriptionWindowData,
 } from "@/admin/types.ts";
 import {
   banUserOperation,
@@ -87,6 +88,7 @@ import { toast } from "sonner";
 import { Badge } from "../ui/badge";
 import type { TFunction } from "i18next";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
+import { Progress } from "@/components/ui/progress.tsx";
 
 type OperationMenuProps = {
   user: UserData;
@@ -124,6 +126,103 @@ function doToast(t: TFunction, resp: CommonResponse) {
     toast.success(t("admin.operate-success"), {
       description: t("admin.operate-success-prompt"),
     });
+}
+
+function clampPercent(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, value));
+}
+
+function formatWindowNumber(value: number): string {
+  if (!Number.isFinite(value)) return "0";
+  return value.toLocaleString(undefined, {
+    maximumFractionDigits: 2,
+  });
+}
+
+function getWindowLabel(t: TFunction, window: UserSubscriptionWindowData): string {
+  if (window.id === "plan_points") return t("admin.subscription-window-short");
+  if (window.id === "plan_points_weekly")
+    return t("admin.subscription-window-weekly");
+  return window.name || window.id;
+}
+
+function getWindowUnit(t: TFunction, window: UserSubscriptionWindowData): string {
+  if (window.unit === "points") return t("admin.subscription-window-points");
+  if (window.unit === "times") return t("admin.subscription-window-times");
+  return window.unit || t("admin.subscription-window-points");
+}
+
+function getProgressClass(percent: number): string {
+  if (percent <= 15) return "bg-destructive";
+  if (percent <= 40) return "bg-amber-500";
+  return "bg-emerald-500";
+}
+
+function formatWindowRemaining(
+  t: TFunction,
+  window: UserSubscriptionWindowData,
+): string {
+  const unit = getWindowUnit(t, window);
+  if (window.total < 0 || window.remaining < 0) {
+    return t("admin.subscription-window-unlimited");
+  }
+  return `${formatWindowNumber(window.remaining)} ${unit}`;
+}
+
+function formatWindowUsedTotal(
+  t: TFunction,
+  window: UserSubscriptionWindowData,
+): string {
+  const unit = getWindowUnit(t, window);
+  const used = formatWindowNumber(window.used);
+  const total =
+    window.total < 0
+      ? t("admin.subscription-window-unlimited")
+      : `${formatWindowNumber(window.total)} ${unit}`;
+
+  return `${used} / ${total}`;
+}
+
+function SubscriptionWindowsCell({ user }: { user: UserData }) {
+  const { t } = useTranslation();
+  const windows = user.subscription_windows ?? [];
+
+  if (!user.is_subscribed || windows.length === 0) {
+    return <span className="text-muted-foreground">-</span>;
+  }
+
+  return (
+    <div className="min-w-[15rem] space-y-2">
+      {windows.map((window) => {
+        const percent = clampPercent(window.remaining_percent);
+        return (
+          <div key={window.id} className="space-y-1">
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <span className="max-w-[8rem] truncate font-medium">
+                {getWindowLabel(t, window)}
+              </span>
+              <span className="shrink-0 tabular-nums text-muted-foreground">
+                {formatWindowRemaining(t, window)} /{" "}
+                {formatWindowNumber(percent)}%
+              </span>
+            </div>
+            <Progress
+              value={percent}
+              className="h-1.5"
+              classNameIndicator={getProgressClass(percent)}
+            />
+            <div className="flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
+              <span>{t("admin.subscription-window-used")}</span>
+              <span className="tabular-nums">
+                {formatWindowUsedTotal(t, window)}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function OperationMenu({ user, onRefresh }: OperationMenuProps) {
@@ -761,6 +860,7 @@ function UserTable() {
                 <TableHead>{t("admin.used-quota")}</TableHead>
                 <TableHead>{t("admin.is-subscribed")}</TableHead>
                 <TableHead>{t("admin.level")}</TableHead>
+                <TableHead>{t("admin.subscription-windows")}</TableHead>
                 <TableHead>{t("admin.total-month")}</TableHead>
                 <TableHead>{t("admin.expired-at")}</TableHead>
                 <TableHead>{t("admin.is-banned")}</TableHead>
@@ -801,6 +901,9 @@ function UserTable() {
                     <Badge variant={`outline`}>
                       {t(`admin.identity.${userTypeArray[user.level]}`)}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <SubscriptionWindowsCell user={user} />
                   </TableCell>
                   <TableCell>{user.total_month}</TableCell>
                   <TableCell className={`whitespace-nowrap`}>

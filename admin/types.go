@@ -94,16 +94,29 @@ type RedeemBatchCodesResponse struct {
 }
 
 type UserData struct {
-	Id           int64   `json:"id"`
-	Username     string  `json:"username"`
-	Email        string  `json:"email"`
-	IsAdmin      bool    `json:"is_admin"`
-	Quota        float32 `json:"quota"`
-	UsedQuota    float32 `json:"used_quota"`
-	ExpiredAt    string  `json:"expired_at"`
-	IsSubscribed bool    `json:"is_subscribed"`
-	TotalMonth   int64   `json:"total_month"`
-	Enterprise   bool    `json:"enterprise"`
-	Level        int     `json:"level"`
-	IsBanned     bool    `json:"is_banned"`
+	Id                  int64                        `json:"id"`
+	Username            string                       `json:"username"`
+	Email               string                       `json:"email"`
+	IsAdmin             bool                         `json:"is_admin"`
+	Quota               float32                      `json:"quota"`
+	UsedQuota           float32                      `json:"used_quota"`
+	ExpiredAt           string                       `json:"expired_at"`
+	IsSubscribed        bool                         `json:"is_subscribed"`
+	TotalMonth          int64                        `json:"total_month"`
+	Enterprise          bool                         `json:"enterprise"`
+	Level               int                          `json:"level"`
+	IsBanned            bool                         `json:"is_banned"`
+	SubscriptionWindows []UserSubscriptionWindowData `json:"subscription_windows"`
+}
+
+type UserSubscriptionWindowData struct {
+	Id               string  `json:"id"`
+	Name             string  `json:"name"`
+	Used             float32 `json:"used"`
+	Total            float32 `json:"total"`
+	Remaining        float32 `json:"remaining"`
+	RemainingPercent float32 `json:"remaining_percent"`
+	Unit             string  `json:"unit"`
+	ResetInterval    int64   `json:"reset_interval,omitempty"`
+	ResetAt          string  `json:"reset_at,omitempty"`
 }

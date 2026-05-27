@@ -1,13 +1,17 @@
 package admin
 
 import (
+	"chat/channel"
 	"chat/connection"
 	"chat/globals"
 	"chat/utils"
 	"database/sql"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/alicebob/miniredis/v2"
+	"github.com/go-redis/redis/v8"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -47,6 +51,27 @@ func openAdminUserTestDB(t *testing.T) *sql.DB {
 	return db
 }
 
+func openAdminUserTestCache(t *testing.T) (*miniredis.Miniredis, *redis.Client) {
+	t.Helper()
+
+	server, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("start miniredis: %v", err)
+	}
+
+	cache := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	if err := cache.Ping(cache.Context()).Err(); err != nil {
+		t.Fatalf("ping miniredis: %v", err)
+	}
+
+	t.Cleanup(func() {
+		_ = cache.Close()
+		server.Close()
+	})
+
+	return server, cache
+}
+
 func TestCreateUserCreatesAuthAndQuotaRows(t *testing.T) {
 	db := openAdminUserTestDB(t)
 
@@ -72,6 +97,82 @@ func TestCreateUserCreatesAuthAndQuotaRows(t *testing.T) {
 	}
 	if quota != 0 {
 		t.Fatalf("expected default quota 0 without system config, got %f", quota)
+	}
+}
+
+func TestGetUsersFormIncludesSubscriptionWindowUsage(t *testing.T) {
+	db := openAdminUserTestDB(t)
+	_, cache := openAdminUserTestCache(t)
+
+	previousPlanInstance := channel.PlanInstance
+	channel.PlanInstance = &channel.PlanManager{
+		Enabled: true,
+		Plans: []channel.Plan{
+			{
+				Level:         1,
+				Price:         0,
+				Quota:         20,
+				ResetInterval: int64((5 * time.Hour).Seconds()),
+				WeeklyQuota:   100,
+				Items:         []channel.PlanItem{},
+			},
+		},
+	}
+	t.Cleanup(func() {
+		channel.PlanInstance = previousPlanInstance
+	})
+
+	if err := createUser(db, "alice", "alice@example.com", "secret123"); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	var userID int64
+	if err := globals.QueryRowDb(db, "SELECT id FROM auth WHERE username = ?", "alice").Scan(&userID); err != nil {
+		t.Fatalf("fetch alice id: %v", err)
+	}
+
+	expiresAt := time.Now().Add(24 * time.Hour).Format("2006-01-02 15:04:05")
+	if _, err := globals.ExecDb(db, `
+		INSERT INTO subscription (user_id, level, expired_at) VALUES (?, ?, ?)
+	`, userID, 1, expiresAt); err != nil {
+		t.Fatalf("insert subscription: %v", err)
+	}
+
+	plan := channel.PlanInstance.GetPlan(1)
+	if !plan.ConsumePointPool(&AuthLike{ID: userID}, cache, "gpt-5.1", 4) {
+		t.Fatalf("consume point pool")
+	}
+
+	form := getUsersForm(db, cache, 0, "alice")
+	if !form.Status {
+		t.Fatalf("expected successful users form, got %s", form.Message)
+	}
+	if len(form.Data) != 1 {
+		t.Fatalf("expected one user, got %d", len(form.Data))
+	}
+
+	user, ok := form.Data[0].(UserData)
+	if !ok {
+		t.Fatalf("expected UserData, got %T", form.Data[0])
+	}
+	if len(user.SubscriptionWindows) != 2 {
+		t.Fatalf("expected two subscription windows, got %#v", user.SubscriptionWindows)
+	}
+
+	short := user.SubscriptionWindows[0]
+	if short.Id != channel.PlanSharedPointsItemID {
+		t.Fatalf("expected short window first, got %s", short.Id)
+	}
+	if short.Used != 4 || short.Total != 20 || short.Remaining != 16 || short.RemainingPercent != 80 {
+		t.Fatalf("unexpected short window data: %#v", short)
+	}
+
+	weekly := user.SubscriptionWindows[1]
+	if weekly.Id != channel.PlanWeeklyPointsItemID {
+		t.Fatalf("expected weekly window second, got %s", weekly.Id)
+	}
+	if weekly.Used != 4 || weekly.Total != 100 || weekly.Remaining != 96 || weekly.RemainingPercent != 96 {
+		t.Fatalf("unexpected weekly window data: %#v", weekly)
 	}
 }
 

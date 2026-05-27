@@ -147,6 +147,19 @@ export type UserData = {
   expired_at: string;
   level: number;
   enterprise: boolean;
+  subscription_windows?: UserSubscriptionWindowData[] | null;
+};
+
+export type UserSubscriptionWindowData = {
+  id: string;
+  name: string;
+  used: number;
+  total: number;
+  remaining: number;
+  remaining_percent: number;
+  unit: "points" | "times" | string;
+  reset_interval?: number;
+  reset_at?: string;
 };
 
 export type UserForm = {

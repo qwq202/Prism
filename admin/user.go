@@ -35,7 +35,7 @@ func (a *AuthLike) HitID() int64 {
 	return a.ID
 }
 
-func getUsersForm(db *sql.DB, page int64, search string) PaginationForm {
+func getUsersForm(db *sql.DB, cache *redis.Client, page int64, search string) PaginationForm {
 	// if search is empty, then search all users
 
 	var users []interface{}
@@ -111,6 +111,7 @@ func getUsersForm(db *sql.DB, page int64, search string) PaginationForm {
 		}
 		user.Enterprise = isEnterprise.Valid && isEnterprise.Bool
 		user.IsBanned = isBanned.Valid && isBanned.Bool
+		user.SubscriptionWindows = getUserSubscriptionWindows(db, cache, user)
 
 		users = append(users, user)
 	}
@@ -126,6 +127,82 @@ func getUsersForm(db *sql.DB, page int64, search string) PaginationForm {
 		Total:  int(math.Ceil(float64(total) / float64(pagination))),
 		Data:   users,
 	}
+}
+
+func getUserSubscriptionWindows(db *sql.DB, cache *redis.Client, user UserData) []UserSubscriptionWindowData {
+	if db == nil || cache == nil || channel.PlanInstance == nil {
+		return nil
+	}
+	if !user.IsSubscribed || user.Level <= 0 {
+		return nil
+	}
+
+	plan := channel.PlanInstance.GetPlan(user.Level)
+	if plan.Level <= 0 {
+		return nil
+	}
+
+	authLike := &AuthLike{ID: user.Id}
+	usage := plan.GetUsage(authLike, db, cache)
+	windows := make([]UserSubscriptionWindowData, 0, len(usage))
+	appendWindow := func(id string, name string) {
+		value, ok := usage[id]
+		if !ok {
+			return
+		}
+		windows = append(windows, getUserSubscriptionWindowData(id, name, value))
+	}
+
+	if plan.HasPointPool() {
+		appendWindow(channel.PlanSharedPointsItemID, channel.PlanSharedPointsItemID)
+		if plan.HasWeeklyPool() {
+			appendWindow(channel.PlanWeeklyPointsItemID, channel.PlanWeeklyPointsItemID)
+		}
+		return windows
+	}
+
+	for _, item := range plan.Items {
+		appendWindow(item.Id, item.Name)
+	}
+	return windows
+}
+
+func getUserSubscriptionWindowData(id string, name string, usage channel.Usage) UserSubscriptionWindowData {
+	remaining, percent := getRemainingSubscriptionUsage(usage.Used, usage.Total)
+	return UserSubscriptionWindowData{
+		Id:               id,
+		Name:             name,
+		Used:             usage.Used,
+		Total:            usage.Total,
+		Remaining:        remaining,
+		RemainingPercent: percent,
+		Unit:             usage.Unit,
+		ResetInterval:    usage.ResetInterval,
+		ResetAt:          usage.ResetAt,
+	}
+}
+
+func getRemainingSubscriptionUsage(used float32, total float32) (float32, float32) {
+	if total < 0 {
+		return -1, 100
+	}
+	if total == 0 {
+		return 0, 0
+	}
+
+	remaining := total - used
+	if remaining < 0 {
+		remaining = 0
+	}
+	percent := remaining / total * 100
+	if percent < 0 {
+		percent = 0
+	}
+	if percent > 100 {
+		percent = 100
+	}
+
+	return remaining, percent
 }
 
 // clearUserCache clears all cache keys starting with nio:user:
