@@ -36,6 +36,7 @@ import {
   getCachedConversation,
   getCachedConversationList,
   removeCachedConversationFromList,
+  setCachedConversation,
 } from "@/utils/conversation-cache.ts";
 import { CustomMask, Mask } from "@/masks/types.ts";
 import { listMasks } from "@/api/mask.ts";
@@ -150,8 +151,30 @@ type initialStateType = {
 
 const defaultConversation: ConversationSerialized = { messages: [] };
 const localMutationProtectionMs = 10_000;
+let conversationNavigationRevision = 0;
+const conversationDetailRequestSeq = new Map<number, number>();
+
+function bumpConversationNavigationRevision(): number {
+  conversationNavigationRevision += 1;
+  return conversationNavigationRevision;
+}
+
+function getConversationNavigationRevision(): number {
+  return conversationNavigationRevision;
+}
+
+function nextConversationDetailRequestSeq(id: number): number {
+  const seq = (conversationDetailRequestSeq.get(id) ?? 0) + 1;
+  conversationDetailRequestSeq.set(id, seq);
+  return seq;
+}
+
+function isLatestConversationDetailRequest(id: number, seq: number): boolean {
+  return conversationDetailRequestSeq.get(id) === seq;
+}
 
 function resetLocalConversationState(state: initialStateType) {
+  bumpConversationNavigationRevision();
   state.history = [];
   state.messages = [];
   state.conversations = { [-1]: { ...defaultConversation } };
@@ -198,6 +221,7 @@ function replaceWithRemoteConversationHistory(
 
   if (currentMissing && !currentConversation) {
     closeConversationConnection(state.current);
+    bumpConversationNavigationRevision();
     state.current = -1;
     state.messages = [];
     state.mask_item = null;
@@ -846,7 +870,6 @@ function finalizePendingToolCalls(
 export const stack = new ConnectionStack();
 
 function closeConversationConnection(id: number) {
-  if (id === -1) return;
   stack.close(id);
 }
 
@@ -1074,11 +1097,13 @@ const chatSlice = createSlice({
         return;
       }
 
-      state.conversations[id] = {
+      const nextConversation = {
         model: conversation.model,
         messages: conversation.message,
         updated_at: conversation.updated_at,
       };
+      state.conversations[id] = nextConversation;
+      void setCachedConversation(id, nextConversation);
 
       const index = state.history.findIndex((item) => item.id === id);
       const previous = index >= 0 ? state.history[index] : undefined;
@@ -1118,6 +1143,7 @@ const chatSlice = createSlice({
       state.history = state.history.filter((item) => item.id !== id);
 
       if (state.current === id) {
+        bumpConversationNavigationRevision();
         state.current = -1;
         state.messages = [];
         state.mask_item = null;
@@ -1128,6 +1154,7 @@ const chatSlice = createSlice({
         setNumberMemory("history_conversation", -1);
       }
 
+      void clearCachedConversation(id);
       if (!state.conversations[id]) return;
 
       closeConversationConnection(id);
@@ -1141,6 +1168,7 @@ const chatSlice = createSlice({
       state.history = state.history.filter((item) => item.id !== id);
 
       if (state.current === id) {
+        bumpConversationNavigationRevision();
         state.current = -1;
         state.messages = [];
         state.mask_item = null;
@@ -1353,11 +1381,24 @@ const chatSlice = createSlice({
       state.mask_item = action.payload as Mask;
     },
     startMaskedConversation: (state, action) => {
+      const mask = action.payload as Mask;
+      closeConversationConnection(-1);
+      bumpConversationNavigationRevision();
+
+      const nextConversation: ConversationSerialized = { ...defaultConversation };
+      if (mask.model) {
+        nextConversation.model = mask.model;
+        if (inModel(state.support_models, mask.model)) {
+          state.model = mask.model;
+          setMemory("model", mask.model);
+        }
+      }
+
       state.current = -1;
       state.messages = [];
       state.history = state.history.filter((item) => item.id !== -1);
-      state.conversations[-1] = { ...defaultConversation };
-      state.mask_item = action.payload as Mask;
+      state.conversations[-1] = nextConversation;
+      state.mask_item = mask;
       setNumberMemory("history_conversation", -1);
     },
     clearMaskItem: (state) => {
@@ -1368,9 +1409,13 @@ const chatSlice = createSlice({
     },
     setSupportModels: (state, action) => {
       const models = action.payload as Model[];
+      const maskedModel =
+        state.current === -1 ? state.conversations[-1]?.model : undefined;
+      const preferredModel =
+        maskedModel && inModel(models, maskedModel) ? maskedModel : getMemory("model");
 
       state.support_models = models;
-      state.model = getModel(models, getMemory("model"));
+      state.model = getModel(models, preferredModel);
       state.model_list = getModelList(
         models,
         getArrayMemory("model_mark_list"),
@@ -1498,13 +1543,16 @@ export function useConversationActions() {
 
   const refreshConversationDetail = async (
     id: number,
-    options?: { activate?: boolean },
+    options?: { activate?: boolean; navigationRevision?: number },
   ) => {
     if (id === -1) return;
     const activate = options?.activate ?? true;
     const requestedRevision = getConversationLocalRevision(conversations[id]);
+    const requestSeq = nextConversationDetailRequestSeq(id);
 
     const result = await fetchConversation(id);
+    if (!isLatestConversationDetailRequest(id, requestSeq)) return;
+
     if (result.status === "not_found") {
       dispatch(deleteRemoteConversation({ id, requestedRevision }));
       return;
@@ -1519,7 +1567,14 @@ export function useConversationActions() {
         requestedRevision,
       }),
     );
-    if (activate) dispatch(setCurrent(id));
+    if (
+      activate &&
+      getNumberMemory("history_conversation", -1) === id &&
+      (options?.navigationRevision === undefined ||
+        options.navigationRevision === getConversationNavigationRevision())
+    ) {
+      dispatch(setCurrent(id));
+    }
   };
 
   const showConversation = async (
@@ -1527,6 +1582,7 @@ export function useConversationActions() {
     options?: { refreshRemote?: boolean; useCache?: boolean },
   ) => {
     const refreshRemote = options?.refreshRemote ?? true;
+    const navigationRevision = bumpConversationNavigationRevision();
     setNumberMemory("history_conversation", id);
 
     if (id === -1) {
@@ -1541,6 +1597,12 @@ export function useConversationActions() {
     let restored = Boolean(restoredConversation);
     if (!restored && options?.useCache) {
       const cached = await getCachedConversation(id);
+      if (
+        navigationRevision !== getConversationNavigationRevision() ||
+        getNumberMemory("history_conversation", -1) !== id
+      ) {
+        return;
+      }
       if (cached) {
         restoredConversation = {
           model: cached.model,
@@ -1575,6 +1637,7 @@ export function useConversationActions() {
 
     await refreshConversationDetail(id, {
       activate: true,
+      navigationRevision,
     });
   };
 
@@ -1636,11 +1699,9 @@ export function useConversationActions() {
           : setRemoteHistory(resp.conversations),
       );
 
-      if (
-        !resp.fromCache &&
-        current !== -1
-      ) {
-        await refreshConversationDetail(current, {
+      const activeConversation = getNumberMemory("history_conversation", current);
+      if (!resp.fromCache && activeConversation !== -1) {
+        await refreshConversationDetail(activeConversation, {
           activate: false,
         });
       }
@@ -1655,6 +1716,7 @@ export function useConversationActions() {
         dispatch(setHistory(cached));
         if (
           stored !== -1 &&
+          getNumberMemory("history_conversation", -1) === stored &&
           current !== stored &&
           cached.some((item) => item.id === stored)
         ) {
@@ -1672,7 +1734,10 @@ export function useConversationActions() {
           : setRemoteHistory(resp.conversations),
       );
 
-      if (stored !== -1) {
+      if (
+        stored !== -1 &&
+        getNumberMemory("history_conversation", -1) === stored
+      ) {
         await showConversation(stored, { useCache: true });
       }
 
@@ -1753,7 +1818,13 @@ export function useMessageActions() {
 
   return {
     send: async (message: string, using_model?: string) => {
-      const targetModel = using_model || model;
+      const conversationModel =
+        current === -1 ? conversations[-1]?.model : undefined;
+      const targetModel =
+        using_model ||
+        (conversationModel && inModel(support_models, conversationModel)
+          ? conversationModel
+          : model);
       const enableGeminiNativeWeb = isGeminiModelId(targetModel);
       const enableXAINativeWeb = isXAIModelId(targetModel);
       const enableDeepSeekThinkingControl = isDeepSeekV4ModelId(targetModel);
@@ -1786,12 +1857,12 @@ export function useMessageActions() {
       }
 
       if (!stack.hasConnection(current)) {
-        const conn = stack.createConnection(current);
+        stack.createConnection(current);
+      }
 
-        if (current === -1 && mask && mask.context.length > 0) {
-          conn.sendMaskEvent(t, mask);
-          dispatch(fillMaskItem());
-        }
+      if (current === -1 && mask && mask.context.length > 0) {
+        stack.sendMaskEvent(current, t, mask);
+        dispatch(fillMaskItem());
       }
 
       const state = stack.send(current, t, {
@@ -1980,7 +2051,7 @@ export function useMessageActions() {
         dispatch(raiseConversation(target));
         setNumberMemory("history_conversation", target);
         stack.raiseConnection(target);
-        await refresh();
+        await refresh({ useCache: false });
       }
     },
   };

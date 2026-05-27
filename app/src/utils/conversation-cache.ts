@@ -59,18 +59,7 @@ export async function getCachedConversationList(): Promise<
 export async function setCachedConversationList(
   conversations: ConversationInstance[],
 ): Promise<void> {
-  const previous = await getCachedConversationList();
   await setClientCache(getConversationListCacheKey(), conversations);
-
-  if (!previous) return;
-
-  const nextIds = new Set(conversations.map((conversation) => conversation.id));
-  await Promise.all(
-    previous
-      .filter((conversation) => conversation.id !== -1)
-      .filter((conversation) => !nextIds.has(conversation.id))
-      .map((conversation) => clearCachedConversation(conversation.id)),
-  );
 }
 
 export async function removeCachedConversationFromList(

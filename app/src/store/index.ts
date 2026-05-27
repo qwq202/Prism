@@ -3,7 +3,7 @@ import infoReducer from "./info";
 import globalReducer from "./globals";
 import menuReducer from "./menu";
 import authReducer from "./auth";
-import chatReducer from "./chat";
+import chatReducer, { type ConversationSerialized } from "./chat";
 import quotaReducer from "./quota";
 import packageReducer from "./package";
 import subscriptionReducer from "./subscription";
@@ -37,6 +37,11 @@ let chatCacheTimer: ReturnType<typeof setTimeout> | undefined;
 let lastChatHistoryCacheSignature = "";
 let lastChatConversationCacheSignature = "";
 
+function isStreamingConversation(conversation: ConversationSerialized): boolean {
+  const last = conversation.messages[conversation.messages.length - 1];
+  return last?.role === "assistant" && last.end === false;
+}
+
 store.subscribe(() => {
   if (chatCacheTimer) clearTimeout(chatCacheTimer);
 
@@ -44,13 +49,14 @@ store.subscribe(() => {
     const { history, current, conversations } = store.getState().chat;
     const cacheableHistory = history.filter((item) => item.id !== -1);
     const currentConversation = current !== -1 ? conversations[current] : null;
-    const cacheableConversation = currentConversation
-      ? {
-          model: currentConversation.model,
-          messages: currentConversation.messages,
-          updated_at: currentConversation.updated_at,
-        }
-      : null;
+    const cacheableConversation =
+      currentConversation && !isStreamingConversation(currentConversation)
+        ? {
+            model: currentConversation.model,
+            messages: currentConversation.messages,
+            updated_at: currentConversation.updated_at,
+          }
+        : null;
     const historySignature = JSON.stringify(
       cacheableHistory.map((item) => ({
         id: item.id,

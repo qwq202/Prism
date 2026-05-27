@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { useMemo, useReducer, useState } from "react";
+import { useMemo, useReducer, useRef, useState } from "react";
 import {
   CommonResponse,
   UserData,
@@ -541,10 +541,15 @@ function UserTable() {
       data.data.filter((user) => user.username !== username).map((u) => u.id),
     );
   }, [data.data, username]);
+  const updateSeqRef = useRef(0);
 
   async function update() {
+    const seq = updateSeqRef.current + 1;
+    updateSeqRef.current = seq;
     setLoading(true);
     const resp = await getUserList(page, search, filter);
+    if (seq !== updateSeqRef.current) return;
+
     setLoading(false);
     if (resp.status) {
       setData(resp as UserResponse);

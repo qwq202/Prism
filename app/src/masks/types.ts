@@ -8,6 +8,7 @@ export type MaskMessage = {
 export type Mask = {
   avatar: string;
   name: string;
+  model?: string;
   description?: string;
   tags?: string[];
   lang?: string;

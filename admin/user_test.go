@@ -176,6 +176,59 @@ func TestGetUsersFormIncludesSubscriptionWindowUsage(t *testing.T) {
 	}
 }
 
+func TestGetUsersFormFiltersAndSortsSubscribedUsers(t *testing.T) {
+	db := openAdminUserTestDB(t)
+	_, cache := openAdminUserTestCache(t)
+
+	users := []struct {
+		username string
+		level    int
+		expires  time.Time
+	}{
+		{username: "alice", level: 1, expires: time.Now().Add(24 * time.Hour)},
+		{username: "bob", level: 2, expires: time.Now().Add(24 * time.Hour)},
+		{username: "carol", level: 3, expires: time.Now().Add(-24 * time.Hour)},
+	}
+
+	for _, entry := range users {
+		if err := createUser(db, entry.username, entry.username+"@example.com", "secret123"); err != nil {
+			t.Fatalf("create user %s: %v", entry.username, err)
+		}
+		var id int64
+		if err := globals.QueryRowDb(db, "SELECT id FROM auth WHERE username = ?", entry.username).Scan(&id); err != nil {
+			t.Fatalf("fetch %s id: %v", entry.username, err)
+		}
+		if _, err := globals.ExecDb(db, `
+			INSERT INTO subscription (user_id, level, expired_at) VALUES (?, ?, ?)
+		`, id, entry.level, entry.expires.Format("2006-01-02 15:04:05")); err != nil {
+			t.Fatalf("insert subscription for %s: %v", entry.username, err)
+		}
+	}
+
+	form := getUsersForm(db, cache, 0, "", userListFilter{
+		Plan: "yes",
+		Sort: "plan-desc",
+	})
+	if !form.Status {
+		t.Fatalf("expected successful users form, got %s", form.Message)
+	}
+	if form.Total != 1 {
+		t.Fatalf("expected one result page, got %d", form.Total)
+	}
+	if len(form.Data) != 2 {
+		t.Fatalf("expected two active subscribed users, got %d", len(form.Data))
+	}
+
+	first := form.Data[0].(UserData)
+	second := form.Data[1].(UserData)
+	if first.Username != "bob" || first.Level != 2 {
+		t.Fatalf("expected bob with level 2 first, got %#v", first)
+	}
+	if second.Username != "alice" || second.Level != 1 {
+		t.Fatalf("expected alice with level 1 second, got %#v", second)
+	}
+}
+
 func TestReleaseUsageForSubscribedUsersResetsPointWindows(t *testing.T) {
 	db := openAdminUserTestDB(t)
 	_, cache := openAdminUserTestCache(t)
@@ -249,6 +302,45 @@ func TestReleaseUsageForSubscribedUsersResetsPointWindows(t *testing.T) {
 		if got := plan.GetWeeklyPointUsage(&AuthLike{ID: id}, cache); got != 0 {
 			t.Fatalf("expected weekly usage reset for user %d, got %f", id, got)
 		}
+	}
+}
+
+func TestReleaseUsageRejectsExpiredSubscription(t *testing.T) {
+	db := openAdminUserTestDB(t)
+	_, cache := openAdminUserTestCache(t)
+
+	previousPlanInstance := channel.PlanInstance
+	channel.PlanInstance = &channel.PlanManager{
+		Enabled: true,
+		Plans: []channel.Plan{
+			{
+				Level:         1,
+				Quota:         20,
+				ResetInterval: int64((5 * time.Hour).Seconds()),
+				WeeklyQuota:   100,
+				Items:         []channel.PlanItem{},
+			},
+		},
+	}
+	t.Cleanup(func() {
+		channel.PlanInstance = previousPlanInstance
+	})
+
+	if err := createUser(db, "alice", "alice@example.com", "secret123"); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	var userID int64
+	if err := globals.QueryRowDb(db, "SELECT id FROM auth WHERE username = ?", "alice").Scan(&userID); err != nil {
+		t.Fatalf("fetch alice id: %v", err)
+	}
+	if _, err := globals.ExecDb(db, `
+		INSERT INTO subscription (user_id, level, expired_at) VALUES (?, ?, ?)
+	`, userID, 1, time.Now().Add(-24*time.Hour).Format("2006-01-02 15:04:05")); err != nil {
+		t.Fatalf("insert expired subscription: %v", err)
+	}
+
+	if err := releaseUsage(db, cache, userID, releaseUsageTypeHour); err == nil || err.Error() != "user is not subscribed" {
+		t.Fatalf("expected expired subscription to be rejected, got %v", err)
 	}
 }
 

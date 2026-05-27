@@ -206,7 +206,7 @@ export async function getUserList(
       params: {
         page,
         search,
-        params,
+        ...params,
       },
     });
     return response.data as UserResponse;

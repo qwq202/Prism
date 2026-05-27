@@ -349,7 +349,24 @@ func UserPaginationAPI(c *gin.Context) {
 	cache := utils.GetCacheFromContext(c)
 
 	search := strings.TrimSpace(c.Query("search"))
-	c.JSON(http.StatusOK, getUsersForm(db, cache, page, search))
+	params := c.QueryMap("params")
+	filterValue := func(key string) string {
+		if value := strings.TrimSpace(c.Query(key)); value != "" {
+			return value
+		}
+		return strings.TrimSpace(params[key])
+	}
+	filter := userListFilter{
+		Plan:  filterValue("plan"),
+		Admin: filterValue("admin"),
+		Ban:   filterValue("ban"),
+		Sort:  filterValue("sort"),
+	}
+
+	c.Header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+	c.Header("Pragma", "no-cache")
+	c.Header("Expires", "0")
+	c.JSON(http.StatusOK, getUsersForm(db, cache, page, search, filter))
 }
 
 func CreateUserAPI(c *gin.Context) {

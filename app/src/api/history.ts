@@ -8,7 +8,6 @@ import { VirtualWebSearchRole, VirtualRolePrefix, Message } from "./types.tsx";
 import { formatToolCallResult } from "@/api/plugin.ts";
 import {
   getCachedConversationList,
-  setCachedConversation,
   setCachedConversationList,
 } from "@/utils/conversation-cache.ts";
 
@@ -166,12 +165,6 @@ export async function fetchConversation(
 
         conversation.message = processedMessages;
       }
-
-      void setCachedConversation(conversation.id, {
-        model: conversation.model,
-        messages: conversation.message,
-        updated_at: conversation.updated_at,
-      });
 
       return { status: "ok", conversation };
     }

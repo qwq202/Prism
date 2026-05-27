@@ -27,6 +27,13 @@ type userAdminState struct {
 	IsBanned bool
 }
 
+type userListFilter struct {
+	Plan  string
+	Admin string
+	Ban   string
+	Sort  string
+}
+
 func (a *AuthLike) GetID(_ *sql.DB) int64 {
 	return a.ID
 }
@@ -35,34 +42,121 @@ func (a *AuthLike) HitID() int64 {
 	return a.ID
 }
 
-func getUsersForm(db *sql.DB, cache *redis.Client, page int64, search string) PaginationForm {
+func normalizeUserListFilter(filter userListFilter) userListFilter {
+	normalizeOption := func(value string, allowed map[string]bool, fallback string) string {
+		value = strings.TrimSpace(value)
+		if allowed[value] {
+			return value
+		}
+		return fallback
+	}
+
+	return userListFilter{
+		Plan:  normalizeOption(filter.Plan, map[string]bool{"all": true, "yes": true, "no": true}, "all"),
+		Admin: normalizeOption(filter.Admin, map[string]bool{"all": true, "yes": true, "no": true}, "all"),
+		Ban:   normalizeOption(filter.Ban, map[string]bool{"all": true, "yes": true, "no": true}, "all"),
+		Sort: normalizeOption(filter.Sort, map[string]bool{
+			"id-asc": true, "id-desc": true,
+			"quota-asc": true, "quota-desc": true,
+			"used-quota-asc": true, "used-quota-desc": true,
+			"plan-asc": true, "plan-desc": true,
+		}, "id-asc"),
+	}
+}
+
+func buildUserListWhere(search string, filter userListFilter) (string, []interface{}) {
+	filter = normalizeUserListFilter(filter)
+	now := time.Now().Format("2006-01-02 15:04:05")
+	conditions := []string{"auth.username LIKE ?"}
+	args := []interface{}{"%" + search + "%"}
+
+	switch filter.Plan {
+	case "yes":
+		conditions = append(conditions, "subscription.level > 0 AND subscription.expired_at > ?")
+		args = append(args, now)
+	case "no":
+		conditions = append(conditions, "(subscription.user_id IS NULL OR subscription.level IS NULL OR subscription.level <= 0 OR subscription.expired_at IS NULL OR subscription.expired_at <= ?)")
+		args = append(args, now)
+	}
+
+	switch filter.Admin {
+	case "yes":
+		conditions = append(conditions, "auth.is_admin = ?")
+		args = append(args, true)
+	case "no":
+		conditions = append(conditions, "(auth.is_admin = ? OR auth.is_admin IS NULL)")
+		args = append(args, false)
+	}
+
+	switch filter.Ban {
+	case "yes":
+		conditions = append(conditions, "auth.is_banned = ?")
+		args = append(args, true)
+	case "no":
+		conditions = append(conditions, "(auth.is_banned = ? OR auth.is_banned IS NULL)")
+		args = append(args, false)
+	}
+
+	return "WHERE " + strings.Join(conditions, " AND "), args
+}
+
+func getUserListOrderBy(sort string) string {
+	switch normalizeUserListFilter(userListFilter{Sort: sort}).Sort {
+	case "id-desc":
+		return "auth.id DESC"
+	case "quota-asc":
+		return "COALESCE(quota.quota, 0) ASC, auth.id ASC"
+	case "quota-desc":
+		return "COALESCE(quota.quota, 0) DESC, auth.id ASC"
+	case "used-quota-asc":
+		return "COALESCE(quota.used, 0) ASC, auth.id ASC"
+	case "used-quota-desc":
+		return "COALESCE(quota.used, 0) DESC, auth.id ASC"
+	case "plan-asc":
+		return "COALESCE(subscription.level, 0) ASC, auth.id ASC"
+	case "plan-desc":
+		return "COALESCE(subscription.level, 0) DESC, auth.id ASC"
+	default:
+		return "auth.id ASC"
+	}
+}
+
+func getUsersForm(db *sql.DB, cache *redis.Client, page int64, search string, filters ...userListFilter) PaginationForm {
 	// if search is empty, then search all users
 
 	var users []interface{}
 	var total int64
+	filter := userListFilter{}
+	if len(filters) > 0 {
+		filter = filters[0]
+	}
+	filter = normalizeUserListFilter(filter)
+	where, args := buildUserListWhere(search, filter)
 
 	if err := globals.QueryRowDb(db, `
-		SELECT COUNT(*) FROM auth
-		WHERE username LIKE ?
-	`, "%"+search+"%").Scan(&total); err != nil {
+			SELECT COUNT(*) FROM auth
+			LEFT JOIN subscription ON subscription.user_id = auth.id
+		`+where, args...).Scan(&total); err != nil {
 		return PaginationForm{
 			Status:  false,
 			Message: err.Error(),
 		}
 	}
 
+	queryArgs := append([]interface{}{}, args...)
+	queryArgs = append(queryArgs, pagination, page*pagination)
 	rows, err := globals.QueryDb(db, `
-		SELECT 
-		    auth.id, auth.username, auth.email, auth.is_admin,
-		    quota.quota, quota.used,
+			SELECT
+			    auth.id, auth.username, auth.email, auth.is_admin,
+			    quota.quota, quota.used,
 		    subscription.expired_at, subscription.total_month, subscription.enterprise, subscription.level,
 		    auth.is_banned
-		FROM auth
-		LEFT JOIN quota ON quota.user_id = auth.id
-		LEFT JOIN subscription ON subscription.user_id = auth.id
-		WHERE auth.username LIKE ?
-		ORDER BY auth.id LIMIT ? OFFSET ?
-	`, "%"+search+"%", pagination, page*pagination)
+			FROM auth
+			LEFT JOIN quota ON quota.user_id = auth.id
+			LEFT JOIN subscription ON subscription.user_id = auth.id
+			`+where+`
+			ORDER BY `+getUserListOrderBy(filter.Sort)+` LIMIT ? OFFSET ?
+		`, queryArgs...)
 	if err != nil {
 		return PaginationForm{
 			Status:  false,
@@ -682,14 +776,24 @@ func releaseUsage(db *sql.DB, cache *redis.Client, id int64, usageType string) e
 		return fmt.Errorf("subscription plan is not configured")
 	}
 
-	var level sql.NullInt64
+	var (
+		level     sql.NullInt64
+		expiredAt sql.NullString
+	)
 	if err := globals.QueryRowDb(db, `
-		SELECT level FROM subscription WHERE user_id = ?
-	`, id).Scan(&level); err != nil {
+			SELECT level, expired_at FROM subscription WHERE user_id = ?
+		`, id).Scan(&level, &expiredAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("user is not subscribed")
+		}
 		return err
 	}
 
-	if !level.Valid || level.Int64 == 0 {
+	if !level.Valid || level.Int64 == 0 || !expiredAt.Valid {
+		return fmt.Errorf("user is not subscribed")
+	}
+	stamp, err := time.Parse("2006-01-02 15:04:05", expiredAt.String)
+	if err != nil || !stamp.After(time.Now()) {
 		return fmt.Errorf("user is not subscribed")
 	}
 

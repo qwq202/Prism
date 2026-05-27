@@ -32,6 +32,7 @@ import { useConversationActions } from "@/store/chat.ts";
 import { toast } from "sonner";
 import Emoji from "@/components/Emoji";
 import { getErrorMessage } from "@/utils/base.ts";
+import { forgetMemory } from "@/utils/memory.ts";
 
 type SharingFormProps = {
   refer?: string;
@@ -185,11 +186,13 @@ function SharingForm({ data }: SharingFormProps) {
               variant="outline"
               onClick={async () => {
                 const message: Message[] = data?.messages || [];
+                forgetMemory("history");
                 await Promise.all([
                   new Promise<void>((resolve) => {
                     setMask({
                       avatar: "",
                       name: data.name,
+                      model: data.model,
                       context: message,
                     });
                     resolve();

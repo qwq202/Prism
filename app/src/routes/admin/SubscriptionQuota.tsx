@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Clock, Loader2, RotateCw, Search } from "lucide-react";
 import { toast } from "sonner";
@@ -203,6 +203,7 @@ function SubscriptionQuota() {
   const [loading, setLoading] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [resetAction, setResetAction] = useState<ResetAction | null>(null);
+  const updateSeqRef = useRef(0);
 
   const users = useMemo(
     () => data.data.filter((user) => user.is_subscribed),
@@ -210,12 +211,16 @@ function SubscriptionQuota() {
   );
 
   async function update() {
+    const seq = updateSeqRef.current + 1;
+    updateSeqRef.current = seq;
     setLoading(true);
     const resp = await getUserList(page, search, {
       ...initialUserFilter,
       plan: "yes",
       sort: "plan-desc",
     });
+    if (seq !== updateSeqRef.current) return;
+
     setLoading(false);
 
     if (resp.status) {
