@@ -4,6 +4,7 @@ import React, { useMemo } from "react";
 import {
   BookCopy,
   CalendarRange,
+  Clock,
   CloudCog,
   CreditCard,
   FolderOpen,
@@ -82,6 +83,11 @@ function MenuBar() {
         title={t("admin.subscription")}
         icon={<CalendarRange />}
         path={"/subscription"}
+      />
+      <MenuItem
+        title={t("admin.subscription-quota")}
+        icon={<Clock />}
+        path={"/subscription/quota"}
       />
       <MenuItem
         title={t("admin.payment")}

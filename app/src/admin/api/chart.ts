@@ -364,6 +364,17 @@ export async function releaseUsageOperation(
   }
 }
 
+export async function releaseAllUsageOperation(
+  type: ReleaseUsageType,
+): Promise<CommonResponse> {
+  try {
+    const response = await axios.post("/admin/user/release", { all: true, type });
+    return response.data as CommonResponse;
+  } catch (e) {
+    return { status: false, message: getErrorMessage(e) };
+  }
+}
+
 export type BatchUserAction = "ban" | "unban" | "add_quota";
 
 export async function batchUserOperation(

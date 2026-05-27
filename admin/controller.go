@@ -82,8 +82,9 @@ type SubscriptionLevelForm struct {
 }
 
 type ReleaseUsageForm struct {
-	Id   int64  `json:"id" binding:"required"`
+	Id   int64  `json:"id"`
 	Type string `json:"type"`
+	All  bool   `json:"all"`
 }
 
 type UpdateRootPasswordForm struct {
@@ -685,6 +686,31 @@ func ReleaseUsageAPI(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  false,
 			"message": err.Error(),
+		})
+		return
+	}
+
+	if form.All {
+		count, err := releaseUsageForSubscribedUsers(db, cache, form.Type)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"status":  false,
+				"message": err.Error(),
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"status": true,
+			"count":  count,
+		})
+		return
+	}
+
+	if form.Id <= 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": "invalid user id",
 		})
 		return
 	}

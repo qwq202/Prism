@@ -176,6 +176,82 @@ func TestGetUsersFormIncludesSubscriptionWindowUsage(t *testing.T) {
 	}
 }
 
+func TestReleaseUsageForSubscribedUsersResetsPointWindows(t *testing.T) {
+	db := openAdminUserTestDB(t)
+	_, cache := openAdminUserTestCache(t)
+
+	previousPlanInstance := channel.PlanInstance
+	channel.PlanInstance = &channel.PlanManager{
+		Enabled: true,
+		Plans: []channel.Plan{
+			{
+				Level:         1,
+				Quota:         20,
+				ResetInterval: int64((5 * time.Hour).Seconds()),
+				WeeklyQuota:   100,
+				Items:         []channel.PlanItem{},
+			},
+		},
+	}
+	t.Cleanup(func() {
+		channel.PlanInstance = previousPlanInstance
+	})
+
+	userIDs := make([]int64, 0, 2)
+	for _, username := range []string{"alice", "bob"} {
+		if err := createUser(db, username, username+"@example.com", "secret123"); err != nil {
+			t.Fatalf("create user %s: %v", username, err)
+		}
+		var id int64
+		if err := globals.QueryRowDb(db, "SELECT id FROM auth WHERE username = ?", username).Scan(&id); err != nil {
+			t.Fatalf("fetch %s id: %v", username, err)
+		}
+		if _, err := globals.ExecDb(db, `
+			INSERT INTO subscription (user_id, level, expired_at) VALUES (?, ?, ?)
+		`, id, 1, time.Now().Add(24*time.Hour).Format("2006-01-02 15:04:05")); err != nil {
+			t.Fatalf("insert subscription for %s: %v", username, err)
+		}
+		userIDs = append(userIDs, id)
+	}
+
+	plan := channel.PlanInstance.GetPlan(1)
+	for _, id := range userIDs {
+		if !plan.ConsumePointPool(&AuthLike{ID: id}, cache, "gpt-5.1", 4) {
+			t.Fatalf("consume point pool for user %d", id)
+		}
+	}
+
+	count, err := releaseUsageForSubscribedUsers(db, cache, releaseUsageTypeHour)
+	if err != nil {
+		t.Fatalf("release hourly usage for subscribed users: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("expected to reset 2 hourly windows, got %d", count)
+	}
+	for _, id := range userIDs {
+		user := &AuthLike{ID: id}
+		if got := plan.GetPointUsage(user, cache); got != 0 {
+			t.Fatalf("expected hourly usage reset for user %d, got %f", id, got)
+		}
+		if got := plan.GetWeeklyPointUsage(user, cache); got != 4 {
+			t.Fatalf("expected weekly usage preserved for user %d, got %f", id, got)
+		}
+	}
+
+	count, err = releaseUsageForSubscribedUsers(db, cache, releaseUsageTypeWeek)
+	if err != nil {
+		t.Fatalf("release weekly usage for subscribed users: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("expected to reset 2 weekly windows, got %d", count)
+	}
+	for _, id := range userIDs {
+		if got := plan.GetWeeklyPointUsage(&AuthLike{ID: id}, cache); got != 0 {
+			t.Fatalf("expected weekly usage reset for user %d, got %f", id, got)
+		}
+	}
+}
+
 func TestCreateUserRejectsDuplicateUsername(t *testing.T) {
 	db := openAdminUserTestDB(t)
 

@@ -49,6 +49,9 @@ const adminBroadcastRoute = lazyFactor(
 const adminSubscriptionRoute = lazyFactor(
   () => import("@/routes/admin/Subscription.tsx"),
 );
+const adminSubscriptionQuotaRoute = lazyFactor(
+  () => import("@/routes/admin/SubscriptionQuota.tsx"),
+);
 const adminAttachmentRoute = lazyFactor(
   () => import("@/routes/admin/Attachment.tsx"),
 );
@@ -210,6 +213,14 @@ const router = createBrowserRouter([
             path: "subscription",
             element: withSuspense(
               adminSubscriptionRoute,
+              <AdminContentSkeleton />,
+            ),
+          },
+          {
+            id: "admin-subscription-quota",
+            path: "subscription/quota",
+            element: withSuspense(
+              adminSubscriptionQuotaRoute,
               <AdminContentSkeleton />,
             ),
           },

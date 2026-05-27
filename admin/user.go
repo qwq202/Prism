@@ -678,6 +678,10 @@ const (
 )
 
 func releaseUsage(db *sql.DB, cache *redis.Client, id int64, usageType string) error {
+	if channel.PlanInstance == nil {
+		return fmt.Errorf("subscription plan is not configured")
+	}
+
 	var level sql.NullInt64
 	if err := globals.QueryRowDb(db, `
 		SELECT level FROM subscription WHERE user_id = ?
@@ -692,17 +696,25 @@ func releaseUsage(db *sql.DB, cache *redis.Client, id int64, usageType string) e
 	u := &AuthLike{ID: id}
 
 	plan := channel.PlanInstance.GetPlan(int(level.Int64))
+	return releasePlanUsage(plan, u, cache, usageType)
+}
+
+func releasePlanUsage(plan channel.Plan, user *AuthLike, cache *redis.Client, usageType string) error {
+	if plan.Level <= 0 {
+		return fmt.Errorf("invalid subscription level")
+	}
+
 	switch usageType {
 	case "", releaseUsageTypeAll:
-		if !plan.ReleaseAll(u, cache) {
+		if !plan.ReleaseAll(user, cache) {
 			return fmt.Errorf("cannot reset subscription usage")
 		}
 	case releaseUsageTypeHour:
-		if !plan.ReleasePointPool(u, cache) {
+		if !plan.ReleasePointPool(user, cache) {
 			return fmt.Errorf("cannot reset hourly subscription usage")
 		}
 	case releaseUsageTypeWeek:
-		if !plan.ReleaseWeeklyPool(u, cache) {
+		if !plan.ReleaseWeeklyPool(user, cache) {
 			return fmt.Errorf("cannot reset weekly subscription usage")
 		}
 	default:
@@ -710,6 +722,70 @@ func releaseUsage(db *sql.DB, cache *redis.Client, id int64, usageType string) e
 	}
 
 	return nil
+}
+
+func planHasReleaseUsageType(plan channel.Plan, usageType string) bool {
+	switch usageType {
+	case "", releaseUsageTypeAll:
+		return plan.HasPointPool() || plan.HasWeeklyPool() || len(plan.Items) > 0
+	case releaseUsageTypeHour:
+		return plan.HasPointPool()
+	case releaseUsageTypeWeek:
+		return plan.HasWeeklyPool()
+	default:
+		return false
+	}
+}
+
+func isReleaseUsageTypeValid(usageType string) bool {
+	switch usageType {
+	case "", releaseUsageTypeAll, releaseUsageTypeHour, releaseUsageTypeWeek:
+		return true
+	default:
+		return false
+	}
+}
+
+func releaseUsageForSubscribedUsers(db *sql.DB, cache *redis.Client, usageType string) (int64, error) {
+	if channel.PlanInstance == nil {
+		return 0, fmt.Errorf("subscription plan is not configured")
+	}
+	if !isReleaseUsageTypeValid(usageType) {
+		return 0, fmt.Errorf("invalid subscription usage reset type")
+	}
+
+	rows, err := globals.QueryDb(db, `
+		SELECT user_id, level FROM subscription
+		WHERE level > 0 AND expired_at > ?
+	`, time.Now().Format("2006-01-02 15:04:05"))
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	var count int64
+	for rows.Next() {
+		var userID int64
+		var level int64
+		if err := rows.Scan(&userID, &level); err != nil {
+			return count, err
+		}
+
+		plan := channel.PlanInstance.GetPlan(int(level))
+		if plan.Level <= 0 || !planHasReleaseUsageType(plan, usageType) {
+			continue
+		}
+
+		if err := releasePlanUsage(plan, &AuthLike{ID: userID}, cache, usageType); err != nil {
+			return count, err
+		}
+		count++
+	}
+	if err := rows.Err(); err != nil {
+		return count, err
+	}
+
+	return count, nil
 }
 
 func UpdateRootPassword(db *sql.DB, cache *redis.Client, password string) error {
