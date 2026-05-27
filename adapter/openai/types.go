@@ -25,6 +25,12 @@ type Message struct {
 	ReasoningContent *string               `json:"reasoning,omitempty"`     // only for claude reasoning models
 }
 
+type ResponseError struct {
+	Message string      `json:"message"`
+	Type    string      `json:"type,omitempty"`
+	Code    interface{} `json:"code,omitempty"`
+}
+
 // ChatRequest is the request body for openai
 type ChatRequest struct {
 	Model               string                 `json:"model"`
@@ -49,14 +55,14 @@ type CompletionRequest struct {
 }
 
 type ResponseMessage struct {
-	Role                string                `json:"role"`
-	Content             string                `json:"content"`
-	Name                *string               `json:"name,omitempty"`
-	FunctionCall        *globals.FunctionCall `json:"function_call,omitempty"`
-	ToolCallId          *string               `json:"tool_call_id,omitempty"`
-	ToolCalls           *globals.ToolCalls    `json:"tool_calls,omitempty"`
-	ReasoningContent    *string               `json:"reasoning_content,omitempty"`
-	Reasoning           *string               `json:"reasoning,omitempty"`
+	Role             string                `json:"role"`
+	Content          string                `json:"content"`
+	Name             *string               `json:"name,omitempty"`
+	FunctionCall     *globals.FunctionCall `json:"function_call,omitempty"`
+	ToolCallId       *string               `json:"tool_call_id,omitempty"`
+	ToolCalls        *globals.ToolCalls    `json:"tool_calls,omitempty"`
+	ReasoningContent *string               `json:"reasoning_content,omitempty"`
+	Reasoning        *string               `json:"reasoning,omitempty"`
 }
 
 // ChatResponse is the native http request body for openai
@@ -70,9 +76,7 @@ type ChatResponse struct {
 		Message      ResponseMessage `json:"message"`
 		FinishReason string          `json:"finish_reason"`
 	} `json:"choices"`
-	Error struct {
-		Message string `json:"message"`
-	} `json:"error"`
+	Error ResponseError `json:"error"`
 }
 
 // ChatStreamResponse is the stream response body for openai
@@ -86,6 +90,7 @@ type ChatStreamResponse struct {
 		Index        int             `json:"index"`
 		FinishReason string          `json:"finish_reason"`
 	} `json:"choices"`
+	Error ResponseError `json:"error"`
 }
 
 // CompletionResponse is the native http request body / stream response body for openai completion
@@ -101,10 +106,7 @@ type CompletionResponse struct {
 }
 
 type ChatStreamErrorResponse struct {
-	Error struct {
-		Message string `json:"message"`
-		Type    string `json:"type"`
-	} `json:"error"`
+	Error ResponseError `json:"error"`
 }
 
 type ImageSize string
@@ -122,9 +124,7 @@ type ImageResponse struct {
 		Url     string `json:"url,omitempty"`
 		B64Json string `json:"b64_json,omitempty"`
 	} `json:"data"`
-	Error struct {
-		Message string `json:"message"`
-	} `json:"error"`
+	Error ResponseError `json:"error"`
 }
 
 var (

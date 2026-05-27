@@ -4,6 +4,7 @@ import (
 	adaptercommon "chat/adapter/common"
 	"chat/globals"
 	"chat/utils"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -16,7 +17,7 @@ type ImageProps struct {
 }
 
 func (c *ChatInstance) GetImageEndpoint() string {
-	return fmt.Sprintf("%s/v1/images/generations", c.GetEndpoint())
+	return c.GetAPIEndpoint("images/generations")
 }
 
 // CreateImageRequest will create a dalle image from prompt, return url of image, base64 data and error
@@ -39,9 +40,9 @@ func (c *ChatInstance) CreateImageRequest(props ImageProps) (string, string, err
 
 	data := utils.MapToStruct[ImageResponse](res)
 	if data == nil {
-		return "", "", fmt.Errorf("openai error: cannot parse response")
-	} else if data.Error.Message != "" {
-		return "", "", fmt.Errorf("%s", data.Error.Message)
+		return "", "", fmt.Errorf("%s error: cannot parse response", c.GetErrorPrefix())
+	} else if hasResponseError(data.Error) {
+		return "", "", errors.New(formatResponseError(c.GetErrorPrefix(), data.Error))
 	}
 
 	// for gpt-image-1, return base64 data if available

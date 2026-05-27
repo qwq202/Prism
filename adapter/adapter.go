@@ -17,6 +17,7 @@ import (
 
 var channelFactories = map[string]adaptercommon.FactoryCreator{
 	globals.OpenAIChannelType:                        openai.NewChatInstanceFromConfig,
+	globals.OpenRouterChannelType:                    openai.NewOpenRouterChatInstanceFromConfig,
 	globals.OpenAIResponsesChannelType:               openairesponses.NewChatInstanceFromConfig,
 	globals.XAIChannelType:                           xai.NewChatInstanceFromConfig,
 	globals.AzureOpenAIChannelType:                   azure.NewChatInstanceFromConfig,

@@ -53,6 +53,7 @@ export type ChannelInfo = {
 
 export const ChannelTypes: Record<string, string> = {
   openai: "OpenAI",
+  openrouter: "OpenRouter",
   "openai-responses": "OpenAI Responses",
   xai: "xAI Grok",
   azure: "Azure OpenAI",
@@ -67,6 +68,7 @@ export const ChannelTypes: Record<string, string> = {
 
 export const ShortChannelTypes: Record<string, string> = {
   openai: "OpenAI",
+  openrouter: "OpenRouter",
   "openai-responses": "OpenAI Responses",
   xai: "xAI",
   azure: "Azure",
@@ -106,6 +108,24 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "dall-e-2",
       "dall-e-3",
     ],
+  },
+  openrouter: {
+    endpoint: "https://openrouter.ai/api/v1",
+    format: "<openrouter-api-key>",
+    models: [
+      "~openai/gpt-latest",
+      "openai/gpt-4o",
+      "openai/gpt-4o-mini",
+      "anthropic/claude-sonnet-4.5",
+      "anthropic/claude-haiku-4.5",
+      "google/gemini-2.5-pro",
+      "google/gemini-2.5-flash",
+      "deepseek/deepseek-chat-v3.1",
+    ],
+    description:
+      "> OpenRouter 渠道基于 **OpenAI Chat Completions API** 兼容格式，接入点填写 *https://openrouter.ai/api/v1* 或其反代地址，系统会请求 *`/chat/completions`*。 \n" +
+      "> 密钥填写 OpenRouter API Key，系统会按 **Authorization: Bearer** 鉴权，并附加 **X-OpenRouter-Title: Prism** 用于应用归因。 \n" +
+      "> 模型名使用 OpenRouter 官方模型 slug，例如 **openai/gpt-4o**、**anthropic/claude-sonnet-4.5**、**google/gemini-2.5-flash**，也可以从 OpenRouter 模型列表复制后手动添加。\n",
   },
   "openai-responses": {
     endpoint: "https://api.openai.com",

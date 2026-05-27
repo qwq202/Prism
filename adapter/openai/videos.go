@@ -36,11 +36,11 @@ type VideoJob struct {
 }
 
 func (c *ChatInstance) getVideoCreateEndpoint() string {
-	return fmt.Sprintf("%s/v1/videos", c.GetEndpoint())
+	return c.GetAPIEndpoint("videos")
 }
 
 func (c *ChatInstance) getVideoQueryEndpoint(id string) string {
-	return fmt.Sprintf("%s/v1/videos/%s", c.GetEndpoint(), id)
+	return c.GetAPIEndpoint(fmt.Sprintf("videos/%s", id))
 }
 
 func (c *ChatInstance) CreateVideoRequest(props *adaptercommon.VideoProps, hook globals.Hook) error {

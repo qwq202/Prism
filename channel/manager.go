@@ -280,6 +280,7 @@ func validateChannelType(channel *Channel) error {
 func isKnownChannelType(channelType string) bool {
 	switch channelType {
 	case globals.OpenAIChannelType,
+		globals.OpenRouterChannelType,
 		globals.OpenAIResponsesChannelType,
 		globals.XAIChannelType,
 		globals.AzureOpenAIChannelType,

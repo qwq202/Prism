@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 )
 
 func formatMessages(props *adaptercommon.ChatProps) interface{} {
@@ -71,6 +72,23 @@ func processCompletionResponse(data string) *CompletionResponse {
 
 func processChatErrorResponse(data string) *ChatStreamErrorResponse {
 	return utils.UnmarshalForm[ChatStreamErrorResponse](data)
+}
+
+func hasResponseError(responseError ResponseError) bool {
+	return strings.TrimSpace(responseError.Message) != "" ||
+		strings.TrimSpace(responseError.Type) != "" ||
+		responseError.Code != nil
+}
+
+func formatResponseError(prefix string, responseError ResponseError) string {
+	message := strings.TrimSpace(responseError.Message)
+	if message == "" {
+		message = "request failed"
+	}
+	if responseType := strings.TrimSpace(responseError.Type); responseType != "" {
+		message = fmt.Sprintf("%s (type: %s)", message, responseType)
+	}
+	return fmt.Sprintf("%s error: %s", prefix, message)
 }
 
 func getReasoningText(message ResponseMessage) *string {
@@ -163,6 +181,8 @@ func getRobustnessResult(chunk string) string {
 }
 
 func (c *ChatInstance) ProcessLine(data string, isCompletionType bool) (*globals.Chunk, error) {
+	errorPrefix := c.GetErrorPrefix()
+
 	if isCompletionType {
 		// openai legacy support
 		if completion := processCompletionResponse(data); completion != nil {
@@ -171,18 +191,21 @@ func (c *ChatInstance) ProcessLine(data string, isCompletionType bool) (*globals
 			}, nil
 		}
 
-		globals.Warn(fmt.Sprintf("openai error: cannot parse completion response: %s", data))
+		globals.Warn(fmt.Sprintf("%s error: cannot parse completion response: %s", errorPrefix, data))
 		return &globals.Chunk{Content: ""}, errors.New("parser error: cannot parse completion response")
 	}
 
 	if form := processChatResponse(data); form != nil {
+		if hasResponseError(form.Error) {
+			return &globals.Chunk{Content: ""}, errors.New(formatResponseError(errorPrefix, form.Error))
+		}
 		return c.getChoices(form), nil
 	}
 
 	if form := processChatErrorResponse(data); form != nil {
-		return &globals.Chunk{Content: ""}, errors.New(fmt.Sprintf("openai error: %s (type: %s)", form.Error.Message, form.Error.Type))
+		return &globals.Chunk{Content: ""}, errors.New(formatResponseError(errorPrefix, form.Error))
 	}
 
-	globals.Warn(fmt.Sprintf("openai error: cannot parse chat completion response: %s", data))
+	globals.Warn(fmt.Sprintf("%s error: cannot parse chat completion response: %s", errorPrefix, data))
 	return &globals.Chunk{Content: ""}, errors.New("parser error: cannot parse chat completion response")
 }

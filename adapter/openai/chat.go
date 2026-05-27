@@ -12,9 +12,9 @@ import (
 
 func (c *ChatInstance) GetChatEndpoint(props *adaptercommon.ChatProps) string {
 	if props.Model == globals.GPT3TurboInstruct {
-		return fmt.Sprintf("%s/v1/completions", c.GetEndpoint())
+		return c.GetAPIEndpoint("completions")
 	}
-	return fmt.Sprintf("%s/v1/chat/completions", c.GetEndpoint())
+	return c.GetAPIEndpoint("chat/completions")
 }
 
 func (c *ChatInstance) GetCompletionPrompt(messages []globals.Message) string {
@@ -91,17 +91,17 @@ func (c *ChatInstance) CreateChatRequest(props *adaptercommon.ChatProps) (string
 	)
 
 	if err != nil || res == nil {
-		return "", fmt.Errorf("openai error: %s", err.Error())
+		return "", fmt.Errorf("%s error: %s", c.GetErrorPrefix(), err.Error())
 	}
 
 	data := utils.MapToStruct[ChatResponse](res)
 	if data == nil {
-		return "", fmt.Errorf("openai error: cannot parse response")
-	} else if data.Error.Message != "" {
-		return "", fmt.Errorf("openai error: %s", data.Error.Message)
+		return "", fmt.Errorf("%s error: cannot parse response", c.GetErrorPrefix())
+	} else if hasResponseError(data.Error) {
+		return "", errors.New(formatResponseError(c.GetErrorPrefix(), data.Error))
 	}
 	if len(data.Choices) == 0 {
-		return "", fmt.Errorf("openai error: no choices")
+		return "", fmt.Errorf("%s error: no choices", c.GetErrorPrefix())
 	}
 	return formatReasoningContent(
 		getReasoningText(data.Choices[0].Message),
