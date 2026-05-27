@@ -1693,11 +1693,13 @@ export function useConversationActions() {
       }
 
       const resp = await fetchConversationList();
-      dispatch(
-        resp.fromCache
-          ? setHistory(resp.conversations)
-          : setRemoteHistory(resp.conversations),
-      );
+      if (!resp.fromCache || resp.conversations.length > 0) {
+        dispatch(
+          resp.fromCache
+            ? setHistory(resp.conversations)
+            : setRemoteHistory(resp.conversations),
+        );
+      }
 
       const activeConversation = getNumberMemory("history_conversation", current);
       if (!resp.fromCache && activeConversation !== -1) {
@@ -1728,11 +1730,13 @@ export function useConversationActions() {
       }
 
       const resp = await fetchConversationList();
-      dispatch(
-        resp.fromCache
-          ? setHistory(resp.conversations)
-          : setRemoteHistory(resp.conversations),
-      );
+      if (!resp.fromCache || resp.conversations.length > 0) {
+        dispatch(
+          resp.fromCache
+            ? setHistory(resp.conversations)
+            : setRemoteHistory(resp.conversations),
+        );
+      }
 
       if (
         stored !== -1 &&

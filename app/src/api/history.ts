@@ -41,17 +41,21 @@ export async function fetchConversationList(): Promise<ConversationListResult> {
       headers: noCacheHeaders,
       params: { _: Date.now() },
     });
-    const conversations = (
-      resp.data.status ? resp.data.data || [] : []
-    ) as ConversationInstance[];
-    if (resp.data.status) {
-      void setCachedConversationList(
-        conversations.filter((item) => item.id !== -1),
-      );
+    if (!resp.data.status) {
+      throw new Error(resp.data.message || "failed to fetch conversations");
     }
+
+    const conversations = resp.data.data;
+    if (!Array.isArray(conversations)) {
+      throw new Error("invalid conversation list response");
+    }
+
+    void setCachedConversationList(
+      conversations.filter((item) => item.id !== -1),
+    );
     return { conversations, fromCache: false };
   } catch (e) {
-    console.warn(e);
+    console.warn("[conversation] failed to refresh list:", getErrorMessage(e));
     return {
       conversations: (await getCachedConversationList()) ?? [],
       fromCache: true,
@@ -63,6 +67,8 @@ export async function updateConversationList(
   dispatch: AppDispatch,
 ): Promise<void> {
   const resp = await fetchConversationList();
+  if (resp.fromCache && resp.conversations.length === 0) return;
+
   dispatch(
     resp.fromCache
       ? setHistory(resp.conversations)
