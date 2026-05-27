@@ -1563,6 +1563,12 @@ export function useConversationActions() {
 
     if (restored) {
       dispatch(setCurrent(id));
+      if (refreshRemote) {
+        void refreshConversationDetail(id, {
+          activate: false,
+        });
+      }
+      return;
     }
 
     if (!refreshRemote) return;
