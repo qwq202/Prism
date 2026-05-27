@@ -87,7 +87,7 @@ function MenuBar() {
       <MenuItem
         title={t("admin.subscription-quota")}
         icon={<Clock />}
-        path={"/subscription/quota"}
+        path={"/quota"}
       />
       <MenuItem
         title={t("admin.payment")}

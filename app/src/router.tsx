@@ -217,8 +217,8 @@ const router = createBrowserRouter([
             ),
           },
           {
-            id: "admin-subscription-quota",
-            path: "subscription/quota",
+            id: "admin-quota",
+            path: "quota",
             element: withSuspense(
               adminSubscriptionQuotaRoute,
               <AdminContentSkeleton />,
