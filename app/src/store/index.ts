@@ -90,15 +90,17 @@ store.subscribe(() => {
 
 type RootState = ReturnType<typeof store.getState>;
 type AppDispatch = typeof store.dispatch;
+type CronJobFactory = () => unknown;
 
 export function createCronJob(
   dispatch: AppDispatch,
-  method: () => Parameters<AppDispatch>[0],
+  method: CronJobFactory,
   interval: number,
   runWhenInit?: boolean,
 ) {
-  if (runWhenInit) dispatch(method());
-  return setInterval(() => dispatch(method()), interval * 1000);
+  const run = () => dispatch(method() as Parameters<AppDispatch>[0]);
+  if (runWhenInit) run();
+  return setInterval(run, interval * 1000);
 }
 
 export function clearCronJob(job: ReturnType<typeof setInterval>) {

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { BarChart4, LineChartIcon, Loader2 } from "lucide-react";
 import Tips from "@/components/Tips.tsx";
-import { AreaChart, BarChart } from "@tremor/react";
+import { AreaChart, BarChart } from "./recharts.tsx";
 import { getReadableNumber } from "@/utils/processor.ts";
 import { getModelColor } from "@/admin/colors.ts";
 import { Button } from "@/components/ui/button.tsx";
@@ -73,7 +73,6 @@ function ModelChart({ labels, datasets }: ModelChartProps) {
           categories={categories}
           colors={colors}
           valueFormatter={(value) => getReadableNumber(value, 1, true)}
-          showLegend={false}
         />
       ) : (
         <AreaChart
@@ -84,7 +83,6 @@ function ModelChart({ labels, datasets }: ModelChartProps) {
           categories={categories}
           colors={colors}
           valueFormatter={(value) => getReadableNumber(value, 1, true)}
-          showLegend={false}
         />
       )}
     </div>

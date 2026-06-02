@@ -137,7 +137,7 @@ function ChatWrapper() {
   const current = useSelector(selectCurrent);
   const auth = useSelector(selectAuthenticated);
   const model = useSelector(selectModel);
-  const target = useRef(null);
+  const target = useRef<HTMLTextAreaElement>(null);
   const align = useSelector(alignSelector);
 
   const working = useWorking();

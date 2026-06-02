@@ -2,9 +2,9 @@ import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { BarList, DonutChart } from "@tremor/react";
-import type { BarListProps } from "@tremor/react";
 import { getModelColor } from "@/admin/colors.ts";
+import { DonutChart } from "@/components/admin/assemblies/recharts.tsx";
+import { resolveChartColor } from "@/components/admin/assemblies/chart-colors.ts";
 import { cn } from "@/components/ui/lib/utils.ts";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { infoTimeZoneSelector } from "@/store/info.ts";
@@ -26,9 +26,6 @@ import {
   PieChart,
   Zap,
 } from "lucide-react";
-
-type ModelUsage = { name: string; value: number; count: number };
-type ModelUsageBar = ModelUsage & { color: string };
 
 function formatQuotaValue(value: number): string {
   return Number.isFinite(value)
@@ -159,6 +156,10 @@ export default function WalletStats() {
       })),
     [modelUsage],
   );
+  const maxBarValue = useMemo(
+    () => Math.max(...barListData.map((item) => item.value), 1),
+    [barListData],
+  );
 
   const hasModelData = modelUsage.length > 0;
 
@@ -223,25 +224,37 @@ export default function WalletStats() {
             <div className="flex justify-center sm:w-52 shrink-0">
               <DonutChart
                 className="w-44 h-44"
-                variant="donut"
                 data={modelUsage}
-                showAnimation
-                showLabel={false}
-                showTooltip
                 valueFormatter={(v: number) => formatQuotaValue(v)}
                 colors={donutColors}
               />
             </div>
 
             <div className="flex-1 min-w-0">
-              <BarList
-                data={
-                  barListData as unknown as BarListProps<ModelUsageBar>["data"]
-                }
-                valueFormatter={(v: number) => formatQuotaValue(v)}
-                showAnimation
-                className="text-sm"
-              />
+              <div className="space-y-2.5 text-sm">
+                {barListData.map((item) => (
+                  <div
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3"
+                    key={item.name}
+                  >
+                    <div className="relative h-8 min-w-0 overflow-hidden rounded-md bg-muted">
+                      <div
+                        className="absolute inset-y-0 left-0 rounded-md opacity-35"
+                        style={{
+                          width: `${Math.max((item.value / maxBarValue) * 100, 2)}%`,
+                          backgroundColor: resolveChartColor(item.color),
+                        }}
+                      />
+                      <span className="relative z-[1] flex h-full min-w-0 items-center truncate px-2 text-foreground">
+                        {item.name}
+                      </span>
+                    </div>
+                    <span className="shrink-0 tabular-nums text-muted-foreground">
+                      {formatQuotaValue(item.value)}
+                    </span>
+                  </div>
+                ))}
+              </div>
               {modelUsage.length > 8 && (
                 <p className="text-xs text-muted-foreground mt-2 text-right">
                   {t("bar.wallet-more-models", {

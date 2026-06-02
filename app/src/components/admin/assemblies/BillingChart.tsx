@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useMemo } from "react";
 import { Loader2 } from "lucide-react";
-import { AreaChart } from "@tremor/react";
+import { AreaChart } from "./recharts.tsx";
 import { useCurrency } from "@/store/info";
 
 type BillingChartProps = {
@@ -46,7 +46,6 @@ function BillingChart({ labels, datasets }: BillingChartProps) {
         categories={[billingLabel]}
         index={"date"}
         colors={["orange"]}
-        showAnimation={true}
         valueFormatter={(value) => `${symbol}${value.toFixed(2)}`}
       />
     </div>

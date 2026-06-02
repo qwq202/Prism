@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
-import { BarChart } from "@tremor/react";
+import { BarChart } from "./recharts.tsx";
 import { ChannelStat } from "@/admin/api/channel.ts";
 import { Channel } from "@/admin/channel.ts";
 import { getReadableNumber } from "@/utils/processor.ts";
@@ -58,7 +58,6 @@ function ChannelHealthChart({ stats, channels }: ChannelHealthChartProps) {
           index={"name"}
           colors={["blue", "red"]}
           layout={"vertical"}
-          showAnimation={true}
           valueFormatter={(v) => getReadableNumber(v, 1)}
         />
       )}

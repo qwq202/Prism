@@ -18,6 +18,7 @@ type RehypePlugin = NonNullable<
 >[number];
 
 const rehypeRawPlugin = rehypeRaw as unknown as RehypePlugin;
+const rehypeKatexPlugin = rehypeKatex as unknown as RehypePlugin;
 
 type HastNode = {
   type?: string;
@@ -112,7 +113,7 @@ function MarkdownContent({
   const rehypePlugins = useMemo(() => {
     const plugins: NonNullable<
       React.ComponentProps<typeof ReactMarkdown>["rehypePlugins"]
-    > = [rehypeKatex, markdownHtmlBreakPlugin];
+    > = [rehypeKatexPlugin, markdownHtmlBreakPlugin];
     return acceptHtml ? [...plugins, rehypeRawPlugin] : plugins;
   }, [acceptHtml]);
 

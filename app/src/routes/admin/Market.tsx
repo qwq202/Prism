@@ -67,8 +67,8 @@ import {
   type DraggableProvidedDragHandleProps,
   type DraggableProvidedDraggableProps,
   Droppable,
-  DropResult,
-} from "react-beautiful-dnd";
+  type DropResult,
+} from "@hello-pangea/dnd";
 import { Label } from "@/components/ui/label.tsx";
 import { uploadResource } from "@/admin/api/system.ts";
 import { withNotify } from "@/api/common.ts";
@@ -1477,6 +1477,7 @@ function Market() {
                       {t("admin.empty")}
                     </p>
                   )}
+                  {provided.placeholder}
                 </div>
               )}
             </Droppable>

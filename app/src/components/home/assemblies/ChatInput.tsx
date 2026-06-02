@@ -11,7 +11,7 @@ import { useMobile } from "@/utils/device.ts";
 
 type ChatInputProps = {
   className?: string;
-  target?: React.RefObject<HTMLTextAreaElement>;
+  target?: React.RefObject<HTMLTextAreaElement | null>;
   value: string;
   onValueChange: (value: string) => void;
   onEnterPressed: () => void;

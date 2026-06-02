@@ -48,7 +48,7 @@ type WindowWithSpeechRecognition = Window &
 type VoiceActionProps = {
   value: string;
   onValueChange: (value: string) => void;
-  target?: React.RefObject<HTMLTextAreaElement>;
+  target?: React.RefObject<HTMLTextAreaElement | null>;
 };
 
 function getSpeechRecognitionConstructor() {

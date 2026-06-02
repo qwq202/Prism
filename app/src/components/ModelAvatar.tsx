@@ -128,9 +128,12 @@ const builtinAvatars: Record<string, AvatarComponent> = {
   mimo: XiaomiAvatar,
 };
 
-function getAvatarType(id: string): OpenAIAvatarType {
+function getAvatarType(id: string): OpenAIAvatarType | undefined {
   if (id.includes("gpt-3.5")) return "gpt3";
-  if (id.includes("gpt-4") || id.includes("o1")) return "gpt4";
+  if (id.includes("gpt-4")) return "gpt4";
+  if (id.includes("gpt-5")) return "gpt4";
+  if (id.includes("o1")) return "o1";
+  if (id.includes("o3")) return "o3";
 }
 
 function ModelAvatar({ model, className, size }: ModelAvatarProps) {

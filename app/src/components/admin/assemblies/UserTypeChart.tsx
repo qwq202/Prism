@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Filter, Loader2 } from "lucide-react";
 import { UserTypeChartResponse } from "@/admin/types.ts";
 import Tips from "@/components/Tips.tsx";
-import { DonutChart, Legend } from "@tremor/react";
+import { ChartLegend, DonutChart } from "./recharts.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { MultiCombobox } from "@/components/ui/multi-combobox.tsx";
 
@@ -70,6 +70,8 @@ function UserTypeChart({ data }: UserTypeChartProps) {
     ].filter((item) => item) as UserStatus[];
   }, [display, data, identityLabels]);
 
+  const colors = ["blue", "cyan", "indigo", "violet", "fuchsia"];
+
   return (
     <div className={`chart`}>
       <div className={`chart-title mb-2`}>
@@ -108,15 +110,13 @@ function UserTypeChart({ data }: UserTypeChartProps) {
       <div className={`flex flex-row`}>
         <DonutChart
           className={`common-chart p-4 w-[50%]`}
-          variant={`donut`}
           data={chart}
-          showAnimation={true}
-          colors={["blue", "cyan", "indigo", "violet", "fuchsia"]}
+          colors={colors}
         />
-        <Legend
+        <ChartLegend
           className={`common-chart p-4 w-[50%]`}
           categories={chart.map((item) => item.name)}
-          colors={["blue", "cyan", "indigo", "violet", "fuchsia"]}
+          colors={colors}
         />
       </div>
     </div>

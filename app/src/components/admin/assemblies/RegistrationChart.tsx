@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useMemo } from "react";
 import { Loader2 } from "lucide-react";
-import { BarChart } from "@tremor/react";
+import { BarChart } from "./recharts.tsx";
 import { getReadableNumber } from "@/utils/processor.ts";
 
 type RegistrationChartProps = {
@@ -39,7 +39,6 @@ function RegistrationChart({ labels, datasets }: RegistrationChartProps) {
         categories={[SERIES]}
         index={"date"}
         colors={["emerald"]}
-        showAnimation={true}
         valueFormatter={(v) => getReadableNumber(v, 1)}
       />
     </div>

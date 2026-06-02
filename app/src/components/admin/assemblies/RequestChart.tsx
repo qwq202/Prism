@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useMemo } from "react";
 import { Loader2 } from "lucide-react";
-import { AreaChart } from "@tremor/react";
+import { AreaChart } from "./recharts.tsx";
 import { getReadableNumber } from "@/utils/processor.ts";
 
 type RequestChartProps = {
@@ -43,7 +43,6 @@ function RequestChart({ labels, datasets }: RequestChartProps) {
         categories={[requestsLabel]}
         index={"date"}
         colors={["blue"]}
-        showAnimation={true}
         valueFormatter={(value) => getReadableNumber(value, 1)}
       />
     </div>

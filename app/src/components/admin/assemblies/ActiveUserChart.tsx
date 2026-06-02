@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useMemo } from "react";
 import { Loader2 } from "lucide-react";
-import { AreaChart } from "@tremor/react";
+import { AreaChart } from "./recharts.tsx";
 import { getReadableNumber } from "@/utils/processor.ts";
 
 type ActiveUserChartProps = {
@@ -39,7 +39,6 @@ function ActiveUserChart({ labels, datasets }: ActiveUserChartProps) {
         categories={[SERIES]}
         index={"date"}
         colors={["violet"]}
-        showAnimation={true}
         valueFormatter={(v) => getReadableNumber(v, 1)}
       />
     </div>

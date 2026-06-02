@@ -64,13 +64,13 @@ function Tips({
   const setDrop = onOpenChange ?? setInternalDrop;
   const [tooltip, setTooltip] = React.useState(false);
 
-  const task = useRef<NodeJS.Timeout>();
+  const task = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (notHide) return;
     drop
       ? (task.current = setTimeout(() => setDrop(false), timeout))
-      : clearTimeout(task.current);
+      : task.current && clearTimeout(task.current);
   }, [drop, notHide, setDrop, timeout]);
 
   useEffect(() => {
