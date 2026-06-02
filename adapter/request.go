@@ -28,8 +28,9 @@ func isDeepseekAdapterRequest(channelType string) bool {
 	return channelType == globals.DeepseekChannelType
 }
 
-func isXiaomiTokenPlanAdapterRequest(channelType string) bool {
-	return channelType == globals.XiaomiTokenPlanCNChannelType
+func isXiaomiMiMoAdapterRequest(channelType string) bool {
+	return channelType == globals.XiaomiMiMoChannelType ||
+		channelType == globals.XiaomiTokenPlanCNChannelType
 }
 
 func stripHiddenMetadata(messages []globals.Message, stripGemini bool, stripClaude bool) ([]globals.Message, bool) {
@@ -215,7 +216,7 @@ func sanitizeChatMessagesForRequest(conf globals.ChannelConfig, props *adapterco
 	stripGemini := !isGeminiAdapterRequest(conf.GetType(), reflectedModel)
 	stripClaude := !isAnthropicAdapterRequest(conf.GetType())
 	allowReasoningReplay := isAnthropicAdapterRequest(conf.GetType()) ||
-		isXiaomiTokenPlanAdapterRequest(conf.GetType()) ||
+		isXiaomiMiMoAdapterRequest(conf.GetType()) ||
 		(isDeepseekAdapterRequest(conf.GetType()) &&
 			globals.IsDeepseekReasoningReplayModel(reflectedModel) &&
 			!globals.IsDeepseekThinkingDisabled(props.Thinking))

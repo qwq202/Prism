@@ -57,7 +57,12 @@ func processChatResponse(data string) *ChatStreamResponse {
 }
 
 func processChatErrorResponse(data string) *ChatStreamErrorResponse {
-	return utils.UnmarshalForm[ChatStreamErrorResponse](data)
+	form := utils.UnmarshalForm[ChatStreamErrorResponse](data)
+	if form == nil || (form.Error.Message == "" && form.Error.Type == "") {
+		return nil
+	}
+
+	return form
 }
 
 func formatReasoningContent(reasoning *string, content string) string {
@@ -157,15 +162,15 @@ func (c *ChatInstance) getChoices(form *ChatStreamResponse) *globals.Chunk {
 }
 
 func (c *ChatInstance) ProcessLine(data string) (*globals.Chunk, error) {
+	if form := processChatErrorResponse(data); form != nil {
+		return &globals.Chunk{Content: ""}, errors.New(fmt.Sprintf("%s error: %s (type: %s)", c.GetErrorPrefix(), form.Error.Message, form.Error.Type))
+	}
+
 	if form := processChatResponse(data); form != nil {
 		return c.getChoices(form), nil
 	}
 
-	if form := processChatErrorResponse(data); form != nil {
-		return &globals.Chunk{Content: ""}, errors.New(fmt.Sprintf("xiaomi token plan error: %s (type: %s)", form.Error.Message, form.Error.Type))
-	}
-
-	globals.Warn(fmt.Sprintf("xiaomi token plan error: cannot parse chat completion response: %s", data))
+	globals.Warn(fmt.Sprintf("%s error: cannot parse chat completion response: %s", c.GetErrorPrefix(), data))
 	return &globals.Chunk{Content: ""}, errors.New("parser error: cannot parse chat completion response")
 }
 

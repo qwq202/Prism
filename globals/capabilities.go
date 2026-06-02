@@ -45,7 +45,7 @@ func CapabilitiesFor(channelType string, model string) ModelCapabilities {
 		applyOpenAIResponsesCapabilities(&capabilities, normalizedModel)
 	case XAIChannelType:
 		applyXAICapabilities(&capabilities, normalizedModel)
-	case XiaomiTokenPlanCNChannelType:
+	case XiaomiMiMoChannelType, XiaomiTokenPlanCNChannelType:
 		applyXiaomiTokenPlanCapabilities(&capabilities, normalizedModel)
 	}
 
@@ -74,6 +74,12 @@ func ProviderCapabilitiesFor(channelType string) ProviderCapabilities {
 			XSearch:         true,
 			Vision:          true,
 			Search:          true,
+		}
+	case XiaomiMiMoChannelType, XiaomiTokenPlanCNChannelType:
+		return ProviderCapabilities{
+			ChannelType: normalizedChannel,
+			Reasoning:   true,
+			Vision:      true,
 		}
 	default:
 		return ProviderCapabilities{ChannelType: normalizedChannel}

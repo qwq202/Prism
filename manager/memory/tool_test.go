@@ -32,6 +32,9 @@ func TestWritableToolChannelsIncludeXiaomiTokenPlan(t *testing.T) {
 	if _, ok := writableToolChannelTypes[globals.XiaomiTokenPlanCNChannelType]; !ok {
 		t.Fatalf("expected xiaomi token plan channel to allow tool definitions")
 	}
+	if _, ok := writableToolChannelTypes[globals.XiaomiMiMoChannelType]; !ok {
+		t.Fatalf("expected xiaomi mimo channel to allow tool definitions")
+	}
 }
 
 func TestToolCallChannelsIncludeFunctionToolCapableAdapters(t *testing.T) {
@@ -42,6 +45,7 @@ func TestToolCallChannelsIncludeFunctionToolCapableAdapters(t *testing.T) {
 		globals.ClaudeChannelType,
 		globals.GLMCodingPlanCNChannelType,
 		globals.MiniMaxTokenPlanCNChannelType,
+		globals.XiaomiMiMoChannelType,
 		globals.XiaomiTokenPlanCNChannelType,
 		globals.PalmChannelType,
 		globals.GeminiEnterpriseAgentPlatformChannelType,

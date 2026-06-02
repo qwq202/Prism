@@ -17,6 +17,7 @@ func TestValidateChannelTypeAllowsKnownTypes(t *testing.T) {
 		globals.ClaudeChannelType,
 		globals.GLMCodingPlanCNChannelType,
 		globals.MiniMaxTokenPlanCNChannelType,
+		globals.XiaomiMiMoChannelType,
 		globals.XiaomiTokenPlanCNChannelType,
 		globals.PalmChannelType,
 		globals.GeminiEnterpriseAgentPlatformChannelType,

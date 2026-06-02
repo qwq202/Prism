@@ -503,7 +503,7 @@ export function getOpenAIResponsesCapabilities(
 
   const channelType = (current.channel_type || "").toLowerCase();
   const normalized = model.trim().toLowerCase();
-  if (channelType === "xiaomi-token-plan-cn") {
+  if (channelType === "xiaomi-mimo" || channelType === "xiaomi-token-plan-cn") {
     return isXiaomiMiMoModel(normalized)
       ? {
           nativeWeb: false,

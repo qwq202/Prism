@@ -24,6 +24,7 @@ var channelFactories = map[string]adaptercommon.FactoryCreator{
 	globals.ClaudeChannelType:                        claude.NewChatInstanceFromConfig,
 	globals.GLMCodingPlanCNChannelType:               claude.NewChatInstanceFromConfig, // anthropic-compatible
 	globals.MiniMaxTokenPlanCNChannelType:            minimaxtokenplan.NewChatInstanceFromConfig,
+	globals.XiaomiMiMoChannelType:                    xiaomitokenplan.NewMiMoChatInstanceFromConfig,
 	globals.XiaomiTokenPlanCNChannelType:             xiaomitokenplan.NewChatInstanceFromConfig,
 	globals.PalmChannelType:                          palm2.NewChatInstanceFromConfig,
 	globals.GeminiEnterpriseAgentPlatformChannelType: palm2.NewVertexAIExpressChatInstanceFromConfig,

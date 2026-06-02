@@ -198,6 +198,19 @@ func TestCapabilitiesForXiaomiTokenPlanModels(t *testing.T) {
 	}
 }
 
+func TestCapabilitiesForXiaomiMiMoModels(t *testing.T) {
+	capabilities := CapabilitiesFor(XiaomiMiMoChannelType, "mimo-v2.5-pro")
+	if !reflect.DeepEqual(capabilities.ReasoningEfforts, []string{"none", "high"}) {
+		t.Fatalf("unexpected xiaomi mimo reasoning efforts: %#v", capabilities.ReasoningEfforts)
+	}
+	if !capabilities.ReasoningControl {
+		t.Fatalf("expected xiaomi mimo to expose thinking control")
+	}
+	if capabilities.SamplingRestriction != SamplingRestrictionWithReasoning {
+		t.Fatalf("expected xiaomi mimo sampling restriction with reasoning, got %q", capabilities.SamplingRestriction)
+	}
+}
+
 func TestReasoningEffortNormalizationUsesCapabilities(t *testing.T) {
 	capabilities := CapabilitiesFor(OpenAIResponsesChannelType, "gpt-5.2-pro")
 	if got := NormalizeReasoningEffort(capabilities, "XHIGH"); got != "xhigh" {

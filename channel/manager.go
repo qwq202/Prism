@@ -287,6 +287,7 @@ func isKnownChannelType(channelType string) bool {
 		globals.ClaudeChannelType,
 		globals.GLMCodingPlanCNChannelType,
 		globals.MiniMaxTokenPlanCNChannelType,
+		globals.XiaomiMiMoChannelType,
 		globals.XiaomiTokenPlanCNChannelType,
 		globals.PalmChannelType,
 		globals.GeminiEnterpriseAgentPlatformChannelType,

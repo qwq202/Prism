@@ -60,6 +60,7 @@ export const ChannelTypes: Record<string, string> = {
   claude: "Anthropic Claude",
   "glm-coding-plan-cn": "GLM Coding Plan（CN）",
   "minimax-token-plan-cn": "MiniMax Token Plan（CN）",
+  "xiaomi-mimo": "Xiaomi MiMo",
   "xiaomi-token-plan-cn": "Xiaomi Token Plan (China)",
   palm: "Google Gemini",
   "gemini-enterprise-agent-platform": "Gemini Enterprise Agent Platform",
@@ -75,6 +76,7 @@ export const ShortChannelTypes: Record<string, string> = {
   claude: "Claude",
   "glm-coding-plan-cn": "GLM Coding",
   "minimax-token-plan-cn": "MiniMax",
+  "xiaomi-mimo": "MiMo",
   "xiaomi-token-plan-cn": "Xiaomi TP",
   palm: "Gemini",
   "gemini-enterprise-agent-platform": "Gemini AP",
@@ -237,6 +239,16 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "MiniMax-M2.7",
       "MiniMax-M2.7-highspeed",
     ],
+  },
+  "xiaomi-mimo": {
+    endpoint: "https://api.xiaomimimo.com/v1",
+    format: "<mimo-api-key>",
+    description:
+      "> Xiaomi MiMo 渠道基于开放平台 **OpenAI Chat Completions API** 兼容格式，接入点默认填写 *https://api.xiaomimimo.com/v1*，系统会请求 *`/chat/completions`*。 \n" +
+      "> 密钥填写开放平台 API Key，系统会按官方 **api-key** 请求头鉴权。 \n" +
+      "> 系统已适配 **max_completion_tokens**、**thinking**、**reasoning_content**、函数调用与流式 Chat Completions 返回。 \n" +
+      "> 默认模型按官方模型列表保留 **mimo-v2.5-pro**、**mimo-v2.5**、**mimo-v2-flash**；**mimo-v2-pro** 和 **mimo-v2-omni** 已进入下线窗口，不再作为默认模型。\n",
+    models: ["mimo-v2.5-pro", "mimo-v2.5", "mimo-v2-flash"],
   },
   "xiaomi-token-plan-cn": {
     endpoint: "https://token-plan-cn.xiaomimimo.com/v1",

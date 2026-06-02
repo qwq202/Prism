@@ -389,6 +389,39 @@ func TestSanitizeChatMessagesForRequestKeepsReasoningReplayForXiaomiTokenPlan(t 
 	}
 }
 
+func TestSanitizeChatMessagesForRequestKeepsReasoningReplayForXiaomiMiMo(t *testing.T) {
+	props := &adaptercommon.ChatProps{
+		OriginalModel: "mimo-v2.5-pro",
+		Message: []globals.Message{
+			{
+				Role:             globals.Assistant,
+				Model:            "mimo-v2.5-pro",
+				Content:          "<think>\nplan\n</think>\n\nAnswer",
+				ReasoningContent: utils.ToPtr("plan"),
+			},
+			{Role: globals.User, Content: "继续"},
+		},
+	}
+
+	restore := sanitizeChatMessagesForRequest(requestTestChannelConfig{
+		channelType:    globals.XiaomiMiMoChannelType,
+		reflectedModel: "mimo-v2.5-pro",
+	}, props)
+
+	if props.Message[0].Content != "Answer" {
+		t.Fatalf("expected visible xiaomi mimo thinking replay to be stripped, got %q", props.Message[0].Content)
+	}
+
+	if props.Message[0].ReasoningContent == nil || *props.Message[0].ReasoningContent != "plan" {
+		t.Fatalf("expected xiaomi mimo reasoning replay to remain, got %#v", props.Message[0].ReasoningContent)
+	}
+
+	restore()
+	if props.Message[0].ReasoningContent == nil || *props.Message[0].ReasoningContent != "plan" {
+		t.Fatalf("expected reasoning replay to remain after restore, got %#v", props.Message[0].ReasoningContent)
+	}
+}
+
 func TestSanitizeChatMessagesForRequestStripsReasoningReplayForDeepseekV4NonThinking(t *testing.T) {
 	props := &adaptercommon.ChatProps{
 		OriginalModel: globals.DeepseekV4Flash,

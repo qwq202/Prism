@@ -26,6 +26,18 @@ func TestGetChatEndpointUsesTokenPlanBaseURL(t *testing.T) {
 	}
 }
 
+func TestGetChatEndpointUsesMiMoOpenPlatformBaseURL(t *testing.T) {
+	instance := NewMiMoChatInstance("", "sk-test")
+	if got := instance.GetChatEndpoint(); got != "https://api.xiaomimimo.com/v1/chat/completions" {
+		t.Fatalf("unexpected default MiMo endpoint: %s", got)
+	}
+
+	instance = NewMiMoChatInstance("https://api.xiaomimimo.com", "sk-test")
+	if got := instance.GetChatEndpoint(); got != "https://api.xiaomimimo.com/v1/chat/completions" {
+		t.Fatalf("unexpected bare MiMo endpoint: %s", got)
+	}
+}
+
 func TestGetHeaderUsesTokenPlanAPIKey(t *testing.T) {
 	headers := NewChatInstance("", "tp-test").GetHeader()
 	if got := headers["api-key"]; got != "tp-test" {
@@ -36,6 +48,16 @@ func TestGetHeaderUsesTokenPlanAPIKey(t *testing.T) {
 	}
 }
 
+func TestGetHeaderUsesMiMoAPIKey(t *testing.T) {
+	headers := NewMiMoChatInstance("", "sk-test").GetHeader()
+	if got := headers["api-key"]; got != "sk-test" {
+		t.Fatalf("expected api-key header, got %q", got)
+	}
+	if _, ok := headers["Authorization"]; ok {
+		t.Fatalf("did not expect Authorization header for official MiMo endpoint: %#v", headers)
+	}
+}
+
 func TestGetHeaderAddsBearerForCustomEndpoint(t *testing.T) {
 	headers := NewChatInstance("https://api.example.com", "sk-test").GetHeader()
 	if got := headers["api-key"]; got != "sk-test" {
@@ -43,6 +65,18 @@ func TestGetHeaderAddsBearerForCustomEndpoint(t *testing.T) {
 	}
 	if got := headers["Authorization"]; got != "Bearer sk-test" {
 		t.Fatalf("expected bearer authorization for custom endpoint, got %q", got)
+	}
+}
+
+func TestProcessLineUsesMiMoErrorPrefix(t *testing.T) {
+	instance := NewMiMoChatInstance("", "sk-test")
+
+	_, err := instance.ProcessLine(`{"error":{"message":"invalid key","type":"auth_error"}}`)
+	if err == nil {
+		t.Fatal("expected stream error")
+	}
+	if !strings.Contains(err.Error(), "xiaomi mimo error: invalid key") {
+		t.Fatalf("expected MiMo error prefix, got %q", err.Error())
 	}
 }
 

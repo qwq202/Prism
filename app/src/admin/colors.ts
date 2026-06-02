@@ -11,6 +11,8 @@ export const modelColorMapper: Record<string, string> = {
   openai: "gray-300",
   azure: "gray-300",
   xai: "gray-900",
+  xiaomi: "orange-500",
+  mimo: "orange-500",
 
   // Anthropic Claude
   "claude-3": "orange-500",

@@ -17,6 +17,7 @@ const (
 	ClaudeChannelType                        = "claude"
 	GLMCodingPlanCNChannelType               = "glm-coding-plan-cn"
 	MiniMaxTokenPlanCNChannelType            = "minimax-token-plan-cn"
+	XiaomiMiMoChannelType                    = "xiaomi-mimo"
 	XiaomiTokenPlanCNChannelType             = "xiaomi-token-plan-cn"
 	PalmChannelType                          = "palm"
 	GeminiEnterpriseAgentPlatformChannelType = "gemini-enterprise-agent-platform"

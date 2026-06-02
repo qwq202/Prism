@@ -22,6 +22,7 @@ var toolCallChannelTypes = map[string]struct{}{
 	globals.ClaudeChannelType:                        {},
 	globals.GLMCodingPlanCNChannelType:               {},
 	globals.MiniMaxTokenPlanCNChannelType:            {},
+	globals.XiaomiMiMoChannelType:                    {},
 	globals.XiaomiTokenPlanCNChannelType:             {},
 	globals.PalmChannelType:                          {},
 	globals.GeminiEnterpriseAgentPlatformChannelType: {},
