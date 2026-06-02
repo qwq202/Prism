@@ -147,6 +147,7 @@ type initialStateType = {
   mask_item: Mask | null;
   custom_masks: CustomMask[];
   support_models: Model[];
+  loadingConversationId: number | null;
 };
 
 const defaultConversation: ConversationSerialized = { messages: [] };
@@ -179,6 +180,7 @@ function resetLocalConversationState(state: initialStateType) {
   state.messages = [];
   state.conversations = { [-1]: { ...defaultConversation } };
   state.current = -1;
+  state.loadingConversationId = null;
   state.mask_item = null;
   setNumberMemory("history_conversation", -1);
 }
@@ -224,6 +226,7 @@ function replaceWithRemoteConversationHistory(
     bumpConversationNavigationRevision();
     state.current = -1;
     state.messages = [];
+    state.loadingConversationId = null;
     state.mask_item = null;
     setNumberMemory("history_conversation", -1);
   }
@@ -908,6 +911,7 @@ const chatSlice = createSlice({
       getMemory("openai_reasoning_summary"),
     ),
     current: -1,
+    loadingConversationId: null,
     model: initialModel,
     model_list: getModelList(offline, getArrayMemory("model_mark_list")),
     market: false,
@@ -1079,6 +1083,9 @@ const chatSlice = createSlice({
       };
 
       state.conversations[id] = conversation;
+      if (state.current === id) {
+        state.loadingConversationId = null;
+      }
     },
     setRemoteConversation: (state, action) => {
       const { conversation, id, requestedRevision } = action.payload as {
@@ -1103,6 +1110,9 @@ const chatSlice = createSlice({
         updated_at: conversation.updated_at,
       };
       state.conversations[id] = nextConversation;
+      if (state.current === id) {
+        state.loadingConversationId = null;
+      }
       void setCachedConversation(id, nextConversation);
 
       const index = state.history.findIndex((item) => item.id === id);
@@ -1146,6 +1156,7 @@ const chatSlice = createSlice({
         bumpConversationNavigationRevision();
         state.current = -1;
         state.messages = [];
+        state.loadingConversationId = null;
         state.mask_item = null;
         setNumberMemory("history_conversation", -1);
       }
@@ -1171,6 +1182,7 @@ const chatSlice = createSlice({
         bumpConversationNavigationRevision();
         state.current = -1;
         state.messages = [];
+        state.loadingConversationId = null;
         state.mask_item = null;
         setNumberMemory("history_conversation", -1);
       }
@@ -1340,6 +1352,7 @@ const chatSlice = createSlice({
     setCurrent: (state, action) => {
       const current = action.payload as number;
       state.current = current;
+      state.loadingConversationId = null;
 
       const conversation = state.conversations[current];
       if (!conversation) return;
@@ -1348,6 +1361,26 @@ const chatSlice = createSlice({
         inModel(state.support_models, conversation.model)
       ) {
         state.model = conversation.model;
+      }
+    },
+    setActiveConversation: (state, action) => {
+      const current = action.payload as number;
+      state.current = current;
+      state.loadingConversationId =
+        current !== -1 && !state.conversations[current] ? current : null;
+
+      const conversation = state.conversations[current];
+      if (
+        conversation?.model &&
+        inModel(state.support_models, conversation.model)
+      ) {
+        state.model = conversation.model;
+      }
+    },
+    clearConversationLoading: (state, action) => {
+      const id = action.payload as number;
+      if (state.loadingConversationId === id) {
+        state.loadingConversationId = null;
       }
     },
     setModelList: (state, action) => {
@@ -1396,6 +1429,7 @@ const chatSlice = createSlice({
 
       state.current = -1;
       state.messages = [];
+      state.loadingConversationId = null;
       state.history = state.history.filter((item) => item.id !== -1);
       state.conversations[-1] = nextConversation;
       state.mask_item = mask;
@@ -1437,6 +1471,8 @@ export const {
   renameHistory,
   upsertHistory,
   setCurrent,
+  setActiveConversation,
+  clearConversationLoading,
   setModel,
   setWeb,
   toggleWeb,
@@ -1519,6 +1555,8 @@ export const selectOpenAIReasoningEffort = (state: RootState): string =>
 export const selectOpenAIReasoningSummary = (state: RootState): string =>
   state.chat.openai_reasoning_summary;
 export const selectCurrent = (state: RootState): number => state.chat.current;
+export const selectConversationLoading = (state: RootState): boolean =>
+  state.chat.loadingConversationId === state.chat.current;
 export const selectModelList = (state: RootState): string[] =>
   state.chat.model_list;
 export const selectCustomMasks = (state: RootState): CustomMask[] =>
@@ -1557,7 +1595,10 @@ export function useConversationActions() {
       dispatch(deleteRemoteConversation({ id, requestedRevision }));
       return;
     }
-    if (result.status !== "ok") return;
+    if (result.status !== "ok") {
+      dispatch(clearConversationLoading(id));
+      return;
+    }
 
     const data = result.conversation;
     dispatch(
@@ -1589,12 +1630,13 @@ export function useConversationActions() {
       if (current === -1 && conversations[-1].messages.length === 0) {
         mask && dispatch(clearMaskItem());
       }
-      dispatch(setCurrent(id));
+      dispatch(setActiveConversation(id));
       return;
     }
 
     let restoredConversation = conversations[id];
     let restored = Boolean(restoredConversation);
+    dispatch(setActiveConversation(id));
     if (!restored && options?.useCache) {
       const cached = await getCachedConversation(id);
       if (
@@ -1624,7 +1666,6 @@ export function useConversationActions() {
     }
 
     if (restored) {
-      dispatch(setCurrent(id));
       if (refreshRemote) {
         void refreshConversationDetail(id, {
           activate: false,
@@ -1633,7 +1674,10 @@ export function useConversationActions() {
       return;
     }
 
-    if (!refreshRemote) return;
+    if (!refreshRemote) {
+      dispatch(clearConversationLoading(id));
+      return;
+    }
 
     await refreshConversationDetail(id, {
       activate: true,
@@ -1762,6 +1806,7 @@ export function useMessageActions() {
   const { refresh } = useConversationActions();
   const current = useSelector(selectCurrent);
   const conversations = useSelector(selectConversations);
+  const conversationLoading = useSelector(selectConversationLoading);
   const mask = useSelector(selectMaskItem);
 
   const model = useSelector(selectModel);
@@ -1822,6 +1867,8 @@ export function useMessageActions() {
 
   return {
     send: async (message: string, using_model?: string) => {
+      if (conversationLoading) return false;
+
       const conversationModel =
         current === -1 ? conversations[-1]?.model : undefined;
       const targetModel =
@@ -1941,6 +1988,8 @@ export function useMessageActions() {
       dispatch(stopMessage(current));
     },
     restart: () => {
+      if (conversationLoading) return;
+
       const enableGeminiNativeWeb = isGeminiModelId(model);
       const enableXAINativeWeb = isXAIModelId(model);
       const enableDeepSeekThinkingControl = isDeepSeekV4ModelId(model);

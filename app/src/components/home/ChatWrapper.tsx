@@ -16,6 +16,7 @@ import { useSelector } from "react-redux";
 import { selectAuthenticated, selectInit } from "@/store/auth.ts";
 import {
   listenMessageEvent,
+  selectConversationLoading,
   selectCurrent,
   selectModel,
   selectSupportModels,
@@ -50,6 +51,7 @@ import { ModelArea } from "@/components/home/ModelArea.tsx";
 import { toast } from "sonner";
 import { VoiceAction } from "@/components/VoiceProvider.tsx";
 import { AnimatePresence, motion } from "framer-motion";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
 
 const ChatInterface = lazy(() => import("@/components/home/ChatInterface.tsx"));
 
@@ -58,19 +60,54 @@ type InterfaceProps = {
   setTarget: (instance: HTMLElement | null) => void;
 };
 
+function ChatContentSkeleton() {
+  return (
+    <div className="chat-content" aria-busy="true">
+      <div className="chat-messages-wrapper gap-6">
+        <div className="flex w-full max-w-3xl items-start gap-3">
+          <Skeleton className="h-9 w-9 shrink-0 rounded-md" />
+          <div className="flex w-full max-w-2xl flex-col gap-3">
+            <Skeleton className="h-5 w-3/5" />
+            <Skeleton className="h-5 w-11/12" />
+            <Skeleton className="h-5 w-4/5" />
+          </div>
+        </div>
+        <div className="ml-auto flex w-full max-w-2xl justify-end">
+          <div className="flex w-3/5 flex-col items-end gap-3">
+            <Skeleton className="h-5 w-full" />
+            <Skeleton className="h-5 w-2/3" />
+          </div>
+        </div>
+        <div className="flex w-full max-w-3xl items-start gap-3">
+          <Skeleton className="h-9 w-9 shrink-0 rounded-md" />
+          <div className="flex w-full max-w-2xl flex-col gap-3">
+            <Skeleton className="h-5 w-1/2" />
+            <Skeleton className="h-5 w-full" />
+            <Skeleton className="h-5 w-5/6" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Interface(props: InterfaceProps) {
   const messages = useMessages();
   const current = useSelector(selectCurrent);
-  const messageStageFallback = (
-    <div className="chat-content chat-content-placeholder" aria-busy="true" />
+  const conversationLoading = useSelector(selectConversationLoading);
+  const loadingStage = <ChatContentSkeleton />;
+  const emptyConversationStage = (
+    <div className="chat-content chat-content-placeholder" aria-busy="false" />
   );
 
-  return messages.length > 0 ? (
-    <Suspense fallback={messageStageFallback}>
+  return conversationLoading && messages.length === 0 ? (
+    loadingStage
+  ) : messages.length > 0 ? (
+    <Suspense fallback={loadingStage}>
       <ChatInterface {...props} />
     </Suspense>
   ) : current !== -1 ? (
-    messageStageFallback
+    emptyConversationStage
   ) : (
     <ChatSpace />
   );
