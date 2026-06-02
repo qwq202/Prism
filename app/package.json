@@ -62,7 +62,7 @@
     "normalize.css": "^8.0.1",
     "qrcode.react": "^4.2.0",
     "react": "19.2.7",
-    "react-day-picker": "^8.10.2",
+    "react-day-picker": "10.0.1",
     "react-dom": "19.2.7",
     "react-ga4": "^2.1.0",
     "react-i18next": "^13.5.0",

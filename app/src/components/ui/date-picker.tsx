@@ -11,11 +11,10 @@ import {
 } from "@/components/ui/popover";
 import { CalendarIcon, Eraser, Minus, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { DayPickerSingleProps } from "react-day-picker";
 
 type DatePickerProps = Omit<
-  DayPickerSingleProps,
-  "mode" | "selected" | "onSelect"
+  React.ComponentProps<typeof Calendar>,
+  "mode" | "selected" | "onSelect" | "required"
 > & {
   classNameTrigger?: string;
   classNameContent?: string;
@@ -109,33 +108,34 @@ const DatePicker = ({
           mode="single"
           selected={date}
           onSelect={(date) => updateDate(date)}
-          initialFocus
+          autoFocus
           className="p-3.5 pb-1"
           classNames={{
             months: "flex w-full flex-col",
             month: "w-full space-y-2",
-            caption:
+            month_caption:
               "relative flex h-8 items-center justify-center px-10 text-center",
             caption_label: "text-lg font-semibold leading-none",
             nav: "absolute inset-x-0 top-0 flex h-8 items-center justify-between",
-            nav_button:
-              "flex h-8 w-8 items-center justify-center rounded-md border bg-background p-0 text-muted-foreground opacity-100 shadow-sm transition-colors hover:bg-muted hover:text-foreground",
-            nav_button_previous: "absolute left-0 top-0",
-            nav_button_next: "absolute right-0 top-0",
-            table: "w-full border-collapse",
-            head_row: "grid grid-cols-7",
-            head_cell:
+            button_previous:
+              "absolute left-0 top-0 flex h-8 w-8 items-center justify-center rounded-md border bg-background p-0 text-muted-foreground opacity-100 shadow-sm transition-colors hover:bg-muted hover:text-foreground",
+            button_next:
+              "absolute right-0 top-0 flex h-8 w-8 items-center justify-center rounded-md border bg-background p-0 text-muted-foreground opacity-100 shadow-sm transition-colors hover:bg-muted hover:text-foreground",
+            month_grid: "w-full border-collapse",
+            weekdays: "grid grid-cols-7",
+            weekday:
               "flex h-7 items-center justify-center text-sm font-normal text-muted-foreground",
-            row: "grid grid-cols-7",
-            cell: "flex h-10 items-center justify-center p-0 text-center",
-            day: "h-8 w-8 rounded-md p-0 text-sm font-normal transition-colors hover:bg-muted",
-            day_selected:
+            week: "grid grid-cols-7",
+            day: "flex h-10 items-center justify-center p-0 text-center",
+            day_button:
+              "h-8 w-8 rounded-md p-0 text-sm font-normal transition-colors hover:bg-muted",
+            selected:
               "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-            day_today: "bg-muted text-foreground",
-            day_outside:
+            today: "bg-muted text-foreground",
+            outside:
               "text-muted-foreground/50 opacity-100 aria-selected:bg-primary aria-selected:text-primary-foreground",
-            day_disabled: "text-muted-foreground/40 opacity-100",
-            day_hidden: "invisible",
+            disabled: "text-muted-foreground/40 opacity-100",
+            hidden: "invisible",
           }}
           {...props}
         />
