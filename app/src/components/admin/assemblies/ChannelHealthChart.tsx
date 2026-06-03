@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
-import { BarChart } from "./recharts.tsx";
+import { LineChart } from "./recharts.tsx";
 import { ChannelStat } from "@/admin/api/channel.ts";
 import { Channel } from "@/admin/channel.ts";
 import { getReadableNumber } from "@/utils/processor.ts";
@@ -51,13 +51,12 @@ function ChannelHealthChart({ stats, channels }: ChannelHealthChartProps) {
           {t("admin.empty")}
         </div>
       ) : (
-        <BarChart
+        <LineChart
           className={`common-chart`}
           data={data}
           categories={[SERIES_REQUESTS, SERIES_ERRORS]}
           index={"name"}
           colors={["blue", "red"]}
-          layout={"vertical"}
           valueFormatter={(v) => getReadableNumber(v, 1)}
         />
       )}

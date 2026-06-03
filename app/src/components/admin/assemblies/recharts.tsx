@@ -5,6 +5,8 @@ import {
   BarChart as RechartsBarChart,
   CartesianGrid,
   Cell,
+  Line,
+  LineChart as RechartsLineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -218,6 +220,49 @@ export function BarChart({
             />
           ))}
         </RechartsBarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+export function LineChart({
+  data,
+  categories,
+  index,
+  colors,
+  className,
+  valueFormatter,
+}: SeriesChartProps) {
+  return (
+    <div className={cn("common-chart", className)}>
+      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+        <RechartsLineChart data={data} margin={{ left: 0, right: 8, top: 8 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+          <XAxis dataKey={index} tickLine={false} axisLine={false} />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(v) => formatValue(v, valueFormatter)}
+          />
+          <Tooltip
+            content={(props) => (
+              <ChartTooltip {...props} valueFormatter={valueFormatter} />
+            )}
+          />
+          {categories.map((category, idx) => (
+            <Line
+              key={category}
+              type="linear"
+              dataKey={category}
+              name={category}
+              stroke={resolveChartColor(colors[idx] ?? "blue")}
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 4 }}
+              isAnimationActive
+            />
+          ))}
+        </RechartsLineChart>
       </ResponsiveContainer>
     </div>
   );
