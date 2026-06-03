@@ -29,6 +29,11 @@ function ConversionFunnelChart({ data }: ConversionFunnelChartProps) {
     [chartData],
   );
 
+  const total = useMemo(
+    () => chartData.reduce((sum, item) => sum + item.value, 0),
+    [chartData],
+  );
+
   const colors = ["emerald", "violet", "slate"];
 
   return (
@@ -43,6 +48,7 @@ function ConversionFunnelChart({ data }: ConversionFunnelChartProps) {
           data={chartData}
           valueFormatter={(v) => getReadableNumber(v)}
           colors={colors}
+          centerLabel={getReadableNumber(total)}
         />
         <ChartLegend
           className="common-chart p-2 w-[50%] z-0"

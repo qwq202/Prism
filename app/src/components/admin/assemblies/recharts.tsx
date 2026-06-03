@@ -310,7 +310,7 @@ export function DonutChart({
         </PieChart>
       </ResponsiveContainer>
       {centerLabel !== undefined && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-xl font-semibold text-foreground">
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-lg font-semibold text-foreground">
           {centerLabel}
         </div>
       )}
