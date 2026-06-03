@@ -125,6 +125,7 @@ function isRealtimePath(path: string): boolean {
     "/memory/list",
     "/admin/logger/console",
     "/admin/user/list",
+    "/admin/charge/list",
     "/v1/market",
     "/v1/model-metrics",
     "/v1/models",
