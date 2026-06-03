@@ -35,23 +35,64 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+function isConversationList(value: unknown): value is ConversationInstance[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (item) =>
+        isRecord(item) &&
+        typeof item.id === "number" &&
+        typeof item.name === "string",
+    )
+  );
+}
+
 function readConversationListPayload(
   value: unknown,
+  visited = new WeakSet<object>(),
 ): ConversationInstance[] | undefined {
-  if (Array.isArray(value)) return value as ConversationInstance[];
+  if (isConversationList(value)) return value;
+
+  if (typeof value === "string") {
+    const text = value.trim();
+    if (!text || (!text.startsWith("{") && !text.startsWith("["))) {
+      return undefined;
+    }
+
+    try {
+      return readConversationListPayload(JSON.parse(text), visited);
+    } catch {
+      return undefined;
+    }
+  }
+
   if (!isRecord(value)) return undefined;
+  if (visited.has(value)) return undefined;
+  visited.add(value);
 
   const candidates = [
     value.data,
     value.conversations,
     value.list,
     value.items,
+    value.history,
+    value.rows,
+    value.results,
   ];
 
   for (const candidate of candidates) {
-    if (Array.isArray(candidate)) return candidate as ConversationInstance[];
-    if (isRecord(candidate)) {
-      const nested = readConversationListPayload(candidate);
+    if (isConversationList(candidate)) return candidate;
+    if (isRecord(candidate) || typeof candidate === "string") {
+      const nested = readConversationListPayload(candidate, visited);
+      if (nested) return nested;
+    }
+  }
+
+  for (const candidate of Object.values(value)) {
+    if (candidates.includes(candidate)) continue;
+    if (isConversationList(candidate)) return candidate;
+    if (isRecord(candidate) || typeof candidate === "string") {
+      const nested = readConversationListPayload(candidate, visited);
       if (nested) return nested;
     }
   }
@@ -83,9 +124,15 @@ export async function fetchConversationList(): Promise<ConversationListResult> {
     );
     return { conversations, fromCache: false };
   } catch (e) {
-    console.warn("[conversation] failed to refresh list:", getErrorMessage(e));
+    const message = getErrorMessage(e);
+    const conversations = (await getCachedConversationList()) ?? [];
+    if (message === "invalid conversation list response") {
+      console.debug("[conversation] failed to refresh list:", message);
+    } else {
+      console.warn("[conversation] failed to refresh list:", message);
+    }
     return {
-      conversations: (await getCachedConversationList()) ?? [],
+      conversations,
       fromCache: true,
     };
   }
