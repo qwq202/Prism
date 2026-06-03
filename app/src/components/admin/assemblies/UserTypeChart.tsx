@@ -6,6 +6,7 @@ import Tips from "@/components/Tips.tsx";
 import { ChartLegend, DonutChart } from "./recharts.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { MultiCombobox } from "@/components/ui/multi-combobox.tsx";
+import { getReadableNumber } from "@/utils/processor.ts";
 
 type UserTypeChartProps = {
   data: UserTypeChartResponse;
@@ -70,6 +71,11 @@ function UserTypeChart({ data }: UserTypeChartProps) {
     ].filter((item) => item) as UserStatus[];
   }, [display, data, identityLabels]);
 
+  const total = useMemo(
+    () => chart.reduce((sum, item) => sum + item.value, 0),
+    [chart],
+  );
+
   const colors = ["blue", "cyan", "indigo", "violet", "fuchsia"];
 
   return (
@@ -112,6 +118,7 @@ function UserTypeChart({ data }: UserTypeChartProps) {
           className={`common-chart p-4 w-[50%]`}
           data={chart}
           colors={colors}
+          centerLabel={getReadableNumber(total)}
         />
         <ChartLegend
           className={`common-chart p-4 w-[50%]`}

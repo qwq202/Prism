@@ -13,6 +13,7 @@ import {
   YAxis,
 } from "recharts";
 import type { TooltipContentProps } from "recharts";
+import type { ReactNode } from "react";
 import { cn } from "@/components/ui/lib/utils.ts";
 import { resolveChartColor } from "./chart-colors.ts";
 
@@ -44,6 +45,7 @@ type DonutChartProps = {
   className?: string;
   valueFormatter?: (value: number) => string;
   tooltipSuffix?: string;
+  centerLabel?: ReactNode;
 };
 
 function formatValue(
@@ -212,7 +214,6 @@ export function BarChart({
               name={category}
               stackId={stack ? "stack" : undefined}
               fill={resolveChartColor(colors[idx] ?? "blue")}
-              radius={vertical ? [0, 4, 4, 0] : [4, 4, 0, 0]}
               isAnimationActive
             />
           ))}
@@ -228,9 +229,10 @@ export function DonutChart({
   className,
   valueFormatter,
   tooltipSuffix = "",
+  centerLabel,
 }: DonutChartProps) {
   return (
-    <div className={cn("common-chart", className)}>
+    <div className={cn("common-chart relative", className)}>
       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         <PieChart>
           <Pie
@@ -262,6 +264,11 @@ export function DonutChart({
           />
         </PieChart>
       </ResponsiveContainer>
+      {centerLabel !== undefined && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-xl font-semibold text-foreground">
+          {centerLabel}
+        </div>
+      )}
     </div>
   );
 }

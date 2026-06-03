@@ -44,6 +44,11 @@ function ModelUsageChart({ labels, datasets }: ModelChartProps) {
     return data.sort((a, b) => b.value - a.value);
   }, [data]);
 
+  const total = useMemo(
+    () => data.reduce((sum, item) => sum + item.value, 0),
+    [data],
+  );
+
   const categories = useMemo(() => {
     return sorted.map(
       (item) => `${item.name} (${getReadableNumber(item.value, 1)})`,
@@ -68,6 +73,7 @@ function ModelUsageChart({ labels, datasets }: ModelChartProps) {
           valueFormatter={(value) => getReadableNumber(value, 1)}
           tooltipSuffix=" tokens"
           colors={data.map((item) => getModelColor(item.name))}
+          centerLabel={getReadableNumber(total, 1)}
         />
         <ChartLegend
           className={`common-chart p-2 w-[50%] z-0`}
