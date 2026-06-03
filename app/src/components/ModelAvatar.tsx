@@ -25,6 +25,7 @@ import {
   Qingyan,
   IconAvatarProps,
   Azure,
+  XiaomiMiMo,
 } from "@lobehub/icons";
 import React from "react";
 import { cn } from "@/components/ui/lib/utils.ts";
@@ -38,33 +39,6 @@ type ModelAvatarProps = {
 type AvatarComponent = React.ComponentType<
   Pick<IconAvatarProps, "size" | "className">
 >;
-type OpenAIAvatarType = React.ComponentProps<typeof OpenAI.Avatar>["type"];
-
-function XiaomiAvatar({
-  size,
-  className,
-}: Pick<IconAvatarProps, "size" | "className">) {
-  const fontSize = Math.max(Math.round(size * 0.42), 10);
-
-  return (
-    <div
-      aria-label="Xiaomi"
-      className={cn(
-        "flex shrink-0 items-center justify-center rounded-full bg-[#ff6900] font-semibold leading-none text-white",
-        className,
-      )}
-      style={{
-        width: size,
-        height: size,
-        minWidth: size,
-        minHeight: size,
-        fontSize,
-      }}
-    >
-      mi
-    </div>
-  );
-}
 
 const builtinAvatars: Record<string, AvatarComponent> = {
   openai: OpenAI.Avatar,
@@ -123,18 +97,10 @@ const builtinAvatars: Record<string, AvatarComponent> = {
 
   suno: Suno.Avatar,
 
-  "xiaomi-token-plan": XiaomiAvatar,
-  xiaomi: XiaomiAvatar,
-  mimo: XiaomiAvatar,
+  "xiaomi-token-plan": XiaomiMiMo.Avatar,
+  xiaomi: XiaomiMiMo.Avatar,
+  mimo: XiaomiMiMo.Avatar,
 };
-
-function getAvatarType(id: string): OpenAIAvatarType | undefined {
-  if (id.includes("gpt-3.5")) return "gpt3";
-  if (id.includes("gpt-4")) return "gpt4";
-  if (id.includes("gpt-5")) return "gpt4";
-  if (id.includes("o1")) return "o1";
-  if (id.includes("o3")) return "o3";
-}
 
 function ModelAvatar({ model, className, size }: ModelAvatarProps) {
   const avatarSize = size ?? 42;
@@ -173,13 +139,7 @@ function ModelAvatar({ model, className, size }: ModelAvatarProps) {
   const Avatar = key ? builtinAvatars[key] : OpenAI.Avatar;
 
   if (!key || Avatar === OpenAI.Avatar) {
-    return (
-      <OpenAI.Avatar
-        size={avatarSize}
-        className={className}
-        type={getAvatarType(id)}
-      />
-    );
+    return <OpenAI.Avatar size={avatarSize} className={className} />;
   }
 
   return <Avatar size={avatarSize} className={className} />;
