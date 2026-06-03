@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
-import { LineChart } from "./recharts.tsx";
+import { AreaChart } from "./recharts.tsx";
 import { ChannelStat } from "@/admin/api/channel.ts";
 import { Channel } from "@/admin/channel.ts";
 import { getReadableNumber } from "@/utils/processor.ts";
@@ -11,11 +11,9 @@ type ChannelHealthChartProps = {
   channels: Channel[];
 };
 
-const SERIES_REQUESTS = "Requests";
-const SERIES_ERRORS = "Errors";
-
 function ChannelHealthChart({ stats, channels }: ChannelHealthChartProps) {
   const { t } = useTranslation();
+  const errorsLabel = t("admin.times");
 
   const nameMap = useMemo(() => {
     const m = new Map<number, string>();
@@ -30,10 +28,9 @@ function ChannelHealthChart({ stats, channels }: ChannelHealthChartProps) {
       .slice(0, 10)
       .map((s) => ({
         name: nameMap.get(s.channel_id) ?? `#${s.channel_id}`,
-        [SERIES_REQUESTS]: s.requests,
-        [SERIES_ERRORS]: s.errors,
+        [errorsLabel]: s.errors,
       }));
-  }, [stats, nameMap]);
+  }, [stats, nameMap, errorsLabel]);
 
   const loading = stats.length === 0 && channels.length === 0;
 
@@ -51,12 +48,12 @@ function ChannelHealthChart({ stats, channels }: ChannelHealthChartProps) {
           {t("admin.empty")}
         </div>
       ) : (
-        <LineChart
+        <AreaChart
           className={`common-chart`}
           data={data}
-          categories={[SERIES_REQUESTS, SERIES_ERRORS]}
+          categories={[errorsLabel]}
           index={"name"}
-          colors={["blue", "red"]}
+          colors={["red"]}
           valueFormatter={(v) => getReadableNumber(v, 1)}
         />
       )}
