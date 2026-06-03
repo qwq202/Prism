@@ -115,7 +115,7 @@ function UserTypeChart({ data }: UserTypeChartProps) {
       </div>
       <div className={`flex flex-row`}>
         <DonutChart
-          className={`common-chart p-4 w-[50%]`}
+          className={`common-chart p-2 w-[50%]`}
           data={chart}
           colors={colors}
           centerLabel={getReadableNumber(total)}

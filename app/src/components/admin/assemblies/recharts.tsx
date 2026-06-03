@@ -284,8 +284,8 @@ export function DonutChart({
             data={data}
             dataKey="value"
             nameKey="name"
-            innerRadius="68%"
-            outerRadius="92%"
+            innerRadius="72%"
+            outerRadius="96%"
             paddingAngle={0}
             stroke="hsl(var(--background))"
             strokeWidth={2}
