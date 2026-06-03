@@ -118,11 +118,16 @@ function isMutatingGetPath(path: string): boolean {
 
 function isRealtimePath(path: string): boolean {
   return [
+    "/admin/",
+    "/broadcast/list",
     "/payment/check",
     "/quota",
     "/subscription",
     "/broadcast/view",
     "/memory/list",
+    "/record/view",
+    "/record/stats",
+    "/record/usage-summary",
     "/admin/logger/console",
     "/admin/user/list",
     "/admin/charge/list",
