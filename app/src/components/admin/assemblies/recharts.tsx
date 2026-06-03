@@ -289,7 +289,7 @@ export function DonutChart({
             paddingAngle={0}
             stroke="hsl(var(--background))"
             strokeWidth={2}
-            isAnimationActive
+            isAnimationActive={false}
           >
             {data.map((item, idx) => (
               <Cell
