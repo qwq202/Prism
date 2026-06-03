@@ -16,7 +16,7 @@ import {
   UserResponse,
   UserTypeChartResponse,
 } from "@/admin/types.ts";
-import axios from "axios";
+import axios, { type AxiosRequestConfig } from "axios";
 import { getErrorMessage } from "@/utils/base.ts";
 
 export const initialAdminInfoState: InfoResponse = {
@@ -46,9 +46,20 @@ export const initialUserFilter: UserFilterProps = {
   // plan-desc/plan-asc
 };
 
+const adminAnalyticsNoCacheConfig: AxiosRequestConfig = {
+  prismCache: false,
+  headers: {
+    "Cache-Control": "no-cache",
+    Pragma: "no-cache",
+  },
+};
+
 export async function getAdminInfo(): Promise<InfoResponse> {
   try {
-    const response = await axios.get("/admin/analytics/info");
+    const response = await axios.get(
+      "/admin/analytics/info",
+      adminAnalyticsNoCacheConfig,
+    );
     return response.data as InfoResponse;
   } catch (e) {
     console.warn(e);
@@ -60,7 +71,10 @@ export async function getAdminInfo(): Promise<InfoResponse> {
 
 export async function getModelChart(): Promise<ModelChartResponse> {
   try {
-    const response = await axios.get("/admin/analytics/model");
+    const response = await axios.get(
+      "/admin/analytics/model",
+      adminAnalyticsNoCacheConfig,
+    );
     const data = response.data as ModelChartResponse;
 
     return {
@@ -75,7 +89,10 @@ export async function getModelChart(): Promise<ModelChartResponse> {
 
 export async function getRequestChart(): Promise<RequestChartResponse> {
   try {
-    const response = await axios.get("/admin/analytics/request");
+    const response = await axios.get(
+      "/admin/analytics/request",
+      adminAnalyticsNoCacheConfig,
+    );
     return response.data as RequestChartResponse;
   } catch (e) {
     console.warn(e);
@@ -85,7 +102,10 @@ export async function getRequestChart(): Promise<RequestChartResponse> {
 
 export async function getBillingChart(): Promise<BillingChartResponse> {
   try {
-    const response = await axios.get("/admin/analytics/billing");
+    const response = await axios.get(
+      "/admin/analytics/billing",
+      adminAnalyticsNoCacheConfig,
+    );
     return response.data as BillingChartResponse;
   } catch (e) {
     console.warn(e);
@@ -95,7 +115,10 @@ export async function getBillingChart(): Promise<BillingChartResponse> {
 
 export async function getErrorChart(): Promise<ErrorChartResponse> {
   try {
-    const response = await axios.get("/admin/analytics/error");
+    const response = await axios.get(
+      "/admin/analytics/error",
+      adminAnalyticsNoCacheConfig,
+    );
     return response.data as ErrorChartResponse;
   } catch (e) {
     console.warn(e);
@@ -105,7 +128,10 @@ export async function getErrorChart(): Promise<ErrorChartResponse> {
 
 export async function getUserTypeChart(): Promise<UserTypeChartResponse> {
   try {
-    const response = await axios.get("/admin/analytics/user");
+    const response = await axios.get(
+      "/admin/analytics/user",
+      adminAnalyticsNoCacheConfig,
+    );
     return response.data as UserTypeChartResponse;
   } catch (e) {
     console.warn(e);
@@ -416,7 +442,10 @@ export async function getRedeemBatchCodes(
 
 export async function getActiveUserChart(): Promise<ActiveUserChartResponse> {
   try {
-    const response = await axios.get("/admin/analytics/active-users");
+    const response = await axios.get(
+      "/admin/analytics/active-users",
+      adminAnalyticsNoCacheConfig,
+    );
     return response.data as ActiveUserChartResponse;
   } catch (e) {
     console.warn(e);
@@ -426,7 +455,10 @@ export async function getActiveUserChart(): Promise<ActiveUserChartResponse> {
 
 export async function getRegistrationChart(): Promise<RegistrationChartResponse> {
   try {
-    const response = await axios.get("/admin/analytics/registrations");
+    const response = await axios.get(
+      "/admin/analytics/registrations",
+      adminAnalyticsNoCacheConfig,
+    );
     return response.data as RegistrationChartResponse;
   } catch (e) {
     console.warn(e);
@@ -436,7 +468,10 @@ export async function getRegistrationChart(): Promise<RegistrationChartResponse>
 
 export async function getConversionFunnel(): Promise<ConversionFunnelResponse> {
   try {
-    const response = await axios.get("/admin/analytics/funnel");
+    const response = await axios.get(
+      "/admin/analytics/funnel",
+      adminAnalyticsNoCacheConfig,
+    );
     return response.data as ConversionFunnelResponse;
   } catch (e) {
     console.warn(e);

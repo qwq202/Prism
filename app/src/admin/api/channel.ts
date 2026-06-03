@@ -3,6 +3,14 @@ import axios from "axios";
 import { getErrorMessage } from "@/utils/base.ts";
 import { CommonResponse } from "@/api/common.ts";
 
+const adminAnalyticsNoCacheConfig = {
+  prismCache: false,
+  headers: {
+    "Cache-Control": "no-cache",
+    Pragma: "no-cache",
+  },
+} as const;
+
 export type ChannelListResponse = CommonResponse & {
   data: Channel[];
 };
@@ -96,9 +104,13 @@ export async function getChannelStats(
   channelIds?: number[],
 ): Promise<ChannelStatsResponse> {
   try {
-    const response = await axios.post("/admin/analytics/channel", {
-      channel_ids: channelIds ?? [],
-    });
+    const response = await axios.post(
+      "/admin/analytics/channel",
+      {
+        channel_ids: channelIds ?? [],
+      },
+      adminAnalyticsNoCacheConfig,
+    );
     return response.data as ChannelStatsResponse;
   } catch (e) {
     console.warn(e);
