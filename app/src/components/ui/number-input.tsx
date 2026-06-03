@@ -14,26 +14,38 @@ export interface NumberInputProps extends InputProps {
 }
 
 const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
-  ({ className, onValueChange, ...props }, ref) => {
-    const [value, setValue] = useState(props.value.toString());
+  (
+    {
+      className,
+      onValueChange,
+      acceptNaN,
+      acceptNegative,
+      min,
+      max,
+      value: propValue,
+      ...inputProps
+    },
+    ref,
+  ) => {
+    const [value, setValue] = useState(propValue.toString());
 
     const getValue = useCallback((v: string) => {
-      const raw = getNumber(v, props.acceptNegative);
+      const raw = getNumber(v, acceptNegative);
       let val = parseFloat(raw);
-      if (isNaN(val) && !props.acceptNaN) val = 0;
-      if (props.max !== undefined && val > props.max) val = props.max;
-      else if (props.min !== undefined && val < props.min) val = props.min;
+      if (isNaN(val) && !acceptNaN) val = 0;
+      if (max !== undefined && val > max) val = max;
+      else if (min !== undefined && val < min) val = min;
       return val;
-    }, [props.acceptNaN, props.acceptNegative, props.max, props.min]);
+    }, [acceptNaN, acceptNegative, max, min]);
 
     useEffect(() => {
-      // fix life cycle: update value when props.value changed
+      // fix life cycle: update value when controlled value changed
       setValue((current) =>
-        getValue(current.toString()) !== props.value
-          ? props.value.toString()
+        getValue(current.toString()) !== propValue
+          ? propValue.toString()
           : current,
       );
-    }, [getValue, props.value]);
+    }, [getValue, propValue]);
 
     const formatValue = (v: string) => {
       if (v.trim().length === 0) return v.trim();
@@ -43,19 +55,17 @@ const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
         return v.match(exp)?.join("") || "";
       }
 
-      if (v === "-" && props.acceptNegative) return v;
+      if (v === "-" && acceptNegative) return v;
 
       // replace -0124.5 to -124.5, 0043 to 43, 2.000 to 2.000
       const exp = /^[-+]?0+(?=[0-9]+(\.[0-9]+)?$)/;
       v = v.replace(exp, "");
 
-      const raw = getNumber(v, props.acceptNegative);
+      const raw = getNumber(v, acceptNegative);
       const val = parseFloat(raw);
-      if (isNaN(val) && !props.acceptNaN) return (props.min ?? 0).toString();
-      if (props.max !== undefined && val > props.max)
-        return props.max.toString();
-      else if (props.min !== undefined && val < props.min)
-        return props.min.toString();
+      if (isNaN(val) && !acceptNaN) return (min ?? 0).toString();
+      if (max !== undefined && val > max) return max.toString();
+      else if (min !== undefined && val < min) return min.toString();
 
       return v;
     };
@@ -63,28 +73,27 @@ const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
     const isValid = useMemo((): boolean => {
       if (!/^[-+]?[0-9]+(\.[0-9]+)?$/.test(value)) return false;
       const val = getValue(value);
-      if (props.max !== undefined && val > props.max) return false;
-      else if (props.min !== undefined && val < props.min) return false;
+      if (max !== undefined && val > max) return false;
+      else if (min !== undefined && val < min) return false;
       return true;
-    }, [getValue, props.max, props.min, value]);
+    }, [getValue, max, min, value]);
 
     return (
       <Input
-        {...props}
+        {...inputProps}
         ref={ref}
         className={cn(
           "number-input transition",
           className,
           !isValid && "border-red-600 focus:border-red-700",
         )}
-        id={props.id}
         value={value}
         onChange={(e) => {
           setValue(formatValue(e.target.value));
           onValueChange(getValue(e.target.value));
         }}
-        min={props.min}
-        max={props.max}
+        min={min}
+        max={max}
         onWheel={(e) => {
           e.stopPropagation();
         }}

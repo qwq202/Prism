@@ -14,7 +14,7 @@ function App() {
         <Toaster />
         <Spinner />
         <ReloadPrompt />
-        <RouterProvider router={router} />
+        <RouterProvider router={router} future={{ v7_startTransition: true }} />
       </AppProvider>
     </Provider>
   );

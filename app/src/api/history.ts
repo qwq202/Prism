@@ -31,6 +31,34 @@ const noCacheHeaders = {
   Pragma: "no-cache",
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function readConversationListPayload(
+  value: unknown,
+): ConversationInstance[] | undefined {
+  if (Array.isArray(value)) return value as ConversationInstance[];
+  if (!isRecord(value)) return undefined;
+
+  const candidates = [
+    value.data,
+    value.conversations,
+    value.list,
+    value.items,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate as ConversationInstance[];
+    if (isRecord(candidate)) {
+      const nested = readConversationListPayload(candidate);
+      if (nested) return nested;
+    }
+  }
+
+  return undefined;
+}
+
 export async function getConversationList(): Promise<ConversationInstance[]> {
   return (await fetchConversationList()).conversations;
 }
@@ -41,12 +69,12 @@ export async function fetchConversationList(): Promise<ConversationListResult> {
       headers: noCacheHeaders,
       params: { _: Date.now() },
     });
-    if (!resp.data.status) {
+    if (resp.data?.status === false) {
       throw new Error(resp.data.message || "failed to fetch conversations");
     }
 
-    const conversations = resp.data.data;
-    if (!Array.isArray(conversations)) {
+    const conversations = readConversationListPayload(resp.data);
+    if (!conversations) {
       throw new Error("invalid conversation list response");
     }
 
