@@ -138,7 +138,7 @@ export function AreaChart({
 }: SeriesChartProps) {
   return (
     <div className={cn("common-chart", className)}>
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         <RechartsAreaChart data={data} margin={{ left: 0, right: 8, top: 8 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey={index} tickLine={false} axisLine={false} />
@@ -180,7 +180,7 @@ export function BarChart({
 
   return (
     <div className={cn("common-chart", className)}>
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         <RechartsBarChart
           data={data}
           layout={vertical ? "vertical" : "horizontal"}
@@ -231,7 +231,7 @@ export function DonutChart({
 }: DonutChartProps) {
   return (
     <div className={cn("common-chart", className)}>
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         <PieChart>
           <Pie
             data={data}
