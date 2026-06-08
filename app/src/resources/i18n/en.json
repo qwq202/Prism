@@ -833,6 +833,7 @@
       "name-tip": "Channel name, used to identify the channel",
       "name-placeholder": "Please enter the channel name",
       "type": "Type",
+      "health": "Health",
       "health-status": "Today's Status",
       "health-loading": "Loading health data...",
       "health-summary": "Health Today",

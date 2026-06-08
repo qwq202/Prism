@@ -1072,6 +1072,7 @@
       "name-tip": "管道名稱，用於識別管道",
       "name-placeholder": "請輸入管道名稱",
       "type": "類型",
+      "health": "健康狀態",
       "health-status": "今日狀態",
       "health-loading": "正在載入健康資料…",
       "health-summary": "今日健康狀態",

@@ -1335,6 +1335,7 @@
       "name-placeholder": "请输入渠道名称",
       "search-channel": "搜索渠道名, 模型, 密钥...",
       "type": "类型",
+      "health": "健康状态",
       "health-status": "今日状态",
       "health-loading": "加载健康数据…",
       "health-summary": "今日健康状态",

@@ -814,6 +814,7 @@
       "name-tip": "チャンネル名、チャンネルを識別するために使用",
       "name-placeholder": "チャンネル名を入力してください",
       "type": "種類",
+      "health": "ヘルス状態",
       "health-status": "今日の状態",
       "health-loading": "ヘルスデータを読み込み中...",
       "health-summary": "今日のヘルス状態",
