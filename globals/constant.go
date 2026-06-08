@@ -11,6 +11,7 @@ const (
 const (
 	OpenAIChannelType                        = "openai"
 	OpenRouterChannelType                    = "openrouter"
+	SiliconFlowChannelType                   = "siliconflow"
 	OpenAIResponsesChannelType               = "openai-responses"
 	XAIChannelType                           = "xai"
 	AzureOpenAIChannelType                   = "azure"

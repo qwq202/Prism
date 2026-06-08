@@ -43,6 +43,8 @@ export const modelColorMapper: Record<string, string> = {
 
   // OpenRouter
   openrouter: "purple-600",
+  siliconflow: "cyan-500",
+  siliconcloud: "cyan-500",
 };
 
 const unknownColors = [

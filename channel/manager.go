@@ -281,6 +281,7 @@ func isKnownChannelType(channelType string) bool {
 	switch channelType {
 	case globals.OpenAIChannelType,
 		globals.OpenRouterChannelType,
+		globals.SiliconFlowChannelType,
 		globals.OpenAIResponsesChannelType,
 		globals.XAIChannelType,
 		globals.AzureOpenAIChannelType,

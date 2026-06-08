@@ -18,6 +18,7 @@ import (
 var toolCallChannelTypes = map[string]struct{}{
 	globals.OpenAIChannelType:                        {},
 	globals.OpenAIResponsesChannelType:               {},
+	globals.SiliconFlowChannelType:                   {},
 	globals.AzureOpenAIChannelType:                   {},
 	globals.ClaudeChannelType:                        {},
 	globals.GLMCodingPlanCNChannelType:               {},

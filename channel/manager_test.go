@@ -11,6 +11,7 @@ func TestValidateChannelTypeAllowsKnownTypes(t *testing.T) {
 	knownTypes := []string{
 		globals.OpenAIChannelType,
 		globals.OpenRouterChannelType,
+		globals.SiliconFlowChannelType,
 		globals.OpenAIResponsesChannelType,
 		globals.XAIChannelType,
 		globals.AzureOpenAIChannelType,

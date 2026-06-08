@@ -54,6 +54,7 @@ export type ChannelInfo = {
 export const ChannelTypes: Record<string, string> = {
   openai: "OpenAI",
   openrouter: "OpenRouter",
+  siliconflow: "硅基流动 SiliconFlow",
   "openai-responses": "OpenAI Responses",
   xai: "xAI Grok",
   azure: "Azure OpenAI",
@@ -70,6 +71,7 @@ export const ChannelTypes: Record<string, string> = {
 export const ShortChannelTypes: Record<string, string> = {
   openai: "OpenAI",
   openrouter: "OpenRouter",
+  siliconflow: "SiliconFlow",
   "openai-responses": "OpenAI Responses",
   xai: "xAI",
   azure: "Azure",
@@ -128,6 +130,22 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "> OpenRouter 渠道基于 **OpenAI Chat Completions API** 兼容格式，接入点填写 *https://openrouter.ai/api/v1* 或其反代地址，系统会请求 *`/chat/completions`*。 \n" +
       "> 密钥填写 OpenRouter API Key，系统会按 **Authorization: Bearer** 鉴权，并附加 **X-OpenRouter-Title: Prism** 用于应用归因。 \n" +
       "> 模型名使用 OpenRouter 官方模型 slug，例如 **openai/gpt-4o**、**anthropic/claude-sonnet-4.5**、**google/gemini-2.5-flash**，也可以从 OpenRouter 模型列表复制后手动添加。\n",
+  },
+  siliconflow: {
+    endpoint: "https://api.siliconflow.cn/v1",
+    format: "<siliconflow-api-key>",
+    models: [
+      "Pro/zai-org/GLM-4.7",
+      "Pro/zai-org/GLM-5",
+      "deepseek-ai/DeepSeek-V3.2",
+      "deepseek-ai/DeepSeek-V4-Flash",
+      "Qwen/Qwen3-32B",
+      "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+    ],
+    description:
+      "> 硅基流动渠道基于 **OpenAI Chat Completions API** 兼容格式，接入点默认填写 `https://api.siliconflow.cn/v1`，系统会请求 *`/chat/completions`*。 \n" +
+      "> 密钥填写 SiliconFlow API Key，系统会按 **Authorization: Bearer** 鉴权。官方同时提供 *`/v1/models`* 模型列表接口，可从控制台或接口复制模型名后添加。 \n" +
+      "> 常见模型包括 **Pro/zai-org/GLM-4.7**、**deepseek-ai/DeepSeek-V3.2**、**deepseek-ai/DeepSeek-V4-Flash**、**Qwen/Qwen3** 系列，具体以硅基流动模型列表和你的账号权限为准。\n",
   },
   "openai-responses": {
     endpoint: "https://api.openai.com",

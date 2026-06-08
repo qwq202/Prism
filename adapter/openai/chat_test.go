@@ -56,3 +56,42 @@ func TestOpenRouterStreamErrorUsesProviderPrefix(t *testing.T) {
 		t.Fatalf("expected OpenRouter error prefix, got %q", err.Error())
 	}
 }
+
+func TestSiliconFlowUsesDocumentedBaseURL(t *testing.T) {
+	props := &adaptercommon.ChatProps{Model: "Qwen/Qwen3-Coder-480B-A35B-Instruct"}
+	instance := NewSiliconFlowChatInstance("", "sk-sf-test")
+
+	if got := instance.GetChatEndpoint(props); got != "https://api.siliconflow.cn/v1/chat/completions" {
+		t.Fatalf("expected SiliconFlow default chat endpoint, got %q", got)
+	}
+
+	instance = NewSiliconFlowChatInstance("https://api.siliconflow.cn", "sk-sf-test")
+	if got := instance.GetChatEndpoint(props); got != "https://api.siliconflow.cn/v1/chat/completions" {
+		t.Fatalf("expected bare SiliconFlow host to use v1 endpoint, got %q", got)
+	}
+
+	instance = NewSiliconFlowChatInstance("https://api.siliconflow.cn/v1", "sk-sf-test")
+	if got := instance.GetChatEndpoint(props); got != "https://api.siliconflow.cn/v1/chat/completions" {
+		t.Fatalf("expected existing SiliconFlow v1 endpoint to be reused, got %q", got)
+	}
+}
+
+func TestSiliconFlowHeaders(t *testing.T) {
+	headers := NewSiliconFlowChatInstance("", "sk-sf-test").GetHeader()
+
+	if got := headers["Authorization"]; got != "Bearer sk-sf-test" {
+		t.Fatalf("expected bearer authorization, got %q", got)
+	}
+}
+
+func TestSiliconFlowStreamErrorUsesProviderPrefix(t *testing.T) {
+	instance := NewSiliconFlowChatInstance("", "sk-sf-test")
+
+	_, err := instance.ProcessLine(`{"error":{"message":"invalid api key","type":"invalid_request_error"}}`, false)
+	if err == nil {
+		t.Fatal("expected stream error")
+	}
+	if !strings.Contains(err.Error(), "siliconflow error: invalid api key") {
+		t.Fatalf("expected SiliconFlow error prefix, got %q", err.Error())
+	}
+}

@@ -41,6 +41,7 @@ func TestToolCallChannelsIncludeFunctionToolCapableAdapters(t *testing.T) {
 	expected := []string{
 		globals.OpenAIChannelType,
 		globals.OpenAIResponsesChannelType,
+		globals.SiliconFlowChannelType,
 		globals.AzureOpenAIChannelType,
 		globals.ClaudeChannelType,
 		globals.GLMCodingPlanCNChannelType,

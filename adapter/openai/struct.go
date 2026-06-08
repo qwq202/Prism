@@ -99,3 +99,25 @@ func NewOpenRouterChatInstanceFromConfig(conf globals.ChannelConfig) factory.Fac
 		conf.GetRandomSecret(),
 	)
 }
+
+func normalizeSiliconFlowEndpoint(endpoint string) string {
+	endpoint = strings.TrimRight(strings.TrimSpace(endpoint), "/")
+	if endpoint == "" {
+		return "https://api.siliconflow.cn/v1"
+	}
+
+	return endpoint
+}
+
+func NewSiliconFlowChatInstance(endpoint, apiKey string) *ChatInstance {
+	instance := NewChatInstance(normalizeSiliconFlowEndpoint(endpoint), apiKey)
+	instance.ErrorPrefix = "siliconflow"
+	return instance
+}
+
+func NewSiliconFlowChatInstanceFromConfig(conf globals.ChannelConfig) factory.Factory {
+	return NewSiliconFlowChatInstance(
+		conf.GetEndpoint(),
+		conf.GetRandomSecret(),
+	)
+}

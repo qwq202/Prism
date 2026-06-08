@@ -26,6 +26,7 @@ import {
   IconAvatarProps,
   Azure,
   XiaomiMiMo,
+  SiliconCloud,
 } from "@lobehub/icons";
 import React from "react";
 import { cn } from "@/components/ui/lib/utils.ts";
@@ -90,6 +91,10 @@ const builtinAvatars: Record<string, AvatarComponent> = {
   firework: Fireworks.Avatar,
 
   router: OpenRouter.Avatar,
+
+  siliconflow: SiliconCloud.Avatar,
+  siliconcloud: SiliconCloud.Avatar,
+  silicon: SiliconCloud.Avatar,
 
   perplexity: Perplexity.Avatar,
 
