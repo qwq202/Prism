@@ -61,7 +61,22 @@ export function MultiCombobox({
     return [...set];
   }, [list, value]);
 
-  const v = value ?? [];
+  const v = React.useMemo(() => value ?? [], [value]);
+
+  const toggleItem = React.useCallback(
+    (item: string) => {
+      const existingIndex = v.findIndex(
+        (selected) => selected.toLowerCase() === item.toLowerCase(),
+      );
+      if (existingIndex !== -1) {
+        onChange(v.filter((_, index) => index !== existingIndex));
+        return;
+      }
+
+      onChange([...v, item]);
+    },
+    [onChange, v],
+  );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -91,23 +106,19 @@ export function MultiCombobox({
               <CommandItem
                 key={key}
                 value={key}
-                onSelect={(current) => {
-                  // keep original case
-                  const originalItem = valueList.find(item => item.toLowerCase() === current.toLowerCase());
-                  if (!originalItem) return;
-
-                  const existingIndex = v.findIndex(item => item.toLowerCase() === current.toLowerCase());
-                  if (existingIndex !== -1) {
-                    onChange(v.filter((_, index) => index !== existingIndex));
-                  } else {
-                    onChange([...v, originalItem]);
-                  }
-                }}
+                disabled={false}
+                aria-disabled={false}
+                className="cursor-pointer text-foreground opacity-100 data-[disabled]:pointer-events-auto data-[disabled]:opacity-100 aria-disabled:pointer-events-auto aria-disabled:opacity-100"
+                onSelect={() => toggleItem(key)}
               >
                 <Check
                   className={cn(
                     "mr-2 h-4 w-4",
-                    v.some(item => item.toLowerCase() === key.toLowerCase()) ? "opacity-100" : "opacity-0",
+                    v.some(
+                      (item) => item.toLowerCase() === key.toLowerCase(),
+                    )
+                      ? "opacity-100"
+                      : "opacity-0",
                   )}
                 />
                 {listTranslateFormatter
