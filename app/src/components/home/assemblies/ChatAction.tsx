@@ -83,6 +83,7 @@ import { Label } from "@/components/ui/label.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
 import { ButtonProps } from "@/components/ui/button.tsx";
 import { getBooleanMemory, setMemory } from "@/utils/memory.ts";
+import { useMobile } from "@/utils/device.ts";
 
 const geminiThinkingPresets = [
   { label: "off", budget: 0 },
@@ -119,35 +120,42 @@ export const ChatAction = React.forwardRef<HTMLButtonElement, ChatActionProps>(
     { className, text, children, active, show = true, onClick, ...props },
     ref,
   ) => {
+    const mobile = useMobile();
+    const button = (
+      <Button
+        ref={ref}
+        size={`icon-sm`}
+        variant={`ghost`}
+        className={cn(
+          "group mr-1 transition-all duration-300 hover:bg-muted-foreground/5",
+          active && "bg-muted-foreground/10 hover:bg-muted-foreground/20",
+          !show && "pointer-events-none invisible opacity-0",
+          className,
+        )}
+        classNameWrapper="shrink-0"
+        tapScale={0.9}
+        unClickable
+        onClick={onClick}
+        {...props}
+      >
+        <Icon
+          icon={children}
+          className={cn(
+            "h-[1.125rem] w-[1.125rem] shrink-0 stroke-[2] text-unread transition",
+            active && "text-primary",
+          )}
+        />
+      </Button>
+    );
+
+    if (mobile) {
+      return button;
+    }
+
     return (
       <TooltipProvider>
         <Tooltip delayDuration={250}>
-          <TooltipTrigger asChild>
-            <Button
-              ref={ref}
-              size={`icon-sm`}
-              variant={`ghost`}
-              className={cn(
-                "group mr-1 transition-all duration-300 hover:bg-muted-foreground/5",
-                active && "bg-muted-foreground/10 hover:bg-muted-foreground/20",
-                !show && "pointer-events-none invisible opacity-0",
-                className,
-              )}
-              classNameWrapper="shrink-0"
-              tapScale={0.9}
-              unClickable
-              onClick={onClick}
-              {...props}
-            >
-              <Icon
-                icon={children}
-                className={cn(
-                  "h-[1.125rem] w-[1.125rem] shrink-0 stroke-[2] text-unread transition",
-                  active && "text-primary",
-                )}
-              />
-            </Button>
-          </TooltipTrigger>
+          <TooltipTrigger asChild>{button}</TooltipTrigger>
           <TooltipContent>{text}</TooltipContent>
         </Tooltip>
       </TooltipProvider>

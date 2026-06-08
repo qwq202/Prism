@@ -33,23 +33,23 @@ export function useMobile(): boolean {
   const [mobile, setMobile] = useState<boolean>(isMobile);
 
   useEffect(() => {
-    const handler = () => setMobile(isMobile);
+    const updateMobile = () => {
+      const next = isMobile();
+      setMobile((current) => (current === next ? current : next));
+    };
 
-    return addEventListeners(
+    const removeWindowListeners = addEventListeners(
       window,
-      [
-        "resize",
-        "orientationchange",
-        "touchstart",
-        "touchmove",
-        "touchend",
-        "touchcancel",
-        "gesturestart",
-        "gesturechange",
-        "gestureend",
-      ],
-      handler,
+      ["resize", "orientationchange"],
+      updateMobile,
     );
+
+    window.visualViewport?.addEventListener("resize", updateMobile);
+
+    return () => {
+      removeWindowListeners();
+      window.visualViewport?.removeEventListener("resize", updateMobile);
+    };
   }, []);
 
   return mobile;

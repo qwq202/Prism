@@ -77,7 +77,7 @@ const DropdownMenuItem = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item> & {
     inset?: boolean;
   }
->(({ className, inset, ...props }, ref) => (
+>(({ className, inset, onClick, onSelect, ...props }, ref) => (
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={cn(
@@ -85,6 +85,12 @@ const DropdownMenuItem = React.forwardRef<
       inset && "pl-8",
       className,
     )}
+    onSelect={(event) => {
+      onSelect?.(event);
+      if (!event.defaultPrevented) {
+        onClick?.(event as unknown as React.MouseEvent<HTMLDivElement>);
+      }
+    }}
     {...props}
   />
 ));
@@ -117,16 +123,19 @@ DropdownMenuCheckboxItem.displayName =
 const DropdownMenuRadioItem = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.RadioItem>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.RadioItem>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, onClick, onSelect, ...props }, ref) => (
   <DropdownMenuPrimitive.RadioItem
     ref={ref}
     className={cn(
       "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className,
     )}
-    onClick={(e) => {
-      e.stopPropagation();
-      props.onClick?.(e);
+    onSelect={(event) => {
+      onSelect?.(event);
+      if (!event.defaultPrevented) {
+        event.stopPropagation();
+        onClick?.(event as unknown as React.MouseEvent<HTMLDivElement>);
+      }
     }}
     {...props}
   >

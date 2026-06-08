@@ -15,7 +15,7 @@ import { selectAuthenticated } from "@/store/auth.ts";
 import { Model, Plans } from "@/api/types.tsx";
 import { modelEvent } from "@/events/model.ts";
 import { levelSelector } from "@/store/subscription.ts";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import {
   CloudOff,
   Gem,
@@ -129,7 +129,7 @@ export default function ModelFinder(props: ModelSelectorProps) {
   const supportModels = useSelector(selectSupportModels);
   const subscriptionData = useSelector(subscriptionDataSelector);
 
-  async function syncConversationModel(value: string) {
+  const syncConversationModel = useCallback(async (value: string) => {
     dispatch(setModel(value));
 
     if (currentConversationId === -1) return;
@@ -140,15 +140,17 @@ export default function ModelFinder(props: ModelSelectorProps) {
         `[conversation] failed to persist model ${value} for conversation ${currentConversationId}: ${resp.error ?? resp.message ?? "unknown error"}`,
       );
     }
-  }
+  }, [currentConversationId, dispatch]);
 
-  modelEvent.bind((target: string) => {
-    if (supportModels.find((m) => m.id === target)) {
-      if (model === target) return;
-      console.debug(`[chat] toggle model from event: ${target}`);
-      void syncConversationModel(target);
-    }
-  });
+  useEffect(() => {
+    modelEvent.bind((target: string) => {
+      if (supportModels.find((m) => m.id === target)) {
+        if (model === target) return;
+        console.debug(`[chat] toggle model from event: ${target}`);
+        void syncConversationModel(target);
+      }
+    });
+  }, [model, supportModels, syncConversationModel]);
 
   const models = useMemo(() => {
     const raw = list.length
@@ -222,7 +224,7 @@ export function ModelArea() {
   const modelList = useSelector(selectModelList);
   const subscriptionData = useSelector(subscriptionDataSelector);
 
-  async function syncConversationModel(value: string) {
+  const syncConversationModel = useCallback(async (value: string) => {
     dispatch(setModel(value));
 
     if (currentConversationId === -1) return;
@@ -233,15 +235,17 @@ export function ModelArea() {
         `[conversation] failed to persist model ${value} for conversation ${currentConversationId}: ${resp.error ?? resp.message ?? "unknown error"}`,
       );
     }
-  }
+  }, [currentConversationId, dispatch]);
 
-  modelEvent.bind((target: string) => {
-    if (supportModels.find((m) => m.id === target)) {
-      if (model === target) return;
-      console.debug(`[chat] toggle model from event: ${target}`);
-      void syncConversationModel(target);
-    }
-  });
+  useEffect(() => {
+    modelEvent.bind((target: string) => {
+      if (supportModels.find((m) => m.id === target)) {
+        if (model === target) return;
+        console.debug(`[chat] toggle model from event: ${target}`);
+        void syncConversationModel(target);
+      }
+    });
+  }, [model, supportModels, syncConversationModel]);
 
   const models = useMemo(() => {
     const raw =
