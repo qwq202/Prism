@@ -19,6 +19,7 @@ import { appLogo, appName } from "@/conf/env.ts";
 import { infoMailSelector } from "@/store/info.ts";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import { toast } from "sonner";
+import { localizeError } from "@/utils/error.ts";
 
 type CompProps = {
   form: RegisterForm;
@@ -150,7 +151,7 @@ function Verify({ form, dispatch, setNext }: CompProps) {
     const resp = await doRegister(data);
     if (!resp.status) {
       toast.error(t("error"), {
-        description: resp.error,
+        description: localizeError(t, resp.error),
       });
       return;
     }

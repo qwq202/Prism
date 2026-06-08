@@ -20,6 +20,7 @@ import { infoMailSelector } from "@/store/info.ts";
 import { AlertCircle } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import { toast } from "sonner";
+import { localizeError } from "@/utils/error.ts";
 
 function Forgot() {
   const { t } = useTranslation();
@@ -46,7 +47,7 @@ function Forgot() {
     const res = await doReset(form);
     if (!res.status) {
       toast.error(t("error"), {
-        description: res.error,
+        description: localizeError(t, res.error),
       });
       return;
     }
