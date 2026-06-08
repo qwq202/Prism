@@ -189,7 +189,10 @@ function replaceWithRemoteConversationHistory(
   state: initialStateType,
   incoming: ConversationInstance[],
 ) {
-  const stable = dedupeStableHistory(incoming);
+  const stable = preserveLocalHistoryKeys(
+    dedupeStableHistory(incoming),
+    state.history,
+  );
   const remoteIds = new Set(stable.map((item) => item.id));
   const pending = state.history.find((item) => item.id === -1);
   const currentMissing =
@@ -262,6 +265,7 @@ function buildConversationHistoryEntry(
   if (model) entry.model = model;
   if (fallback?.shared !== undefined) entry.shared = fallback.shared;
   entry.updated_at = conversation?.updated_at ?? fallback?.updated_at;
+  if (fallback?.local_key) entry.local_key = fallback.local_key;
 
   return entry;
 }
@@ -276,6 +280,22 @@ function dedupeStableHistory(
 
     seen.add(item.id);
     return true;
+  });
+}
+
+function preserveLocalHistoryKeys(
+  incoming: ConversationInstance[],
+  localHistory: ConversationInstance[],
+): ConversationInstance[] {
+  const localKeys = new Map(
+    localHistory
+      .filter((item) => item.local_key)
+      .map((item) => [item.id, item.local_key as string]),
+  );
+
+  return incoming.map((item) => {
+    const localKey = localKeys.get(item.id);
+    return localKey ? { ...item, local_key: localKey } : item;
   });
 }
 
@@ -302,7 +322,10 @@ function reconcileConversationHistory(
   localHistory: ConversationInstance[],
   conversations: Record<number, ConversationSerialized>,
 ): ConversationInstance[] {
-  const stable = dedupeStableHistory(incoming);
+  const stable = preserveLocalHistoryKeys(
+    dedupeStableHistory(incoming),
+    localHistory,
+  );
 
   if (current === -1) {
     const pending = localHistory.find((item) => item.id === -1);
@@ -1124,6 +1147,7 @@ const chatSlice = createSlice({
         model: conversation.model ?? previous?.model,
         shared: conversation.shared ?? previous?.shared,
         updated_at: conversation.updated_at ?? previous?.updated_at,
+        local_key: previous?.local_key ?? conversation.local_key,
       };
 
       if (index >= 0) {
@@ -1215,10 +1239,16 @@ const chatSlice = createSlice({
       );
     },
     preflightHistory: (state, action) => {
-      const name = action.payload as string;
+      const { localKey, name } = action.payload as {
+        localKey: string;
+        name: string;
+      };
 
       // add a new history at the beginning
-      state.history = [{ id: -1, name, message: [] }, ...state.history];
+      state.history = [
+        { id: -1, name, message: [], local_key: localKey },
+        ...state.history.filter((item) => item.id !== -1),
+      ];
     },
     renameHistory: (state, action) => {
       const { id, name } = action.payload as { id: number; name: string };
@@ -1238,6 +1268,7 @@ const chatSlice = createSlice({
         model: incoming.model ?? previous?.model,
         shared: incoming.shared ?? previous?.shared,
         updated_at: incoming.updated_at ?? previous?.updated_at,
+        local_key: previous?.local_key ?? incoming.local_key,
       };
 
       if (index >= 0) {
@@ -1902,10 +1933,8 @@ export function useMessageActions() {
           enableOpenAINativeWeb && openai_responses_web_search,
         );
 
-      if (current === -1 && conversations[-1].messages.length === 0) {
-        // preflight history if it's a new conversation
-        dispatch(preflightHistory(message));
-      }
+      const shouldPreflightHistory =
+        current === -1 && conversations[-1].messages.length === 0;
 
       if (!stack.hasConnection(current)) {
         stack.createConnection(current);
@@ -1968,6 +1997,17 @@ export function useMessageActions() {
         repetition_penalty,
       });
       if (!state) return false;
+
+      if (shouldPreflightHistory) {
+        dispatch(
+          preflightHistory({
+            localKey: `pending:${Date.now()}:${Math.random()
+              .toString(36)
+              .slice(2)}`,
+            name: message,
+          }),
+        );
+      }
 
       dispatch(
         createMessage({ id: current, role: UserRole, content: message }),

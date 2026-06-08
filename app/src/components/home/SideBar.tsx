@@ -264,11 +264,19 @@ function SidebarConversationList({
           {filteredHistory.length ? (
             filteredHistory.map((conversation, i) => (
               <motion.div
-                key={conversation.id}
-                initial={{ opacity: 0, y: 20 }}
+                key={conversation.local_key ?? conversation.id}
+                initial={
+                  conversation.id === -1 ? false : { opacity: 0, y: 20 }
+                }
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3, delay: i * 0.05 }}
+                exit={
+                  conversation.id === -1 ? undefined : { opacity: 0, y: -20 }
+                }
+                transition={
+                  conversation.id === -1
+                    ? { duration: 0 }
+                    : { duration: 0.3, delay: i * 0.05 }
+                }
               >
                 <ConversationItem
                   operate={setOperateConversation}

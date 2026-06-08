@@ -101,6 +101,7 @@ export type ConversationInstance = {
   model?: string;
   shared?: boolean;
   updated_at?: string;
+  local_key?: string;
 };
 
 export type PlanItem = {

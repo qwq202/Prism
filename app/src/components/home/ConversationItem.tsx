@@ -67,7 +67,8 @@ function ConversationItem({
   >("idle");
   const [typingTarget, setTypingTarget] = useState("");
 
-  const loading = conversation.id <= 0;
+  const pendingLocal = conversation.id === -1;
+  const loading = conversation.id === 0;
 
   useEffect(() => {
     if (retitleStage !== "idle") return;
@@ -141,6 +142,11 @@ function ConversationItem({
         className={`h-6 w-6 p-1 mr-1 text-muted-foreground bg-muted/60 rounded-sm`}
       />
       <div className={`title`}>{displayTitle}</div>
+      {pendingLocal ? (
+        <div className={`id`}>
+          <MoreHorizontal className={`h-4 w-4 mr-0.5 text-muted-foreground`} />
+        </div>
+      ) : (
       <DropdownMenu
         open={open}
         onOpenChange={(state: boolean) => {
@@ -259,6 +265,7 @@ function ConversationItem({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      )}
     </Clickable>
   );
 }
