@@ -2,8 +2,6 @@
 
 # 🔮 Prism
 
----
-
 [![stars](https://img.shields.io/github/stars/qwq202/prism?style=flat-square&label=stars)](https://github.com/qwq202/prism/stargazers)
 [![forks](https://img.shields.io/github/forks/qwq202/prism?style=flat-square&label=forks)](https://github.com/qwq202/prism/network/members)
 [![license](https://img.shields.io/badge/license-Apache--2.0-green?style=flat-square)](LICENSE)
