@@ -5,8 +5,8 @@ import {
   lazy,
   useMemo,
   useReducer,
-  useRef,
   useState,
+  useRef,
   Suspense,
 } from "react";
 import FileAction, {
@@ -52,8 +52,7 @@ import { toast } from "sonner";
 import { VoiceAction } from "@/components/VoiceProvider.tsx";
 import { AnimatePresence, motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { FileText, ImagePlus, UploadCloud } from "lucide-react";
-import { blobEvent } from "@/events/blob.ts";
+import { blobEvent, filePanelEvent } from "@/events/blob.ts";
 
 const loadChatInterface = () => import("@/components/home/ChatInterface.tsx");
 let chatInterfacePromise: ReturnType<typeof loadChatInterface> | undefined;
@@ -166,8 +165,6 @@ function ChatWrapper() {
   const model = useSelector(selectModel);
   const target = useRef<HTMLTextAreaElement>(null);
   const align = useSelector(alignSelector);
-  const [draggingFiles, setDraggingFiles] = useState(false);
-  const dragResetTimer = useRef<number | undefined>(undefined);
 
   const working = useWorking();
   const supportModels = useSelector(selectSupportModels);
@@ -183,44 +180,28 @@ function ChatWrapper() {
     void preloadChatInterface();
   }, []);
 
-  const clearDragResetTimer = useCallback(() => {
-    if (dragResetTimer.current === undefined) return;
-    window.clearTimeout(dragResetTimer.current);
-    dragResetTimer.current = undefined;
-  }, []);
-
-  const hideFileDropOverlay = useCallback(() => {
-    clearDragResetTimer();
-    setDraggingFiles(false);
-  }, [clearDragResetTimer]);
-
-  const keepFileDropOverlayVisible = useCallback(() => {
-    clearDragResetTimer();
-    setDraggingFiles(true);
-    dragResetTimer.current = window.setTimeout(() => {
-      setDraggingFiles(false);
-      dragResetTimer.current = undefined;
-    }, 160);
-  }, [clearDragResetTimer]);
-
   useEffect(() => {
-    const handleDragEnter = (event: DragEvent) => {
-      if (!hasDraggedFiles(event.dataTransfer)) return;
+    const openFilePanel = (event: DragEvent) => {
+      if (!hasDraggedFiles(event.dataTransfer)) return false;
       event.preventDefault();
-      keepFileDropOverlayVisible();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+      filePanelEvent.emit(undefined);
+      return true;
+    };
+
+    const handleDragEnter = (event: DragEvent) => {
+      openFilePanel(event);
     };
 
     const handleDragOver = (event: DragEvent) => {
-      if (!hasDraggedFiles(event.dataTransfer)) return;
-      event.preventDefault();
-      if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
-      keepFileDropOverlayVisible();
+      openFilePanel(event);
     };
 
     const handleDrop = (event: DragEvent) => {
-      if (!hasDraggedFiles(event.dataTransfer)) return;
+      if (event.defaultPrevented || !hasDraggedFiles(event.dataTransfer)) {
+        return;
+      }
       event.preventDefault();
-      hideFileDropOverlay();
 
       const files = getDroppedFiles(event.dataTransfer);
       if (files.length > 0) {
@@ -228,25 +209,16 @@ function ChatWrapper() {
       }
     };
 
-    const handleDragEnd = () => hideFileDropOverlay();
-
     window.addEventListener("dragenter", handleDragEnter);
     window.addEventListener("dragover", handleDragOver);
     window.addEventListener("drop", handleDrop);
-    window.addEventListener("dragend", handleDragEnd);
 
     return () => {
-      clearDragResetTimer();
       window.removeEventListener("dragenter", handleDragEnter);
       window.removeEventListener("dragover", handleDragOver);
       window.removeEventListener("drop", handleDrop);
-      window.removeEventListener("dragend", handleDragEnd);
     };
-  }, [
-    clearDragResetTimer,
-    hideFileDropOverlay,
-    keepFileDropOverlayVisible,
-  ]);
+  }, []);
 
   function clearFile() {
     fileDispatch({ type: "clear" });
@@ -494,34 +466,6 @@ function ChatWrapper() {
           </div>
         </div>
       </div>
-      <AnimatePresence>
-        {draggingFiles && (
-          <motion.div
-            className="chat-file-drop-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.16 }}
-            aria-hidden="true"
-          >
-            <motion.div
-              className="chat-file-drop-card"
-              initial={{ opacity: 0, scale: 0.96, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.98, y: 4 }}
-              transition={{ duration: 0.18, ease: "easeOut" }}
-            >
-              <div className="chat-file-drop-icons">
-                <FileText className="chat-file-drop-icon chat-file-drop-icon-back" />
-                <ImagePlus className="chat-file-drop-icon chat-file-drop-icon-main" />
-                <UploadCloud className="chat-file-drop-icon chat-file-drop-icon-front" />
-              </div>
-              <div className="chat-file-drop-title">{t("file.drop-title")}</div>
-              <div className="chat-file-drop-description">{t("file.drop")}</div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

@@ -44,7 +44,7 @@ import {
 } from "@/conf/model.ts";
 import { selectModel, selectSupportModels } from "@/store/chat.ts";
 import { ChatAction } from "@/components/home/assemblies/ChatAction.tsx";
-import { blobEvent } from "@/events/blob.ts";
+import { blobEvent, filePanelEvent } from "@/events/blob.ts";
 import { isB64Image } from "@/utils/base.ts";
 import { toast } from "sonner";
 import { Badge } from "./ui/badge.tsx";
@@ -260,6 +260,13 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
       await triggerFile(Array.isArray(file) ? file : [file]);
     });
   }, [canUploadImage, t, triggerFile]);
+
+  useEffect(() => {
+    filePanelEvent.bind(() => {
+      if (!canOpenFilePanel) return;
+      setOpen(true);
+    });
+  }, [canOpenFilePanel]);
 
   useEffect(() => {
     if (canUploadImage || canOpenFilePanel) return;
