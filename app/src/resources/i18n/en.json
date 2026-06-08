@@ -464,6 +464,7 @@
   "file": {
     "upload": "Upload",
     "type": "Only image uploads are supported",
+    "drop-title": "Add files",
     "drop": "Drag images here, click to upload, or paste",
     "parse-error": "Parse Error",
     "parse-error-prompt": "Parse Error: {{reason}}",

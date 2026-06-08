@@ -541,6 +541,7 @@
     "file": "檔案",
     "upload": "上傳檔案",
     "type": "僅支援圖像上傳",
+    "drop-title": "新增檔案",
     "drop": "將圖片拖曳至此處、點選上傳或貼上",
     "parse-error": "解析失敗",
     "parse-error-prompt": "解析失敗：{{reason}}",
