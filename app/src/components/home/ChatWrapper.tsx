@@ -53,7 +53,15 @@ import { VoiceAction } from "@/components/VoiceProvider.tsx";
 import { AnimatePresence, motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 
-const ChatInterface = lazy(() => import("@/components/home/ChatInterface.tsx"));
+const loadChatInterface = () => import("@/components/home/ChatInterface.tsx");
+let chatInterfacePromise: ReturnType<typeof loadChatInterface> | undefined;
+
+function preloadChatInterface() {
+  chatInterfacePromise ??= loadChatInterface();
+  return chatInterfacePromise;
+}
+
+const ChatInterface = lazy(preloadChatInterface);
 
 type InterfaceProps = {
   scrollable: boolean;
@@ -103,7 +111,7 @@ function Interface(props: InterfaceProps) {
   return conversationLoading && messages.length === 0 ? (
     loadingStage
   ) : messages.length > 0 ? (
-    <Suspense fallback={loadingStage}>
+    <Suspense fallback={current === -1 ? emptyConversationStage : loadingStage}>
       <ChatInterface {...props} />
     </Suspense>
   ) : current !== -1 ? (
@@ -149,6 +157,10 @@ function ChatWrapper() {
   );
 
   const [instance, setInstance] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    void preloadChatInterface();
+  }, []);
 
   function clearFile() {
     fileDispatch({ type: "clear" });
