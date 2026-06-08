@@ -237,20 +237,6 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
   );
 
   useEffect(() => {
-    if (!open || !canUploadImage) return;
-
-    const onPaste = (event: ClipboardEvent) => {
-      if (event.defaultPrevented) return;
-      if (handlePasteImages(event.clipboardData)) {
-        event.preventDefault();
-      }
-    };
-
-    window.addEventListener("paste", onPaste);
-    return () => window.removeEventListener("paste", onPaste);
-  }, [canUploadImage, handlePasteImages, open]);
-
-  useEffect(() => {
     blobEvent.bind(async (file: File | File[]) => {
       if (!canUploadImage) {
         toast.info(t("file.vision-model-required"));

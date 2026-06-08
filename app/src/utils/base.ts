@@ -165,7 +165,11 @@ export function getHostName(url: string): string {
 }
 
 export function isB64Image(value: string): boolean {
-  return /data:image\/([^;]+);base64,([a-zA-Z0-9+/=]+)/g.test(value);
+  const commaIndex = value.indexOf(",");
+  if (commaIndex <= 0 || commaIndex > 128) return false;
+
+  const header = value.slice(0, commaIndex);
+  return /^data:image\/[-+.\w]+(?:;[-\w]+=[^;]*)*;base64$/i.test(header);
 }
 
 export function trimPrefix(value: string, prefix: string): string {
