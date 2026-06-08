@@ -111,23 +111,25 @@ type ChatActionProps = {
   className?: string;
   text?: string;
   active?: boolean | number;
+  badge?: number;
   show?: boolean;
   children?: React.ReactElement;
 } & Omit<ButtonProps, "children">;
 
 export const ChatAction = React.forwardRef<HTMLButtonElement, ChatActionProps>(
   (
-    { className, text, children, active, show = true, onClick, ...props },
+    { className, text, children, active, badge = 0, show = true, onClick, ...props },
     ref,
   ) => {
     const mobile = useMobile();
+    const showBadge = badge > 0;
     const button = (
       <Button
         ref={ref}
         size={`icon-sm`}
         variant={`ghost`}
         className={cn(
-          "group mr-1 transition-all duration-300 hover:bg-muted-foreground/5",
+          "chat-action group relative mr-1 transition-all duration-300 hover:bg-muted-foreground/5",
           active && "bg-muted-foreground/10 hover:bg-muted-foreground/20",
           !show && "pointer-events-none invisible opacity-0",
           className,
@@ -145,6 +147,11 @@ export const ChatAction = React.forwardRef<HTMLButtonElement, ChatActionProps>(
             active && "text-primary",
           )}
         />
+        {showBadge && (
+          <span className="chat-action-badge">
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
       </Button>
     );
 

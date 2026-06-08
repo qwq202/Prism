@@ -287,6 +287,7 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
       <ChatAction
         text={canOpenFilePanel ? t("file.file") : t("file.vision-model-required")}
         active={files.length}
+        badge={files.length}
         className={!canOpenFilePanel ? "opacity-50" : undefined}
         disabled={!canOpenFilePanel}
         onClick={() => {
