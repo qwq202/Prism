@@ -127,7 +127,7 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "deepseek/deepseek-chat-v3.1",
     ],
     description:
-      "> OpenRouter 渠道基于 **OpenAI Chat Completions API** 兼容格式，接入点填写 *https://openrouter.ai/api/v1* 或其反代地址，系统会请求 *`/chat/completions`*。 \n" +
+      "> OpenRouter 渠道基于 **OpenAI Chat Completions API** 兼容格式，接入点填写 `https://openrouter.ai/api/v1` 或其反代地址，系统会请求 *`/chat/completions`*。 \n" +
       "> 密钥填写 OpenRouter API Key，系统会按 **Authorization: Bearer** 鉴权，并附加 **X-OpenRouter-Title: Prism** 用于应用归因。 \n" +
       "> 模型名使用 OpenRouter 官方模型 slug，例如 **openai/gpt-4o**、**anthropic/claude-sonnet-4.5**、**google/gemini-2.5-flash**，也可以从 OpenRouter 模型列表复制后手动添加。\n",
   },
@@ -187,7 +187,7 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "grok-4-1-fast",
     ],
     description:
-      "> xAI 渠道基于 **OpenAI Responses API** 兼容格式，请将接入点填写为 *https://api.x.ai* 或其反代地址，系统会自动请求 */v1/responses*。 \n" +
+      "> xAI 渠道基于 **OpenAI Responses API** 兼容格式，请将接入点填写为 `https://api.x.ai` 或其反代地址，系统会自动请求 `/v1/responses`。 \n" +
       "> 系统已按 xAI 当前文档改为将 **system prompt** 保留在 `input` 中，而不是使用 xAI 暂不支持的 `instructions` 字段。 \n" +
       "> 已内置适配 xAI 原生 **Web Search** 与 **X Search** 两个独立开关，并会按官方方式自动开启 **view_image / view_x_video** 所需的图像与视频理解能力。 \n" +
       "> 常用模型可填写如 **grok-4.20-reasoning**、**grok-4-1-fast-reasoning**、**grok-4-1-fast** 等 Grok 模型。\n",
@@ -222,7 +222,7 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
     endpoint: "https://api.anthropic.com",
     format: "<x-api-key>",
     description:
-      "> Anthropic Claude 密钥即为 **x-api-key**，接入点填写 *https://api.anthropic.com* 或其反代地址，系统会请求官方 *`/v1/messages`* 接口。 \n" +
+      "> Anthropic Claude 密钥即为 **x-api-key**，接入点填写 `https://api.anthropic.com` 或其反代地址，系统会请求官方 *`/v1/messages`* 接口。 \n" +
       "> 系统现已适配新版 **Messages API** 的 **tools / tool_choice / thinking** 与完整 **SSE content block** 流式事件，可用于 Claude 原生工具调用与 extended thinking。 \n" +
       "> 如果同时开启工具调用与 thinking，系统会按官方要求自动启用 **interleaved thinking** beta 头。Anthropic 对请求 IP 地域有限制，可能出现 **Request not allowed** 的错误，请尝试更换 IP 或者使用代理。\n",
     models: [
@@ -237,7 +237,7 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
     endpoint: "https://open.bigmodel.cn/api/anthropic",
     format: "<x-api-key>",
     description:
-      "> GLM Coding Plan（CN）渠道基于 **Anthropic / Claude API** 兼容格式，接入点请填写 *https://open.bigmodel.cn/api/anthropic* 或其反代地址。 \n" +
+      "> GLM Coding Plan（CN）渠道基于 **Anthropic / Claude API** 兼容格式，接入点请填写 `https://open.bigmodel.cn/api/anthropic` 或其反代地址。 \n" +
       "> 密钥请填写智谱 API Key，系统会按 **x-api-key** 方式请求官方 *`/v1/messages`* 接口。 \n" +
       "> 官方当前推荐模型包括 **glm-5.1**、**glm-5**、**glm-4.7**，编码套餐文档中也常见 **glm-4.5-air**。 \n",
     models: ["glm-5.1", "glm-5", "glm-4.7", "glm-4.5-air"],
@@ -246,7 +246,7 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
     endpoint: "https://api.minimaxi.com/anthropic",
     format: "<x-api-key>",
     description:
-      "> MiniMax Token Plan（CN）渠道基于 **Anthropic API** 兼容格式，接入点请填写 *https://api.minimaxi.com/anthropic* 或其反代地址。 \n" +
+      "> MiniMax Token Plan（CN）渠道基于 **Anthropic API** 兼容格式，接入点请填写 `https://api.minimaxi.com/anthropic` 或其反代地址。 \n" +
       "> 密钥需使用 **Token Plan 专属 API Key**，与 MiniMax 按量计费 API Key **不可互通**。 \n" +
       "> 系统现已适配 MiniMax 当前 Anthropic 兼容链路里的 **tools / tool_choice / thinking** 与完整 **SSE content block** 流式事件，可用于 Tool Use 与交错思维链。 \n" +
       "> 官方文档当前同时出现 **MiniMax-M2.1 / MiniMax-M2.1-highspeed / MiniMax-M2** 与快速接入页里的 **MiniMax-M2.7 / MiniMax-M2.7-highspeed**，这里一并保留，方便兼容不同套餐文档口径。 \n",
@@ -262,7 +262,7 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
     endpoint: "https://api.xiaomimimo.com/v1",
     format: "<mimo-api-key>",
     description:
-      "> Xiaomi MiMo 渠道基于开放平台 **OpenAI Chat Completions API** 兼容格式，接入点默认填写 *https://api.xiaomimimo.com/v1*，系统会请求 *`/chat/completions`*。 \n" +
+      "> Xiaomi MiMo 渠道基于开放平台 **OpenAI Chat Completions API** 兼容格式，接入点默认填写 `https://api.xiaomimimo.com/v1`，系统会请求 *`/chat/completions`*。 \n" +
       "> 密钥填写开放平台 API Key，系统会按官方 **api-key** 请求头鉴权。 \n" +
       "> 系统已适配 **max_completion_tokens**、**thinking**、**reasoning_content**、函数调用与流式 Chat Completions 返回。 \n" +
       "> 默认模型按官方模型列表保留 **mimo-v2.5-pro**、**mimo-v2.5**、**mimo-v2-flash**；**mimo-v2-pro** 和 **mimo-v2-omni** 已进入下线窗口，不再作为默认模型。\n",
@@ -272,7 +272,7 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
     endpoint: "https://token-plan-cn.xiaomimimo.com/v1",
     format: "<tp-api-key>",
     description:
-      "> Xiaomi Token Plan (China) 渠道基于 **OpenAI Chat Completions API** 兼容格式，接入点默认填写 *https://token-plan-cn.xiaomimimo.com/v1*，系统会请求 *`/chat/completions`*。 \n" +
+      "> Xiaomi Token Plan (China) 渠道基于 **OpenAI Chat Completions API** 兼容格式，接入点默认填写 `https://token-plan-cn.xiaomimimo.com/v1`，系统会请求 *`/chat/completions`*。 \n" +
       "> 密钥需使用 **Token Plan 专属 API Key**，格式通常为 **tp-xxxxx**，与按量计费 API Key **sk-xxxxx** 不可互通。 \n" +
       "> 系统已单独适配小米 Token Plan 的 **api-key** 鉴权、**max_completion_tokens**、**thinking**、**reasoning_content** 与流式 Chat Completions 返回。 \n" +
       "> 默认模型按官方快速接入和模型列表保留 **mimo-v2.5-pro**、**mimo-v2.5**、**mimo-v2-pro**、**mimo-v2-omni**、**mimo-v2-flash**。\n",
@@ -305,7 +305,7 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "gemini-3.1-flash-image-preview",
     ],
     description:
-      "> Google Gemini 密钥格式为 **api-key**，接入点填写 *https://generativelanguage.googleapis.com* 或其反代地址。 \n" +
+      "> Google Gemini 密钥格式为 **api-key**，接入点填写 `https://generativelanguage.googleapis.com` 或其反代地址。 \n" +
       "> 系统已适配当前官方 `generateContent` / `streamGenerateContent` 请求结构，并支持 `system_instruction` 与 function calling。 \n" +
       "> Gemini 2.5 系列使用 `thinkingBudget`，Gemini 3 系列使用官方推荐的 `thinkingLevel` 参数，系统会按模型自动选择。 \n" +
       "> 为兼容官方稳定版与预览版模型，系统会自动在 `v1` 与 `v1beta` 之间选择合适的 Gemini API 版本。 \n" +
@@ -331,7 +331,7 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "gemini-3.1-flash-image-preview",
     ],
     description:
-      "> Gemini Enterprise Agent Platform 渠道基于 **Vertex AI Express Mode** 的 Gemini API，接入点填写 *https://aiplatform.googleapis.com* 或其反代地址。 \n" +
+      "> Gemini Enterprise Agent Platform 渠道基于 **Vertex AI Express Mode** 的 Gemini API，接入点填写 `https://aiplatform.googleapis.com` 或其反代地址。 \n" +
       "> 密钥请填写 Google Cloud Express Mode API Key；系统会请求 *`/v1/publishers/google/models/{model}:generateContent`*，流式请求使用 *`streamGenerateContent?alt=sse`*。 \n" +
       "> 预览、实验和 latest 模型会自动切换到 Agent Platform 的 *`v1beta1`* API 版本；稳定模型默认使用 *`v1`*。 \n" +
       "> 请求体沿用官方 Gemini `contents` / `systemInstruction` / `tools` / `generationConfig` 结构，并支持当前 Gemini 思考预算、URL Context、Google Search 与 function calling。 \n" +
@@ -342,7 +342,7 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
     format: "<api-key>",
     models: ["deepseek-v4-pro", "deepseek-v4-flash"],
     description:
-      "> DeepSeek 渠道使用官方 **Chat Completions API**，接入点填写 *https://api.deepseek.com* 或其反代地址，系统会请求 *`/chat/completions`*。 \n" +
+      "> DeepSeek 渠道使用官方 **Chat Completions API**，接入点填写 `https://api.deepseek.com` 或其反代地址，系统会请求 *`/chat/completions`*。 \n" +
       "> 官方已发布 **DeepSeek-V4** 预览模型 **deepseek-v4-pro** 与 **deepseek-v4-flash**，二者均支持 1M 上下文与 Thinking / Non-Thinking 双模式。 \n" +
       "> 系统现已适配官方最新的 **thinking**、**reasoning_effort**、**response_format**、**stream_options**、**logprobs / top_logprobs**、**tools / tool_choice** 等参数。 \n",
   },
