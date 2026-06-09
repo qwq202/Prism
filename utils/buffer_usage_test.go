@@ -74,3 +74,30 @@ func TestBufferMergesOfficialUsage(t *testing.T) {
 		t.Fatalf("unexpected merged cache tokens: %#v", usage)
 	}
 }
+
+func TestBufferRecordsBuiltinToolUsage(t *testing.T) {
+	buffer := &Buffer{}
+	buffer.SetCodeExecutionToolUsage(true, true)
+	buffer.WriteChunk(&globals.Chunk{
+		BuiltinToolUsage: &globals.BuiltinToolUsage{
+			CodeExecution: &globals.BuiltinToolUsageStatus{
+				Used: true,
+			},
+		},
+	})
+
+	usage := buffer.GetBuiltinToolUsage()
+	if usage == nil || usage.CodeExecution == nil {
+		t.Fatalf("expected code execution usage to be recorded, got %#v", usage)
+	}
+	if !usage.CodeExecution.Enabled || !usage.CodeExecution.Sent || !usage.CodeExecution.Used {
+		t.Fatalf("unexpected code execution usage: %#v", usage.CodeExecution)
+	}
+
+	detail := buffer.GetBillingDetail()
+	for _, expected := range []string{"tools", "code_execution", "enabled", "sent", "used"} {
+		if !strings.Contains(detail, expected) {
+			t.Fatalf("expected billing detail to include %q, got %q", expected, detail)
+		}
+	}
+}

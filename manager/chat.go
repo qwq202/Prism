@@ -375,6 +375,19 @@ func waitForRoundTaskEnd(chunkChan <-chan partialChunk) {
 	}
 }
 
+func recordBuiltinToolRequest(buffer *utils.Buffer, instance *conversation.Conversation, model string) {
+	if buffer == nil || instance == nil {
+		return
+	}
+
+	codeExecutionEnabled := instance.IsEnableCodeExecution()
+	if !codeExecutionEnabled {
+		return
+	}
+
+	buffer.SetCodeExecutionToolUsage(codeExecutionEnabled, globals.SupportGeminiCodeExecution(model))
+}
+
 func buildChatProps(
 	conn *Connection,
 	instance *conversation.Conversation,
@@ -642,6 +655,7 @@ func syncToolFinalMetadata(liveBuffer *utils.Buffer, responseBuffer *utils.Buffe
 	liveBuffer.SetGeminiHiddenMetadata(responseBuffer.GetGeminiHiddenMetadata())
 	liveBuffer.SetClaudeHiddenMetadata(responseBuffer.GetClaudeHiddenMetadata())
 	liveBuffer.MergeUsage(responseBuffer)
+	liveBuffer.MergeBuiltinToolUsage(responseBuffer.GetBuiltinToolUsage())
 }
 
 func buildToolLimitSystemMessage() globals.Message {
@@ -1166,6 +1180,7 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 	}
 
 	buffer := utils.NewBuffer(model, segment, channel.ChargeInstance.GetCharge(model))
+	recordBuiltinToolRequest(buffer, instance, model)
 	var hit bool
 	var err error
 	var interrupted bool

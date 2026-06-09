@@ -25,6 +25,16 @@ type ClaudeHiddenMetadata struct {
 	ThinkingBlocks []ClaudeThinkingBlock `json:"thinking_blocks,omitempty"`
 }
 
+type BuiltinToolUsageStatus struct {
+	Enabled bool `json:"enabled,omitempty"`
+	Sent    bool `json:"sent,omitempty"`
+	Used    bool `json:"used,omitempty"`
+}
+
+type BuiltinToolUsage struct {
+	CodeExecution *BuiltinToolUsageStatus `json:"code_execution,omitempty"`
+}
+
 func (m *GeminiHiddenMetadata) UnmarshalJSON(data []byte) error {
 	type rawMetadata struct {
 		ThoughtSignatures []string `json:"thought_signatures,omitempty"`
@@ -73,6 +83,7 @@ type Chunk struct {
 	GeminiHiddenMetadata *GeminiHiddenMetadata `json:"gemini_hidden_metadata,omitempty"` // hidden gemini metadata for replay
 	ClaudeHiddenMetadata *ClaudeHiddenMetadata `json:"claude_hidden_metadata,omitempty"` // hidden claude thinking metadata for replay
 	Usage                *TokenUsage           `json:"usage,omitempty"`
+	BuiltinToolUsage     *BuiltinToolUsage     `json:"builtin_tool_usage,omitempty"`
 }
 
 type CompletionTokensDetails struct {

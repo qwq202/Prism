@@ -157,6 +157,7 @@ func (c *ChatInstance) buildGeminiChunk(model string, parts []GeminiChatPart, st
 		Content:              content,
 		ToolCall:             getGeminiToolCalls(parts),
 		GeminiHiddenMetadata: getGeminiHiddenMetadataFromParts(parts),
+		BuiltinToolUsage:     getGeminiBuiltinToolUsageFromParts(parts),
 	}
 }
 

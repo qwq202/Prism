@@ -69,3 +69,38 @@ func TestGetGeminiChatTextIncludesCodeExecutionParts(t *testing.T) {
 		}
 	}
 }
+
+func TestGetGeminiChunkMarksCodeExecutionUsed(t *testing.T) {
+	instance := &ChatInstance{}
+	chunk, err := instance.GetGeminiChunk(globals.Gemini35Flash, GeminiChatResponse{
+		Candidates: []GeminiCandidate{
+			{
+				Content: GeminiContent{
+					Parts: []GeminiChatPart{
+						{
+							ExecutableCode: &GeminiExecutableCode{
+								Language: "PYTHON",
+								Code:     "print(2 + 2)",
+							},
+						},
+						{
+							CodeExecutionResult: &GeminiCodeExecutionResult{
+								Outcome: "OUTCOME_OK",
+								Output:  "4",
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if chunk.BuiltinToolUsage == nil || chunk.BuiltinToolUsage.CodeExecution == nil {
+		t.Fatalf("expected code execution usage metadata, got %#v", chunk.BuiltinToolUsage)
+	}
+	if !chunk.BuiltinToolUsage.CodeExecution.Used {
+		t.Fatalf("expected code execution used flag, got %#v", chunk.BuiltinToolUsage.CodeExecution)
+	}
+}

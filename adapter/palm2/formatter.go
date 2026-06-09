@@ -569,6 +569,20 @@ func getGeminiHiddenMetadataFromParts(parts []GeminiChatPart) *globals.GeminiHid
 	}).Normalized(globals.GeminiThoughtSignatureLimit)
 }
 
+func getGeminiBuiltinToolUsageFromParts(parts []GeminiChatPart) *globals.BuiltinToolUsage {
+	for _, part := range parts {
+		if part.ExecutableCode != nil || part.CodeExecutionResult != nil {
+			return &globals.BuiltinToolUsage{
+				CodeExecution: &globals.BuiltinToolUsageStatus{
+					Used: true,
+				},
+			}
+		}
+	}
+
+	return nil
+}
+
 func (c *ChatInstance) GetGeminiText(parts []GeminiChatPart) string {
 	builder := strings.Builder{}
 
