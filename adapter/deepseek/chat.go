@@ -184,7 +184,6 @@ func sanitizeDSMLToolMarkup(content string) string {
 		}
 	}
 
-	cleaned = strings.TrimSuffix(cleaned, "<")
 	return cleaned
 }
 

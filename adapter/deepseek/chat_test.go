@@ -168,6 +168,14 @@ func TestSanitizeDSMLToolMarkupPreservesWhitespaceWithoutMarker(t *testing.T) {
 	}
 }
 
+func TestSanitizeDSMLToolMarkupPreservesTrailingHtmlTagStart(t *testing.T) {
+	input := "    <"
+	got := sanitizeDSMLToolMarkup(input)
+	if got != input {
+		t.Fatalf("expected trailing html tag start to be preserved, got %q", got)
+	}
+}
+
 func TestSanitizeDeepseekStreamTextRemovesNestedThinkTags(t *testing.T) {
 	input := "先想一下 < THINK >\ninner\n</ Think > 继续"
 	got := sanitizeDeepseekStreamText(input)
