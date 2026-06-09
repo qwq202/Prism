@@ -794,6 +794,53 @@ export function supportsGeminiThinkingBudgetControl(
   );
 }
 
+export function supportsGeminiCodeExecution(
+  model: string | undefined | null,
+): boolean {
+  if (!model) return false;
+  const normalized = model.trim().toLowerCase();
+  if (!normalized) return false;
+
+  if (
+    normalized.includes("-image") ||
+    normalized.includes("image-generation") ||
+    normalized.includes("-tts") ||
+    normalized.includes("live") ||
+    normalized.includes("native-audio")
+  ) {
+    return false;
+  }
+
+  return (
+    normalized === "gemini-2.0-flash" ||
+    normalized === "gemini-2.0-flash-001" ||
+    normalized === "gemini-2.0-flash-exp" ||
+    normalized === "gemini-2.0-flash-thinking-exp-01-21" ||
+    normalized === "gemini-2.0-flash-thinking-exp-1219" ||
+    normalized === "gemini-2.5-flash" ||
+    normalized.startsWith("gemini-2.5-flash-preview-") ||
+    normalized === "gemini-2.5-flash-lite" ||
+    normalized.startsWith("gemini-2.5-flash-lite-preview-") ||
+    normalized === "gemini-2.5-pro" ||
+    normalized.startsWith("gemini-2.5-pro-preview-") ||
+    normalized.startsWith("gemini-2.5-pro-exp-") ||
+    normalized === "gemini-3.5-flash" ||
+    normalized.startsWith("gemini-3.5-flash-") ||
+    normalized === "gemini-3-flash" ||
+    normalized.startsWith("gemini-3-flash-") ||
+    normalized === "gemini-3-pro-preview" ||
+    normalized.startsWith("gemini-3-pro-preview-") ||
+    normalized === "gemini-3.1-pro-preview" ||
+    normalized.startsWith("gemini-3.1-pro-preview-") ||
+    normalized === "gemini-3.1-pro-preview-customtools" ||
+    normalized.startsWith("gemini-3.1-pro-preview-customtools-") ||
+    normalized === "gemini-3.1-flash-lite-preview" ||
+    normalized.startsWith("gemini-3.1-flash-lite-preview-") ||
+    normalized === "gemini-robotics-er-1.5-preview" ||
+    normalized.startsWith("gemini-robotics-er-1.5-preview-")
+  );
+}
+
 const toolStatusPriority: Record<string, number> = {
   start: 0,
   executing: 1,
@@ -1928,6 +1975,8 @@ export function useMessageActions() {
           ? conversationModel
           : model);
       const enableGeminiNativeWeb = isGeminiModelId(targetModel);
+      const enableGeminiCodeExecution =
+        enableGeminiNativeWeb && supportsGeminiCodeExecution(targetModel);
       const enableXAINativeWeb = isXAIModelId(targetModel);
       const enableDeepSeekThinkingControl = isDeepSeekV4ModelId(targetModel);
       const openAIReasoningCapabilities = getOpenAIResponsesCapabilities(
@@ -1983,7 +2032,9 @@ export function useMessageActions() {
               ? openai_responses_web_search
               : false,
         url_context: enableGeminiNativeWeb ? gemini_url_context : false,
-        code_execution: enableGeminiNativeWeb ? gemini_code_execution : false,
+        code_execution: enableGeminiCodeExecution
+          ? gemini_code_execution
+          : false,
         x_search: enableXAINativeWeb ? xai_x_search : false,
         fetch: enableGeminiNativeWeb ? false : fetch,
         learning_mode,
@@ -2052,6 +2103,8 @@ export function useMessageActions() {
       if (conversationLoading) return;
 
       const enableGeminiNativeWeb = isGeminiModelId(model);
+      const enableGeminiCodeExecution =
+        enableGeminiNativeWeb && supportsGeminiCodeExecution(model);
       const enableXAINativeWeb = isXAIModelId(model);
       const enableDeepSeekThinkingControl = isDeepSeekV4ModelId(model);
       const openAIReasoningCapabilities = getOpenAIResponsesCapabilities(
@@ -2095,7 +2148,9 @@ export function useMessageActions() {
               ? openai_responses_web_search
               : false,
         url_context: enableGeminiNativeWeb ? gemini_url_context : false,
-        code_execution: enableGeminiNativeWeb ? gemini_code_execution : false,
+        code_execution: enableGeminiCodeExecution
+          ? gemini_code_execution
+          : false,
         x_search: enableXAINativeWeb ? xai_x_search : false,
         fetch: enableGeminiNativeWeb ? false : fetch,
         learning_mode,

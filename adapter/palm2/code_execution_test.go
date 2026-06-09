@@ -32,6 +32,19 @@ func TestGetGeminiChatBodyOmitsCodeExecutionToolByDefault(t *testing.T) {
 	}
 }
 
+func TestGetGeminiChatBodyOmitsCodeExecutionToolForUnsupportedModel(t *testing.T) {
+	instance := &ChatInstance{}
+	body := instance.GetGeminiChatBody(&adaptercommon.ChatProps{
+		Model:               globals.Gemini3ProImagePreview,
+		Message:             []globals.Message{{Role: globals.User, Content: "draw image"}},
+		EnableCodeExecution: true,
+	})
+
+	if len(body.Tools) != 0 {
+		t.Fatalf("expected no code execution tool for unsupported model, got %#v", body.Tools)
+	}
+}
+
 func TestGetGeminiChatTextIncludesCodeExecutionParts(t *testing.T) {
 	instance := &ChatInstance{}
 	text := instance.GetGeminiChatText(globals.Gemini35Flash, []GeminiChatPart{

@@ -33,6 +33,7 @@ import {
   setGeminiCodeExecution,
   setXAIWebSearch,
   setXAIXSearch,
+  supportsGeminiCodeExecution,
   supportsGeminiThinkingBudgetControl,
   toggleWeb,
   useConversationActions,
@@ -271,6 +272,7 @@ export function WebAction() {
     model,
   );
   const openAIModelLabel = formatModelLabel(model);
+  const geminiCodeExecutionSupported = supportsGeminiCodeExecution(model);
 
   const xaiSearchEnabled = xaiWebSearch || xaiXSearch;
   const openAIWebEnabled = openAIResponsesWebSearch;
@@ -308,20 +310,22 @@ export function WebAction() {
             dispatch(setGeminiURLContext(state));
           }}
         />
-        <ToolPopoverAction
-          active={geminiCodeExecution}
-          text={t("chat.code-execution")}
-          icon={
-            <Terminal
-              className={cn("h-4 w-4", geminiCodeExecution && "enable")}
-            />
-          }
-          switchId="gemini-code-execution-toggle"
-          tip={t("chat.code-execution-tip")}
-          onCheckedChange={(state) => {
-            dispatch(setGeminiCodeExecution(state));
-          }}
-        />
+        {geminiCodeExecutionSupported && (
+          <ToolPopoverAction
+            active={geminiCodeExecution}
+            text={t("chat.code-execution")}
+            icon={
+              <Terminal
+                className={cn("h-4 w-4", geminiCodeExecution && "enable")}
+              />
+            }
+            switchId="gemini-code-execution-toggle"
+            tip={t("chat.code-execution-tip")}
+            onCheckedChange={(state) => {
+              dispatch(setGeminiCodeExecution(state));
+            }}
+          />
+        )}
       </div>
     );
   }
