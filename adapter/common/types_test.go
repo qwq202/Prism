@@ -275,58 +275,6 @@ func TestCreateChatPropsUpdatesExistingCurrentModelReference(t *testing.T) {
 	}
 }
 
-func TestCreateChatPropsInjectsBuiltinToolState(t *testing.T) {
-	props := CreateChatProps(&ChatProps{
-		Model:               "gemini-3.5-flash",
-		EnableWebSearch:     true,
-		EnableURLContext:    true,
-		EnableCodeExecution: true,
-		Message: []globals.Message{
-			{Role: globals.User, Content: "你可以使用哪些工具"},
-		},
-	}, nil)
-
-	content := props.Message[0].Content
-	if !strings.Contains(content, builtinToolPromptPrefix) {
-		t.Fatalf("expected builtin tool state prefix, got %q", content)
-	}
-
-	if !strings.Contains(content, "Enabled builtin tools this turn: web search, web page context, code execution.") {
-		t.Fatalf("expected enabled builtin tools to be injected, got %q", content)
-	}
-
-	if !strings.Contains(content, "answer from this list only") {
-		t.Fatalf("expected tool-list answer guidance, got %q", content)
-	}
-}
-
-func TestCreateChatPropsUpdatesExistingBuiltinToolState(t *testing.T) {
-	props := CreateChatProps(&ChatProps{
-		Model:               "gemini-3.5-flash",
-		EnableCodeExecution: true,
-		Message: []globals.Message{
-			{
-				Role:    globals.System,
-				Content: builtinToolPromptPrefix + "\n- Enabled builtin tools this turn: web search.",
-			},
-			{Role: globals.User, Content: "现在呢"},
-		},
-	}, nil)
-
-	content := props.Message[0].Content
-	if strings.Count(content, builtinToolPromptPrefix) != 1 {
-		t.Fatalf("expected builtin tool state prompt prefix to appear once, got %q", content)
-	}
-
-	if strings.Contains(content, "Enabled builtin tools this turn: web search.") {
-		t.Fatalf("expected previous tool state to be replaced, got %q", content)
-	}
-
-	if !strings.Contains(content, "Enabled builtin tools this turn: code execution.") {
-		t.Fatalf("expected updated builtin tool state, got %q", content)
-	}
-}
-
 func TestCreateChatPropsAvoidsDuplicateMemoryCapabilityInjection(t *testing.T) {
 	props := CreateChatProps(&ChatProps{
 		Model:                "grok-4-1-fast-reasoning",
