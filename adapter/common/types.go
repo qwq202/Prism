@@ -80,6 +80,7 @@ const personalizationPromptPrefix = "User personalization preferences:"
 const learningModePromptPrefix = "Learning mode guidance:"
 const memoryCapabilityPromptPrefix = "Memory capability state:"
 const currentModelPromptPrefix = "Current conversation model reference:"
+const builtinToolPromptPrefix = "Builtin tool state:"
 const memoryPromptPrefix = "Saved user memories:"
 const recentChatsPromptPrefix = "Recent conversation references:"
 
@@ -337,6 +338,57 @@ func injectCurrentModel(messages []globals.Message, model string) []globals.Mess
 	}, cloned...)
 }
 
+func formatEnabledToolNames(names []string) string {
+	if len(names) == 0 {
+		return "none"
+	}
+
+	return strings.Join(names, ", ")
+}
+
+func buildBuiltinToolPrompt(enableWebSearch bool, enableURLContext bool, enableCodeExecution bool) string {
+	enabledTools := make([]string, 0, 3)
+	if enableWebSearch {
+		enabledTools = append(enabledTools, "web search")
+	}
+	if enableURLContext {
+		enabledTools = append(enabledTools, "web page context")
+	}
+	if enableCodeExecution {
+		enabledTools = append(enabledTools, "code execution")
+	}
+
+	return fmt.Sprintf(
+		"%s\n- Enabled builtin tools this turn: %s.\n- If the user asks what tools you can use, answer from this list only.\n- Do not invent provider-specific tool names or claim a disabled tool is available.",
+		builtinToolPromptPrefix,
+		formatEnabledToolNames(enabledTools),
+	)
+}
+
+func injectBuiltinToolState(messages []globals.Message, enableWebSearch bool, enableURLContext bool, enableCodeExecution bool) []globals.Message {
+	cloned := utils.DeepCopy[[]globals.Message](messages)
+	body := strings.TrimPrefix(
+		buildBuiltinToolPrompt(enableWebSearch, enableURLContext, enableCodeExecution),
+		builtinToolPromptPrefix+"\n",
+	)
+
+	for i := range cloned {
+		if cloned[i].Role != globals.System {
+			continue
+		}
+
+		cloned[i].Content = upsertPromptSection(cloned[i].Content, builtinToolPromptPrefix, body)
+		return cloned
+	}
+
+	return append([]globals.Message{
+		{
+			Role:    globals.System,
+			Content: fmt.Sprintf("%s\n%s", builtinToolPromptPrefix, body),
+		},
+	}, cloned...)
+}
+
 func appendPromptSection(content string, prefix string, prompt string) string {
 	content = strings.TrimSpace(content)
 	prompt = strings.TrimSpace(prompt)
@@ -405,6 +457,7 @@ func (c *ChatProps) SetupBuffer(buf *utils.Buffer) {
 		currentModel = strings.TrimSpace(c.Model)
 	}
 	c.Message = injectCurrentModel(c.Message, currentModel)
+	c.Message = injectBuiltinToolState(c.Message, c.EnableWebSearch, c.EnableURLContext, c.EnableCodeExecution)
 	c.Message = injectReferencePrompts(c.Message, c.MemoryPrompt, c.RecentChatsPrompt)
 	if buf == nil {
 		return
