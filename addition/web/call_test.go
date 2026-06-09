@@ -39,3 +39,32 @@ func TestRecentUserSearchContextFallsBackToLastMessage(t *testing.T) {
 		t.Fatalf("expected fallback to last message, got %q", got)
 	}
 }
+
+func TestToTavilyUsageViewCalculatesRemainingBalance(t *testing.T) {
+	var usage TavilyUsageResponse
+	usage.Key.Usage = 125
+	usage.Key.Limit = 1000
+	usage.Key.SearchUsage = 100
+	usage.Account.CurrentPlan = "Project"
+
+	got := toTavilyUsageView(&usage)
+
+	if got.Remaining != 875 || got.Percent != 87.5 {
+		t.Fatalf("expected 875 remaining and 87.5 percent, got %#v", got)
+	}
+	if got.SearchUsage != 100 || got.CurrentPlan != "Project" {
+		t.Fatalf("expected usage details to be preserved, got %#v", got)
+	}
+}
+
+func TestToTavilyUsageViewClampsNegativeBalance(t *testing.T) {
+	var usage TavilyUsageResponse
+	usage.Key.Usage = 1200
+	usage.Key.Limit = 1000
+
+	got := toTavilyUsageView(&usage)
+
+	if got.Remaining != 0 || got.Percent != 0 {
+		t.Fatalf("expected over-limit key to show zero remaining, got %#v", got)
+	}
+}

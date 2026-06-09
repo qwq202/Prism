@@ -7,6 +7,23 @@ export type TestWebSearchResponse = CommonResponse & {
   result: string;
 };
 
+export type TavilyUsage = {
+  usage: number;
+  limit: number;
+  remaining: number;
+  percent: number;
+  search_usage: number;
+  extract_usage: number;
+  crawl_usage: number;
+  map_usage: number;
+  research_usage: number;
+  current_plan?: string;
+};
+
+export type TavilyUsageResponse = CommonResponse & {
+  data?: TavilyUsage;
+};
+
 export type whiteList = {
   enabled: boolean;
   custom: string;
@@ -662,6 +679,19 @@ export async function testWebSearching(
     return response.data as TestWebSearchResponse;
   } catch (e) {
     return { status: false, error: getErrorMessage(e), result: "" };
+  }
+}
+
+export async function getTavilyUsage(
+  apiKey: string,
+): Promise<TavilyUsageResponse> {
+  try {
+    const response = await axios.post(`/admin/config/test/search/usage`, {
+      api_key: apiKey,
+    });
+    return response.data as TavilyUsageResponse;
+  } catch (e) {
+    return { status: false, error: getErrorMessage(e) };
   }
 }
 

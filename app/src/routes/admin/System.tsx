@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import { useMemo, useReducer, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 import { formReducer } from "@/utils/form.ts";
 import { NumberInput } from "@/components/ui/number-input.tsx";
 import {
@@ -29,6 +29,7 @@ import {
   CommonState,
   commonWhiteList,
   GeneralState,
+  getTavilyUsage,
   getConfig,
   initialSystemState,
   MailState,
@@ -37,12 +38,13 @@ import {
   setConfig,
   SiteState,
   SystemProps,
+  TavilyUsage,
   testStorageConfig,
   testWebSearching,
   updateRootPassword,
 } from "@/admin/api/system.ts";
 import { useEffectAsync } from "@/utils/hook.ts";
-import { withNotify } from "@/api/common.ts";
+import { CommonResponse, withNotify } from "@/api/common.ts";
 import { doVerify } from "@/api/auth.ts";
 import {
   Dialog,
@@ -66,6 +68,7 @@ import { selectSupportModels } from "@/store/chat.ts";
 import { JSONEditorProvider } from "@/components/EditorProvider.tsx";
 import { Combobox } from "@/components/ui/combo-box.tsx";
 import { validateToken } from "@/store/auth.ts";
+import { Progress } from "@/components/ui/progress.tsx";
 
 type FormAction = {
   type: string;
@@ -77,7 +80,11 @@ type CompProps<T> = {
   data: T;
   form: SystemProps;
   dispatch: (action: FormAction) => void;
-  onChange: (doToast?: boolean) => Promise<void>;
+  onChange: (doToast?: boolean) => Promise<CommonResponse>;
+  searchUsageRefresh?: {
+    key: string;
+    version: number;
+  };
 };
 
 const systemTimeZoneSuggestions = [
@@ -1294,13 +1301,77 @@ function StorageSettings({
   );
 }
 
-function Search({ data, dispatch, onChange }: CompProps<SearchState>) {
+function formatTavilyCredit(value: number): string {
+  if (!Number.isFinite(value)) return "0";
+
+  return new Intl.NumberFormat(undefined, {
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function Search({
+  data,
+  dispatch,
+  onChange,
+  searchUsageRefresh,
+}: CompProps<SearchState>) {
   const { t } = useTranslation();
 
   const [search, setSearch] = useState<string>("");
   const [searchDialog, setSearchDialog] = useState<boolean>(false);
   const [searchResult, setSearchResult] = useState<string>("");
   const [searchLoading, setSearchLoading] = useState<boolean>(false);
+  const [usage, setUsage] = useState<TavilyUsage | null>(null);
+  const [usageLoading, setUsageLoading] = useState<boolean>(false);
+
+  const refreshTavilyUsage = useCallback(
+    async (apiKey: string, toastSuccess = true) => {
+      const key = apiKey.trim();
+      if (!key) {
+        setUsage(null);
+        withNotify(
+          t,
+          {
+            status: false,
+            error: t("admin.system.tavilyUsageApiKeyRequired"),
+          },
+          false,
+        );
+        return;
+      }
+
+      setUsageLoading(true);
+      try {
+        const res = await getTavilyUsage(key);
+        if (res.status && res.data) {
+          setUsage(res.data);
+          if (toastSuccess) {
+            withNotify(
+              t,
+              res,
+              true,
+              t("admin.system.tavilyUsageRefreshSuccess"),
+            );
+          }
+        } else {
+          setUsage(null);
+          withNotify(t, res, false);
+        }
+      } finally {
+        setUsageLoading(false);
+      }
+    },
+    [t],
+  );
+
+  useEffect(() => {
+    if (!searchUsageRefresh?.version || !searchUsageRefresh.key) return;
+
+    void refreshTavilyUsage(searchUsageRefresh.key, false);
+  }, [refreshTavilyUsage, searchUsageRefresh]);
+
+  const usagePercent = Math.max(0, Math.min(100, usage?.percent ?? 0));
+  const currentApiKey = data.api_key.trim();
 
   return (
     <Paragraph
@@ -1315,14 +1386,63 @@ function Search({ data, dispatch, onChange }: CompProps<SearchState>) {
         <Label>{t("admin.system.searchApiKey")}</Label>
         <Input
           value={data.api_key}
-          onChange={(e) =>
+          onChange={(e) => {
+            setUsage(null);
             dispatch({
               type: "update:search.api_key",
               value: e.target.value,
-            })
-          }
+            });
+          }}
           placeholder={t("admin.system.searchApiKeyPlaceholder")}
         />
+      </ParagraphItem>
+      <ParagraphItem>
+        <Label>{t("admin.system.tavilyUsage")}</Label>
+        <div className={`flex flex-col gap-2`}>
+          <div className={`flex items-center gap-2`}>
+            <Progress value={usagePercent} className={`h-2 flex-1`} />
+            <Button
+              type={`button`}
+              size={`icon`}
+              variant={`outline`}
+              className={`h-8 w-8 shrink-0`}
+              disabled={!currentApiKey || usageLoading}
+              aria-label={t("admin.system.tavilyUsageRefresh")}
+              onClick={() => refreshTavilyUsage(currentApiKey)}
+            >
+              <RotateCw
+                className={cn(`h-4 w-4`, usageLoading && `animate-spin`)}
+              />
+            </Button>
+          </div>
+          <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground`}>
+            {usage ? (
+              <>
+                <span>
+                  {t("admin.system.tavilyUsageBalance", {
+                    remaining: formatTavilyCredit(usage.remaining),
+                    limit: formatTavilyCredit(usage.limit),
+                    percent: formatTavilyCredit(usagePercent),
+                  })}
+                </span>
+                <span>
+                  {t("admin.system.tavilyUsageUsed", {
+                    usage: formatTavilyCredit(usage.usage),
+                  })}
+                </span>
+                {usage.current_plan && (
+                  <span>
+                    {t("admin.system.tavilyUsagePlan", {
+                      plan: usage.current_plan,
+                    })}
+                  </span>
+                )}
+              </>
+            ) : (
+              <span>{t("admin.system.tavilyUsageEmpty")}</span>
+            )}
+          </div>
+        </div>
       </ParagraphItem>
       <ParagraphItem>
         <Label>{t("admin.system.searchTopic")}</Label>
@@ -1512,11 +1632,23 @@ function System() {
   );
 
   const [loading, setLoading] = useState<boolean>(false);
+  const [searchUsageRefresh, setSearchUsageRefresh] = useState({
+    key: "",
+    version: 0,
+  });
 
-  const doSaving = async (doToast?: boolean) => {
+  const doSaving = async (doToast?: boolean): Promise<CommonResponse> => {
     const res = await setConfig(data);
 
     if (doToast !== false) withNotify(t, res, true);
+    if (res.status) {
+      setSearchUsageRefresh((current) => ({
+        key: data.search.api_key.trim(),
+        version: current.version + 1,
+      }));
+    }
+
+    return res;
   };
 
   const doRefresh = async () => {
@@ -1586,6 +1718,7 @@ function System() {
             data={data.search}
             dispatch={setData}
             onChange={doSaving}
+            searchUsageRefresh={searchUsageRefresh}
           />
           <Task
             form={data}
