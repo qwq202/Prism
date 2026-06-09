@@ -2,12 +2,12 @@ package manager
 
 import (
 	adaptercommon "chat/adapter/common"
-	"chat/addition/web"
 	"chat/admin"
 	"chat/auth"
 	"chat/billing"
 	"chat/channel"
 	"chat/globals"
+	"chat/manager/memory"
 	"chat/utils"
 	"fmt"
 	"runtime/debug"
@@ -28,7 +28,7 @@ func NativeChatHandler(c *gin.Context, user *auth.User, model string, message []
 	db := utils.GetDBFromContext(c)
 	cache := utils.GetCacheFromContext(c)
 	group := auth.GetGroup(db, user)
-	segment := web.ToSearched(enableWeb, model, message, group, cache)
+	segment := utils.DeepCopy(message)
 	check, plan := auth.CanEnableModelWithSubscription(db, cache, user, model, segment)
 
 	if check != nil {
@@ -36,23 +36,46 @@ func NativeChatHandler(c *gin.Context, user *auth.User, model string, message []
 	}
 
 	buffer := utils.NewBuffer(model, segment, channel.ChargeInstance.GetCharge(model))
-	hit, err := channel.NewChatRequestWithCache(
-		cache, buffer,
-		group,
-		adaptercommon.CreateChatProps(&adaptercommon.ChatProps{
+	buildProps := func(
+		segment []globals.Message,
+		requestBuffer *utils.Buffer,
+		tools *globals.FunctionTools,
+		toolChoice *interface{},
+		disableCache bool,
+	) *adaptercommon.ChatProps {
+		return adaptercommon.CreateChatProps(&adaptercommon.ChatProps{
 			Model:            model,
+			OriginalModel:    model,
 			Message:          segment,
+			Tools:            tools,
+			ToolChoice:       toolChoice,
 			EnableWeb:        enableWeb,
 			EnableWebSearch:  enableWeb,
 			EnableURLContext: enableWeb,
 			EnableXSearch:    false,
 			ClientContext:    extractClientContext(c),
-		}, buffer),
-		func(resp *globals.Chunk) error {
-			buffer.WriteChunk(resp)
-			return nil
-		},
-	)
+			DisableCache:     disableCache,
+		}, requestBuffer)
+	}
+
+	var hit bool
+	var err error
+	toolCallsSupported := memory.CanUseToolCalls(model, group)
+	webSearchToolEnabled := canUseTavilySearchTool(enableWeb, model, toolCallsSupported)
+	tools := buildAvailableToolDefinitions(false, false, webSearchToolEnabled)
+	if tools != nil {
+		hit, err = createNativeToolChatTask(buffer, model, group, segment, tools, memory.MaxToolRounds, buildProps)
+	} else {
+		hit, err = channel.NewChatRequestWithCache(
+			cache, buffer,
+			group,
+			buildProps(segment, buffer, nil, nil, false),
+			func(resp *globals.Chunk) error {
+				buffer.WriteChunk(resp)
+				return nil
+			},
+		)
+	}
 
 	admin.AnalyseRequest(model, buffer, err)
 	billing.RecordModelUsageMetric(db, model, buffer, err)

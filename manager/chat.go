@@ -389,20 +389,35 @@ func recordBuiltinToolRequest(buffer *utils.Buffer, instance *conversation.Conve
 	}
 
 	requestedTools := make([]string, 0, 2)
-	if instance.IsEnableWebSearch() {
-		requestedTools = append(requestedTools, "google_search")
-	}
-	if instance.IsEnableURLContext() {
-		requestedTools = append(requestedTools, "url_context")
+	switch {
+	case globals.IsGeminiModel(model):
+		if instance.IsEnableWebSearch() {
+			requestedTools = append(requestedTools, "google_search")
+		}
+		if instance.IsEnableURLContext() {
+			requestedTools = append(requestedTools, "url_context")
+		}
+	case globals.IsXAIModel(model):
+		if instance.IsEnableWebSearch() {
+			requestedTools = append(requestedTools, "web_search")
+		}
+		if instance.IsEnableXSearch() {
+			requestedTools = append(requestedTools, "x_search")
+		}
+	case globals.IsOpenAIResponsesNativeWebModel(model):
+		if instance.IsEnableWebSearch() {
+			requestedTools = append(requestedTools, "web_search")
+		}
 	}
 
 	globals.Debug(fmt.Sprintf(
-		"[builtin-tools] request conversation_id=%d model=%s tools_requested=%s web_search_enabled=%v url_context_enabled=%v",
+		"[builtin-tools] request conversation_id=%d model=%s tools_requested=%s web_search_enabled=%v url_context_enabled=%v x_search_enabled=%v",
 		instance.GetId(),
 		model,
 		formatBuiltinToolNames(requestedTools),
 		instance.IsEnableWebSearch(),
 		instance.IsEnableURLContext(),
+		instance.IsEnableXSearch(),
 	))
 }
 
@@ -593,10 +608,22 @@ func appendFunctionTools(target globals.FunctionTools, source *globals.FunctionT
 	return append(target, (*source)...)
 }
 
-func buildAvailableToolDefinitions(fetchEnabled bool, memoryWritable bool) *globals.FunctionTools {
+func canUseTavilySearchTool(enable bool, model string, toolCallsSupported bool) bool {
+	return enable &&
+		toolCallsSupported &&
+		!globals.IsGeminiModel(model) &&
+		!globals.IsXAIModel(model) &&
+		!globals.IsOpenAIResponsesNativeWebModel(model) &&
+		strings.TrimSpace(globals.SearchApiKey) != ""
+}
+
+func buildAvailableToolDefinitions(fetchEnabled bool, memoryWritable bool, webSearchEnabled bool) *globals.FunctionTools {
 	tools := make(globals.FunctionTools, 0)
 	if memoryWritable {
 		tools = appendFunctionTools(tools, memory.BuildToolDefinition())
+	}
+	if webSearchEnabled {
+		tools = appendFunctionTools(tools, web.BuildToolDefinition())
 	}
 	if fetchEnabled {
 		tools = appendFunctionTools(tools, fetch.BuildToolDefinition())
@@ -632,6 +659,8 @@ func executeAvailableToolCall(db *sql.DB, user *auth.User, call globals.ToolCall
 		if len(messages) > 0 {
 			return messages[0]
 		}
+	case web.SearchToolName:
+		return web.ExecuteToolCall(call)
 	case fetch.ToolName:
 		return fetch.ExecuteToolCall(call)
 	}
@@ -914,6 +943,133 @@ func createToolChatTask(
 	return hit, nil, false
 }
 
+type nativeToolPropsBuilder func(
+	segment []globals.Message,
+	buffer *utils.Buffer,
+	tools *globals.FunctionTools,
+	toolChoice *interface{},
+	disableCache bool,
+) *adaptercommon.ChatProps
+
+func mergeNativeToolRoundAccounting(target *utils.Buffer, source *utils.Buffer) {
+	if target == nil || source == nil {
+		return
+	}
+
+	target.SetGeminiHiddenMetadata(source.GetGeminiHiddenMetadata())
+	target.SetClaudeHiddenMetadata(source.GetClaudeHiddenMetadata())
+	target.MergeUsage(source)
+}
+
+func appendNativeFinalResponse(target *utils.Buffer, source *utils.Buffer) {
+	if target == nil || source == nil {
+		return
+	}
+
+	target.Write(source.Read())
+	target.AddReasoningContent(source.GetReasoningContent())
+	mergeNativeToolRoundAccounting(target, source)
+}
+
+func createNativeToolChatTask(
+	baseBuffer *utils.Buffer,
+	model string,
+	group string,
+	segment []globals.Message,
+	tools *globals.FunctionTools,
+	maxToolRounds int,
+	buildProps nativeToolPropsBuilder,
+) (hit bool, err error) {
+	if tools == nil || len(*tools) == 0 {
+		return false, nil
+	}
+
+	workingSegment := utils.DeepCopy(segment)
+	toolChoice := buildAutoToolChoice()
+
+	for round := 0; round < maxToolRounds; round++ {
+		roundBuffer := utils.NewBuffer(model, workingSegment, baseBuffer.GetCharge())
+		if round > 0 {
+			baseBuffer.InputTokens += roundBuffer.CountInputToken()
+			baseBuffer.Quota += utils.CountInputQuota(baseBuffer.GetCharge(), roundBuffer.CountInputToken())
+		}
+
+		globals.Debug(fmt.Sprintf(
+			"[tools] starting native tool round %d model=%s segment_messages=%d tools=%d",
+			round+1,
+			model,
+			len(workingSegment),
+			len(*tools),
+		))
+
+		props := buildProps(workingSegment, roundBuffer, tools, toolChoice, true)
+		if props.OriginalModel == "" {
+			props.OriginalModel = model
+		}
+		if err = channel.NewChatRequest(group, props, func(resp *globals.Chunk) error {
+			roundBuffer.WriteChunk(resp)
+			return nil
+		}); err != nil {
+			return hit, err
+		}
+
+		assistant := extractAssistantMessageFromBuffer(roundBuffer, false, false)
+		if assistant.ToolCalls == nil || len(*assistant.ToolCalls) == 0 {
+			appendNativeFinalResponse(baseBuffer, roundBuffer)
+			return hit, nil
+		}
+
+		globals.Debug(fmt.Sprintf(
+			"[tools] native round %d received tool calls for model %s: %s",
+			round+1,
+			model,
+			summarizeToolCalls(assistant.ToolCalls),
+		))
+
+		baseBuffer.Quota += utils.CountOutputToken(baseBuffer.GetCharge(), roundBuffer.CountOutputToken(false))
+		mergeNativeToolRoundAccounting(baseBuffer, roundBuffer)
+
+		toolMessages := executeAvailableToolCalls(nil, nil, assistant.ToolCalls)
+		for _, toolMessage := range toolMessages {
+			globals.Debug(fmt.Sprintf(
+				"[tools] native round %d tool result for model %s tool_call_id=%s payload=%s",
+				round+1,
+				model,
+				utils.ToString(toolMessage.ToolCallId),
+				summarizeToolCallArguments(toolMessage.Content),
+			))
+		}
+
+		workingSegment = append(workingSegment, assistant)
+		workingSegment = append(workingSegment, toolMessages...)
+	}
+
+	globals.Warn(fmt.Sprintf(
+		"[tools] reached max native tool rounds for model %s max_rounds=%d; requesting final answer without tools",
+		model,
+		maxToolRounds,
+	))
+
+	workingSegment = append(workingSegment, buildToolLimitSystemMessage())
+	finalBuffer := utils.NewBuffer(model, workingSegment, baseBuffer.GetCharge())
+	baseBuffer.InputTokens += finalBuffer.CountInputToken()
+	baseBuffer.Quota += utils.CountInputQuota(baseBuffer.GetCharge(), finalBuffer.CountInputToken())
+
+	props := buildProps(workingSegment, finalBuffer, nil, nil, true)
+	if props.OriginalModel == "" {
+		props.OriginalModel = model
+	}
+	if err = channel.NewChatRequest(group, props, func(resp *globals.Chunk) error {
+		finalBuffer.WriteChunk(resp)
+		return nil
+	}); err != nil {
+		return hit, err
+	}
+
+	appendNativeFinalResponse(baseBuffer, finalBuffer)
+	return hit, nil
+}
+
 func latestMessageContent(messages []globals.Message) (string, bool) {
 	if len(messages) == 0 {
 		return "", false
@@ -1173,7 +1329,7 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 
 	model := instance.GetModel()
 	group := auth.GetGroup(db, user)
-	segment := web.ToChatSearched(instance, restart, group, cache)
+	segment := conversation.CopyMessage(instance.GetChatMessage(restart))
 	segment = adapter.ClearMessages(model, segment)
 
 	check, plan := auth.CanEnableModelWithSubscription(db, cache, user, model, segment)
@@ -1204,8 +1360,10 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 		hit, err, interrupted = createChatTask(conn, user, buffer, db, cache, model, instance, segment, plan)
 	} else {
 		memCtx := buildMemoryContext(db, user, instance, model, group)
-		fetchToolEnabled := instance.IsEnableFetch() && memory.CanUseToolCalls(model, group)
-		tools := buildAvailableToolDefinitions(fetchToolEnabled, memCtx.Writable)
+		toolCallsSupported := memory.CanUseToolCalls(model, group)
+		fetchToolEnabled := instance.IsEnableFetch() && toolCallsSupported
+		webSearchToolEnabled := canUseTavilySearchTool(instance.IsEnableWebSearch(), model, toolCallsSupported)
+		tools := buildAvailableToolDefinitions(fetchToolEnabled, memCtx.Writable, webSearchToolEnabled)
 		toolEnabled = tools != nil
 		if tools != nil {
 			maxToolRounds := memory.MaxToolRounds

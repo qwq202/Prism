@@ -6,37 +6,39 @@ import (
 	"testing"
 )
 
-func TestRecentUserSearchContextUsesLatestThreeUserMessages(t *testing.T) {
-	messages := []globals.Message{
-		{Role: globals.User, Content: "第一条用户消息"},
-		{Role: globals.Assistant, Content: "助手回复"},
-		{Role: globals.User, Content: "第二条用户消息"},
-		{Role: globals.System, Content: "系统消息"},
-		{Role: globals.User, Content: "第三条用户消息"},
-		{Role: globals.User, Content: "第四条用户消息"},
+func TestBuildToolDefinitionExposesWebSearchQuery(t *testing.T) {
+	tools := BuildToolDefinition()
+	if tools == nil || len(*tools) != 1 {
+		t.Fatalf("expected one web search tool, got %#v", tools)
 	}
 
-	got := recentUserSearchContext(messages, 3)
-	want := strings.Join([]string{
-		"Recent user messages:",
-		"1. 第二条用户消息",
-		"2. 第三条用户消息",
-		"3. 第四条用户消息",
-	}, "\n")
-
-	if got != want {
-		t.Fatalf("expected recent user context %q, got %q", want, got)
+	tool := (*tools)[0]
+	if tool.Function.Name != SearchToolName {
+		t.Fatalf("expected web search tool name %q, got %q", SearchToolName, tool.Function.Name)
+	}
+	if tool.Function.Parameters.Required == nil || len(*tool.Function.Parameters.Required) != 1 || (*tool.Function.Parameters.Required)[0] != "query" {
+		t.Fatalf("expected query to be required, got %#v", tool.Function.Parameters.Required)
+	}
+	if _, ok := tool.Function.Parameters.Properties["query"]; !ok {
+		t.Fatalf("expected query property in tool parameters, got %#v", tool.Function.Parameters.Properties)
 	}
 }
 
-func TestRecentUserSearchContextFallsBackToLastMessage(t *testing.T) {
-	got := recentUserSearchContext([]globals.Message{
-		{Role: globals.System, Content: "系统消息"},
-		{Role: globals.Assistant, Content: "助手回复"},
-	}, 3)
+func TestExecuteToolCallRejectsEmptyQuery(t *testing.T) {
+	message := ExecuteToolCall(globals.ToolCall{
+		Id:   "call_search",
+		Type: "function",
+		Function: globals.ToolCallFunction{
+			Name:      SearchToolName,
+			Arguments: `{"query":"   "}`,
+		},
+	})
 
-	if got != "助手回复" {
-		t.Fatalf("expected fallback to last message, got %q", got)
+	if message.ToolCallId == nil || *message.ToolCallId != "call_search" {
+		t.Fatalf("expected tool call id to be preserved, got %#v", message.ToolCallId)
+	}
+	if !strings.Contains(message.Content, "query is required") {
+		t.Fatalf("expected empty query error, got %s", message.Content)
 	}
 }
 
