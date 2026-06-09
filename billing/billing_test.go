@@ -101,6 +101,32 @@ func TestListRecordsFiltersByPartialTokenNameAndInclusiveDate(t *testing.T) {
 	}
 }
 
+func TestListRecordsReturnsFilteredTokenTotals(t *testing.T) {
+	db := openBillingTestDB(t)
+
+	seedBillingRecord(t, db, "root", "consume", "alpha-main-token", "deepseek-v4-flash", "2026-04-22 15:30:00")
+	seedBillingRecord(t, db, "root", "consume", "alpha-secondary-token", "deepseek-v4-flash", "2026-04-22 16:30:00")
+	seedBillingRecord(t, db, "root", "consume", "beta-token", "deepseek-v4-flash", "2026-04-22 17:30:00")
+
+	data, err := ListRecords(db, true, 1, 0, RecordQuery{
+		TokenName: "alpha",
+		Type:      "consume",
+	})
+	if err != nil {
+		t.Fatalf("list records: %v", err)
+	}
+
+	if data.TotalInputTokens != 20 {
+		t.Fatalf("expected filtered input token total 20, got %d", data.TotalInputTokens)
+	}
+	if data.TotalOutputTokens != 40 {
+		t.Fatalf("expected filtered output token total 40, got %d", data.TotalOutputTokens)
+	}
+	if data.TotalTokens != 60 {
+		t.Fatalf("expected filtered token total 60, got %d", data.TotalTokens)
+	}
+}
+
 func TestListRecordsConvertsOffsetFilterToRecordStorageTime(t *testing.T) {
 	db := openBillingTestDB(t)
 

@@ -56,8 +56,11 @@ type RecordQuery struct {
 }
 
 type RecordData struct {
-	Total   int64    `json:"total"`
-	Records []Record `json:"records"`
+	Total             int64    `json:"total"`
+	TotalInputTokens  int64    `json:"total_input_tokens"`
+	TotalOutputTokens int64    `json:"total_output_tokens"`
+	TotalTokens       int64    `json:"total_tokens"`
+	Records           []Record `json:"records"`
 }
 
 type RecordStats struct {
@@ -334,16 +337,21 @@ func ListRecords(db *sql.DB, isAdmin bool, userId int64, page int64, query Recor
 	}
 
 	var total int64
+	var totalInputTokens int64
+	var totalOutputTokens int64
 	countArgs := make([]interface{}, len(filterArgs))
 	copy(countArgs, filterArgs)
 
 	countQuery := `
-		SELECT COUNT(*)
+		SELECT
+			COUNT(*),
+			COALESCE(SUM(b.input_tokens), 0),
+			COALESCE(SUM(b.output_tokens), 0)
 		FROM billing b
 		LEFT JOIN auth a ON a.id = b.user_id
 	` + recordFilterWhereSQL
 
-	if err := globals.QueryRowDb(db, countQuery, countArgs...).Scan(&total); err != nil {
+	if err := globals.QueryRowDb(db, countQuery, countArgs...).Scan(&total, &totalInputTokens, &totalOutputTokens); err != nil {
 		return RecordData{}, err
 	}
 
@@ -394,5 +402,11 @@ func ListRecords(db *sql.DB, isAdmin bool, userId int64, page int64, query Recor
 		pages++
 	}
 
-	return RecordData{Total: pages, Records: records}, nil
+	return RecordData{
+		Total:             pages,
+		TotalInputTokens:  totalInputTokens,
+		TotalOutputTokens: totalOutputTokens,
+		TotalTokens:       totalInputTokens + totalOutputTokens,
+		Records:           records,
+	}, nil
 }

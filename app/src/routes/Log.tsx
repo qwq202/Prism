@@ -16,6 +16,7 @@ import {
   KeySquare,
   Search,
   Timer,
+  Hash,
 } from "lucide-react";
 import {
   getRecordStats,
@@ -126,6 +127,23 @@ function getInitialFilters(timeZone: string): LogFilters {
 
 function formatQuota(value: number) {
   return Number.isFinite(value) ? value.toFixed(4).replace(/\.?0+$/, "") : "0";
+}
+
+function formatCompactTokenCount(value: number, unit: "K" | "M") {
+  const fractionDigits = Math.abs(value) >= 100 ? 0 : 1;
+  return `${value.toFixed(fractionDigits).replace(/\.0$/, "")}${unit}`;
+}
+
+function formatTokenCount(value: number) {
+  if (!Number.isFinite(value)) return "0";
+  const absValue = Math.abs(value);
+  if (absValue >= 1_000_000) {
+    return formatCompactTokenCount(value / 1_000_000, "M");
+  }
+  if (absValue >= 1_000) {
+    return formatCompactTokenCount(value / 1_000, "K");
+  }
+  return new Intl.NumberFormat().format(value);
 }
 
 function MetricCard({
@@ -346,6 +364,7 @@ function Log() {
   const timeZone = useSelector(infoTimeZoneSelector);
   const [records, setRecords] = useState<BillingRecord[]>([]);
   const [stats, setStats] = useState<RecordStats>(emptyStats);
+  const [totalTokens, setTotalTokens] = useState(0);
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(1);
   const [filters, setFilters] = useState<LogFilters>(() =>
@@ -358,6 +377,10 @@ function Log() {
   const [statsLoading, setStatsLoading] = useState(false);
 
   const initialLoading = loading && records.length === 0;
+  const totalTokenLabel = useMemo(
+    () => formatTokenCount(totalTokens),
+    [totalTokens],
+  );
 
   const requestBadges = useMemo(
     () => (
@@ -385,6 +408,7 @@ function Log() {
         if (resp.status && resp.data) {
           setRecords(resp.data.records ?? []);
           setTotal(resp.data.total ?? 1);
+          setTotalTokens(resp.data.total_tokens ?? 0);
         } else {
           withNotify(t, resp);
         }
@@ -441,7 +465,7 @@ function Log() {
         animate="visible"
       >
         <motion.div
-          className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-4"
+          className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-5"
           variants={logContainerVariants}
         >
           <MetricCard
@@ -477,6 +501,12 @@ function Log() {
           >
             <Clock3 className="h-3.5 w-3.5 stroke-[1.8]" />
           </MetricCard>
+          <MetricCard
+            title={t("record.total-tokens")}
+            value={totalTokenLabel}
+            icon={<Hash />}
+            loading={loading}
+          />
         </motion.div>
 
         <motion.div

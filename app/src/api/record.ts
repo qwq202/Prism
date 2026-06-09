@@ -22,6 +22,9 @@ export type Record = {
 };
 export type RecordData = {
   total: number;
+  total_input_tokens?: number;
+  total_output_tokens?: number;
+  total_tokens?: number;
   records: Record[];
 };
 
