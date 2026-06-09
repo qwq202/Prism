@@ -36,6 +36,7 @@ import { selectSupportModels } from "@/store/chat.ts";
 import { ToolCallStatus } from "@/components/ToolCallStatus";
 import { parseThinkContent } from "@/utils/thinking";
 import { showQuotaSelector } from "@/store/settings.ts";
+import { getVisibleToolCalls } from "@/api/tool-calls.ts";
 
 type MessageProps = {
   index: number;
@@ -279,8 +280,10 @@ function MessageContent({
   const hasContent = message.content.length > 0;
   const isAssistant = message.role === "assistant";
   const isOutput = message.end === false;
-  const hasToolCalls =
-    isAssistant && !!message.tool_calls && message.tool_calls.length > 0;
+  const visibleToolCalls = isAssistant
+    ? getVisibleToolCalls(message.tool_calls)
+    : [];
+  const hasToolCalls = visibleToolCalls.length > 0;
   const user = useSelector(selectUsername);
   const supportModels = useSelector(selectSupportModels);
 
@@ -383,7 +386,7 @@ function MessageContent({
           <Loader2 className={`h-5 w-5 m-1 animate-spin`} />
         ) : null}
 
-        {hasToolCalls && <ToolCallStatus toolCalls={message.tool_calls!} />}
+        {hasToolCalls && <ToolCallStatus toolCalls={visibleToolCalls} />}
 
         {isAssistant && hasContent && isOutput && (
           <Loader2

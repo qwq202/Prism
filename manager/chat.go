@@ -71,6 +71,9 @@ func buildToolCallEvent(call globals.ToolCall, status string) *globals.ChatSegme
 	if name == "" {
 		return nil
 	}
+	if name == web.SearchToolName {
+		return nil
+	}
 
 	return &globals.ChatSegmentToolCall{
 		Id:        strings.TrimSpace(call.Id),

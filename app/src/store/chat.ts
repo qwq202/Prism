@@ -38,6 +38,7 @@ import {
   removeCachedConversationFromList,
   setCachedConversation,
 } from "@/utils/conversation-cache.ts";
+import { isHiddenToolCallName } from "@/api/tool-calls.ts";
 import { CustomMask, Mask } from "@/masks/types.ts";
 import { listMasks } from "@/api/mask.ts";
 import { useDispatch, useSelector } from "react-redux";
@@ -824,6 +825,9 @@ function upsertToolCall(
   const next = current ? [...current] : [];
   const id = incoming.id?.trim() || "";
   const name = incoming.name.trim();
+  if (isHiddenToolCallName(name)) {
+    return next;
+  }
   let hitIndex = -1;
 
   if (id) {

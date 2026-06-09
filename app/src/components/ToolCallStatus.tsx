@@ -1,4 +1,5 @@
 import { MessageToolCall } from "@/api/types.tsx";
+import { getVisibleToolCalls } from "@/api/tool-calls.ts";
 import { cn } from "@/components/ui/lib/utils.ts";
 import { formatToolCallResult } from "@/api/plugin.ts";
 import {
@@ -178,11 +179,12 @@ function ToolCallRow({ toolCall }: ToolCallRowProps) {
 }
 
 export function ToolCallStatus({ toolCalls, className }: ToolCallStatusProps) {
-  if (toolCalls.length === 0) return null;
+  const visibleToolCalls = getVisibleToolCalls(toolCalls);
+  if (visibleToolCalls.length === 0) return null;
 
   return (
     <div className={cn("mt-1.5 flex flex-wrap gap-1", className)}>
-      {toolCalls.map((toolCall, index) => (
+      {visibleToolCalls.map((toolCall, index) => (
         <ToolCallRow
           key={toolCall.id || `${toolCall.function.name}-${index}`}
           toolCall={toolCall}

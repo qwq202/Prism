@@ -10,6 +10,7 @@ import {
   getCachedConversationList,
   setCachedConversationList,
 } from "@/utils/conversation-cache.ts";
+import { getVisibleToolCalls } from "@/api/tool-calls.ts";
 
 type ConversationListResult = {
   conversations: ConversationInstance[];
@@ -201,10 +202,17 @@ export async function fetchConversation(
           }
 
           if (currentMsg.role === "assistant" && currentMsg.tool_calls) {
-            currentMsg.tool_calls = currentMsg.tool_calls.map((toolCall) => ({
+            const visibleToolCalls = getVisibleToolCalls(
+              currentMsg.tool_calls,
+            ).map((toolCall) => ({
               ...toolCall,
               status: toolCall.status ?? "success",
             }));
+            if (visibleToolCalls.length > 0) {
+              currentMsg.tool_calls = visibleToolCalls;
+            } else {
+              delete currentMsg.tool_calls;
+            }
             processedMessages.push(currentMsg);
           } else if (currentMsg.role === "tool" && currentMsg.tool_call_id) {
             const toolCallId = currentMsg.tool_call_id;

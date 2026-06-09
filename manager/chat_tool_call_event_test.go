@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"chat/addition/web"
 	"chat/globals"
 	"testing"
 )
@@ -37,6 +38,21 @@ func TestBuildToolCallEvent(t *testing.T) {
 
 	if event.Arguments != `{"action":"create"}` {
 		t.Fatalf("unexpected tool call arguments: %#v", event)
+	}
+}
+
+func TestBuildToolCallEventHidesWebSearch(t *testing.T) {
+	call := globals.ToolCall{
+		Id:   "call_search",
+		Type: "function",
+		Function: globals.ToolCallFunction{
+			Name:      web.SearchToolName,
+			Arguments: `{"query":"latest news"}`,
+		},
+	}
+
+	if event := buildToolCallEvent(call, "success"); event != nil {
+		t.Fatalf("expected web search tool call event to be hidden, got %#v", event)
 	}
 }
 
