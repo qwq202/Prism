@@ -3,23 +3,32 @@ import { format } from "date-fns";
 
 import { cn } from "@/components/ui/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, Eraser, Minus, Plus } from "lucide-react";
+import {
+  CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  Eraser,
+  Minus,
+  Plus,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-type DatePickerProps = Omit<
-  React.ComponentProps<typeof Calendar>,
-  "mode" | "selected" | "onSelect" | "required"
-> & {
+type DatePickerProps = {
   classNameTrigger?: string;
   classNameContent?: string;
   value?: string;
   onValueChange?: (value: string) => void;
+};
+
+type CalendarCell = {
+  date: Date;
+  inMonth: boolean;
+  key: string;
 };
 
 function parseDate(value?: string): Date | undefined {
@@ -35,16 +44,70 @@ function parseDate(value?: string): Date | undefined {
   }
 }
 
+function isSameDay(a?: Date, b?: Date): boolean {
+  return (
+    !!a &&
+    !!b &&
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function addMonth(date: Date, amount: number): Date {
+  return new Date(date.getFullYear(), date.getMonth() + amount, 1);
+}
+
+function buildCalendarCells(month: Date): CalendarCell[] {
+  const year = month.getFullYear();
+  const monthIndex = month.getMonth();
+  const firstDay = new Date(year, monthIndex, 1);
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const leadingDays = firstDay.getDay();
+  const cellCount = Math.ceil((leadingDays + daysInMonth) / 7) * 7;
+
+  return Array.from({ length: cellCount }, (_, index) => {
+    const dayOffset = index - leadingDays + 1;
+    const date = new Date(year, monthIndex, dayOffset);
+    return {
+      date,
+      inMonth: date.getMonth() === monthIndex,
+      key: `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`,
+    };
+  });
+}
+
 const DatePicker = ({
   value,
   onValueChange,
   classNameTrigger,
   classNameContent,
-  ...props
 }: DatePickerProps) => {
   const { t } = useTranslation();
   const [open, setOpen] = React.useState(false);
   const date = React.useMemo(() => parseDate(value), [value]);
+  const [visibleMonth, setVisibleMonth] = React.useState<Date>(
+    () => date ?? new Date(),
+  );
+  const today = React.useMemo(() => new Date(), []);
+  const cells = React.useMemo(
+    () => buildCalendarCells(visibleMonth),
+    [visibleMonth],
+  );
+  const weekdays = React.useMemo(() => {
+    const formatter = new Intl.DateTimeFormat(undefined, {
+      weekday: "short",
+    });
+    return Array.from({ length: 7 }, (_, index) =>
+      formatter.format(new Date(2026, 5, index)),
+    );
+  }, []);
+
+  React.useEffect(() => {
+    if (open) {
+      setVisibleMonth(date ?? new Date());
+    }
+  }, [date, open]);
 
   const updateDate = React.useCallback(
     (next?: Date) => {
@@ -55,7 +118,7 @@ const DatePicker = ({
   );
 
   const addYear = () => {
-    const current = date || new Date();
+    const current = date || visibleMonth || new Date();
     updateDate(
       new Date(
         current.getFullYear() + 1,
@@ -66,7 +129,7 @@ const DatePicker = ({
   };
 
   const subYear = () => {
-    const current = date || new Date();
+    const current = date || visibleMonth || new Date();
     updateDate(
       new Date(
         current.getFullYear() - 1,
@@ -98,51 +161,82 @@ const DatePicker = ({
       </PopoverTrigger>
       <PopoverContent
         className={cn(
-          "w-[292px] max-w-[calc(100vw-2rem)] rounded-lg p-0 shadow-lg",
+          "w-[300px] max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg border bg-popover p-0 shadow-xl",
           classNameContent,
         )}
         align="start"
         sideOffset={8}
       >
-        <Calendar
-          mode="single"
-          selected={date}
-          onSelect={(date) => updateDate(date)}
-          autoFocus
-          className="p-3 pb-1"
-          classNames={{
-            months: "flex w-full flex-col space-y-0",
-            month: "w-full space-y-3",
-            month_caption: "relative flex h-8 items-center justify-center",
-            caption_label: "text-base font-semibold leading-none",
-            nav: "absolute inset-x-0 top-0 flex h-8 items-center justify-between",
-            button_previous:
-              "absolute left-0 top-0 flex h-8 w-8 items-center justify-center rounded-md border bg-background p-0 text-muted-foreground opacity-100 shadow-sm transition-colors hover:bg-muted hover:text-foreground",
-            button_next:
-              "absolute right-0 top-0 flex h-8 w-8 items-center justify-center rounded-md border bg-background p-0 text-muted-foreground opacity-100 shadow-sm transition-colors hover:bg-muted hover:text-foreground",
-            month_grid: "w-full border-collapse table-fixed",
-            weekdays: "grid grid-cols-7 gap-1",
-            weekday:
-              "flex h-7 items-center justify-center text-sm font-normal text-muted-foreground tabular-nums",
-            week: "grid grid-cols-7 gap-1",
-            day: "flex h-8 w-8 items-center justify-center p-0 text-center",
-            day_button:
-              "h-8 w-8 rounded-md p-0 text-sm font-normal transition-colors hover:bg-muted",
-            selected:
-              "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-            today: "bg-muted text-foreground",
-            outside:
-              "text-muted-foreground/50 opacity-100 aria-selected:bg-primary aria-selected:text-primary-foreground",
-            disabled: "text-muted-foreground/40 opacity-100",
-            hidden: "invisible",
-          }}
-          {...props}
-        />
-        <div className="flex items-center gap-3 px-3 pb-3 pt-1">
+        <div className="px-3 pt-4">
+          <div className="relative flex h-9 items-center justify-center">
+            <Button
+              unClickable
+              variant="outline"
+              size="icon"
+              aria-label="Go to the Previous Month"
+              className="absolute left-0 top-0 h-9 w-9 rounded-md bg-background p-0 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground"
+              onClick={() =>
+                setVisibleMonth((current) => addMonth(current, -1))
+              }
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="text-center text-xl font-semibold leading-none">
+              {visibleMonth.getFullYear()}/{visibleMonth.getMonth() + 1}
+            </div>
+            <Button
+              unClickable
+              variant="outline"
+              size="icon"
+              aria-label="Go to the Next Month"
+              className="absolute right-0 top-0 h-9 w-9 rounded-md bg-background p-0 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground"
+              onClick={() => setVisibleMonth((current) => addMonth(current, 1))}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="sr-only" aria-live="polite">
+            {visibleMonth.getFullYear()}/{visibleMonth.getMonth() + 1}
+          </div>
+          <div className="mt-5 grid grid-cols-7 gap-y-2 gap-x-1">
+            {weekdays.map((weekday) => (
+              <div
+                key={weekday}
+                className="flex h-8 w-8 items-center justify-center text-sm font-medium text-muted-foreground tabular-nums"
+              >
+                {weekday}
+              </div>
+            ))}
+            {cells.map((cell) => {
+              const selected = isSameDay(cell.date, date);
+              const currentDay = isSameDay(cell.date, today);
+              return (
+                <button
+                  key={cell.key}
+                  type="button"
+                  aria-pressed={selected}
+                  className={cn(
+                    "flex h-8 w-8 items-center justify-center justify-self-center rounded-md text-sm font-normal tabular-nums outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    !cell.inMonth &&
+                      "text-muted-foreground/45 hover:bg-muted hover:text-muted-foreground",
+                    currentDay && "bg-muted text-foreground",
+                    selected &&
+                      "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
+                  )}
+                  onClick={() => updateDate(cell.date)}
+                >
+                  {cell.date.getDate()}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="flex items-center gap-3 px-3 pb-4 pt-3">
           <Button
             unClickable
             variant="ghost"
             size="icon"
+            aria-label="Add one year"
             className="h-8 w-8 rounded-md"
             onClick={addYear}
           >
@@ -152,6 +246,7 @@ const DatePicker = ({
             unClickable
             variant="ghost"
             size="icon"
+            aria-label="Subtract one year"
             className="h-8 w-8 rounded-md"
             onClick={subYear}
           >
@@ -161,6 +256,7 @@ const DatePicker = ({
             unClickable
             variant="outline"
             size="icon"
+            aria-label="Clear date"
             className="h-8 w-10 rounded-md"
             onClick={() => updateDate(undefined)}
           >
