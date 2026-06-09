@@ -117,13 +117,15 @@ function ToolCallRow({ toolCall }: ToolCallRowProps) {
 
       {hasDetails && (
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-sm">
-                <span>{toolCall.function.name}</span>
+          <DialogContent className="max-w-2xl overflow-hidden">
+            <DialogHeader className="min-w-0">
+              <DialogTitle className="flex min-w-0 items-center gap-2 pr-8 text-sm">
+                <span className="min-w-0 break-words [overflow-wrap:anywhere]">
+                  {toolCall.function.name}
+                </span>
                 <span
                   className={cn(
-                    "flex items-center gap-1 text-xs font-normal",
+                    "flex shrink-0 items-center gap-1 text-xs font-normal",
                     status.tone,
                   )}
                 >
@@ -131,38 +133,38 @@ function ToolCallRow({ toolCall }: ToolCallRowProps) {
                   {status.label}
                 </span>
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="min-w-0 break-words text-left [overflow-wrap:anywhere]">
                 {toolCall.id || t("plugin.mcp.tool-arguments")}
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-3">
+            <div className="min-w-0 space-y-3 overflow-hidden">
               {argumentsText && (
-                <div className="space-y-1">
+                <div className="min-w-0 space-y-1">
                   <div className="text-xs font-medium text-muted-foreground">
                     {t("plugin.mcp.tool-arguments")}
                   </div>
-                  <pre className="max-h-72 overflow-auto rounded-md bg-background/80 p-3 text-xs leading-relaxed text-foreground whitespace-pre-wrap break-words">
+                  <pre className="max-h-72 max-w-full overflow-y-auto overflow-x-hidden rounded-md bg-background/80 p-3 text-xs leading-relaxed text-foreground whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
                     {argumentsText}
                   </pre>
                 </div>
               )}
               {resultText && (
-                <div className="space-y-1">
+                <div className="min-w-0 space-y-1">
                   <div className="text-xs font-medium text-muted-foreground">
                     {t("plugin.mcp.result")}
                   </div>
-                  <pre className="max-h-72 overflow-auto rounded-md bg-background/80 p-3 text-xs leading-relaxed text-foreground whitespace-pre-wrap break-words">
+                  <pre className="max-h-72 max-w-full overflow-y-auto overflow-x-hidden rounded-md bg-background/80 p-3 text-xs leading-relaxed text-foreground whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
                     {resultText}
                   </pre>
                 </div>
               )}
               {errorText && (
-                <div className="space-y-1">
+                <div className="min-w-0 space-y-1">
                   <div className="text-xs font-medium text-red-500">
                     {t("plugin.mcp.error")}
                   </div>
-                  <pre className="max-h-72 overflow-auto rounded-md bg-red-500/10 p-3 text-xs leading-relaxed text-red-600 dark:text-red-400 whitespace-pre-wrap break-words">
+                  <pre className="max-h-72 max-w-full overflow-y-auto overflow-x-hidden rounded-md bg-red-500/10 p-3 text-xs leading-relaxed text-red-600 dark:text-red-400 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
                     {errorText}
                   </pre>
                 </div>
