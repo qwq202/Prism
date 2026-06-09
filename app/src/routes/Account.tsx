@@ -1,6 +1,7 @@
 import "@/assets/pages/package.less";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import React, { useState } from "react";
+import { useLocation } from "react-router-dom";
 import { cn } from "@/components/ui/lib/utils.ts";
 import Avatar from "@/components/Avatar.tsx";
 import { useDispatch, useSelector } from "react-redux";
@@ -10,6 +11,7 @@ import {
   selectUsername,
   validateToken,
 } from "@/store/auth.ts";
+import type { AppDispatch } from "@/store";
 import { Badge } from "@/components/ui/badge.tsx";
 import { useClipboard } from "@/utils/dom.ts";
 import { useGroup } from "@/utils/groups.ts";
@@ -35,7 +37,6 @@ import {
 import { Button } from "@/components/ui/button.tsx";
 import { useEffectAsync } from "@/utils/hook.ts";
 import {
-  getCachedUserInfo,
   getUserInfo,
   initialUserInfo,
   createPasskeyRegistrationOptions,
@@ -50,11 +51,11 @@ import {
 } from "@/api/auth.ts";
 import { withNotify } from "@/api/common.ts";
 import { goAuth } from "@/utils/app.ts";
-import { quotaSelector } from "@/store/quota.ts";
+import { quotaSelector, refreshQuota, setQuota } from "@/store/quota.ts";
 import Tips from "@/components/Tips.tsx";
 import { getSharedLink, SharingPreviewForm } from "@/api/sharing.ts";
 import { openWindow } from "@/utils/device.ts";
-import { dataSelector, deleteData, syncData } from "@/store/sharing.ts";
+import { dataSelector, deleteData, setData, syncData } from "@/store/sharing.ts";
 import { DeeptrainOnly } from "@/conf/deeptrain.tsx";
 import { deeptrainEndpoint } from "@/conf/env.ts";
 import { Input } from "@/components/ui/input.tsx";
@@ -242,7 +243,8 @@ function ShareContent({ data }: ShareContentProps) {
 
 function Account() {
   const { t } = useTranslation();
-  const dispatch = useDispatch();
+  const dispatch: AppDispatch = useDispatch();
+  const location = useLocation();
   const username = useSelector(selectUsername);
   const auth = useSelector(selectAuthenticated);
   const quota = useSelector(quotaSelector);
@@ -288,29 +290,27 @@ function Account() {
   const sharingData = useSelector(dataSelector);
 
   useEffectAsync(async () => {
-    if (auth) {
-      if (sharingData.length > 0) return;
-      const resp = await syncData(dispatch);
-      if (resp) {
-        toast.error(t("share.sync-error"), {
-          description: resp,
-        });
-      }
-    }
-  }, [auth]);
-
-  const updateUserInfo = async () => {
     if (!auth) {
+      dispatch(setData([]));
       return;
     }
 
-    const cached = await getCachedUserInfo();
-    if (cached) {
-      setInfo(cached);
+    const resp = await syncData(dispatch);
+    if (resp) {
+      toast.error(t("share.sync-error"), {
+        description: resp,
+      });
+    }
+  }, [auth, location.key]);
+
+  const updateUserInfo = async () => {
+    if (!auth) {
+      setInfo({ ...initialUserInfo });
+      return;
     }
 
     const resp = await getUserInfo();
-    if (!cached || !resp.status) {
+    if (!resp.status) {
       withNotify(t, resp);
     }
 
@@ -318,7 +318,16 @@ function Account() {
       setInfo(resp.data);
     }
   };
-  useEffectAsync(updateUserInfo, [auth]);
+  useEffectAsync(updateUserInfo, [auth, location.key]);
+
+  useEffectAsync(async () => {
+    if (!auth) {
+      dispatch(setQuota(0));
+      return;
+    }
+
+    await dispatch(refreshQuota());
+  }, [auth, location.key]);
 
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
@@ -346,7 +355,7 @@ function Account() {
       withNotify(t, resp);
     }
   };
-  useEffectAsync(refreshPasskeys, [auth]);
+  useEffectAsync(refreshPasskeys, [auth, location.key]);
 
   async function sendEmailChangeCode() {
     const email = emailForm.email.trim();

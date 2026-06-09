@@ -2,6 +2,11 @@ import axios from "axios";
 import { Message } from "./types.tsx";
 import { getErrorMessage } from "@/utils/base.ts";
 
+const noCacheHeaders = {
+  "Cache-Control": "no-cache",
+  Pragma: "no-cache",
+};
+
 export type SharingForm = {
   status: boolean;
   message: string;
@@ -67,7 +72,10 @@ export async function viewConversation(hash: string): Promise<ViewForm> {
 
 export async function listSharing(): Promise<ListSharingResponse> {
   try {
-    const resp = await axios.get("/conversation/share/list");
+    const resp = await axios.get("/conversation/share/list", {
+      headers: noCacheHeaders,
+      params: { _: Date.now() },
+    });
     return resp.data as ListSharingResponse;
   } catch (e) {
     return {

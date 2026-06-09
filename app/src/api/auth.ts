@@ -4,23 +4,11 @@ import { localizeError } from "@/utils/error.ts";
 import { isEmailValid } from "@/utils/form.ts";
 import { toast } from "sonner";
 import type { TFunction } from "i18next";
-import { getClientCache, setClientCache } from "@/utils/client-cache.ts";
 
-const userInfoCacheKey = "user-info";
-
-function hashCacheScope(value: string): string {
-  let hash = 5381;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 33) ^ value.charCodeAt(index);
-  }
-  return (hash >>> 0).toString(36);
-}
-
-function getUserInfoCacheKey(): string {
-  const endpoint = String(axios.defaults.baseURL ?? "default");
-  const token = String(axios.defaults.headers.common["Authorization"] ?? "");
-  return `${userInfoCacheKey}:${endpoint}:${hashCacheScope(token)}`;
-}
+const noCacheHeaders = {
+  "Cache-Control": "no-cache",
+  Pragma: "no-cache",
+};
 
 export type LoginForm = {
   username: string;
@@ -311,7 +299,10 @@ export async function updateAccountPassword(
 
 export async function listPasskeys(): Promise<PasskeyListResponse> {
   try {
-    const response = await axios.get("/account/passkeys");
+    const response = await axios.get("/account/passkeys", {
+      headers: noCacheHeaders,
+      params: { _: Date.now() },
+    });
     return response.data as PasskeyListResponse;
   } catch (e) {
     return {
@@ -394,20 +385,16 @@ export const initialUserInfo: UserInfo = {
 
 export async function getUserInfo(): Promise<UserInfoResponse> {
   try {
-    const response = await axios.get("/userinfo");
-    const data = response.data as UserInfoResponse;
-    if (data.status) void setClientCache(getUserInfoCacheKey(), data.data);
-    return data;
+    const response = await axios.get("/userinfo", {
+      headers: noCacheHeaders,
+      params: { _: Date.now() },
+    });
+    return response.data as UserInfoResponse;
   } catch (e) {
-    const cached = await getCachedUserInfo();
     return {
-      status: Boolean(cached),
+      status: false,
       error: getErrorMessage(e),
-      data: cached ?? { ...initialUserInfo },
+      data: { ...initialUserInfo },
     };
   }
-}
-
-export async function getCachedUserInfo(): Promise<UserInfo | undefined> {
-  return await getClientCache<UserInfo>(getUserInfoCacheKey());
 }
