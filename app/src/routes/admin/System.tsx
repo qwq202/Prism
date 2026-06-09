@@ -1405,13 +1405,13 @@ function Search({
               type={`button`}
               size={`icon`}
               variant={`outline`}
-              className={`h-8 w-8 shrink-0`}
+              className={`h-7 w-7 shrink-0`}
               disabled={!currentApiKey || usageLoading}
               aria-label={t("admin.system.tavilyUsageRefresh")}
               onClick={() => refreshTavilyUsage(currentApiKey)}
             >
               <RotateCw
-                className={cn(`h-4 w-4`, usageLoading && `animate-spin`)}
+                className={cn(`h-3.5 w-3.5`, usageLoading && `animate-spin`)}
               />
             </Button>
           </div>
