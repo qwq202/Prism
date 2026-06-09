@@ -6,6 +6,92 @@ import (
 	"testing"
 )
 
+func withSearchAPIKey(t *testing.T, value string) {
+	t.Helper()
+	previous := globals.SearchApiKey
+	globals.SearchApiKey = value
+	t.Cleanup(func() {
+		globals.SearchApiKey = previous
+	})
+}
+
+func TestShouldUseFallbackSearchWhenToolCallsUnsupported(t *testing.T) {
+	withSearchAPIKey(t, "tvly-test")
+
+	if !ShouldUseFallbackSearch(true, "gpt-4o", false) {
+		t.Fatalf("expected fallback search when web is enabled and tool calls are unsupported")
+	}
+	if ShouldUseFallbackSearch(true, "gpt-4o", true) {
+		t.Fatalf("expected fallback search to stay off when tool calls are supported")
+	}
+	if ShouldUseFallbackSearch(false, "gpt-4o", false) {
+		t.Fatalf("expected fallback search to stay off when web is disabled")
+	}
+}
+
+func TestShouldUseFallbackSearchRequiresAPIKey(t *testing.T) {
+	withSearchAPIKey(t, " ")
+
+	if ShouldUseFallbackSearch(true, "gpt-4o", false) {
+		t.Fatalf("expected fallback search to stay off without Tavily API key")
+	}
+}
+
+func TestShouldUseFallbackSearchSkipsNativeWebProviders(t *testing.T) {
+	withSearchAPIKey(t, "tvly-test")
+
+	for _, model := range []string{"gemini-3.5-flash", "grok-4-1-fast-reasoning", "gpt-5.5"} {
+		if ShouldUseFallbackSearch(true, model, false) {
+			t.Fatalf("expected fallback search to stay off for native web provider model %q", model)
+		}
+	}
+}
+
+func TestCanUseSearchToolRequiresToolCalls(t *testing.T) {
+	withSearchAPIKey(t, "tvly-test")
+
+	if !CanUseSearchTool(true, "gpt-4o", true) {
+		t.Fatalf("expected search tool when web is enabled and tool calls are supported")
+	}
+	if CanUseSearchTool(true, "gpt-4o", false) {
+		t.Fatalf("expected search tool to stay off without tool call support")
+	}
+}
+
+func TestRecentUserSearchContextUsesLatestThreeUserMessages(t *testing.T) {
+	messages := []globals.Message{
+		{Role: globals.User, Content: "第一条用户消息"},
+		{Role: globals.Assistant, Content: "助手回复"},
+		{Role: globals.User, Content: "第二条用户消息"},
+		{Role: globals.System, Content: "系统消息"},
+		{Role: globals.User, Content: "第三条用户消息"},
+		{Role: globals.User, Content: "第四条用户消息"},
+	}
+
+	got := recentUserSearchContext(messages, 3)
+	want := strings.Join([]string{
+		"Recent user messages:",
+		"1. 第二条用户消息",
+		"2. 第三条用户消息",
+		"3. 第四条用户消息",
+	}, "\n")
+
+	if got != want {
+		t.Fatalf("expected recent user context %q, got %q", want, got)
+	}
+}
+
+func TestRecentUserSearchContextFallsBackToLastMessage(t *testing.T) {
+	got := recentUserSearchContext([]globals.Message{
+		{Role: globals.System, Content: "系统消息"},
+		{Role: globals.Assistant, Content: "助手回复"},
+	}, 3)
+
+	if got != "助手回复" {
+		t.Fatalf("expected fallback to last message, got %q", got)
+	}
+}
+
 func TestBuildToolDefinitionExposesWebSearchQuery(t *testing.T) {
 	tools := BuildToolDefinition()
 	if tools == nil || len(*tools) != 1 {

@@ -2,6 +2,7 @@ package manager
 
 import (
 	adaptercommon "chat/adapter/common"
+	"chat/addition/web"
 	"chat/admin"
 	"chat/auth"
 	"chat/billing"
@@ -28,7 +29,11 @@ func NativeChatHandler(c *gin.Context, user *auth.User, model string, message []
 	db := utils.GetDBFromContext(c)
 	cache := utils.GetCacheFromContext(c)
 	group := auth.GetGroup(db, user)
+	toolCallsSupported := memory.CanUseToolCalls(model, group)
 	segment := utils.DeepCopy(message)
+	if web.ShouldUseFallbackSearch(enableWeb, model, toolCallsSupported) {
+		segment = web.ToFallbackSearched(segment, group, cache)
+	}
 	check, plan := auth.CanEnableModelWithSubscription(db, cache, user, model, segment)
 
 	if check != nil {
@@ -60,7 +65,6 @@ func NativeChatHandler(c *gin.Context, user *auth.User, model string, message []
 
 	var hit bool
 	var err error
-	toolCallsSupported := memory.CanUseToolCalls(model, group)
 	webSearchToolEnabled := canUseTavilySearchTool(enableWeb, model, toolCallsSupported)
 	tools := buildAvailableToolDefinitions(false, false, webSearchToolEnabled)
 	if tools != nil {

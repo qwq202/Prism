@@ -612,12 +612,7 @@ func appendFunctionTools(target globals.FunctionTools, source *globals.FunctionT
 }
 
 func canUseTavilySearchTool(enable bool, model string, toolCallsSupported bool) bool {
-	return enable &&
-		toolCallsSupported &&
-		!globals.IsGeminiModel(model) &&
-		!globals.IsXAIModel(model) &&
-		!globals.IsOpenAIResponsesNativeWebModel(model) &&
-		strings.TrimSpace(globals.SearchApiKey) != ""
+	return web.CanUseSearchTool(enable, model, toolCallsSupported)
 }
 
 func buildAvailableToolDefinitions(fetchEnabled bool, memoryWritable bool, webSearchEnabled bool) *globals.FunctionTools {
@@ -1332,7 +1327,11 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 
 	model := instance.GetModel()
 	group := auth.GetGroup(db, user)
+	toolCallsSupported := memory.CanUseToolCalls(model, group)
 	segment := conversation.CopyMessage(instance.GetChatMessage(restart))
+	if web.ShouldUseFallbackSearch(instance.IsEnableWebSearch(), model, toolCallsSupported) {
+		segment = web.ToFallbackSearched(segment, group, cache)
+	}
 	segment = adapter.ClearMessages(model, segment)
 
 	check, plan := auth.CanEnableModelWithSubscription(db, cache, user, model, segment)
@@ -1363,7 +1362,6 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 		hit, err, interrupted = createChatTask(conn, user, buffer, db, cache, model, instance, segment, plan)
 	} else {
 		memCtx := buildMemoryContext(db, user, instance, model, group)
-		toolCallsSupported := memory.CanUseToolCalls(model, group)
 		fetchToolEnabled := instance.IsEnableFetch() && toolCallsSupported
 		webSearchToolEnabled := canUseTavilySearchTool(instance.IsEnableWebSearch(), model, toolCallsSupported)
 		tools := buildAvailableToolDefinitions(fetchToolEnabled, memCtx.Writable, webSearchToolEnabled)
