@@ -109,24 +109,23 @@ const DatePicker = ({
           selected={date}
           onSelect={(date) => updateDate(date)}
           autoFocus
-          className="p-3.5 pb-1"
+          className="p-3 pb-1"
           classNames={{
-            months: "flex w-full flex-col",
-            month: "w-full space-y-2",
-            month_caption:
-              "relative flex h-8 items-center justify-center px-10 text-center",
-            caption_label: "text-lg font-semibold leading-none",
+            months: "flex w-full flex-col space-y-0",
+            month: "w-full space-y-3",
+            month_caption: "relative flex h-8 items-center justify-center",
+            caption_label: "text-base font-semibold leading-none",
             nav: "absolute inset-x-0 top-0 flex h-8 items-center justify-between",
             button_previous:
               "absolute left-0 top-0 flex h-8 w-8 items-center justify-center rounded-md border bg-background p-0 text-muted-foreground opacity-100 shadow-sm transition-colors hover:bg-muted hover:text-foreground",
             button_next:
               "absolute right-0 top-0 flex h-8 w-8 items-center justify-center rounded-md border bg-background p-0 text-muted-foreground opacity-100 shadow-sm transition-colors hover:bg-muted hover:text-foreground",
-            month_grid: "w-full border-collapse",
-            weekdays: "grid grid-cols-7",
+            month_grid: "w-full border-collapse table-fixed",
+            weekdays: "grid grid-cols-7 gap-1",
             weekday:
-              "flex h-7 items-center justify-center text-sm font-normal text-muted-foreground",
-            week: "grid grid-cols-7",
-            day: "flex h-10 items-center justify-center p-0 text-center",
+              "flex h-7 items-center justify-center text-sm font-normal text-muted-foreground tabular-nums",
+            week: "grid grid-cols-7 gap-1",
+            day: "flex h-8 w-8 items-center justify-center p-0 text-center",
             day_button:
               "h-8 w-8 rounded-md p-0 text-sm font-normal transition-colors hover:bg-muted",
             selected:
@@ -139,7 +138,7 @@ const DatePicker = ({
           }}
           {...props}
         />
-        <div className={cn("flex items-center gap-5 px-4 pb-3 pt-1")}>
+        <div className="flex items-center gap-3 px-3 pb-3 pt-1">
           <Button
             unClickable
             variant="ghost"
