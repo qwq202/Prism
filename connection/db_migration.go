@@ -87,6 +87,22 @@ func doMysqlMigration(execer migrationExecer) error {
 		return err
 	}
 
+	if err := execSql(execer, `
+		ALTER TABLE auth
+		ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP;
+	`); err != nil {
+		return err
+	}
+
+	if err := execSql(execer, `
+		UPDATE auth
+		LEFT JOIN quota ON quota.user_id = auth.id
+		SET auth.created_at = COALESCE(quota.created_at, auth.created_at, CURRENT_TIMESTAMP)
+		WHERE quota.created_at IS NOT NULL OR auth.created_at IS NULL;
+	`); err != nil {
+		return err
+	}
+
 	// add new field `task_id` in `conversation` table to store task id (e.g., video job id)
 	if err := execSql(execer, `
 		ALTER TABLE conversation
@@ -191,6 +207,25 @@ func doSqliteMigration(execer migrationExecer) error {
 	if err := execSql(execer, `
 		ALTER TABLE conversation
 		ADD COLUMN updated_at DATETIME NULL;
+	`); err != nil {
+		return err
+	}
+
+	if err := execSql(execer, `
+		ALTER TABLE auth
+		ADD COLUMN created_at DATETIME NULL;
+	`); err != nil {
+		return err
+	}
+
+	if err := execSql(execer, `
+		UPDATE auth
+		SET created_at = COALESCE(
+			(SELECT quota.created_at FROM quota WHERE quota.user_id = auth.id),
+			created_at,
+			CURRENT_TIMESTAMP
+		)
+		WHERE created_at IS NULL;
 	`); err != nil {
 		return err
 	}

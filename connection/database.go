@@ -188,7 +188,8 @@ func CreateUserTable(db *sql.DB) {
 		  email VARCHAR(255) UNIQUE,
 		  password VARCHAR(64) NOT NULL,
 		  is_admin BOOLEAN DEFAULT FALSE,
-		  is_banned BOOLEAN DEFAULT FALSE
+		  is_banned BOOLEAN DEFAULT FALSE,
+		  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
 	`)
 

@@ -124,7 +124,7 @@ func (u *User) GetUserInfo(db *sql.DB) (*UserInfo, error) {
 	var usedQuota sql.NullFloat64
 	if err := globals.QueryRowDb(db, `
 		SELECT
-			auth.id, quota.created_at, quota.used, subscription.total_month
+			auth.id, COALESCE(auth.created_at, quota.created_at), quota.used, subscription.total_month
 		FROM auth
 		LEFT JOIN quota ON quota.user_id = auth.id
 		LEFT JOIN subscription ON subscription.user_id = auth.id

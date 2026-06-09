@@ -123,6 +123,37 @@ func TestJWTSigningKeyRejectsUnexpectedAlgorithm(t *testing.T) {
 	}
 }
 
+func TestGetUserInfoUsesAuthCreatedAtForRegisterDays(t *testing.T) {
+	db := openAuthSecurityTestDB(t)
+	connection.CreateSubscriptionTable(db)
+
+	userCreatedAt := time.Now().UTC().Add(-48 * time.Hour).Format("2006-01-02 15:04:05")
+	quotaCreatedAt := time.Now().UTC().Add(-30 * 24 * time.Hour).Format("2006-01-02 15:04:05")
+	if _, err := globals.ExecDb(db, `
+		INSERT INTO auth (username, password, email, bind_id, token, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, "alice", utils.Sha2Encrypt("password"), "alice@example.com", 1001, "alice-token", userCreatedAt); err != nil {
+		t.Fatalf("insert auth user: %v", err)
+	}
+
+	user := &User{Username: "alice"}
+	if _, err := globals.ExecDb(db, `
+		INSERT INTO quota (user_id, quota, used, created_at)
+		VALUES (?, ?, ?, ?)
+	`, user.GetID(db), 100, 12, quotaCreatedAt); err != nil {
+		t.Fatalf("insert quota: %v", err)
+	}
+
+	info, err := user.GetUserInfo(db)
+	if err != nil {
+		t.Fatalf("get user info: %v", err)
+	}
+
+	if info.RegisterDays < 1.9 || info.RegisterDays > 2.1 {
+		t.Fatalf("expected register days to use auth.created_at, got %.2f", info.RegisterDays)
+	}
+}
+
 func TestParseTokenClaimsRejectsMalformedClaims(t *testing.T) {
 	now := time.Unix(100, 0)
 	tests := []struct {
