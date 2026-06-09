@@ -21,7 +21,14 @@ import {
 } from "@/components/ui/select.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import { formReducer } from "@/utils/form.ts";
 import { NumberInput } from "@/components/ui/number-input.tsx";
 import {
@@ -76,11 +83,18 @@ type FormAction = {
   value?: unknown;
 };
 
+type SaveOptions = {
+  refreshTavilyUsage?: boolean;
+};
+
 type CompProps<T> = {
   data: T;
   form: SystemProps;
   dispatch: (action: FormAction) => void;
-  onChange: (doToast?: boolean) => Promise<CommonResponse>;
+  onChange: (
+    doToast?: boolean,
+    options?: SaveOptions,
+  ) => Promise<CommonResponse>;
   searchUsageRefresh?: {
     key: string;
     version: number;
@@ -1323,6 +1337,13 @@ function Search({
   const [searchLoading, setSearchLoading] = useState<boolean>(false);
   const [usage, setUsage] = useState<TavilyUsage | null>(null);
   const [usageLoading, setUsageLoading] = useState<boolean>(false);
+  const usageRequestRef = useRef(0);
+  const currentApiKey = data.api_key.trim();
+  const currentApiKeyRef = useRef(currentApiKey);
+
+  useEffect(() => {
+    currentApiKeyRef.current = currentApiKey;
+  }, [currentApiKey]);
 
   const refreshTavilyUsage = useCallback(
     async (apiKey: string, toastSuccess = true) => {
@@ -1340,9 +1361,18 @@ function Search({
         return;
       }
 
+      const requestId = usageRequestRef.current + 1;
+      usageRequestRef.current = requestId;
       setUsageLoading(true);
       try {
         const res = await getTavilyUsage(key);
+        if (
+          requestId !== usageRequestRef.current ||
+          key !== currentApiKeyRef.current
+        ) {
+          return;
+        }
+
         if (res.status && res.data) {
           setUsage(res.data);
           if (toastSuccess) {
@@ -1358,7 +1388,9 @@ function Search({
           withNotify(t, res, false);
         }
       } finally {
-        setUsageLoading(false);
+        if (requestId === usageRequestRef.current) {
+          setUsageLoading(false);
+        }
       }
     },
     [t],
@@ -1371,7 +1403,11 @@ function Search({
   }, [refreshTavilyUsage, searchUsageRefresh]);
 
   const usagePercent = Math.max(0, Math.min(100, usage?.percent ?? 0));
-  const currentApiKey = data.api_key.trim();
+  const handleSearchSave = useCallback(
+    async (doToast?: boolean) =>
+      await onChange(doToast, { refreshTavilyUsage: true }),
+    [onChange],
+  );
 
   return (
     <Paragraph
@@ -1387,7 +1423,11 @@ function Search({
         <Input
           value={data.api_key}
           onChange={(e) => {
+            const key = e.target.value.trim();
+            usageRequestRef.current += 1;
+            currentApiKeyRef.current = key;
             setUsage(null);
+            setUsageLoading(false);
             dispatch({
               type: "update:search.api_key",
               value: e.target.value,
@@ -1547,7 +1587,7 @@ function Search({
                 variant={`default`}
                 loading={true}
                 onClick={async () => {
-                  await onChange();
+                  await handleSearchSave();
 
                   setSearchResult("");
                   setSearchLoading(true);
@@ -1566,7 +1606,7 @@ function Search({
         <Button
           size={`sm`}
           loading={true}
-          onClick={async () => await onChange()}
+          onClick={async () => await handleSearchSave()}
         >
           {t("admin.system.save")}
         </Button>
@@ -1637,11 +1677,14 @@ function System() {
     version: 0,
   });
 
-  const doSaving = async (doToast?: boolean): Promise<CommonResponse> => {
+  const doSaving = async (
+    doToast?: boolean,
+    options?: SaveOptions,
+  ): Promise<CommonResponse> => {
     const res = await setConfig(data);
 
     if (doToast !== false) withNotify(t, res, true);
-    if (res.status) {
+    if (res.status && options?.refreshTavilyUsage) {
       setSearchUsageRefresh((current) => ({
         key: data.search.api_key.trim(),
         version: current.version + 1,
