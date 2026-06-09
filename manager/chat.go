@@ -58,6 +58,14 @@ func summarizeToolCalls(calls *globals.ToolCalls) string {
 	return "[" + strings.Join(items, ", ") + "]"
 }
 
+func formatBuiltinToolNames(names []string) string {
+	if len(names) == 0 {
+		return "[]"
+	}
+
+	return "[" + strings.Join(names, ",") + "]"
+}
+
 func buildToolCallEvent(call globals.ToolCall, status string) *globals.ChatSegmentToolCall {
 	name := strings.TrimSpace(call.Function.Name)
 	if name == "" {
@@ -380,12 +388,34 @@ func recordBuiltinToolRequest(buffer *utils.Buffer, instance *conversation.Conve
 		return
 	}
 
-	codeExecutionEnabled := instance.IsEnableCodeExecution()
-	if !codeExecutionEnabled {
-		return
+	requestedTools := make([]string, 0, 3)
+	if instance.IsEnableWebSearch() {
+		requestedTools = append(requestedTools, "google_search")
+	}
+	if instance.IsEnableURLContext() {
+		requestedTools = append(requestedTools, "url_context")
 	}
 
-	buffer.SetCodeExecutionToolUsage(codeExecutionEnabled, globals.SupportGeminiCodeExecution(model))
+	codeExecutionEnabled := instance.IsEnableCodeExecution()
+	codeExecutionSupported := globals.SupportGeminiCodeExecution(model)
+	if codeExecutionEnabled && codeExecutionSupported {
+		requestedTools = append(requestedTools, "code_execution")
+	}
+
+	globals.Debug(fmt.Sprintf(
+		"[builtin-tools] request conversation_id=%d model=%s tools_requested=%s web_search_enabled=%v url_context_enabled=%v code_execution_enabled=%v code_execution_supported=%v",
+		instance.GetId(),
+		model,
+		formatBuiltinToolNames(requestedTools),
+		instance.IsEnableWebSearch(),
+		instance.IsEnableURLContext(),
+		codeExecutionEnabled,
+		codeExecutionSupported,
+	))
+
+	if codeExecutionEnabled {
+		buffer.SetCodeExecutionToolUsage(codeExecutionEnabled, codeExecutionSupported)
+	}
 }
 
 func buildChatProps(

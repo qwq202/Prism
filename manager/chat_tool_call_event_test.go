@@ -5,6 +5,17 @@ import (
 	"testing"
 )
 
+func TestFormatBuiltinToolNames(t *testing.T) {
+	if got := formatBuiltinToolNames(nil); got != "[]" {
+		t.Fatalf("expected empty builtin tool list, got %q", got)
+	}
+
+	got := formatBuiltinToolNames([]string{"google_search", "code_execution"})
+	if got != "[google_search,code_execution]" {
+		t.Fatalf("unexpected builtin tool list: %q", got)
+	}
+}
+
 func TestBuildToolCallEvent(t *testing.T) {
 	call := globals.ToolCall{
 		Id:   "call_1",
