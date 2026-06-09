@@ -451,8 +451,8 @@ func getGeminiTools(tools *globals.FunctionTools) []GeminiTool {
 	return []GeminiTool{{FunctionDeclarations: declarations}}
 }
 
-func getGeminiBuiltinWebTools(enableSearch bool, enableURLContext bool) []GeminiTool {
-	tools := make([]GeminiTool, 0, 2)
+func getGeminiBuiltinTools(enableSearch bool, enableURLContext bool, enableCodeExecution bool) []GeminiTool {
+	tools := make([]GeminiTool, 0, 3)
 
 	if enableURLContext {
 		tools = append(tools, GeminiTool{URLContext: &GeminiURLContext{}})
@@ -460,6 +460,10 @@ func getGeminiBuiltinWebTools(enableSearch bool, enableURLContext bool) []Gemini
 
 	if enableSearch {
 		tools = append(tools, GeminiTool{GoogleSearch: &GeminiGoogleSearch{}})
+	}
+
+	if enableCodeExecution {
+		tools = append(tools, GeminiTool{CodeExecution: &GeminiCodeExecution{}})
 	}
 
 	if len(tools) == 0 {
@@ -595,13 +599,54 @@ func getGeminiAnswerText(parts []GeminiChatPart) string {
 	builder := strings.Builder{}
 
 	for _, part := range parts {
-		if part.Text == nil || part.Thought {
-			continue
+		if part.Text != nil && !part.Thought {
+			builder.WriteString(*part.Text)
 		}
-		builder.WriteString(*part.Text)
+		appendGeminiCodeExecutionText(&builder, part)
 	}
 
 	return builder.String()
+}
+
+func appendGeminiCodeExecutionText(builder *strings.Builder, part GeminiChatPart) {
+	if part.ExecutableCode != nil && strings.TrimSpace(part.ExecutableCode.Code) != "" {
+		appendGeminiMarkdownBlock(
+			builder,
+			normalizeGeminiExecutableCodeLanguage(part.ExecutableCode.Language),
+			part.ExecutableCode.Code,
+		)
+	}
+
+	if part.CodeExecutionResult != nil && strings.TrimSpace(part.CodeExecutionResult.Output) != "" {
+		appendGeminiMarkdownBlock(builder, "text", part.CodeExecutionResult.Output)
+	}
+}
+
+func normalizeGeminiExecutableCodeLanguage(language string) string {
+	normalized := strings.ToLower(strings.TrimSpace(language))
+	if normalized == "" || normalized == "language_unspecified" {
+		return "python"
+	}
+	if strings.Contains(normalized, "python") {
+		return "python"
+	}
+	return normalized
+}
+
+func appendGeminiMarkdownBlock(builder *strings.Builder, language string, content string) {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return
+	}
+
+	if builder.Len() > 0 {
+		builder.WriteString("\n\n")
+	}
+	builder.WriteString("```")
+	builder.WriteString(language)
+	builder.WriteString("\n")
+	builder.WriteString(content)
+	builder.WriteString("\n```")
 }
 
 func (c *ChatInstance) GetGeminiChatText(model string, parts []GeminiChatPart) string {
@@ -628,6 +673,7 @@ func (c *ChatInstance) GetGeminiStreamText(model string, parts []GeminiChatPart)
 
 	for _, part := range parts {
 		if part.Text == nil || *part.Text == "" {
+			appendGeminiCodeExecutionText(&builder, part)
 			continue
 		}
 
@@ -649,6 +695,7 @@ func (c *ChatInstance) GetGeminiStreamText(model string, parts []GeminiChatPart)
 		}
 
 		builder.WriteString(*part.Text)
+		appendGeminiCodeExecutionText(&builder, part)
 	}
 
 	return builder.String()

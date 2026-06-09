@@ -123,7 +123,7 @@ func (c *ChatInstance) GetGeminiChatBody(props *adaptercommon.ChatProps) *Gemini
 	return &GeminiChatBody{
 		SystemInstruction: c.GetGeminiSystemInstruction(props.Model, props.Message),
 		Contents:          c.GetGeminiContents(props.Model, props.Message),
-		Tools:             mergeGeminiTools(getGeminiBuiltinWebTools(props.EnableWebSearch, props.EnableURLContext), getGeminiTools(props.Tools)),
+		Tools:             mergeGeminiTools(getGeminiBuiltinTools(props.EnableWebSearch, props.EnableURLContext, props.EnableCodeExecution), getGeminiTools(props.Tools)),
 		ToolConfig:        getGeminiToolConfig(props.ToolChoice),
 		GenerationConfig: GeminiConfig{
 			Temperature:     props.Temperature,

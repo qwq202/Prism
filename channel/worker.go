@@ -74,13 +74,41 @@ func cacheHashForChatProps(props *adaptercommon.ChatProps) string {
 		props.ChannelType == globals.ClaudeChannelType ||
 		props.ChannelType == globals.GLMCodingPlanCNChannelType ||
 		props.ChannelType == globals.MiniMaxTokenPlanCNChannelType {
-		return utils.Md5Encrypt(utils.Marshal(props))
+		return utils.Md5Encrypt(marshalChatPropsForCache(props))
 	}
 
 	cloned := *props
 	cloned.Message = stripHiddenMetadataForCache(props.Message, true, true)
 
-	return utils.Md5Encrypt(utils.Marshal(&cloned))
+	return utils.Md5Encrypt(marshalChatPropsForCache(&cloned))
+}
+
+type chatPropsCacheKey struct {
+	*adaptercommon.ChatProps
+	EnableWeb            bool   `json:"enable_web"`
+	EnableWebSearch      bool   `json:"enable_web_search"`
+	EnableURLContext     bool   `json:"enable_url_context"`
+	EnableCodeExecution  bool   `json:"enable_code_execution"`
+	EnableXSearch        bool   `json:"enable_x_search"`
+	GeminiThinkingBudget *int   `json:"gemini_thinking_budget,omitempty"`
+	ChannelType          string `json:"channel_type,omitempty"`
+}
+
+func marshalChatPropsForCache(props *adaptercommon.ChatProps) string {
+	if props == nil {
+		return ""
+	}
+
+	return utils.Marshal(chatPropsCacheKey{
+		ChatProps:            props,
+		EnableWeb:            props.EnableWeb,
+		EnableWebSearch:      props.EnableWebSearch,
+		EnableURLContext:     props.EnableURLContext,
+		EnableCodeExecution:  props.EnableCodeExecution,
+		EnableXSearch:        props.EnableXSearch,
+		GeminiThinkingBudget: props.GeminiThinkingBudget,
+		ChannelType:          props.ChannelType,
+	})
 }
 
 func hasToolCalls(toolCalls *globals.ToolCalls) bool {

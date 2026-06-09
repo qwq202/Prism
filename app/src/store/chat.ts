@@ -131,6 +131,7 @@ type initialStateType = {
   web: boolean;
   gemini_google_search: boolean;
   gemini_url_context: boolean;
+  gemini_code_execution: boolean;
   xai_web_search: boolean;
   xai_x_search: boolean;
   openai_responses_web_search: boolean;
@@ -195,8 +196,7 @@ function replaceWithRemoteConversationHistory(
   );
   const remoteIds = new Set(stable.map((item) => item.id));
   const pending = state.history.find((item) => item.id === -1);
-  const currentMissing =
-    state.current !== -1 && !remoteIds.has(state.current);
+  const currentMissing = state.current !== -1 && !remoteIds.has(state.current);
   const currentConversation = currentMissing
     ? state.conversations[state.current]
     : undefined;
@@ -399,7 +399,9 @@ function markConversationPending(conversation: ConversationSerialized) {
   conversation.local_pending_until = Date.now() + localMutationProtectionMs;
 }
 
-function hasPendingLocalMutation(conversation: ConversationSerialized): boolean {
+function hasPendingLocalMutation(
+  conversation: ConversationSerialized,
+): boolean {
   return (conversation.local_pending_until ?? 0) > Date.now();
 }
 
@@ -409,7 +411,9 @@ function getConversationLocalRevision(
   return conversation?.local_revision ?? 0;
 }
 
-function isStreamingConversation(conversation: ConversationSerialized): boolean {
+function isStreamingConversation(
+  conversation: ConversationSerialized,
+): boolean {
   const last = conversation.messages[conversation.messages.length - 1];
   return last?.role === AssistantRole && last.end === false;
 }
@@ -741,7 +745,7 @@ function getDeepSeekThinkingEnabledForModel(
   model: string | undefined | null,
 ): boolean {
   const key = getDeepSeekV4ModelKey(model);
-  return key ? enabledByModel[key] ?? true : false;
+  return key ? (enabledByModel[key] ?? true) : false;
 }
 
 function getDeepSeekReasoningEffortForModel(
@@ -916,6 +920,7 @@ const chatSlice = createSlice({
     web: getBooleanMemory("web", false),
     gemini_google_search: getBooleanMemory("gemini_google_search", false),
     gemini_url_context: getBooleanMemory("gemini_url_context", false),
+    gemini_code_execution: getBooleanMemory("gemini_code_execution", false),
     xai_web_search: getBooleanMemory("xai_web_search", false),
     xai_x_search: getBooleanMemory("xai_x_search", false),
     openai_responses_web_search: getBooleanMemory(
@@ -1323,6 +1328,10 @@ const chatSlice = createSlice({
       setMemory("gemini_url_context", action.payload ? "true" : "false");
       state.gemini_url_context = action.payload as boolean;
     },
+    setGeminiCodeExecution: (state, action) => {
+      setMemory("gemini_code_execution", action.payload ? "true" : "false");
+      state.gemini_code_execution = action.payload as boolean;
+    },
     setXAIWebSearch: (state, action) => {
       setMemory("xai_web_search", action.payload ? "true" : "false");
       state.xai_web_search = action.payload as boolean;
@@ -1449,7 +1458,9 @@ const chatSlice = createSlice({
       closeConversationConnection(-1);
       bumpConversationNavigationRevision();
 
-      const nextConversation: ConversationSerialized = { ...defaultConversation };
+      const nextConversation: ConversationSerialized = {
+        ...defaultConversation,
+      };
       if (mask.model) {
         nextConversation.model = mask.model;
         if (inModel(state.support_models, mask.model)) {
@@ -1477,7 +1488,9 @@ const chatSlice = createSlice({
       const maskedModel =
         state.current === -1 ? state.conversations[-1]?.model : undefined;
       const preferredModel =
-        maskedModel && inModel(models, maskedModel) ? maskedModel : getMemory("model");
+        maskedModel && inModel(models, maskedModel)
+          ? maskedModel
+          : getMemory("model");
 
       state.support_models = models;
       state.model = getModel(models, preferredModel);
@@ -1509,6 +1522,7 @@ export const {
   toggleWeb,
   setGeminiGoogleSearch,
   setGeminiURLContext,
+  setGeminiCodeExecution,
   setXAIWebSearch,
   setXAIXSearch,
   setOpenAIResponsesWebSearch,
@@ -1554,6 +1568,8 @@ export const selectGeminiGoogleSearch = (state: RootState): boolean =>
   state.chat.gemini_google_search;
 export const selectGeminiURLContext = (state: RootState): boolean =>
   state.chat.gemini_url_context;
+export const selectGeminiCodeExecution = (state: RootState): boolean =>
+  state.chat.gemini_code_execution;
 export const selectXAIWebSearch = (state: RootState): boolean =>
   state.chat.xai_web_search;
 export const selectXAIXSearch = (state: RootState): boolean =>
@@ -1776,7 +1792,10 @@ export function useConversationActions() {
         );
       }
 
-      const activeConversation = getNumberMemory("history_conversation", current);
+      const activeConversation = getNumberMemory(
+        "history_conversation",
+        current,
+      );
       if (!resp.fromCache && activeConversation !== -1) {
         await refreshConversationDetail(activeConversation, {
           activate: false,
@@ -1844,6 +1863,7 @@ export function useMessageActions() {
   const web = useSelector(selectWeb);
   const gemini_google_search = useSelector(selectGeminiGoogleSearch);
   const gemini_url_context = useSelector(selectGeminiURLContext);
+  const gemini_code_execution = useSelector(selectGeminiCodeExecution);
   const xai_web_search = useSelector(selectXAIWebSearch);
   const xai_x_search = useSelector(selectXAIXSearch);
   const openai_responses_web_search = useSelector(
@@ -1951,18 +1971,19 @@ export function useMessageActions() {
         web: enableGeminiNativeWeb
           ? gemini_google_search || gemini_url_context
           : enableXAINativeWeb
-          ? xai_web_search || xai_x_search
-          : enableOpenAINativeWeb
-          ? openai_responses_web_search
-          : web,
+            ? xai_web_search || xai_x_search
+            : enableOpenAINativeWeb
+              ? openai_responses_web_search
+              : web,
         web_search: enableGeminiNativeWeb
           ? gemini_google_search
           : enableXAINativeWeb
-          ? xai_web_search
-          : enableOpenAINativeWeb
-          ? openai_responses_web_search
-          : false,
+            ? xai_web_search
+            : enableOpenAINativeWeb
+              ? openai_responses_web_search
+              : false,
         url_context: enableGeminiNativeWeb ? gemini_url_context : false,
+        code_execution: enableGeminiNativeWeb ? gemini_code_execution : false,
         x_search: enableXAINativeWeb ? xai_x_search : false,
         fetch: enableGeminiNativeWeb ? false : fetch,
         learning_mode,
@@ -2062,18 +2083,19 @@ export function useMessageActions() {
         web: enableGeminiNativeWeb
           ? gemini_google_search || gemini_url_context
           : enableXAINativeWeb
-          ? xai_web_search || xai_x_search
-          : enableOpenAINativeWeb
-          ? openai_responses_web_search
-          : web,
+            ? xai_web_search || xai_x_search
+            : enableOpenAINativeWeb
+              ? openai_responses_web_search
+              : web,
         web_search: enableGeminiNativeWeb
           ? gemini_google_search
           : enableXAINativeWeb
-          ? xai_web_search
-          : enableOpenAINativeWeb
-          ? openai_responses_web_search
-          : false,
+            ? xai_web_search
+            : enableOpenAINativeWeb
+              ? openai_responses_web_search
+              : false,
         url_context: enableGeminiNativeWeb ? gemini_url_context : false,
+        code_execution: enableGeminiNativeWeb ? gemini_code_execution : false,
         x_search: enableXAINativeWeb ? xai_x_search : false,
         fetch: enableGeminiNativeWeb ? false : fetch,
         learning_mode,

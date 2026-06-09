@@ -53,12 +53,14 @@ type GeminiContent struct {
 }
 
 type GeminiChatPart struct {
-	Text             *string                 `json:"text,omitempty"`
-	InlineData       *GeminiInlineData       `json:"inline_data,omitempty"`
-	FunctionCall     *GeminiFunctionCall     `json:"functionCall,omitempty"`
-	FunctionResponse *GeminiFunctionResponse `json:"functionResponse,omitempty"`
-	Thought          bool                    `json:"thought,omitempty"`
-	ThoughtSignature *string                 `json:"thoughtSignature,omitempty"`
+	Text                *string                    `json:"text,omitempty"`
+	InlineData          *GeminiInlineData          `json:"inline_data,omitempty"`
+	FunctionCall        *GeminiFunctionCall        `json:"functionCall,omitempty"`
+	FunctionResponse    *GeminiFunctionResponse    `json:"functionResponse,omitempty"`
+	ExecutableCode      *GeminiExecutableCode      `json:"executableCode,omitempty"`
+	CodeExecutionResult *GeminiCodeExecutionResult `json:"codeExecutionResult,omitempty"`
+	Thought             bool                       `json:"thought,omitempty"`
+	ThoughtSignature    *string                    `json:"thoughtSignature,omitempty"`
 }
 
 type GeminiInlineData struct {
@@ -70,11 +72,24 @@ type GeminiTool struct {
 	FunctionDeclarations []GeminiFunctionDeclaration `json:"functionDeclarations,omitempty"`
 	URLContext           *GeminiURLContext           `json:"url_context,omitempty"`
 	GoogleSearch         *GeminiGoogleSearch         `json:"google_search,omitempty"`
+	CodeExecution        *GeminiCodeExecution        `json:"code_execution,omitempty"`
 }
 
 type GeminiURLContext struct{}
 
 type GeminiGoogleSearch struct{}
+
+type GeminiCodeExecution struct{}
+
+type GeminiExecutableCode struct {
+	Language string `json:"language,omitempty"`
+	Code     string `json:"code,omitempty"`
+}
+
+type GeminiCodeExecutionResult struct {
+	Outcome string `json:"outcome,omitempty"`
+	Output  string `json:"output,omitempty"`
+}
 
 type GeminiFunctionDeclaration struct {
 	Name        string      `json:"name"`

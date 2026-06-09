@@ -56,6 +56,7 @@ export type ChatProps = {
   web?: boolean;
   web_search?: boolean;
   url_context?: boolean;
+  code_execution?: boolean;
   x_search?: boolean;
   fetch?: boolean;
   learning_mode?: boolean;
@@ -152,7 +153,9 @@ export class Connection {
     this.init();
   }
 
-  public send(data: Record<string, string | boolean | number | undefined>): boolean {
+  public send(
+    data: Record<string, string | boolean | number | undefined>,
+  ): boolean {
     if (!this.connection || this.connection.readyState !== WebSocket.OPEN) {
       this.state = false;
       if (
@@ -168,7 +171,11 @@ export class Connection {
     return true;
   }
 
-  public sendWithRetry(t: TFunction | undefined, data: ChatProps, times?: number): void {
+  public sendWithRetry(
+    t: TFunction | undefined,
+    data: ChatProps,
+    times?: number,
+  ): void {
     try {
       if (!times || times < maxRetry) {
         if (!this.send(data)) {
@@ -208,7 +215,12 @@ export class Connection {
       });
   }
 
-  public sendEvent(t: TFunction | undefined, event: string, data?: string, props?: ChatProps) {
+  public sendEvent(
+    t: TFunction | undefined,
+    event: string,
+    data?: string,
+    props?: ChatProps,
+  ) {
     this.sendWithRetry(t, {
       type: event,
       message: data || "",
@@ -318,7 +330,12 @@ export class ConnectionStack {
     this.callback = callback;
   }
 
-  public sendEvent(id: number, t: TFunction | undefined, event: string, data?: string) {
+  public sendEvent(
+    id: number,
+    t: TFunction | undefined,
+    event: string,
+    data?: string,
+  ) {
     const conn = this.getConnection(id);
     conn && conn.sendEvent(t, event, data);
   }
@@ -328,7 +345,11 @@ export class ConnectionStack {
     conn && conn.sendStopEvent(t);
   }
 
-  public sendRestartEvent(id: number, t: TFunction | undefined, data?: ChatProps) {
+  public sendRestartEvent(
+    id: number,
+    t: TFunction | undefined,
+    data?: ChatProps,
+  ) {
     const conn = this.getConnection(id);
     conn && conn.sendRestartEvent(t, data);
   }
@@ -338,12 +359,21 @@ export class ConnectionStack {
     conn && conn.sendMaskEvent(t, mask);
   }
 
-  public sendEditEvent(id: number, t: TFunction | undefined, messageId: number, message: string) {
+  public sendEditEvent(
+    id: number,
+    t: TFunction | undefined,
+    messageId: number,
+    message: string,
+  ) {
     const conn = this.getConnection(id);
     conn && conn.sendEditEvent(t, messageId, message);
   }
 
-  public sendRemoveEvent(id: number, t: TFunction | undefined, messageId: number) {
+  public sendRemoveEvent(
+    id: number,
+    t: TFunction | undefined,
+    messageId: number,
+  ) {
     const conn = this.getConnection(id);
     conn && conn.sendRemoveEvent(t, messageId);
   }

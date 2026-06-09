@@ -140,6 +140,28 @@ func TestCacheHashForChatPropsKeepsHiddenMetadataOnGemini(t *testing.T) {
 	}
 }
 
+func TestCacheHashForChatPropsIncludesToolFlags(t *testing.T) {
+	plain := &adaptercommon.ChatProps{
+		OriginalModel: "gemini-3.5-flash",
+		Message: []globals.Message{
+			{Role: globals.User, Content: "calculate"},
+		},
+	}
+
+	withCodeExecution := &adaptercommon.ChatProps{
+		OriginalModel:        "gemini-3.5-flash",
+		EnableCodeExecution:  true,
+		EnableWebSearch:      plain.EnableWebSearch,
+		EnableURLContext:     plain.EnableURLContext,
+		GeminiThinkingBudget: plain.GeminiThinkingBudget,
+		Message:              plain.Message,
+	}
+
+	if got, want := cacheHashForChatProps(withCodeExecution), cacheHashForChatProps(plain); got == want {
+		t.Fatalf("expected cache hash to include code execution flag")
+	}
+}
+
 func TestCacheHashForChatPropsKeepsClaudeMetadataOnAnthropic(t *testing.T) {
 	plain := &adaptercommon.ChatProps{
 		OriginalModel: "claude-sonnet-4-20250514",

@@ -14,6 +14,7 @@ import {
   selectGeminiThinkingBudget,
   selectGeminiGoogleSearch,
   selectGeminiURLContext,
+  selectGeminiCodeExecution,
   selectModel,
   selectSupportModels,
   selectWeb,
@@ -29,6 +30,7 @@ import {
   setGeminiThinkingBudget,
   setGeminiGoogleSearch,
   setGeminiURLContext,
+  setGeminiCodeExecution,
   setXAIWebSearch,
   setXAIXSearch,
   supportsGeminiThinkingBudgetControl,
@@ -45,6 +47,7 @@ import {
   Link,
   TriangleAlert,
   MessageSquarePlus,
+  Terminal,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -118,7 +121,16 @@ type ChatActionProps = {
 
 export const ChatAction = React.forwardRef<HTMLButtonElement, ChatActionProps>(
   (
-    { className, text, children, active, badge = 0, show = true, onClick, ...props },
+    {
+      className,
+      text,
+      children,
+      active,
+      badge = 0,
+      show = true,
+      onClick,
+      ...props
+    },
     ref,
   ) => {
     const mobile = useMobile();
@@ -171,6 +183,72 @@ export const ChatAction = React.forwardRef<HTMLButtonElement, ChatActionProps>(
 );
 ChatAction.displayName = "ChatAction";
 
+function ToolSwitchItem({
+  id,
+  label,
+  tip,
+  checked,
+  onCheckedChange,
+}: {
+  id: string;
+  label: string;
+  tip: string;
+  checked: boolean;
+  onCheckedChange: (state: boolean) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-6">
+        <Label htmlFor={id} className="text-base font-medium">
+          {label}
+        </Label>
+        <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} />
+      </div>
+      <div className="flex items-start rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+        <Icon icon={<Info />} className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0" />
+        <span>{tip}</span>
+      </div>
+    </div>
+  );
+}
+
+function ToolPopoverAction({
+  active,
+  text,
+  icon,
+  switchId,
+  tip,
+  onCheckedChange,
+}: {
+  active: boolean;
+  text: string;
+  icon: React.ReactElement;
+  switchId: string;
+  tip: string;
+  onCheckedChange: (state: boolean) => void;
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <div>
+          <ChatAction active={active} text={text} aria-pressed={active}>
+            {icon}
+          </ChatAction>
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-4" side="top" align="start">
+        <ToolSwitchItem
+          id={switchId}
+          label={text}
+          tip={tip}
+          checked={active}
+          onCheckedChange={onCheckedChange}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function WebAction() {
   const { t } = useTranslation();
   const dispatch = useDispatch();
@@ -179,6 +257,7 @@ export function WebAction() {
   const supportModels = useSelector(selectSupportModels);
   const geminiGoogleSearch = useSelector(selectGeminiGoogleSearch);
   const geminiURLContext = useSelector(selectGeminiURLContext);
+  const geminiCodeExecution = useSelector(selectGeminiCodeExecution);
   const xaiWebSearch = useSelector(selectXAIWebSearch);
   const xaiXSearch = useSelector(selectXAIXSearch);
   const openAIResponsesWebSearch = useSelector(selectOpenAIResponsesWebSearch);
@@ -193,12 +272,58 @@ export function WebAction() {
   );
   const openAIModelLabel = formatModelLabel(model);
 
-  const geminiWebEnabled = geminiGoogleSearch || geminiURLContext;
   const xaiSearchEnabled = xaiWebSearch || xaiXSearch;
   const openAIWebEnabled = openAIResponsesWebSearch;
 
   if (!webSearchEnabled && !isGeminiModel && !isXAIModel && !isOpenAIWebModel) {
     return null;
+  }
+
+  if (isGeminiModel) {
+    return (
+      <div className="flex flex-row items-center">
+        <ToolPopoverAction
+          active={geminiGoogleSearch}
+          text={t("chat.web-search")}
+          icon={
+            <Globe
+              className={cn("h-4 w-4 web", geminiGoogleSearch && "enable")}
+            />
+          }
+          switchId="gemini-google-search-toggle"
+          tip={t("chat.web-enable-tip")}
+          onCheckedChange={(state) => {
+            dispatch(setGeminiGoogleSearch(state));
+          }}
+        />
+        <ToolPopoverAction
+          active={geminiURLContext}
+          text={t("chat.url-context")}
+          icon={
+            <Link className={cn("h-4 w-4", geminiURLContext && "enable")} />
+          }
+          switchId="gemini-url-context-toggle"
+          tip={t("chat.url-context-tip")}
+          onCheckedChange={(state) => {
+            dispatch(setGeminiURLContext(state));
+          }}
+        />
+        <ToolPopoverAction
+          active={geminiCodeExecution}
+          text={t("chat.code-execution")}
+          icon={
+            <Terminal
+              className={cn("h-4 w-4", geminiCodeExecution && "enable")}
+            />
+          }
+          switchId="gemini-code-execution-toggle"
+          tip={t("chat.code-execution-tip")}
+          onCheckedChange={(state) => {
+            dispatch(setGeminiCodeExecution(state));
+          }}
+        />
+      </div>
+    );
   }
 
   return (
@@ -207,34 +332,28 @@ export function WebAction() {
         <div>
           <ChatAction
             active={
-              isGeminiModel
-                ? geminiWebEnabled
-                : isXAIModel
+              isXAIModel
                 ? xaiSearchEnabled
                 : isOpenAIWebModel
-                ? openAIWebEnabled
-                : web
+                  ? openAIWebEnabled
+                  : web
             }
             text={
-              isGeminiModel
-                ? t("chat.gemini-web")
-                : isXAIModel
+              isXAIModel
                 ? t("chat.xai-web")
                 : isOpenAIWebModel
-                ? t("chat.openai-web", { model: openAIModelLabel })
-                : t("chat.web")
+                  ? t("chat.openai-web", { model: openAIModelLabel })
+                  : t("chat.web")
             }
           >
             <Globe
               className={cn(
                 "h-4 w-4 web",
-                (isGeminiModel
-                  ? geminiWebEnabled
-                  : isXAIModel
+                (isXAIModel
                   ? xaiSearchEnabled
                   : isOpenAIWebModel
-                  ? openAIWebEnabled
-                  : web) && "enable",
+                    ? openAIWebEnabled
+                    : web) && "enable",
               )}
             />
           </ChatAction>
@@ -242,48 +361,7 @@ export function WebAction() {
       </PopoverTrigger>
       <PopoverContent className="w-64 p-3" side="top" align="start">
         <div className="space-y-4">
-          {isGeminiModel ? (
-            <>
-              <div className="flex items-center justify-between">
-                <Label
-                  htmlFor="gemini-google-search-toggle"
-                  className="text-sm"
-                >
-                  {t("chat.gemini-google-search")}
-                </Label>
-                <Switch
-                  id="gemini-google-search-toggle"
-                  checked={geminiGoogleSearch}
-                  onCheckedChange={(state) => {
-                    dispatch(setGeminiGoogleSearch(state));
-                  }}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Label htmlFor="gemini-url-context-toggle" className="text-sm">
-                  {t("chat.gemini-url-context")}
-                </Label>
-                <Switch
-                  id="gemini-url-context-toggle"
-                  checked={geminiURLContext}
-                  onCheckedChange={(state) => {
-                    dispatch(setGeminiURLContext(state));
-                  }}
-                />
-              </div>
-
-              <div className="rounded-md bg-muted p-2 text-xs">
-                <div className="flex items-start">
-                  <Icon
-                    icon={<Info />}
-                    className="h-3 w-3 mr-1 mt-0.5 shrink-0"
-                  />
-                  {t("chat.gemini-web-enable-tip")}
-                </div>
-              </div>
-            </>
-          ) : isXAIModel ? (
+          {isXAIModel ? (
             <>
               <div className="flex items-center justify-between">
                 <Label htmlFor="xai-web-search-toggle" className="text-sm">
@@ -762,7 +840,9 @@ export function DeepSeekThinkingAction() {
             <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-md bg-black text-white dark:bg-white dark:text-black">
               <TriangleAlert className="h-5 w-5" />
             </div>
-            <DialogTitle>{t("chat.deepseek-pro-max-warning-title")}</DialogTitle>
+            <DialogTitle>
+              {t("chat.deepseek-pro-max-warning-title")}
+            </DialogTitle>
             <DialogDescription>
               {t("chat.deepseek-pro-max-warning-desc")}
             </DialogDescription>
