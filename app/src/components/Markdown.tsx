@@ -7,6 +7,7 @@ import rehypeRaw from "rehype-raw";
 import "@/assets/markdown/all.less";
 import { useEffect, useMemo } from "react";
 import { cn } from "@/components/ui/lib/utils.ts";
+import { normalizeLatexDelimiters } from "@/utils/markdown-math.ts";
 import Label from "@/components/markdown/Label.tsx";
 import Link from "@/components/markdown/Link.tsx";
 import Code, { CodeProps } from "@/components/markdown/Code.tsx";
@@ -102,13 +103,18 @@ function MarkdownContent({
   codeStyle,
   loading,
 }: MarkdownProps) {
+  const normalizedChildren = useMemo(
+    () => normalizeLatexDelimiters(children),
+    [children],
+  );
+
   useEffect(() => {
     document.querySelectorAll(".file-instance").forEach((el) => {
       const parent = el.parentElement as HTMLElement;
       if (!parent.classList.contains("file-block"))
         parent.classList.add("file-block");
     });
-  }, [children]);
+  }, [normalizedChildren]);
 
   const rehypePlugins = useMemo(() => {
     const plugins: NonNullable<
@@ -144,7 +150,7 @@ function MarkdownContent({
       remarkPlugins={[remarkMath, remarkGfm, remarkBreaks]}
       rehypePlugins={rehypePlugins}
       className={cn("markdown-body", className)}
-      children={children}
+      children={normalizedChildren}
       skipHtml={false}
       components={components}
     />
