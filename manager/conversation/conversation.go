@@ -27,7 +27,6 @@ type Conversation struct {
 	EnableWeb                bool              `json:"enable_web"`
 	WebSearch                bool              `json:"web_search"`
 	URLContext               bool              `json:"url_context"`
-	CodeExecution            bool              `json:"code_execution"`
 	XSearch                  bool              `json:"x_search"`
 	Fetch                    bool              `json:"fetch"`
 	GeminiThinkingBudget     int               `json:"gemini_thinking_budget"`
@@ -57,7 +56,6 @@ type FormMessage struct {
 	Web                     bool   `json:"web"`
 	WebSearch               bool   `json:"web_search"`
 	URLContext              bool   `json:"url_context"`
-	CodeExecution           bool   `json:"code_execution"`
 	XSearch                 bool   `json:"x_search"`
 	Fetch                   bool   `json:"fetch"`
 	GeminiThinkingBudget    int    `json:"gemini_thinking_budget"`
@@ -149,10 +147,6 @@ func (c *Conversation) IsEnableURLContext() bool {
 	return c.URLContext
 }
 
-func (c *Conversation) IsEnableCodeExecution() bool {
-	return c.CodeExecution
-}
-
 func (c *Conversation) IsEnableXSearch() bool {
 	return c.XSearch
 }
@@ -206,10 +200,6 @@ func (c *Conversation) SetEnableWebSearch(enable bool) {
 
 func (c *Conversation) SetEnableURLContext(enable bool) {
 	c.URLContext = enable
-}
-
-func (c *Conversation) SetEnableCodeExecution(enable bool) {
-	c.CodeExecution = enable
 }
 
 func (c *Conversation) SetEnableXSearch(enable bool) {
@@ -533,10 +523,9 @@ func GetMessage(data []byte) (string, error) {
 
 func (c *Conversation) ApplyParam(form *FormMessage) {
 	c.SetModel(form.Model)
-	c.SetEnableWeb(form.Web || form.WebSearch || form.URLContext || form.CodeExecution || form.XSearch)
-	c.SetEnableWebSearch(utils.Multi(form.Web && !form.WebSearch && !form.URLContext && !form.CodeExecution && !form.XSearch, true, form.WebSearch))
-	c.SetEnableURLContext(utils.Multi(form.Web && !form.WebSearch && !form.URLContext && !form.CodeExecution && !form.XSearch, true, form.URLContext))
-	c.SetEnableCodeExecution(form.CodeExecution)
+	c.SetEnableWeb(form.Web || form.WebSearch || form.URLContext || form.XSearch)
+	c.SetEnableWebSearch(utils.Multi(form.Web && !form.WebSearch && !form.URLContext && !form.XSearch, true, form.WebSearch))
+	c.SetEnableURLContext(utils.Multi(form.Web && !form.WebSearch && !form.URLContext && !form.XSearch, true, form.URLContext))
 	c.SetEnableXSearch(form.XSearch)
 	c.SetEnableFetch(form.Fetch)
 	c.SetGeminiThinkingBudget(form.GeminiThinkingBudget)

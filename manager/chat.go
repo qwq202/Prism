@@ -388,7 +388,7 @@ func recordBuiltinToolRequest(buffer *utils.Buffer, instance *conversation.Conve
 		return
 	}
 
-	requestedTools := make([]string, 0, 3)
+	requestedTools := make([]string, 0, 2)
 	if instance.IsEnableWebSearch() {
 		requestedTools = append(requestedTools, "google_search")
 	}
@@ -396,26 +396,14 @@ func recordBuiltinToolRequest(buffer *utils.Buffer, instance *conversation.Conve
 		requestedTools = append(requestedTools, "url_context")
 	}
 
-	codeExecutionEnabled := instance.IsEnableCodeExecution()
-	codeExecutionSupported := globals.SupportGeminiCodeExecution(model)
-	if codeExecutionEnabled && codeExecutionSupported {
-		requestedTools = append(requestedTools, "code_execution")
-	}
-
 	globals.Debug(fmt.Sprintf(
-		"[builtin-tools] request conversation_id=%d model=%s tools_requested=%s web_search_enabled=%v url_context_enabled=%v code_execution_enabled=%v code_execution_supported=%v",
+		"[builtin-tools] request conversation_id=%d model=%s tools_requested=%s web_search_enabled=%v url_context_enabled=%v",
 		instance.GetId(),
 		model,
 		formatBuiltinToolNames(requestedTools),
 		instance.IsEnableWebSearch(),
 		instance.IsEnableURLContext(),
-		codeExecutionEnabled,
-		codeExecutionSupported,
 	))
-
-	if codeExecutionEnabled {
-		buffer.SetCodeExecutionToolUsage(codeExecutionEnabled, codeExecutionSupported)
-	}
 }
 
 func buildChatProps(
@@ -451,7 +439,6 @@ func buildChatProps(
 		EnableWeb:            instance.IsEnableWeb(),
 		EnableWebSearch:      instance.IsEnableWebSearch(),
 		EnableURLContext:     instance.IsEnableURLContext(),
-		EnableCodeExecution:  instance.IsEnableCodeExecution() && globals.SupportGeminiCodeExecution(model),
 		EnableXSearch:        instance.IsEnableXSearch(),
 		GeminiThinkingBudget: instance.GetGeminiThinkingBudget(),
 		Thinking:             thinking,
@@ -685,7 +672,6 @@ func syncToolFinalMetadata(liveBuffer *utils.Buffer, responseBuffer *utils.Buffe
 	liveBuffer.SetGeminiHiddenMetadata(responseBuffer.GetGeminiHiddenMetadata())
 	liveBuffer.SetClaudeHiddenMetadata(responseBuffer.GetClaudeHiddenMetadata())
 	liveBuffer.MergeUsage(responseBuffer)
-	liveBuffer.MergeBuiltinToolUsage(responseBuffer.GetBuiltinToolUsage())
 }
 
 func buildToolLimitSystemMessage() globals.Message {
@@ -1033,7 +1019,6 @@ func createChatTask(
 				EnableWeb:            instance.IsEnableWeb(),
 				EnableWebSearch:      instance.IsEnableWebSearch(),
 				EnableURLContext:     instance.IsEnableURLContext(),
-				EnableCodeExecution:  instance.IsEnableCodeExecution() && globals.SupportGeminiCodeExecution(model),
 				EnableXSearch:        instance.IsEnableXSearch(),
 				GeminiThinkingBudget: instance.GetGeminiThinkingBudget(),
 				MaxTokens:            instance.GetMaxTokens(),

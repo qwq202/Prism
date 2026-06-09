@@ -10,8 +10,8 @@ func TestFormatBuiltinToolNames(t *testing.T) {
 		t.Fatalf("expected empty builtin tool list, got %q", got)
 	}
 
-	got := formatBuiltinToolNames([]string{"google_search", "code_execution"})
-	if got != "[google_search,code_execution]" {
+	got := formatBuiltinToolNames([]string{"google_search", "url_context"})
+	if got != "[google_search,url_context]" {
 		t.Fatalf("unexpected builtin tool list: %q", got)
 	}
 }

@@ -73,39 +73,3 @@ func TestGemini35FlashCapabilities(t *testing.T) {
 		t.Fatalf("expected %q to not use gemini thinkingBudget control", Gemini35Flash)
 	}
 }
-
-func TestGeminiCodeExecutionSupport(t *testing.T) {
-	supported := []string{
-		Gemini20Flash,
-		Gemini25Flash,
-		Gemini25Pro,
-		Gemini35Flash,
-		Gemini3Flash,
-		Gemini3ProPreview,
-		"gemini-3-flash-preview",
-		"gemini-3.1-pro-preview-customtools",
-		"gemini-3.1-flash-lite-preview",
-	}
-
-	for _, model := range supported {
-		if !SupportGeminiCodeExecution(model) {
-			t.Fatalf("expected %q to support code execution", model)
-		}
-	}
-
-	unsupported := []string{
-		GeminiPro,
-		Gemini20FlashLite,
-		Gemini3ProImagePreview,
-		"gemini-3.1-flash-image-preview",
-		"gemini-2.5-flash-preview-tts",
-		"gemini-2.5-flash-native-audio-preview-12-2025",
-		"gemini-2.0-flash-preview-image-generation",
-	}
-
-	for _, model := range unsupported {
-		if SupportGeminiCodeExecution(model) {
-			t.Fatalf("expected %q to not support code execution", model)
-		}
-	}
-}

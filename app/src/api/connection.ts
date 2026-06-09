@@ -56,7 +56,6 @@ export type ChatProps = {
   web?: boolean;
   web_search?: boolean;
   url_context?: boolean;
-  code_execution?: boolean;
   x_search?: boolean;
   fetch?: boolean;
   learning_mode?: boolean;

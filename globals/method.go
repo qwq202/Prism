@@ -132,14 +132,6 @@ func MergeClaudeHiddenMetadata(limit int, metadata ...*ClaudeHiddenMetadata) *Cl
 	}).Normalized(limit)
 }
 
-func (s *BuiltinToolUsageStatus) IsEmpty() bool {
-	return s == nil || (!s.Enabled && !s.Sent && !s.Used)
-}
-
-func (u *BuiltinToolUsage) IsEmpty() bool {
-	return u == nil || u.CodeExecution.IsEmpty()
-}
-
 // Chunk-level emptiness controls whether a stream delta should be emitted.
 // Hidden metadata is intentionally considered non-empty so metadata deltas can be forwarded.
 func (c *Chunk) IsEmpty() bool {
@@ -148,6 +140,5 @@ func (c *Chunk) IsEmpty() bool {
 		c.FunctionCall == nil &&
 		c.ReasoningContent == nil &&
 		c.GeminiHiddenMetadata.IsEmpty() &&
-		c.ClaudeHiddenMetadata.IsEmpty() &&
-		c.BuiltinToolUsage.IsEmpty()
+		c.ClaudeHiddenMetadata.IsEmpty()
 }

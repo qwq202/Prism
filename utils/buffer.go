@@ -32,7 +32,6 @@ type Buffer struct {
 	FunctionCall         *globals.FunctionCall         `json:"function_call"`
 	ReasoningContent     string                        `json:"reasoning_content,omitempty"`
 	Usage                *globals.TokenUsage           `json:"usage,omitempty"`
-	BuiltinToolUsage     *globals.BuiltinToolUsage     `json:"builtin_tool_usage,omitempty"`
 	GeminiHiddenMetadata *globals.GeminiHiddenMetadata `json:"gemini_hidden_metadata,omitempty"`
 	ClaudeHiddenMetadata *globals.ClaudeHiddenMetadata `json:"claude_hidden_metadata,omitempty"`
 	StartTime            *time.Time                    `json:"-"`
@@ -121,7 +120,6 @@ func (b *Buffer) WriteChunk(data *globals.Chunk) string {
 	b.SetGeminiHiddenMetadata(data.GeminiHiddenMetadata)
 	b.SetClaudeHiddenMetadata(data.ClaudeHiddenMetadata)
 	b.SetUsage(data.Usage)
-	b.MergeBuiltinToolUsage(data.BuiltinToolUsage)
 
 	return data.Content
 }
@@ -299,87 +297,12 @@ func (b *Buffer) GetBillingDetail() string {
 	if !b.Usage.IsEmpty() {
 		detail["official_usage"] = b.Usage
 	}
-	if !b.BuiltinToolUsage.IsEmpty() {
-		detail["tools"] = b.BuiltinToolUsage
-	}
 
 	if len(detail) == 0 {
 		return ""
 	}
 
 	return Marshal(detail)
-}
-
-func cloneBuiltinToolUsageStatus(status *globals.BuiltinToolUsageStatus) *globals.BuiltinToolUsageStatus {
-	if status == nil {
-		return nil
-	}
-
-	return &globals.BuiltinToolUsageStatus{
-		Enabled: status.Enabled,
-		Sent:    status.Sent,
-		Used:    status.Used,
-	}
-}
-
-func cloneBuiltinToolUsage(usage *globals.BuiltinToolUsage) *globals.BuiltinToolUsage {
-	if usage.IsEmpty() {
-		return nil
-	}
-
-	return &globals.BuiltinToolUsage{
-		CodeExecution: cloneBuiltinToolUsageStatus(usage.CodeExecution),
-	}
-}
-
-func mergeBuiltinToolUsageStatus(target *globals.BuiltinToolUsageStatus, source *globals.BuiltinToolUsageStatus) *globals.BuiltinToolUsageStatus {
-	if target == nil {
-		return cloneBuiltinToolUsageStatus(source)
-	}
-	if source == nil {
-		return target
-	}
-
-	target.Enabled = target.Enabled || source.Enabled
-	target.Sent = target.Sent || source.Sent
-	target.Used = target.Used || source.Used
-	return target
-}
-
-func (b *Buffer) MergeBuiltinToolUsage(usage *globals.BuiltinToolUsage) {
-	if usage.IsEmpty() {
-		return
-	}
-
-	if b.BuiltinToolUsage == nil {
-		b.BuiltinToolUsage = &globals.BuiltinToolUsage{}
-	}
-
-	b.BuiltinToolUsage.CodeExecution = mergeBuiltinToolUsageStatus(
-		b.BuiltinToolUsage.CodeExecution,
-		usage.CodeExecution,
-	)
-
-	if b.BuiltinToolUsage.IsEmpty() {
-		b.BuiltinToolUsage = nil
-	}
-}
-
-func (b *Buffer) SetCodeExecutionToolUsage(enabled bool, sent bool) {
-	if !enabled && !sent {
-		return
-	}
-
-	b.MergeBuiltinToolUsage(&globals.BuiltinToolUsage{
-		CodeExecution: &globals.BuiltinToolUsageStatus{
-			Enabled: enabled,
-			Sent:    sent,
-		},
-	})
-}
-
-func (b *Buffer) GetBuiltinToolUsage() *globals.BuiltinToolUsage {
-	return cloneBuiltinToolUsage(b.BuiltinToolUsage)
 }
 
 func cloneGeminiHiddenMetadata(metadata *globals.GeminiHiddenMetadata) *globals.GeminiHiddenMetadata {

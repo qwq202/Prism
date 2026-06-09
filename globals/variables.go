@@ -361,53 +361,6 @@ func SupportGeminiThinkingBudget(model string) bool {
 		strings.HasPrefix(model, "gemini-2.5-pro-exp-")
 }
 
-func SupportGeminiCodeExecution(model string) bool {
-	model = strings.ToLower(strings.TrimSpace(model))
-	if model == "" {
-		return false
-	}
-
-	unsupportedMarkers := []string{
-		"-image",
-		"image-generation",
-		"-tts",
-		"live",
-		"native-audio",
-	}
-	for _, marker := range unsupportedMarkers {
-		if strings.Contains(model, marker) {
-			return false
-		}
-	}
-
-	return model == Gemini20Flash ||
-		model == Gemini20Flash001 ||
-		model == Gemini20FlashExp ||
-		model == Gemini20FlashThinkingExp ||
-		model == Gemini20FlashThinkingExp1219 ||
-		model == Gemini25Flash ||
-		strings.HasPrefix(model, "gemini-2.5-flash-preview-") ||
-		model == "gemini-2.5-flash-lite" ||
-		strings.HasPrefix(model, "gemini-2.5-flash-lite-preview-") ||
-		model == Gemini25Pro ||
-		strings.HasPrefix(model, "gemini-2.5-pro-preview-") ||
-		strings.HasPrefix(model, "gemini-2.5-pro-exp-") ||
-		model == Gemini35Flash ||
-		strings.HasPrefix(model, "gemini-3.5-flash-") ||
-		model == Gemini3Flash ||
-		strings.HasPrefix(model, "gemini-3-flash-") ||
-		model == Gemini3ProPreview ||
-		strings.HasPrefix(model, "gemini-3-pro-preview-") ||
-		model == "gemini-3.1-pro-preview" ||
-		strings.HasPrefix(model, "gemini-3.1-pro-preview-") ||
-		model == "gemini-3.1-pro-preview-customtools" ||
-		strings.HasPrefix(model, "gemini-3.1-pro-preview-customtools-") ||
-		model == "gemini-3.1-flash-lite-preview" ||
-		strings.HasPrefix(model, "gemini-3.1-flash-lite-preview-") ||
-		model == "gemini-robotics-er-1.5-preview" ||
-		strings.HasPrefix(model, "gemini-robotics-er-1.5-preview-")
-}
-
 func IsGoogleImagenModel(model string) bool {
 	// using image generation api if model is in imagen models
 	return in(model, GoogleImagenModels)

@@ -148,17 +148,16 @@ func TestCacheHashForChatPropsIncludesToolFlags(t *testing.T) {
 		},
 	}
 
-	withCodeExecution := &adaptercommon.ChatProps{
+	withURLContext := &adaptercommon.ChatProps{
 		OriginalModel:        "gemini-3.5-flash",
-		EnableCodeExecution:  true,
+		EnableURLContext:     true,
 		EnableWebSearch:      plain.EnableWebSearch,
-		EnableURLContext:     plain.EnableURLContext,
 		GeminiThinkingBudget: plain.GeminiThinkingBudget,
 		Message:              plain.Message,
 	}
 
-	if got, want := cacheHashForChatProps(withCodeExecution), cacheHashForChatProps(plain); got == want {
-		t.Fatalf("expected cache hash to include code execution flag")
+	if got, want := cacheHashForChatProps(withURLContext), cacheHashForChatProps(plain); got == want {
+		t.Fatalf("expected cache hash to include url context flag")
 	}
 }
 

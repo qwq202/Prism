@@ -88,7 +88,6 @@ type chatPropsCacheKey struct {
 	EnableWeb            bool   `json:"enable_web"`
 	EnableWebSearch      bool   `json:"enable_web_search"`
 	EnableURLContext     bool   `json:"enable_url_context"`
-	EnableCodeExecution  bool   `json:"enable_code_execution"`
 	EnableXSearch        bool   `json:"enable_x_search"`
 	GeminiThinkingBudget *int   `json:"gemini_thinking_budget,omitempty"`
 	ChannelType          string `json:"channel_type,omitempty"`
@@ -104,7 +103,6 @@ func marshalChatPropsForCache(props *adaptercommon.ChatProps) string {
 		EnableWeb:            props.EnableWeb,
 		EnableWebSearch:      props.EnableWebSearch,
 		EnableURLContext:     props.EnableURLContext,
-		EnableCodeExecution:  props.EnableCodeExecution,
 		EnableXSearch:        props.EnableXSearch,
 		GeminiThinkingBudget: props.GeminiThinkingBudget,
 		ChannelType:          props.ChannelType,

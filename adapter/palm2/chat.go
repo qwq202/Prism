@@ -120,12 +120,10 @@ func (c *ChatInstance) GetPalm2ChatBody(props *adaptercommon.ChatProps) *PalmCha
 }
 
 func (c *ChatInstance) GetGeminiChatBody(props *adaptercommon.ChatProps) *GeminiChatBody {
-	enableCodeExecution := props.EnableCodeExecution && globals.SupportGeminiCodeExecution(props.Model)
-
 	return &GeminiChatBody{
 		SystemInstruction: c.GetGeminiSystemInstruction(props.Model, props.Message),
 		Contents:          c.GetGeminiContents(props.Model, props.Message),
-		Tools:             mergeGeminiTools(getGeminiBuiltinTools(props.EnableWebSearch, props.EnableURLContext, enableCodeExecution), getGeminiTools(props.Tools)),
+		Tools:             mergeGeminiTools(getGeminiBuiltinTools(props.EnableWebSearch, props.EnableURLContext), getGeminiTools(props.Tools)),
 		ToolConfig:        getGeminiToolConfig(props.ToolChoice),
 		GenerationConfig: GeminiConfig{
 			Temperature:     props.Temperature,
@@ -157,7 +155,6 @@ func (c *ChatInstance) buildGeminiChunk(model string, parts []GeminiChatPart, st
 		Content:              content,
 		ToolCall:             getGeminiToolCalls(parts),
 		GeminiHiddenMetadata: getGeminiHiddenMetadataFromParts(parts),
-		BuiltinToolUsage:     getGeminiBuiltinToolUsageFromParts(parts),
 	}
 }
 
