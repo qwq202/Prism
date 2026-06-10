@@ -1,11 +1,16 @@
 package auth
 
 import (
+	"chat/channel"
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 )
 
@@ -77,5 +82,68 @@ func TestValidateVerificationEmailForResetRequiresRegisteredEmail(t *testing.T) 
 
 	if err := validateVerificationEmail(db, "missing@example.com", false, false); err != nil {
 		t.Fatalf("expected non-reset verification to allow unregistered test email: %v", err)
+	}
+}
+
+func withSystemBackend(t *testing.T, backend string) {
+	t.Helper()
+
+	previousInstance := channel.SystemInstance
+	if channel.SystemInstance == nil {
+		channel.SystemInstance = &channel.SystemConfig{}
+	}
+	previousBackend := channel.SystemInstance.General.Backend
+	channel.SystemInstance.General.Backend = backend
+
+	t.Cleanup(func() {
+		if previousInstance == nil {
+			channel.SystemInstance = nil
+			return
+		}
+		channel.SystemInstance = previousInstance
+		channel.SystemInstance.General.Backend = previousBackend
+	})
+}
+
+func TestBuildPasswordResetLinkUsesRequestOrigin(t *testing.T) {
+	withSystemBackend(t, "")
+
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/verify", nil)
+	c.Request.Header.Set("Origin", "https://prism.example.com")
+
+	link, err := buildPasswordResetLink(c, "root@example.com", "reset-token")
+	if err != nil {
+		t.Fatalf("build reset link: %v", err)
+	}
+
+	parsed, err := url.Parse(link)
+	if err != nil {
+		t.Fatalf("parse reset link: %v", err)
+	}
+	if parsed.Scheme != "https" || parsed.Host != "prism.example.com" || parsed.Path != "/forgot" {
+		t.Fatalf("unexpected reset link target: %s", link)
+	}
+	if parsed.Query().Get("email") != "root@example.com" || parsed.Query().Get("token") != "reset-token" {
+		t.Fatalf("unexpected reset link query: %s", link)
+	}
+}
+
+func TestBuildPasswordResetLinkStripsConfiguredBackendAPIPath(t *testing.T) {
+	withSystemBackend(t, "https://prism.example.com/api")
+
+	link, err := buildPasswordResetLink(&gin.Context{}, "root@example.com", "reset-token")
+	if err != nil {
+		t.Fatalf("build reset link: %v", err)
+	}
+
+	parsed, err := url.Parse(link)
+	if err != nil {
+		t.Fatalf("parse reset link: %v", err)
+	}
+	if parsed.String() != "https://prism.example.com/forgot?email=root%40example.com&token=reset-token" {
+		t.Fatalf("unexpected reset link: %s", link)
 	}
 }

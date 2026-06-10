@@ -257,6 +257,12 @@ export async function doVerify(
   }
 }
 
+export async function requestPasswordReset(
+  email: string,
+): Promise<VerifyResponse> {
+  return doVerify(email, false, true);
+}
+
 export async function doReset(data: ResetForm): Promise<ResetResponse> {
   try {
     const response = await axios.post("/reset", data);

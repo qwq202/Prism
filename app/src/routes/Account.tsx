@@ -41,10 +41,10 @@ import {
   initialUserInfo,
   createPasskeyRegistrationOptions,
   deletePasskey,
-  doVerify,
   listPasskeys,
   PasskeyCredentialInfo,
   registerPasskey,
+  requestPasswordReset as requestPasswordResetEmail,
   sendCode,
   updateAccountEmail,
   updateAccountPassword,
@@ -383,10 +383,10 @@ function Account() {
 
     setPasswordResetLoading(true);
     try {
-      const resp = await doVerify(email, false, true);
+      const resp = await requestPasswordResetEmail(email);
       if (!resp.status) {
-        toast.error(t("auth.send-code-failed"), {
-          description: t("auth.send-code-failed-prompt", {
+        toast.error(t("auth.reset-link-failed"), {
+          description: t("auth.reset-link-failed-prompt", {
             reason: localizeError(t, resp.error),
           }),
         });

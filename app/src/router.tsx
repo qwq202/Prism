@@ -278,11 +278,7 @@ const router = createBrowserRouter([
             {
               id: "forgot",
               path: "/forgot",
-              element: (
-                <AuthForbidden>
-                  <Forgot />
-                </AuthForbidden>
-              ),
+              element: <Forgot />,
               ErrorBoundary: NotFound,
             },
           ]),

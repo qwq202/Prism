@@ -248,6 +248,46 @@ func TestSystemConfigTestMailTemplateRendersWithoutOTPContent(t *testing.T) {
 	}
 }
 
+func TestSystemConfigPasswordResetTemplateRendersLinkWithoutOTPContent(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working directory: %v", err)
+	}
+	if strings.HasSuffix(cwd, "/channel") {
+		t.Chdir("..")
+	}
+
+	conf := &SystemConfig{
+		General: generalState{
+			Title: "Prism",
+		},
+	}
+
+	body, err := conf.GetMail().RenderTemplate("reset.html", struct {
+		Title string
+		Logo  string
+		Link  string
+	}{
+		Title: conf.GetAppName(),
+		Logo:  "",
+		Link:  "https://prism.example.com/forgot?email=root%40example.com&token=reset-token",
+	})
+	if err != nil {
+		t.Fatalf("render password reset mail template: %v", err)
+	}
+
+	for _, forbidden := range []string{"One-Time Password", "OTP Verification", "{{.Code}}"} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("password reset template should not contain %q: %s", forbidden, body)
+		}
+	}
+	for _, expected := range []string{"Reset your password", "Reset password", "reset-token", "Prism"} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("password reset template should contain %q: %s", expected, body)
+		}
+	}
+}
+
 func TestPasskeyGettersReturnValidBrowserEnums(t *testing.T) {
 	conf := &SystemConfig{
 		Auth: authState{

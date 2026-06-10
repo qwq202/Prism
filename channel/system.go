@@ -431,6 +431,21 @@ func (c *SystemConfig) SendVerifyMail(email string, code string) error {
 	)
 }
 
+func (c *SystemConfig) SendPasswordResetMail(email string, link string) error {
+	type Temp struct {
+		Title string `json:"title"`
+		Logo  string `json:"logo"`
+		Link  string `json:"link"`
+	}
+
+	return c.GetMail().RenderMail(
+		"reset.html",
+		Temp{Title: c.GetAppName(), Logo: strings.TrimSpace(c.General.Logo), Link: link},
+		email,
+		fmt.Sprintf("%s | Password Reset", c.GetAppName()),
+	)
+}
+
 func (c *SystemConfig) SendTestMail(email string) error {
 	type Temp struct {
 		Title string `json:"title"`

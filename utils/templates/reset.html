@@ -1,0 +1,107 @@
+<link href="https://fonts.googlefonts.cn/css?family=Open+Sans" rel="stylesheet">
+<style>
+  * {
+    font-family: "Open Sans", Ubuntu, Verdana, Nunito, monospace, Consolas, Monospace, sans-serif;
+  }
+  .im {  /* gmail adapter */
+    color: inherit;
+  }
+  .main {
+    width: max-content;
+    padding: 60px 35px;
+    border: 1px solid lightgray;
+    border-radius: 10px;
+    margin: 10px auto;
+  }
+  .column {
+    text-align: center;
+  }
+  h1 {
+    margin-top: 4px;
+  }
+  a {
+    text-decoration: none;
+    transition: .5s;
+    color: #009efd;
+  }
+  a:active, a:hover {
+    color: #0d64fd;
+  }
+  .logo-image {
+    width: 64px;
+    height: 64px;
+  }
+  .prism-logo {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    margin: 0 auto;
+    line-height: 64px;
+    color: #111827;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 52px;
+    font-weight: 700;
+    letter-spacing: -2px;
+  }
+  .prism-dot {
+    position: absolute;
+    right: 8px;
+    bottom: 9px;
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    background: #3b82f6;
+  }
+  .headline {
+    color: #111827;
+    font-size: large;
+    font-weight: 700;
+  }
+  .button {
+    display: inline-block;
+    padding: 12px 22px;
+    border-radius: 8px;
+    background: #111827;
+    color: #ffffff;
+    font-weight: 700;
+  }
+  .button:active, .button:hover {
+    color: #ffffff;
+    background: #1f2937;
+  }
+  .fallback {
+    max-width: 560px;
+    word-break: break-all;
+    font-size: 12px;
+  }
+</style>
+<body>
+<div class="main">
+  <div class="column">
+    {{if .Logo}}
+    <img class="logo-image" src="{{.Logo}}" alt="{{.Title}}">
+    {{else}}
+    <div class="prism-logo" aria-label="{{.Title}}">P<span class="prism-dot"></span></div>
+    {{end}}
+    <h1>{{.Title}}</h1>
+  </div>
+  <div class="column"><p class="headline">Reset your password</p></div>
+  <div class="column" style="color:gray">
+    <span>Click the link below to set a new password.</span><br>
+    <span>The reset link will expire soon. If you did not request this, please ignore it.</span><br>
+  </div>
+  <br>
+  <div class="column">
+    <a class="button" href="{{.Link}}">Reset password</a>
+  </div>
+  <br>
+  <div class="column fallback" style="color:gray">
+    <span>If the button does not work, copy and open this link:</span><br>
+    <a href="{{.Link}}">{{.Link}}</a>
+  </div>
+  <br>
+  <div class="column">
+    <a href="">&copy; {{.Title}}</a>
+  </div>
+</div>
+</body>

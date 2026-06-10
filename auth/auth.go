@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -159,6 +160,92 @@ func validateVerificationEmail(db *sql.DB, email string, checkout bool, reset bo
 	return nil
 }
 
+func firstForwardedValue(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+
+	return strings.TrimSpace(strings.Split(value, ",")[0])
+}
+
+func isHTTPURL(value string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(value))
+	return err == nil && parsed.Host != "" && (parsed.Scheme == "http" || parsed.Scheme == "https")
+}
+
+func configuredPasswordResetBaseURL() string {
+	backend := channel.SystemInstance.GetBackend()
+	parsed, err := url.Parse(backend)
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return ""
+	}
+
+	basePath := strings.TrimRight(parsed.Path, "/")
+	if strings.HasSuffix(basePath, "/api") {
+		parsed.Path = strings.TrimSuffix(basePath, "/api")
+	}
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return strings.TrimRight(parsed.String(), "/")
+}
+
+func passwordResetBaseURL(c *gin.Context) string {
+	if configured := configuredPasswordResetBaseURL(); configured != "" {
+		return configured
+	}
+
+	if c != nil && c.Request != nil {
+		if origin := firstForwardedValue(c.GetHeader("Origin")); isHTTPURL(origin) {
+			return strings.TrimRight(origin, "/")
+		}
+
+		host := firstForwardedValue(c.GetHeader("X-Forwarded-Host"))
+		if host == "" {
+			host = c.Request.Host
+		}
+		if host != "" {
+			protocol := firstForwardedValue(c.GetHeader("X-Forwarded-Proto"))
+			if protocol == "" {
+				if c.Request.TLS != nil {
+					protocol = "https"
+				} else {
+					protocol = "http"
+				}
+			}
+			if protocol == "http" || protocol == "https" {
+				return fmt.Sprintf("%s://%s", protocol, host)
+			}
+		}
+	}
+
+	return ""
+}
+
+func buildPasswordResetLink(c *gin.Context, email string, token string) (string, error) {
+	base := passwordResetBaseURL(c)
+	if base == "" {
+		return "", errors.New("cannot build password reset link")
+	}
+
+	parsed, err := url.Parse(base)
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return "", errors.New("cannot build password reset link")
+	}
+
+	basePath := strings.TrimRight(parsed.Path, "/")
+	parsed.Path = basePath + "/forgot"
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+
+	query := parsed.Query()
+	query.Set("email", email)
+	query.Set("token", token)
+	parsed.RawQuery = query.Encode()
+
+	return parsed.String(), nil
+}
+
 func Verify(c *gin.Context, email string, checkout bool, reset bool) error {
 	email = strings.TrimSpace(email)
 	db := utils.GetDBFromContext(c)
@@ -168,11 +255,25 @@ func Verify(c *gin.Context, email string, checkout bool, reset bool) error {
 
 	cache := utils.GetCacheFromContext(c)
 	code := utils.GenerateCode(6)
+	if reset {
+		code = utils.GenerateChar(64)
+	}
 	if !setCode(c, cache, email, code) {
 		return errors.New("verification code storage is unavailable")
 	}
 
-	if err := channel.SystemInstance.SendVerifyMail(email, code); err != nil {
+	var err error
+	if reset {
+		link, linkErr := buildPasswordResetLink(c, email, code)
+		if linkErr != nil {
+			deleteCode(c, cache, email)
+			return linkErr
+		}
+		err = channel.SystemInstance.SendPasswordResetMail(email, link)
+	} else {
+		err = channel.SystemInstance.SendVerifyMail(email, code)
+	}
+	if err != nil {
 		deleteCode(c, cache, email)
 		return err
 	}
