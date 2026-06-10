@@ -11,6 +11,24 @@ const adminAnalyticsNoCacheConfig = {
   },
 } as const;
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function asNumber(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function asString(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
 export type ChannelListResponse = CommonResponse & {
   data: Channel[];
 };
@@ -24,7 +42,13 @@ export async function listChannel(): Promise<ChannelListResponse> {
     const response = await axios.get("/admin/channel/list", {
       prismCache: false,
     });
-    return response.data as ChannelListResponse;
+    const data = asRecord(response.data);
+    return {
+      status: data.status === true,
+      error: asString(data.error),
+      message: asString(data.message),
+      data: asArray<Channel>(data.data),
+    };
   } catch (e) {
     return { status: false, error: getErrorMessage(e), data: [] };
   }
@@ -111,7 +135,18 @@ export async function getChannelStats(
       },
       adminAnalyticsNoCacheConfig,
     );
-    return response.data as ChannelStatsResponse;
+    const data = asRecord(response.data);
+    return {
+      stats: asArray<unknown>(data.stats).map((item) => {
+        const stat = asRecord(item);
+        return {
+          channel_id: asNumber(stat.channel_id),
+          requests: asNumber(stat.requests),
+          errors: asNumber(stat.errors),
+          error_rate: asNumber(stat.error_rate),
+        };
+      }),
+    };
   } catch (e) {
     console.warn(e);
     return { stats: [] };

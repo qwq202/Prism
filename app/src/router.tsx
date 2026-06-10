@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router-dom";
 import Home from "./routes/Home.tsx";
 import NotFound from "./routes/NotFound.tsx";
+import AdminRouteError from "@/routes/AdminRouteError.tsx";
 import Auth from "./routes/Auth.tsx";
 import React, { Suspense } from "react";
 import { useDeeptrain } from "@/conf/env.ts";
@@ -240,7 +241,7 @@ const router = createBrowserRouter([
             element: withSuspense(adminLoggerRoute, <AdminContentSkeleton />),
           },
         ],
-        ErrorBoundary: NotFound,
+        ErrorBoundary: AdminRouteError,
       },
       {
         id: "generation",

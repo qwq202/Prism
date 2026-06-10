@@ -13,6 +13,8 @@ import {
   RedeemResponse,
   RegistrationChartResponse,
   RequestChartResponse,
+  UserData,
+  UserSubscriptionWindowData,
   UserResponse,
   UserTypeChartResponse,
 } from "@/admin/types.ts";
@@ -54,13 +56,138 @@ const adminAnalyticsNoCacheConfig: AxiosRequestConfig = {
   },
 };
 
+const initialUserTypeChartState: UserTypeChartResponse = {
+  total: 0,
+  normal: 0,
+  api_paid: 0,
+  basic_plan: 0,
+  standard_plan: 0,
+  pro_plan: 0,
+};
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function asString(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function asNumber(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  return asArray<unknown>(value).map((item) => String(item ?? ""));
+}
+
+function normalizeNumberArray(value: unknown): number[] {
+  return asArray<unknown>(value).map(asNumber);
+}
+
+function normalizeSeriesChart(value: unknown): RequestChartResponse {
+  const data = asRecord(value);
+
+  return {
+    date: normalizeStringArray(data.date),
+    value: normalizeNumberArray(data.value),
+  };
+}
+
+function normalizeModelChart(value: unknown): ModelChartResponse {
+  const data = asRecord(value);
+
+  return {
+    date: normalizeStringArray(data.date),
+    value: asArray<unknown>(data.value)
+      .map((item) => {
+        const record = asRecord(item);
+        const model = asString(record.model).trim();
+        if (!model) return null;
+
+        return {
+          model,
+          data: normalizeNumberArray(record.data),
+        };
+      })
+      .filter((item): item is ModelChartResponse["value"][number] => item !== null),
+  };
+}
+
+function normalizeAdminInfo(value: unknown): InfoResponse {
+  const data = asRecord(value);
+
+  return {
+    subscription_count: asNumber(data.subscription_count),
+    billing_today: asNumber(data.billing_today),
+    billing_month: asNumber(data.billing_month),
+    online_chats: asNumber(data.online_chats),
+    billing_yesterday: asNumber(data.billing_yesterday),
+    billing_last_month: asNumber(data.billing_last_month),
+  };
+}
+
+function normalizeUserTypeChart(value: unknown): UserTypeChartResponse {
+  const data = asRecord(value);
+
+  return {
+    total: asNumber(data.total),
+    normal: asNumber(data.normal),
+    api_paid: asNumber(data.api_paid),
+    basic_plan: asNumber(data.basic_plan),
+    standard_plan: asNumber(data.standard_plan),
+    pro_plan: asNumber(data.pro_plan),
+  };
+}
+
+function normalizeFunnel(value: unknown): ConversionFunnelResponse {
+  const data = asRecord(value);
+
+  return {
+    registered: asNumber(data.registered),
+    ever_subscribed: asNumber(data.ever_subscribed),
+    active_subscribed: asNumber(data.active_subscribed),
+  };
+}
+
+function normalizeUser(value: unknown): UserData | null {
+  if (value === null || typeof value !== "object") return null;
+
+  const user = value as UserData & { subscription_windows?: unknown };
+  return {
+    ...user,
+    subscription_windows: asArray<UserSubscriptionWindowData>(
+      user.subscription_windows,
+    ),
+  };
+}
+
+function normalizeUserResponse(value: unknown): UserResponse {
+  const data = asRecord(value);
+
+  return {
+    status: data.status === true,
+    message: asString(data.message || data.error),
+    data: asArray<unknown>(data.data)
+      .map(normalizeUser)
+      .filter((user): user is UserData => user !== null),
+    total: asNumber(data.total),
+  };
+}
+
 export async function getAdminInfo(): Promise<InfoResponse> {
   try {
     const response = await axios.get(
       "/admin/analytics/info",
       adminAnalyticsNoCacheConfig,
     );
-    return response.data as InfoResponse;
+    return normalizeAdminInfo(response.data);
   } catch (e) {
     console.warn(e);
     return {
@@ -75,12 +202,7 @@ export async function getModelChart(): Promise<ModelChartResponse> {
       "/admin/analytics/model",
       adminAnalyticsNoCacheConfig,
     );
-    const data = response.data as ModelChartResponse;
-
-    return {
-      date: data.date,
-      value: data.value || [],
-    };
+    return normalizeModelChart(response.data);
   } catch (e) {
     console.warn(e);
     return { date: [], value: [] };
@@ -93,7 +215,7 @@ export async function getRequestChart(): Promise<RequestChartResponse> {
       "/admin/analytics/request",
       adminAnalyticsNoCacheConfig,
     );
-    return response.data as RequestChartResponse;
+    return normalizeSeriesChart(response.data);
   } catch (e) {
     console.warn(e);
     return { date: [], value: [] };
@@ -106,7 +228,7 @@ export async function getBillingChart(): Promise<BillingChartResponse> {
       "/admin/analytics/billing",
       adminAnalyticsNoCacheConfig,
     );
-    return response.data as BillingChartResponse;
+    return normalizeSeriesChart(response.data);
   } catch (e) {
     console.warn(e);
     return { date: [], value: [] };
@@ -119,7 +241,7 @@ export async function getErrorChart(): Promise<ErrorChartResponse> {
       "/admin/analytics/error",
       adminAnalyticsNoCacheConfig,
     );
-    return response.data as ErrorChartResponse;
+    return normalizeSeriesChart(response.data);
   } catch (e) {
     console.warn(e);
     return { date: [], value: [] };
@@ -132,17 +254,10 @@ export async function getUserTypeChart(): Promise<UserTypeChartResponse> {
       "/admin/analytics/user",
       adminAnalyticsNoCacheConfig,
     );
-    return response.data as UserTypeChartResponse;
+    return normalizeUserTypeChart(response.data);
   } catch (e) {
     console.warn(e);
-    return {
-      total: 0,
-      normal: 0,
-      api_paid: 0,
-      basic_plan: 0,
-      standard_plan: 0,
-      pro_plan: 0,
-    };
+    return { ...initialUserTypeChartState };
   }
 }
 
@@ -151,7 +266,13 @@ export async function getInvitationList(
 ): Promise<InvitationResponse> {
   try {
     const response = await axios.get(`/admin/invitation/list?page=${page}`);
-    return response.data as InvitationResponse;
+    const data = asRecord(response.data);
+    return {
+      status: data.status === true,
+      message: asString(data.message || data.error),
+      data: asArray<InvitationResponse["data"][number]>(data.data),
+      total: asNumber(data.total),
+    };
   } catch (e) {
     return {
       status: false,
@@ -191,7 +312,13 @@ export async function generateInvitation(
 export async function getRedeemList(page: number): Promise<RedeemResponse> {
   try {
     const response = await axios.get(`/admin/redeem/list?page=${page}`);
-    return response.data as RedeemResponse;
+    const data = asRecord(response.data);
+    return {
+      status: data.status === true,
+      message: asString(data.message || data.error),
+      data: asArray<RedeemResponse["data"][number]>(data.data),
+      total: asNumber(data.total),
+    };
   } catch (e) {
     console.warn(e);
     return { status: false, message: getErrorMessage(e), data: [], total: 0 };
@@ -235,7 +362,7 @@ export async function getUserList(
         ...params,
       },
     });
-    return response.data as UserResponse;
+    return normalizeUserResponse(response.data);
   } catch (e) {
     return {
       status: false,
@@ -423,7 +550,12 @@ export async function batchUserOperation(
 export async function getRedeemBatchList(): Promise<RedeemBatchResponse> {
   try {
     const response = await axios.get("/admin/redeem/batch/list");
-    return response.data as RedeemBatchResponse;
+    const data = asRecord(response.data);
+    return {
+      status: data.status === true,
+      message: asString(data.message || data.error),
+      data: asArray<RedeemBatchResponse["data"][number]>(data.data),
+    };
   } catch (e) {
     return { status: false, message: getErrorMessage(e), data: [] };
   }
@@ -434,7 +566,12 @@ export async function getRedeemBatchCodes(
 ): Promise<RedeemBatchCodesResponse> {
   try {
     const response = await axios.get(`/admin/redeem/batch/${batchId}`);
-    return response.data as RedeemBatchCodesResponse;
+    const data = asRecord(response.data);
+    return {
+      status: data.status === true,
+      message: asString(data.message || data.error),
+      data: asArray<RedeemBatchCodesResponse["data"][number]>(data.data),
+    };
   } catch (e) {
     return { status: false, message: getErrorMessage(e), data: [] };
   }
@@ -446,7 +583,7 @@ export async function getActiveUserChart(): Promise<ActiveUserChartResponse> {
       "/admin/analytics/active-users",
       adminAnalyticsNoCacheConfig,
     );
-    return response.data as ActiveUserChartResponse;
+    return normalizeSeriesChart(response.data);
   } catch (e) {
     console.warn(e);
     return { date: [], value: [] };
@@ -459,7 +596,7 @@ export async function getRegistrationChart(): Promise<RegistrationChartResponse>
       "/admin/analytics/registrations",
       adminAnalyticsNoCacheConfig,
     );
-    return response.data as RegistrationChartResponse;
+    return normalizeSeriesChart(response.data);
   } catch (e) {
     console.warn(e);
     return { date: [], value: [] };
@@ -472,7 +609,7 @@ export async function getConversionFunnel(): Promise<ConversionFunnelResponse> {
       "/admin/analytics/funnel",
       adminAnalyticsNoCacheConfig,
     );
-    return response.data as ConversionFunnelResponse;
+    return normalizeFunnel(response.data);
   } catch (e) {
     console.warn(e);
     return { registered: 0, ever_subscribed: 0, active_subscribed: 0 };

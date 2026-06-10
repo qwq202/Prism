@@ -124,7 +124,7 @@ func getUserListOrderBy(sort string) string {
 func getUsersForm(db *sql.DB, cache *redis.Client, page int64, search string, filters ...userListFilter) PaginationForm {
 	// if search is empty, then search all users
 
-	var users []interface{}
+	users := make([]interface{}, 0)
 	var total int64
 	filter := userListFilter{}
 	if len(filters) > 0 {

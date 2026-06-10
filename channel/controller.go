@@ -66,9 +66,14 @@ func DeactivateChannel(c *gin.Context) {
 }
 
 func GetChannelList(c *gin.Context) {
+	data := ConduitInstance.Sequence
+	if data == nil {
+		data = Sequence{}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status": true,
-		"data":   ConduitInstance.Sequence,
+		"data":   data,
 	})
 }
 

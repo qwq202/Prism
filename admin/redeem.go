@@ -18,7 +18,7 @@ func execRedeemSql(execer redeemExecer, query string, args ...interface{}) (sql.
 }
 
 func GetRedeemData(db *sql.DB, page int64) PaginationForm {
-	var data []interface{}
+	data := make([]interface{}, 0)
 	var total int64
 	if err := globals.QueryRowDb(db, `
 		SELECT COUNT(*) FROM redeem

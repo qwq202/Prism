@@ -242,7 +242,7 @@ func Sort[T any](arr []T, compare func(a, b T) bool) []T {
 }
 
 func Each[T any, U any](arr []T, f func(T) U) []U {
-	var res []U
+	res := make([]U, 0, len(arr))
 	for _, v := range arr {
 		res = append(res, f(v))
 	}
@@ -259,7 +259,7 @@ func EachObject[T any, V any](arr []T, f func(T) (string, V)) map[string]V {
 }
 
 func EachNotNil[T any, U any](arr []T, f func(T) *U) []U {
-	var res []U
+	res := make([]U, 0, len(arr))
 	for _, v := range arr {
 		if val := f(v); val != nil {
 			res = append(res, *val)
@@ -269,7 +269,7 @@ func EachNotNil[T any, U any](arr []T, f func(T) *U) []U {
 }
 
 func Filter[T any](arr []T, f func(T) bool) []T {
-	var res []T
+	res := make([]T, 0, len(arr))
 	for _, v := range arr {
 		if f(v) {
 			res = append(res, v)

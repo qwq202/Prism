@@ -11,7 +11,7 @@ import (
 )
 
 func GetInvitationPagination(db *sql.DB, page int64) PaginationForm {
-	var invitations []interface{}
+	invitations := make([]interface{}, 0)
 	var total int64
 	if err := globals.QueryRowDb(db, `
 		SELECT COUNT(*) FROM invitation
