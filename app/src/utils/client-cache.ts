@@ -5,6 +5,7 @@ type CacheEnvelope<T> = {
 };
 
 const cachePrefix = "api-cache:";
+const maxCachePayloadLength = 1_500_000;
 
 function getCacheKey(key: string): string {
   return `${cachePrefix}${key}`;
@@ -25,6 +26,65 @@ function getStorageValue<T>(key: string): T | undefined {
   }
 }
 
+function isStorageQuotaError(error: unknown): boolean {
+  if (error instanceof DOMException) {
+    return (
+      error.name === "QuotaExceededError" ||
+      error.name === "NS_ERROR_DOM_QUOTA_REACHED"
+    );
+  }
+
+  return String(error).includes("QuotaExceeded");
+}
+
+function listCacheStorageKeys(): string[] {
+  const keys: string[] = [];
+
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key?.startsWith(cachePrefix)) keys.push(key);
+  }
+
+  return keys;
+}
+
+function removeOldestCacheEntries(exceptKey: string, count: number): void {
+  listCacheStorageKeys()
+    .filter((key) => key !== exceptKey)
+    .map((key) => ({
+      key,
+      updatedAt:
+        getStorageValue<Partial<CacheEnvelope<unknown>>>(key)?.updatedAt ?? 0,
+    }))
+    .sort((left, right) => left.updatedAt - right.updatedAt)
+    .slice(0, count)
+    .forEach(({ key }) => localStorage.removeItem(key));
+}
+
+function setStorageValue(key: string, value: string): void {
+  if (value.length > maxCachePayloadLength) return;
+
+  try {
+    localStorage.setItem(key, value);
+    return;
+  } catch (error) {
+    if (!isStorageQuotaError(error)) throw error;
+  }
+
+  const cacheKeys = listCacheStorageKeys().filter((item) => item !== key);
+  const step = Math.max(1, Math.ceil(cacheKeys.length / 3));
+
+  for (let removed = step; removed <= cacheKeys.length; removed += step) {
+    removeOldestCacheEntries(key, step);
+    try {
+      localStorage.setItem(key, value);
+      return;
+    } catch (error) {
+      if (!isStorageQuotaError(error)) throw error;
+    }
+  }
+}
+
 export async function getClientCache<T>(
   key: string,
   maxAgeMs?: number,
@@ -39,11 +99,8 @@ export async function getClientCache<T>(
   return cached.data;
 }
 
-export async function setClientCache<T>(
-  key: string,
-  data: T,
-): Promise<void> {
-  localStorage.setItem(
+export async function setClientCache<T>(key: string, data: T): Promise<void> {
+  setStorageValue(
     getCacheKey(key),
     JSON.stringify({
       version: 1,
@@ -63,10 +120,9 @@ export async function removeClientCachesByPrefix(
   const storagePrefix = getCacheKey(keyPrefix);
   const keys: string[] = [];
 
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key?.startsWith(storagePrefix)) keys.push(key);
-  }
+  listCacheStorageKeys().forEach((key) => {
+    if (key.startsWith(storagePrefix)) keys.push(key);
+  });
 
   keys.forEach((key) => localStorage.removeItem(key));
 }

@@ -20,6 +20,7 @@ type RehypePlugin = NonNullable<
 
 const rehypeRawPlugin = rehypeRaw as unknown as RehypePlugin;
 const rehypeKatexPlugin = rehypeKatex as unknown as RehypePlugin;
+const maxRichMarkdownLength = 200_000;
 
 type HastNode = {
   type?: string;
@@ -103,18 +104,21 @@ function MarkdownContent({
   codeStyle,
   loading,
 }: MarkdownProps) {
+  const plainTextFallback = children.length > maxRichMarkdownLength;
   const normalizedChildren = useMemo(
-    () => normalizeLatexDelimiters(children),
-    [children],
+    () => (plainTextFallback ? children : normalizeLatexDelimiters(children)),
+    [children, plainTextFallback],
   );
 
   useEffect(() => {
+    if (plainTextFallback) return;
+
     document.querySelectorAll(".file-instance").forEach((el) => {
       const parent = el.parentElement as HTMLElement;
       if (!parent.classList.contains("file-block"))
         parent.classList.add("file-block");
     });
-  }, [normalizedChildren]);
+  }, [normalizedChildren, plainTextFallback]);
 
   const rehypePlugins = useMemo(() => {
     const plugins: NonNullable<
@@ -144,6 +148,19 @@ function MarkdownContent({
       ),
     };
   }, [codeStyle, loading]);
+
+  if (plainTextFallback) {
+    return (
+      <pre
+        className={cn(
+          "markdown-body whitespace-pre-wrap break-words",
+          className,
+        )}
+      >
+        {normalizedChildren}
+      </pre>
+    );
+  }
 
   return (
     <ReactMarkdown
