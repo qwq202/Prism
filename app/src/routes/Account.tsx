@@ -41,6 +41,7 @@ import {
   initialUserInfo,
   createPasskeyRegistrationOptions,
   deletePasskey,
+  doVerify,
   listPasskeys,
   PasskeyCredentialInfo,
   registerPasskey,
@@ -86,6 +87,7 @@ import Emoji from "@/components/Emoji";
 import { motion } from "framer-motion";
 import { isEmailValid, isTextInRange } from "@/utils/form.ts";
 import { getErrorMessage } from "@/utils/base.ts";
+import { localizeError } from "@/utils/error.ts";
 
 type AccountCardProps = {
   title: string;
@@ -331,6 +333,9 @@ function Account() {
 
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [passwordResetDialogOpen, setPasswordResetDialogOpen] =
+    useState(false);
+  const [passwordResetLoading, setPasswordResetLoading] = useState(false);
   const [emailForm, setEmailForm] = useState({ email: "", code: "" });
   const [passwordForm, setPasswordForm] = useState({
     oldPassword: "",
@@ -365,6 +370,34 @@ function Account() {
     }
 
     await sendCode(t, email, true);
+  }
+
+  async function requestPasswordReset() {
+    if (passwordResetLoading) return;
+
+    const email = info.email.trim();
+    if (!isEmailValid(email)) {
+      toast.error(t("error"), { description: t("account.email-not-bound") });
+      return;
+    }
+
+    setPasswordResetLoading(true);
+    try {
+      const resp = await doVerify(email, false, true);
+      if (!resp.status) {
+        toast.error(t("auth.send-code-failed"), {
+          description: t("auth.send-code-failed-prompt", {
+            reason: localizeError(t, resp.error),
+          }),
+        });
+        return;
+      }
+
+      setPasswordDialogOpen(false);
+      setPasswordResetDialogOpen(true);
+    } finally {
+      setPasswordResetLoading(false);
+    }
   }
 
   async function submitEmailChange() {
@@ -672,11 +705,42 @@ function Account() {
                             }))
                           }
                         />
+                        <button
+                          type="button"
+                          className="w-fit text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+                          onClick={requestPasswordReset}
+                          disabled={passwordResetLoading}
+                        >
+                          {t("account.forgot-password")}
+                        </button>
                       </div>
                       <DialogFooter>
                         <DialogCancel>{t("cancel")}</DialogCancel>
                         <DialogAction loading onClick={submitPasswordChange}>
                           {t("confirm")}
+                        </DialogAction>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Dialog
+                    open={passwordResetDialogOpen}
+                    onOpenChange={setPasswordResetDialogOpen}
+                  >
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>
+                          {t("account.password-reset-sent")}
+                        </DialogTitle>
+                        <DialogDescription>
+                          {t("account.password-reset-sent-description")}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <DialogFooter>
+                        <DialogAction
+                          onClick={() => setPasswordResetDialogOpen(false)}
+                        >
+                          {t("i-know")}
                         </DialogAction>
                       </DialogFooter>
                     </DialogContent>
