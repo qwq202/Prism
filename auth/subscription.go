@@ -266,15 +266,23 @@ func RevertSubscriptionUsage(db *sql.DB, cache *redis.Client, user *User, model 
 }
 
 func FinalizeSubscriptionUsage(db *sql.DB, cache *redis.Client, user *User, model string, quota float32) bool {
+	return FinalizeSubscriptionUsageAmount(db, cache, user, model, quota) >= quota
+}
+
+func FinalizeSubscriptionUsageAmount(db *sql.DB, cache *redis.Client, user *User, model string, quota float32) float32 {
 	if disableSubscription() {
-		return false
+		return 0
 	}
 
 	plan := user.GetPlan(db)
 	if !plan.HasPointPool() {
 		// Legacy per-item subscription usage was consumed before the request.
-		return true
+		return quota
 	}
 
-	return plan.ConsumePointPool(user, cache, model, quota)
+	if plan.ConsumePointPool(user, cache, model, quota) {
+		return quota
+	}
+
+	return plan.ConsumeAvailablePointPool(user, cache, model, quota)
 }

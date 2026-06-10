@@ -330,6 +330,80 @@ func consumeSubscriptionPointUsageWindows(cache *redis.Client, windows []subscri
 	return false
 }
 
+func consumeAvailableSubscriptionPointUsageWindows(cache *redis.Client, windows []subscriptionPointUsageWindow, amount float32) float32 {
+	if amount <= 0 {
+		return 0
+	}
+	if len(windows) == 0 {
+		return amount
+	}
+
+	ctx := context.Background()
+	keys := make([]string, 0, len(windows))
+	for _, window := range windows {
+		keys = append(keys, window.key)
+	}
+
+	for attempts := 0; attempts < 32; attempts++ {
+		var consumed float32
+		err := cache.Watch(ctx, func(tx *redis.Tx) error {
+			offsets := make([]time.Time, len(windows))
+			usages := make([]float32, len(windows))
+			available := amount
+
+			for i, window := range windows {
+				value, err := tx.Get(ctx, window.key).Result()
+				if err != nil && !errors.Is(err, redis.Nil) {
+					return err
+				}
+				if errors.Is(err, redis.Nil) {
+					value = ""
+				}
+
+				used, offset := parseSubscriptionPointUsageValue(value, window.resetInterval, time.Now())
+				remaining := window.limit - used
+				if remaining < 0 {
+					remaining = 0
+				}
+				if remaining < available {
+					available = remaining
+				}
+				offsets[i] = offset
+				usages[i] = used
+			}
+
+			if available <= 0 {
+				consumed = 0
+				return nil
+			}
+
+			consumed = available
+			_, err := tx.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+				for i, window := range windows {
+					pipe.Set(
+						ctx,
+						window.key,
+						getFloatOffsetFormat(offsets[i], usages[i]+consumed),
+						time.Duration(planExp)*time.Second,
+					)
+				}
+				return nil
+			})
+			return err
+		}, keys...)
+
+		if err == nil {
+			return consumed
+		}
+		if errors.Is(err, redis.TxFailedErr) {
+			continue
+		}
+		return 0
+	}
+
+	return 0
+}
+
 func GetSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string) (usage int64, offset time.Time) {
 	return getSubscriptionUsage(cache, user, t, 0)
 }
@@ -512,6 +586,33 @@ func (p *Plan) ConsumePointPool(user globals.AuthLike, cache *redis.Client, mode
 	}
 
 	return consumeSubscriptionPointUsageWindows(cache, windows, quota)
+}
+
+func (p *Plan) ConsumeAvailablePointPool(user globals.AuthLike, cache *redis.Client, model string, quota float32) float32 {
+	if !p.HasPointPool() || !p.IncludesModel(model) {
+		return 0
+	}
+	if quota <= 0 {
+		return 0
+	}
+
+	windows := make([]subscriptionPointUsageWindow, 0, 2)
+	if !p.IsPointPoolInfinity() {
+		windows = append(windows, subscriptionPointUsageWindow{
+			key:           globals.GetSubscriptionLimitFormat(p.pointUsageKey(), user.HitID()),
+			limit:         p.Quota,
+			resetInterval: p.pointResetInterval(),
+		})
+	}
+	if p.HasWeeklyPool() && !p.IsWeeklyPoolInfinity() {
+		windows = append(windows, subscriptionPointUsageWindow{
+			key:           globals.GetSubscriptionLimitFormat(p.weeklyUsageKey(), user.HitID()),
+			limit:         p.WeeklyQuota,
+			resetInterval: weeklyResetInterval,
+		})
+	}
+
+	return consumeAvailableSubscriptionPointUsageWindows(cache, windows, quota)
 }
 
 func increaseSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string, limit int64, resetInterval int64, amount int64) bool {

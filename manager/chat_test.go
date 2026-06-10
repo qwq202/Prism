@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	_ "github.com/mattn/go-sqlite3"
@@ -59,12 +60,6 @@ func openChatQuotaTestDB(t *testing.T) *sql.DB {
 func newCollectQuotaTestContext(t *testing.T, db *sql.DB) *gin.Context {
 	t.Helper()
 
-	gin.SetMode(gin.TestMode)
-	recorder := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(recorder)
-	c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
-	c.Set("db", db)
-
 	cache := redis.NewClient(&redis.Options{
 		Addr:         "127.0.0.1:1",
 		MaxRetries:   -1,
@@ -75,6 +70,18 @@ func newCollectQuotaTestContext(t *testing.T, db *sql.DB) *gin.Context {
 	t.Cleanup(func() {
 		_ = cache.Close()
 	})
+
+	return newCollectQuotaTestContextWithCache(t, db, cache)
+}
+
+func newCollectQuotaTestContextWithCache(t *testing.T, db *sql.DB, cache *redis.Client) *gin.Context {
+	t.Helper()
+
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	c.Set("db", db)
 	c.Set("cache", cache)
 
 	return c
@@ -130,13 +137,23 @@ func TestCollectQuotaRecordsDebtWhenFinalCostExceedsBalance(t *testing.T) {
 	}
 }
 
-func TestCollectQuotaDoesNotFallbackToUserQuotaWhenSubscriptionFinalizeFails(t *testing.T) {
+func TestCollectQuotaUsesAvailableSubscriptionAndChargesRemainingUserQuota(t *testing.T) {
 	db := openChatQuotaTestDB(t)
+	server, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("start miniredis: %v", err)
+	}
+	cache := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	t.Cleanup(func() {
+		_ = cache.Close()
+		server.Close()
+	})
+
 	user := auth.GetUserByName(db, "root")
 	if user == nil {
 		t.Fatalf("expected root user")
 	}
-	if !user.SetQuota(db, 1) {
+	if !user.SetQuota(db, 10) {
 		t.Fatalf("set quota")
 	}
 
@@ -157,27 +174,30 @@ func TestCollectQuotaDoesNotFallbackToUserQuotaWhenSubscriptionFinalizeFails(t *
 		channel.PlanInstance = previousPlan
 	})
 
-	_, err := globals.ExecDb(
+	if _, err := globals.ExecDb(
 		db,
 		"INSERT INTO subscription (user_id, level, expired_at) VALUES (?, ?, ?)",
 		user.GetID(db),
 		1,
 		time.Now().Add(24*time.Hour).Format("2006-01-02 15:04:05"),
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatalf("insert subscription: %v", err)
 	}
 
 	buffer := utils.NewBuffer(globals.GPT3Turbo, nil, chatTestCharge{})
 	buffer.Write("hello")
 
-	CollectQuota(newCollectQuotaTestContext(t, db), user, buffer, true, nil)
+	CollectQuota(newCollectQuotaTestContextWithCache(t, db, cache), user, buffer, true, nil)
 
-	if got := user.GetQuota(db); math.Abs(float64(got-1)) > 0.001 {
-		t.Fatalf("expected user quota to remain 1 after subscription finalize failure, got %f", got)
+	plan := channel.PlanInstance.GetPlan(1)
+	if got := plan.GetPointUsage(user, cache); math.Abs(float64(got-1)) > 0.001 {
+		t.Fatalf("expected subscription usage to consume available 1 quota, got %f", got)
 	}
-	if got := user.GetUsedQuota(db); math.Abs(float64(got)) > 0.001 {
-		t.Fatalf("expected used quota to remain 0 after subscription finalize failure, got %f", got)
+	if got := user.GetQuota(db); math.Abs(float64(got-2)) > 0.001 {
+		t.Fatalf("expected user quota to pay remaining 8 quota, got %f", got)
+	}
+	if got := user.GetUsedQuota(db); math.Abs(float64(got-8)) > 0.001 {
+		t.Fatalf("expected used quota to record remaining 8 quota, got %f", got)
 	}
 }
 
