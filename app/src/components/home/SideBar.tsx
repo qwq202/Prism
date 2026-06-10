@@ -25,6 +25,7 @@ import {
   Plus,
   RotateCw,
   Search,
+  Star,
   User,
 } from "lucide-react";
 import ConversationItem from "./ConversationItem.tsx";
@@ -54,12 +55,15 @@ type Operation = {
 
 type SidebarActionProps = {
   search: string;
+  favoriteOnly: boolean;
   setSearch: (search: string) => void;
+  setFavoriteOnly: (favoriteOnly: boolean) => void;
   setOperateConversation: (operation: Operation) => void;
 };
 
 type ConversationListProps = {
   search: string;
+  favoriteOnly: boolean;
   operateConversation: Operation;
   setOperateConversation: (operation: Operation) => void;
 };
@@ -69,7 +73,9 @@ const conversationFocusRefreshThrottleMs = 2_000;
 
 function SidebarAction({
   search,
+  favoriteOnly,
   setSearch,
+  setFavoriteOnly,
   setOperateConversation,
 }: SidebarActionProps) {
   const { t } = useTranslation();
@@ -163,6 +169,24 @@ function SidebarAction({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        <motion.div whileTap={{ scale: 0.9 }}>
+          <Button
+            variant={`ghost`}
+            size={`icon`}
+            aria-pressed={favoriteOnly}
+            aria-label={t("conversation.favorites")}
+            title={t("conversation.favorites")}
+            className={cn(favoriteOnly && `bg-muted text-foreground`)}
+            onClick={() => setFavoriteOnly(!favoriteOnly)}
+          >
+            <Star
+              className={cn(
+                `h-4 w-4`,
+                favoriteOnly && `fill-amber-400 text-amber-500`,
+              )}
+            />
+          </Button>
+        </motion.div>
         <motion.div whileTap={{ scale: 0.9 }} className={`refresh-action`}>
           <Button
             variant={`ghost`}
@@ -200,6 +224,7 @@ function SidebarAction({
 
 function SidebarConversationList({
   search,
+  favoriteOnly,
   operateConversation,
   setOperateConversation,
 }: ConversationListProps) {
@@ -211,7 +236,11 @@ function SidebarConversationList({
   const current = useSelector(selectCurrent);
 
   const filteredHistory = useMemo(() => {
-    if (search.trim().length === 0) return history;
+    const visibleHistory = favoriteOnly
+      ? history.filter((conversation) => conversation.favorite)
+      : history;
+
+    if (search.trim().length === 0) return visibleHistory;
 
     const searchItems = search
       .trim()
@@ -219,14 +248,14 @@ function SidebarConversationList({
       .split(" ")
       .filter((item) => item.length > 0);
 
-    return history.filter((conversation) => {
+    return visibleHistory.filter((conversation) => {
       const name = conversation.name.toLowerCase();
       const id = conversation.id.toString();
       return searchItems.every(
         (item) => name.includes(item) || id.includes(item),
       );
     });
-  }, [history, search]);
+  }, [favoriteOnly, history, search]);
 
   async function handleDelete(e: React.MouseEvent<HTMLButtonElement>) {
     e.preventDefault();
@@ -293,7 +322,11 @@ function SidebarConversationList({
               className={`empty text-center px-6`}
             >
               {auth
-                ? t("conversation.empty")
+                ? t(
+                    favoriteOnly
+                      ? "conversation.empty-favorites"
+                      : "conversation.empty",
+                  )
                 : t("conversation.empty-anonymous")}
             </motion.div>
           )}
@@ -423,6 +456,7 @@ function SideBar() {
   const refreshingRef = useRef(false);
   const lastAutoRefreshRef = useRef(0);
   const [search, setSearch] = useState<string>("");
+  const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [operateConversation, setOperateConversation] = useState<Operation>({
     target: null,
     type: "",
@@ -500,11 +534,14 @@ function SideBar() {
       <div className={`sidebar-content`}>
         <SidebarAction
           search={search}
+          favoriteOnly={favoriteOnly}
           setSearch={setSearch}
+          setFavoriteOnly={setFavoriteOnly}
           setOperateConversation={setOperateConversation}
         />
         <SidebarConversationList
           search={search}
+          favoriteOnly={favoriteOnly}
           operateConversation={operateConversation}
           setOperateConversation={setOperateConversation}
         />

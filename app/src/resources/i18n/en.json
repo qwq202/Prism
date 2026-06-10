@@ -115,7 +115,13 @@
     "retitle": "Smart Title Summary",
     "empty-anonymous": "You are currently in anonymous mode. Conversations will not be saved.",
     "search": "Search Conversations",
-    "retitle-loading": "Summarizing"
+    "retitle-loading": "Summarizing",
+    "favorite": "Favorite Conversation",
+    "unfavorite": "Remove from Favorites",
+    "favorites": "Favorites",
+    "favorite-success": "Conversation favorited",
+    "unfavorite-success": "Removed from favorites",
+    "empty-favorites": "No favorite conversations yet."
   },
   "chat": {
     "web": "Web search",

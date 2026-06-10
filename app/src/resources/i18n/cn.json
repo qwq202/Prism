@@ -260,7 +260,13 @@
     "delete-success": "对话已删除",
     "delete-success-prompt": "对话已删除。",
     "delete-failed": "删除失败",
-    "delete-failed-prompt": "删除对话失败，请检查您的网络并重试。"
+    "delete-failed-prompt": "删除对话失败，请检查您的网络并重试。",
+    "favorite": "收藏对话",
+    "unfavorite": "取消收藏",
+    "favorites": "收藏对话",
+    "favorite-success": "已收藏对话",
+    "unfavorite-success": "已取消收藏",
+    "empty-favorites": "还没有收藏的对话。"
   },
   "chat": {
     "web": "联网",

@@ -108,3 +108,38 @@ func TestCleanupOrphanStoredAttachmentsKeepsReferencedAndDeletesOrphan(t *testin
 		t.Fatalf("expected orphan attachment to be deleted, got %v", err)
 	}
 }
+
+func TestConversationFavoritePersistsInDetailAndList(t *testing.T) {
+	db := openOrphanAttachmentCleanupDB(t)
+
+	conversation := &Conversation{
+		UserID:    1,
+		Id:        1,
+		Name:      "favorite chat",
+		Model:     globals.GPT3Turbo,
+		Message:   []globals.Message{},
+		Persisted: false,
+	}
+	if !conversation.SaveConversation(db) {
+		t.Fatalf("save conversation")
+	}
+	if !conversation.SetFavorite(db, true) {
+		t.Fatalf("set conversation favorite")
+	}
+
+	loaded := LoadConversation(db, 1, 1)
+	if loaded == nil {
+		t.Fatalf("load conversation")
+	}
+	if !loaded.Favorite {
+		t.Fatalf("expected loaded conversation to be favorite")
+	}
+
+	list := LoadConversationList(db, 1)
+	if len(list) != 1 {
+		t.Fatalf("expected one conversation, got %d", len(list))
+	}
+	if !list[0].Favorite {
+		t.Fatalf("expected listed conversation to be favorite")
+	}
+}

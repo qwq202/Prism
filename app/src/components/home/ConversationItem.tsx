@@ -9,6 +9,7 @@ import {
   PencilLine,
   Share2,
   Sparkles,
+  Star,
   Trash2,
 } from "lucide-react";
 import {
@@ -54,9 +55,8 @@ function ConversationItem({
   const conversationTitle = filterMessage(conversation.name);
   const dispatch = useDispatch();
   const hasTaskModel = useSelector(infoHasTaskModelSelector);
-  const { toggle } = useConversationActions();
   const { t } = useTranslation();
-  const { rename, retitle } = useConversationActions();
+  const { toggle, rename, retitle, favorite } = useConversationActions();
   const [open, setOpen] = useState(false);
   const [offset, setOffset] = useState(0);
 
@@ -142,6 +142,9 @@ function ConversationItem({
         className={`h-6 w-6 p-1 mr-1 text-muted-foreground bg-muted/60 rounded-sm`}
       />
       <div className={`title`}>{displayTitle}</div>
+      {conversation.favorite && (
+        <Star className={`h-3.5 w-3.5 mx-1 fill-amber-400 text-amber-500`} />
+      )}
       {pendingLocal ? (
         <div className={`id`}>
           <MoreHorizontal className={`h-4 w-4 mr-0.5 text-muted-foreground`} />
@@ -239,6 +242,40 @@ function ConversationItem({
               {t("conversation.retitle")}
             </DropdownMenuItem>
           )}
+          <DropdownMenuItem
+            disabled={loading}
+            onClick={async (e) => {
+              if (offset + 500 > new Date().getTime()) return;
+
+              e.preventDefault();
+              e.stopPropagation();
+
+              const nextFavorite = !conversation.favorite;
+              const resp = await favorite(conversation.id, nextFavorite);
+              withNotify(
+                t,
+                resp,
+                true,
+                t(
+                  nextFavorite
+                    ? "conversation.favorite-success"
+                    : "conversation.unfavorite-success",
+                ),
+              );
+
+              setOpen(false);
+            }}
+          >
+            <Star
+              className={cn(
+                `h-4 w-4 mx-1`,
+                conversation.favorite && `fill-amber-400 text-amber-500`,
+              )}
+            />
+            {conversation.favorite
+              ? t("conversation.unfavorite")
+              : t("conversation.favorite")}
+          </DropdownMenuItem>
           <DropdownMenuItem
             onClick={(e) => {
               e.preventDefault();

@@ -257,7 +257,13 @@ export async function fetchConversation(
 
       return { status: "ok", conversation };
     }
-    return { status: "not_found" };
+
+    const message =
+      resp.data?.message ?? resp.data?.error ?? resp.data?.reason ?? "";
+    if (message === "conversation not found") {
+      return { status: "not_found" };
+    }
+    throw new Error(message || "failed to fetch conversation");
   } catch (e) {
     console.warn(e);
     return { status: "error" };
@@ -317,6 +323,19 @@ export async function updateConversationModel(
 export async function retitleConversation(id: number): Promise<CommonResponse> {
   try {
     const resp = await axios.post("/conversation/retitle", { id });
+    return resp.data as CommonResponse;
+  } catch (e) {
+    console.warn(e);
+    return { status: false, error: getErrorMessage(e) };
+  }
+}
+
+export async function favoriteConversation(
+  id: number,
+  favorite: boolean,
+): Promise<CommonResponse> {
+  try {
+    const resp = await axios.post("/conversation/favorite", { id, favorite });
     return resp.data as CommonResponse;
   } catch (e) {
     console.warn(e);

@@ -115,7 +115,13 @@
     "retitle": "スマート要約タイトル",
     "empty-anonymous": "現在匿名モードになっているため、会話は保存されません。",
     "search": "会話を検索...",
-    "retitle-loading": "まとめ"
+    "retitle-loading": "まとめ",
+    "favorite": "会話をお気に入りに追加",
+    "unfavorite": "お気に入りから削除",
+    "favorites": "お気に入り",
+    "favorite-success": "会話をお気に入りに追加しました",
+    "unfavorite-success": "お気に入りから削除しました",
+    "empty-favorites": "お気に入りの会話はまだありません。"
   },
   "chat": {
     "web": "ネットワーキング",

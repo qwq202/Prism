@@ -42,6 +42,27 @@ func normalizeDBString(value interface{}) string {
 	}
 }
 
+func normalizeDBBool(value interface{}) bool {
+	switch v := value.(type) {
+	case nil:
+		return false
+	case bool:
+		return v
+	case int64:
+		return v != 0
+	case int:
+		return v != 0
+	case []byte:
+		value = string(v)
+	case string:
+	default:
+		return strings.EqualFold(fmt.Sprint(v), "true") || fmt.Sprint(v) == "1"
+	}
+
+	text := strings.TrimSpace(strings.ToLower(fmt.Sprint(value)))
+	return text == "1" || text == "true" || text == "t" || text == "yes"
+}
+
 func isDuplicateConversationIDError(err error) bool {
 	if err == nil {
 		return false
@@ -261,10 +282,11 @@ func LoadConversation(db *sql.DB, userId int64, conversationId int64) *Conversat
 		taskID    sql.NullString
 		updatedAt interface{}
 	)
+	var favorite interface{}
 	err := globals.QueryRowDb(db, `
-		SELECT conversation_name, model, data, task_id, updated_at FROM conversation
+		SELECT conversation_name, model, data, task_id, updated_at, favorite FROM conversation
 		WHERE user_id = ? AND conversation_id = ?
-		`, userId, conversationId).Scan(&conversation.Name, &model, &data, &taskID, &updatedAt)
+		`, userId, conversationId).Scan(&conversation.Name, &model, &data, &taskID, &updatedAt, &favorite)
 	if err != nil {
 		return nil
 	}
@@ -277,6 +299,7 @@ func LoadConversation(db *sql.DB, userId int64, conversationId int64) *Conversat
 		conversation.TaskID = taskID.String
 	}
 	conversation.UpdatedAt = normalizeDBString(updatedAt)
+	conversation.Favorite = normalizeDBBool(favorite)
 
 	conversation.Message, err = utils.Unmarshal[[]globals.Message]([]byte(data))
 	if err != nil {
@@ -289,7 +312,7 @@ func LoadConversation(db *sql.DB, userId int64, conversationId int64) *Conversat
 func LoadConversationList(db *sql.DB, userId int64) []Conversation {
 	var conversationList []Conversation
 	rows, err := globals.QueryDb(db, `
-			SELECT conversation_id, conversation_name, updated_at FROM conversation WHERE user_id = ?
+			SELECT conversation_id, conversation_name, updated_at, favorite FROM conversation WHERE user_id = ?
 			ORDER BY conversation_id DESC LIMIT 100
 	`, userId)
 	if err != nil {
@@ -305,11 +328,13 @@ func LoadConversationList(db *sql.DB, userId int64) []Conversation {
 	for rows.Next() {
 		var conversation Conversation
 		var updatedAt interface{}
-		err := rows.Scan(&conversation.Id, &conversation.Name, &updatedAt)
+		var favorite interface{}
+		err := rows.Scan(&conversation.Id, &conversation.Name, &updatedAt, &favorite)
 		if err != nil {
 			continue
 		}
 		conversation.UpdatedAt = normalizeDBString(updatedAt)
+		conversation.Favorite = normalizeDBBool(favorite)
 		conversationList = append(conversationList, conversation)
 	}
 
@@ -326,6 +351,15 @@ func (c *Conversation) RenameConversation(db *sql.DB, name string) bool {
 	if err != nil {
 		return false
 	}
+	return true
+}
+
+func (c *Conversation) SetFavorite(db *sql.DB, favorite bool) bool {
+	_, err := globals.ExecDb(db, "UPDATE conversation SET favorite = ? WHERE user_id = ? AND conversation_id = ?", favorite, c.UserID, c.Id)
+	if err != nil {
+		return false
+	}
+	c.Favorite = favorite
 	return true
 }
 

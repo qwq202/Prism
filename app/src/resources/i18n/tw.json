@@ -198,7 +198,13 @@
     "delete-failed-prompt": "刪除對話失敗，請檢查您的網路並再試一次。",
     "search": "搜尋對話...",
     "empty-anonymous": "您目前處於匿名模式，對話將不會被儲存。",
-    "retitle-loading": "總結中"
+    "retitle-loading": "總結中",
+    "favorite": "收藏對話",
+    "unfavorite": "取消收藏",
+    "favorites": "收藏對話",
+    "favorite-success": "已收藏對話",
+    "unfavorite-success": "已取消收藏",
+    "empty-favorites": "還沒有收藏的對話。"
   },
   "chat": {
     "web": "網路搜尋",

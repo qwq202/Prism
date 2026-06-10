@@ -118,6 +118,13 @@ func doMysqlMigration(execer migrationExecer) error {
 		return err
 	}
 
+	if err := execSql(execer, `
+		ALTER TABLE conversation
+		ADD COLUMN favorite BOOLEAN DEFAULT FALSE;
+	`); err != nil {
+		return err
+	}
+
 	// add batch_id to redeem table for batch history tracking
 	if err := execSql(execer, `
 		ALTER TABLE redeem
@@ -207,6 +214,13 @@ func doSqliteMigration(execer migrationExecer) error {
 	if err := execSql(execer, `
 		ALTER TABLE conversation
 		ADD COLUMN updated_at DATETIME NULL;
+	`); err != nil {
+		return err
+	}
+
+	if err := execSql(execer, `
+		ALTER TABLE conversation
+		ADD COLUMN favorite BOOLEAN DEFAULT FALSE;
 	`); err != nil {
 		return err
 	}

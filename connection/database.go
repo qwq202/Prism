@@ -233,6 +233,7 @@ func CreateConversationTable(db *sql.DB) {
 		  data MEDIUMTEXT,
 		  model VARCHAR(255) NOT NULL DEFAULT 'gpt-3.5-turbo-0613',
 		  task_id VARCHAR(255) NULL,
+		  favorite BOOLEAN DEFAULT FALSE,
 		  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		  UNIQUE KEY (user_id, conversation_id)
 		);

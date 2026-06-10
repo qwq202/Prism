@@ -25,6 +25,7 @@ import {
 import {
   deleteConversation as doDeleteConversation,
   deleteAllConversations as doDeleteAllConversations,
+  favoriteConversation as doFavoriteConversation,
   renameConversation as doRenameConversation,
   retitleConversation as doRetitleConversation,
   fetchConversation,
@@ -264,6 +265,7 @@ function buildConversationHistoryEntry(
 
   if (model) entry.model = model;
   if (fallback?.shared !== undefined) entry.shared = fallback.shared;
+  if (fallback?.favorite !== undefined) entry.favorite = fallback.favorite;
   entry.updated_at = conversation?.updated_at ?? fallback?.updated_at;
   if (fallback?.local_key) entry.local_key = fallback.local_key;
 
@@ -1153,6 +1155,7 @@ const chatSlice = createSlice({
         message: previous?.message ?? [],
         model: conversation.model ?? previous?.model,
         shared: conversation.shared ?? previous?.shared,
+        favorite: conversation.favorite ?? previous?.favorite,
         updated_at: conversation.updated_at ?? previous?.updated_at,
         local_key: previous?.local_key ?? conversation.local_key,
       };
@@ -1262,6 +1265,14 @@ const chatSlice = createSlice({
       const conversation = state.history.find((item) => item.id === id);
       if (conversation) conversation.name = name;
     },
+    favoriteHistory: (state, action) => {
+      const { id, favorite } = action.payload as {
+        id: number;
+        favorite: boolean;
+      };
+      const conversation = state.history.find((item) => item.id === id);
+      if (conversation) conversation.favorite = favorite;
+    },
     upsertHistory: (state, action) => {
       const incoming = action.payload as ConversationInstance;
       if (incoming.id === -1) return;
@@ -1274,6 +1285,7 @@ const chatSlice = createSlice({
         message: incoming.message ?? previous?.message ?? [],
         model: incoming.model ?? previous?.model,
         shared: incoming.shared ?? previous?.shared,
+        favorite: incoming.favorite ?? previous?.favorite,
         updated_at: incoming.updated_at ?? previous?.updated_at,
         local_key: previous?.local_key ?? incoming.local_key,
       };
@@ -1511,6 +1523,7 @@ export const {
   setHistory,
   setRemoteHistory,
   renameHistory,
+  favoriteHistory,
   upsertHistory,
   setCurrent,
   setActiveConversation,
@@ -1634,7 +1647,18 @@ export function useConversationActions() {
     if (!isLatestConversationDetailRequest(id, requestSeq)) return;
 
     if (result.status === "not_found") {
-      dispatch(deleteRemoteConversation({ id, requestedRevision }));
+      const list = await fetchConversationList();
+      if (!isLatestConversationDetailRequest(id, requestSeq)) return;
+
+      if (!list.fromCache) {
+        dispatch(setRemoteHistory(list.conversations));
+        if (!list.conversations.some((item) => item.id === id)) {
+          dispatch(deleteRemoteConversation({ id, requestedRevision }));
+          return;
+        }
+      }
+
+      dispatch(clearConversationLoading(id));
       return;
     }
     if (result.status !== "ok") {
@@ -1734,6 +1758,12 @@ export function useConversationActions() {
     rename: async (id: number, name: string) => {
       const resp = await doRenameConversation(id, name);
       resp.status && dispatch(renameHistory({ id, name }));
+
+      return resp;
+    },
+    favorite: async (id: number, favorite: boolean) => {
+      const resp = await doFavoriteConversation(id, favorite);
+      resp.status && dispatch(favoriteHistory({ id, favorite }));
 
       return resp;
     },

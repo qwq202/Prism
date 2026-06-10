@@ -100,6 +100,7 @@ export type ConversationInstance = {
   message: Message[];
   model?: string;
   shared?: boolean;
+  favorite?: boolean;
   updated_at?: string;
   local_key?: string;
 };

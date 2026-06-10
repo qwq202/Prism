@@ -29,6 +29,11 @@ type UpdateConversationModelForm struct {
 	Model string `json:"model"`
 }
 
+type FavoriteConversationForm struct {
+	Id       int64 `json:"id"`
+	Favorite bool  `json:"favorite"`
+}
+
 type DeleteConversationForm struct {
 	Id int64 `json:"id"`
 }
@@ -299,6 +304,49 @@ func UpdateModelAPI(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  false,
 			"message": "failed to update conversation model",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  true,
+		"message": "",
+	})
+}
+
+func FavoriteAPI(c *gin.Context) {
+	user := auth.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": "user not found",
+		})
+		return
+	}
+
+	db := utils.GetDBFromContext(c)
+	var form FavoriteConversationForm
+	if err := c.ShouldBindJSON(&form); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": "invalid form",
+		})
+		return
+	}
+
+	conversation := LoadConversation(db, user.GetID(db), form.Id)
+	if conversation == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": "conversation not found",
+		})
+		return
+	}
+
+	if !conversation.SetFavorite(db, form.Favorite) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": "failed to update conversation favorite",
 		})
 		return
 	}

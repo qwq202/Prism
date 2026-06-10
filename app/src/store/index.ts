@@ -63,6 +63,7 @@ store.subscribe(() => {
         name: item.name,
         model: item.model,
         shared: item.shared,
+        favorite: item.favorite,
         updated_at: item.updated_at,
       })),
     );
