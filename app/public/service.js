@@ -1,5 +1,5 @@
 
-const SERVICE_NAME = 'coai';
+const SERVICE_NAME = 'prism';
 
 function isAppRuntimeCache(name) {
   return (
