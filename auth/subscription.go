@@ -257,6 +257,15 @@ func HandleSubscriptionUsage(db *sql.DB, cache *redis.Client, user *User, model 
 	return plan.IncreaseUsage(user, cache, model, minimumQuota)
 }
 
+func GetSubscriptionQuotaBudget(db *sql.DB, cache *redis.Client, user *User, model string) (float32, bool) {
+	if disableSubscription() || user == nil {
+		return 0, false
+	}
+
+	plan := user.GetPlan(db)
+	return plan.PointPoolRemaining(user, cache, model)
+}
+
 func RevertSubscriptionUsage(db *sql.DB, cache *redis.Client, user *User, model string) bool {
 	if disableSubscription() {
 		return false

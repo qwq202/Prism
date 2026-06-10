@@ -238,14 +238,12 @@ func CollectQuota(c *gin.Context, user *auth.User, buffer *utils.Buffer, uncount
 	if uncountable {
 		consumed := auth.FinalizeSubscriptionUsageAmount(db, utils.GetCacheFromContext(c), user, buffer.GetModel(), quota)
 		if consumed+0.0001 < quota {
-			remaining := quota - consumed
 			globals.Warn(fmt.Sprintf(
-				"subscription usage only covered %.4f/%.4f quota (model: %s); charging remaining quota to user balance",
+				"subscription usage only covered %.4f/%.4f quota (model: %s); realtime quota limiter should stop requests before overflow",
 				consumed,
 				quota,
 				buffer.GetModel(),
 			))
-			collectUserQuota(db, user, remaining)
 		}
 		return
 	}
@@ -257,6 +255,62 @@ func collectUserQuota(db *sql.DB, user *auth.User, quota float32) {
 	if !user.UseQuota(db, quota) {
 		user.ForceUseQuota(db, quota)
 	}
+}
+
+const realtimeQuotaEpsilon = float32(0.0001)
+
+type realtimeQuotaLimiter struct {
+	enabled bool
+	limit   float32
+}
+
+func newRealtimeQuotaLimiter(db *sql.DB, cache *redis.Client, user *auth.User, model string, plan bool) realtimeQuotaLimiter {
+	if user == nil {
+		return realtimeQuotaLimiter{}
+	}
+
+	charge := channel.ChargeInstance.GetCharge(model)
+	if !charge.IsBilling() {
+		return realtimeQuotaLimiter{}
+	}
+
+	if plan {
+		limit, ok := auth.GetSubscriptionQuotaBudget(db, cache, user, model)
+		if !ok {
+			return realtimeQuotaLimiter{}
+		}
+		return realtimeQuotaLimiter{enabled: true, limit: limit}
+	}
+
+	return realtimeQuotaLimiter{enabled: true, limit: user.GetQuota(db)}
+}
+
+func (l realtimeQuotaLimiter) allows(quota float32) bool {
+	return !l.enabled || quota <= l.limit+realtimeQuotaEpsilon
+}
+
+func (l realtimeQuotaLimiter) exhausted(quota float32) bool {
+	return l.enabled && quota+realtimeQuotaEpsilon >= l.limit
+}
+
+func (l realtimeQuotaLimiter) allowsProjectedChunk(buffer *utils.Buffer, chunk *globals.Chunk) bool {
+	if !l.enabled || buffer == nil {
+		return true
+	}
+
+	preview := *buffer
+	preview.WriteChunk(chunk)
+	return l.allows(preview.GetQuota())
+}
+
+func (l realtimeQuotaLimiter) allowsProjectedText(buffer *utils.Buffer, content string) bool {
+	if !l.enabled || buffer == nil || content == "" {
+		return true
+	}
+
+	preview := *buffer
+	preview.Write(content)
+	return l.allows(preview.GetQuota())
 }
 
 type partialChunk struct {
@@ -492,6 +546,7 @@ func createRoundTask(
 	props *adaptercommon.ChatProps,
 	plan bool,
 	onRemove removeSignalHandler,
+	limiter realtimeQuotaLimiter,
 ) (hit bool, err error, interrupted bool) {
 	chunkChan := make(chan partialChunk, 24)
 	interruptSignal := make(chan error, 1)
@@ -558,6 +613,42 @@ func createRoundTask(
 			}
 
 			chunk := data.Chunk
+			quotaBuffer := streamBuffer
+			if quotaBuffer == nil {
+				quotaBuffer = captureBuffer
+			}
+			if captureBuffer == streamBuffer {
+				if !limiter.allowsProjectedChunk(captureBuffer, chunk) {
+					quota := float32(0)
+					if quotaBuffer != nil {
+						quota = quotaBuffer.GetQuota()
+					}
+					globals.Info(fmt.Sprintf("realtime quota limit reached for chat request (model: %s, client: %s)", props.Model, conn.GetCtx().ClientIP()))
+					_ = conn.SendClient(globals.ChatSegmentResponse{
+						Quota: quota,
+						End:   true,
+						Plan:  plan,
+					})
+					signalInterrupt(interruptSignal, errors.New("quota limit"))
+					waitForRoundTaskEnd(chunkChan)
+					return hit, nil, true
+				}
+			} else if chunk != nil && !limiter.allowsProjectedText(quotaBuffer, chunk.Content) {
+				quota := float32(0)
+				if quotaBuffer != nil {
+					quota = quotaBuffer.GetQuota()
+				}
+				globals.Info(fmt.Sprintf("realtime quota limit reached for chat request (model: %s, client: %s)", props.Model, conn.GetCtx().ClientIP()))
+				_ = conn.SendClient(globals.ChatSegmentResponse{
+					Quota: quota,
+					End:   true,
+					Plan:  plan,
+				})
+				signalInterrupt(interruptSignal, errors.New("quota limit"))
+				waitForRoundTaskEnd(chunkChan)
+				return hit, nil, true
+			}
+
 			if captureBuffer != nil && chunk != nil {
 				captureBuffer.WriteChunk(chunk)
 			}
@@ -580,6 +671,17 @@ func createRoundTask(
 					Plan:    plan,
 				}) {
 					continue
+				}
+				if limiter.exhausted(streamBuffer.GetQuota()) {
+					globals.Info(fmt.Sprintf("realtime quota exhausted for chat request (model: %s, client: %s)", props.Model, conn.GetCtx().ClientIP()))
+					_ = conn.SendClient(globals.ChatSegmentResponse{
+						Quota: streamBuffer.GetQuota(),
+						End:   true,
+						Plan:  plan,
+					})
+					signalInterrupt(interruptSignal, errors.New("quota limit"))
+					waitForRoundTaskEnd(chunkChan)
+					return hit, nil, true
 				}
 			}
 		case signal := <-stopSignal:
@@ -829,6 +931,7 @@ func createToolChatTask(
 	ctx memoryContext,
 	tools *globals.FunctionTools,
 	maxToolRounds int,
+	limiter realtimeQuotaLimiter,
 ) (hit bool, err error, interrupted bool) {
 	workingSegment := utils.DeepCopy(segment)
 	memoryPrompt := ctx.MemoryPrompt
@@ -867,7 +970,7 @@ func createToolChatTask(
 
 		streamBuffer := liveBuffer
 
-		hit, err, interrupted = createRoundTask(conn, user, roundBuffer, streamBuffer, db, cache, group, props, plan, createRemoveSignalHandler(db, instance))
+		hit, err, interrupted = createRoundTask(conn, user, roundBuffer, streamBuffer, db, cache, group, props, plan, createRemoveSignalHandler(db, instance), limiter)
 		if err != nil || interrupted {
 			return hit, err, interrupted
 		}
@@ -939,7 +1042,7 @@ func createToolChatTask(
 		true,
 	)
 
-	hit, err, interrupted = createRoundTask(conn, user, finalBuffer, liveBuffer, db, cache, group, props, plan, createRemoveSignalHandler(db, instance))
+	hit, err, interrupted = createRoundTask(conn, user, finalBuffer, liveBuffer, db, cache, group, props, plan, createRemoveSignalHandler(db, instance), limiter)
 	if err != nil || interrupted {
 		return hit, err, interrupted
 	}
@@ -1085,7 +1188,7 @@ func latestMessageContent(messages []globals.Message) (string, bool) {
 
 func createChatTask(
 	conn *Connection, user *auth.User, buffer *utils.Buffer, db *sql.DB, cache *redis.Client,
-	model string, instance *conversation.Conversation, segment []globals.Message, plan bool,
+	model string, instance *conversation.Conversation, segment []globals.Message, plan bool, limiter realtimeQuotaLimiter,
 ) (hit bool, err error, interrupted bool) {
 	chunkChan := make(chan partialChunk, 24) // the channel to send the chunk data
 	interruptSignal := make(chan error, 1)   // the signal to interrupt the chat task routine
@@ -1249,6 +1352,18 @@ func createChatTask(
 				}
 			}
 
+			if !limiter.allowsProjectedChunk(buffer, data.Chunk) {
+				globals.Info(fmt.Sprintf("realtime quota limit reached for chat request (model: %s, client: %s)", model, conn.GetCtx().ClientIP()))
+				_ = conn.SendClient(globals.ChatSegmentResponse{
+					Quota: buffer.GetQuota(),
+					End:   true,
+					Plan:  plan,
+				})
+				signalInterrupt(interruptSignal, errors.New("quota limit"))
+				waitForRoundTaskEnd(chunkChan)
+				return hit, nil, true
+			}
+
 			message := buffer.WriteChunk(data.Chunk)
 			if !conn.TrySendClient(globals.ChatSegmentResponse{
 				Message: message,
@@ -1257,6 +1372,17 @@ func createChatTask(
 				Plan:    plan,
 			}) {
 				continue
+			}
+			if limiter.exhausted(buffer.GetQuota()) {
+				globals.Info(fmt.Sprintf("realtime quota exhausted for chat request (model: %s, client: %s)", model, conn.GetCtx().ClientIP()))
+				_ = conn.SendClient(globals.ChatSegmentResponse{
+					Quota: buffer.GetQuota(),
+					End:   true,
+					Plan:  plan,
+				})
+				signalInterrupt(interruptSignal, errors.New("quota limit"))
+				waitForRoundTaskEnd(chunkChan)
+				return hit, nil, true
 			}
 
 		case signal := <-stopSignal:
@@ -1361,13 +1487,14 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 	}
 
 	buffer := utils.NewBuffer(model, segment, channel.ChargeInstance.GetCharge(model))
+	limiter := newRealtimeQuotaLimiter(db, cache, user, model, plan)
 	recordBuiltinToolRequest(buffer, instance, model)
 	var hit bool
 	var err error
 	var interrupted bool
 	toolEnabled := false
 	if globals.IsVideoModel(model) {
-		hit, err, interrupted = createChatTask(conn, user, buffer, db, cache, model, instance, segment, plan)
+		hit, err, interrupted = createChatTask(conn, user, buffer, db, cache, model, instance, segment, plan, limiter)
 	} else {
 		memCtx := buildMemoryContext(db, user, instance, model, group)
 		fetchToolEnabled := instance.IsEnableFetch() && toolCallsSupported
@@ -1379,10 +1506,10 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 			if fetchToolEnabled {
 				maxToolRounds = maxFetchToolRounds
 			}
-			hit, err, interrupted = createToolChatTask(conn, user, buffer, db, cache, model, group, instance, segment, plan, memCtx, tools, maxToolRounds)
+			hit, err, interrupted = createToolChatTask(conn, user, buffer, db, cache, model, group, instance, segment, plan, memCtx, tools, maxToolRounds, limiter)
 		} else {
 			props := buildChatProps(conn, instance, model, segment, buffer, memCtx.MemoryPrompt, memCtx.RecentChatsPrompt, nil, nil, false)
-			hit, err, interrupted = createRoundTask(conn, user, buffer, buffer, db, cache, group, props, plan, createRemoveSignalHandler(db, instance))
+			hit, err, interrupted = createRoundTask(conn, user, buffer, buffer, db, cache, group, props, plan, createRemoveSignalHandler(db, instance), limiter)
 		}
 	}
 

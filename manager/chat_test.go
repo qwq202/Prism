@@ -87,6 +87,24 @@ func newCollectQuotaTestContextWithCache(t *testing.T, db *sql.DB, cache *redis.
 	return c
 }
 
+func useChatTestChargeInstance(t *testing.T) {
+	t.Helper()
+
+	previousCharge := channel.ChargeInstance
+	channel.ChargeInstance = &channel.ChargeManager{
+		Models: map[string]*channel.Charge{
+			globals.GPT3Turbo: {
+				Type:   globals.TimesBilling,
+				Models: []string{globals.GPT3Turbo},
+				Output: 9,
+			},
+		},
+	}
+	t.Cleanup(func() {
+		channel.ChargeInstance = previousCharge
+	})
+}
+
 func TestLatestMessageContentHandlesEmptySegment(t *testing.T) {
 	if content, ok := latestMessageContent(nil); ok || content != "" {
 		t.Fatalf("expected empty segment to be rejected, got content=%q ok=%v", content, ok)
@@ -137,7 +155,68 @@ func TestCollectQuotaRecordsDebtWhenFinalCostExceedsBalance(t *testing.T) {
 	}
 }
 
-func TestCollectQuotaUsesAvailableSubscriptionAndChargesRemainingUserQuota(t *testing.T) {
+func TestRealtimeQuotaLimiterRejectsProjectedSubscriptionOverflow(t *testing.T) {
+	useChatTestChargeInstance(t)
+
+	db := openChatQuotaTestDB(t)
+	server, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("start miniredis: %v", err)
+	}
+	cache := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	t.Cleanup(func() {
+		_ = cache.Close()
+		server.Close()
+	})
+
+	user := auth.GetUserByName(db, "root")
+	if user == nil {
+		t.Fatalf("expected root user")
+	}
+	if !user.SetQuota(db, 10) {
+		t.Fatalf("set quota")
+	}
+
+	previousPlan := channel.PlanInstance
+	channel.PlanInstance = &channel.PlanManager{
+		Enabled: true,
+		Plans: []channel.Plan{
+			{
+				Level: 1,
+				Quota: 1,
+				Items: []channel.PlanItem{
+					{Id: "included", Models: []string{globals.GPT3Turbo}},
+				},
+			},
+		},
+	}
+	t.Cleanup(func() {
+		channel.PlanInstance = previousPlan
+	})
+
+	if _, err := globals.ExecDb(
+		db,
+		"INSERT INTO subscription (user_id, level, expired_at) VALUES (?, ?, ?)",
+		user.GetID(db),
+		1,
+		time.Now().Add(24*time.Hour).Format("2006-01-02 15:04:05"),
+	); err != nil {
+		t.Fatalf("insert subscription: %v", err)
+	}
+
+	buffer := utils.NewBuffer(globals.GPT3Turbo, nil, chatTestCharge{})
+	limiter := newRealtimeQuotaLimiter(db, cache, user, globals.GPT3Turbo, true)
+	if limiter.allowsProjectedChunk(buffer, &globals.Chunk{Content: "hello"}) {
+		t.Fatalf("expected realtime limiter to reject a chunk above subscription budget")
+	}
+	if !buffer.IsEmpty() {
+		t.Fatalf("expected rejected projected chunk not to mutate buffer")
+	}
+}
+
+func TestCollectQuotaDoesNotChargeUserBalanceForSubscriptionOverflow(t *testing.T) {
+	useChatTestChargeInstance(t)
+
 	db := openChatQuotaTestDB(t)
 	server, err := miniredis.Run()
 	if err != nil {
@@ -193,11 +272,11 @@ func TestCollectQuotaUsesAvailableSubscriptionAndChargesRemainingUserQuota(t *te
 	if got := plan.GetPointUsage(user, cache); math.Abs(float64(got-1)) > 0.001 {
 		t.Fatalf("expected subscription usage to consume available 1 quota, got %f", got)
 	}
-	if got := user.GetQuota(db); math.Abs(float64(got-2)) > 0.001 {
-		t.Fatalf("expected user quota to pay remaining 8 quota, got %f", got)
+	if got := user.GetQuota(db); math.Abs(float64(got-10)) > 0.001 {
+		t.Fatalf("expected user quota not to pay subscription overflow, got %f", got)
 	}
-	if got := user.GetUsedQuota(db); math.Abs(float64(got-8)) > 0.001 {
-		t.Fatalf("expected used quota to record remaining 8 quota, got %f", got)
+	if got := user.GetUsedQuota(db); math.Abs(float64(got)) > 0.001 {
+		t.Fatalf("expected used quota to remain 0 for subscription overflow, got %f", got)
 	}
 }
 

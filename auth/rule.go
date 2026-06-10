@@ -86,8 +86,15 @@ func CanEnableModel(db *sql.DB, user *User, model string, messages []globals.Mes
 
 func CanEnableModelWithSubscription(db *sql.DB, cache *redis.Client, user *User, model string, messages []globals.Message) (canEnable error, usePlan bool) {
 	// use subscription quota first
-	minimumCost := channel.ChargeInstance.GetCharge(model).GetLimit()
-	if user != nil && HandleSubscriptionUsage(db, cache, user, model, minimumCost) {
+	charge := channel.ChargeInstance.GetCharge(model)
+	minimumCost := charge.GetLimit()
+	inputTokens := utils.NumTokensFromMessages(messages, model, false)
+	estimatedInputCost := float32(inputTokens) / 1000 * charge.GetInput()
+	subscriptionPreflightCost := minimumCost
+	if estimatedInputCost > subscriptionPreflightCost {
+		subscriptionPreflightCost = estimatedInputCost
+	}
+	if user != nil && HandleSubscriptionUsage(db, cache, user, model, subscriptionPreflightCost) {
 		return nil, true
 	}
 	return CanEnableModel(db, user, model, messages), false

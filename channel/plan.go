@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -559,6 +560,34 @@ func (p *Plan) CanUsePointPoolForQuota(user globals.AuthLike, cache *redis.Clien
 		return false
 	}
 	return true
+}
+
+func (p *Plan) PointPoolRemaining(user globals.AuthLike, cache *redis.Client, model string) (float32, bool) {
+	if !p.HasPointPool() || !p.IncludesModel(model) {
+		return 0, false
+	}
+
+	remaining := float32(math.MaxFloat32)
+	hasFiniteWindow := false
+	if !p.IsPointPoolInfinity() {
+		remaining = p.Quota - p.GetPointUsage(user, cache)
+		hasFiniteWindow = true
+	}
+	if p.HasWeeklyPool() && !p.IsWeeklyPoolInfinity() {
+		weeklyRemaining := p.WeeklyQuota - p.GetWeeklyPointUsage(user, cache)
+		if !hasFiniteWindow || weeklyRemaining < remaining {
+			remaining = weeklyRemaining
+		}
+		hasFiniteWindow = true
+	}
+
+	if !hasFiniteWindow {
+		return float32(math.MaxFloat32), true
+	}
+	if remaining < 0 {
+		remaining = 0
+	}
+	return remaining, true
 }
 
 func (p *Plan) ConsumePointPool(user globals.AuthLike, cache *redis.Client, model string, quota float32) bool {
