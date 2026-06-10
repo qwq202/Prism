@@ -107,6 +107,11 @@ func ExecDb(db *sql.DB, sql string, args ...interface{}) (sql.Result, error) {
 	return db.Exec(sql, args...)
 }
 
+func ExecTx(tx *sql.Tx, sql string, args ...interface{}) (sql.Result, error) {
+	sql = PreflightSql(sql)
+	return tx.Exec(sql, args...)
+}
+
 func PrepareDb(db *sql.DB, sql string) (*sql.Stmt, error) {
 	sql = PreflightSql(sql)
 	return db.Prepare(sql)

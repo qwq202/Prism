@@ -214,7 +214,7 @@ func TestRealtimeQuotaLimiterRejectsProjectedSubscriptionOverflow(t *testing.T) 
 	}
 }
 
-func TestCollectQuotaDoesNotChargeUserBalanceForSubscriptionOverflow(t *testing.T) {
+func TestCollectQuotaChargesUserBalanceForSubscriptionOverflow(t *testing.T) {
 	useChatTestChargeInstance(t)
 
 	db := openChatQuotaTestDB(t)
@@ -272,11 +272,11 @@ func TestCollectQuotaDoesNotChargeUserBalanceForSubscriptionOverflow(t *testing.
 	if got := plan.GetPointUsage(user, cache); math.Abs(float64(got-1)) > 0.001 {
 		t.Fatalf("expected subscription usage to consume available 1 quota, got %f", got)
 	}
-	if got := user.GetQuota(db); math.Abs(float64(got-10)) > 0.001 {
-		t.Fatalf("expected user quota not to pay subscription overflow, got %f", got)
+	if got := user.GetQuota(db); math.Abs(float64(got-2)) > 0.001 {
+		t.Fatalf("expected user quota to pay subscription overflow, got %f", got)
 	}
-	if got := user.GetUsedQuota(db); math.Abs(float64(got)) > 0.001 {
-		t.Fatalf("expected used quota to remain 0 for subscription overflow, got %f", got)
+	if got := user.GetUsedQuota(db); math.Abs(float64(got-8)) > 0.001 {
+		t.Fatalf("expected used quota to record subscription overflow, got %f", got)
 	}
 }
 

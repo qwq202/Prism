@@ -367,3 +367,86 @@ func TestForceUseQuotaRecordsDebtAndUsage(t *testing.T) {
 		t.Fatalf("expected used quota 3, got %f", got)
 	}
 }
+
+func TestRedeemUseIsSingleGrant(t *testing.T) {
+	db := openAuthSecurityTestDB(t)
+	connection.CreateRedeemTable(db)
+
+	user := GetUserByName(db, "root")
+	if user == nil {
+		t.Fatalf("expected root user")
+	}
+	if !user.SetQuota(db, 0) {
+		t.Fatalf("set quota")
+	}
+	if err := CreateRedeemCode(db, "nio-test", 7); err != nil {
+		t.Fatalf("create redeem code: %v", err)
+	}
+
+	redeem, err := GetRedeemCode(db, "nio-test")
+	if err != nil {
+		t.Fatalf("get redeem code: %v", err)
+	}
+	if err := redeem.UseRedeem(db, user); err != nil {
+		t.Fatalf("first redeem use should succeed: %v", err)
+	}
+	if err := redeem.UseRedeem(db, user); err == nil {
+		t.Fatalf("second redeem use should fail")
+	}
+	if got := user.GetQuota(db); got != 7 {
+		t.Fatalf("expected quota to be granted once, got %f", got)
+	}
+}
+
+func TestInvitationUseIsSingleGrant(t *testing.T) {
+	db := openAuthSecurityTestDB(t)
+	connection.CreateInvitationTable(db)
+
+	user := GetUserByName(db, "root")
+	if user == nil {
+		t.Fatalf("expected root user")
+	}
+	if !user.SetQuota(db, 0) {
+		t.Fatalf("set quota")
+	}
+	if err := CreateInvitationCode(db, "invite-test", 11, "campaign"); err != nil {
+		t.Fatalf("create invitation code: %v", err)
+	}
+
+	invitation, err := GetInvitation(db, "invite-test")
+	if err != nil {
+		t.Fatalf("get invitation: %v", err)
+	}
+	if err := invitation.UseInvitation(db, *user); err != nil {
+		t.Fatalf("first invitation use should succeed: %v", err)
+	}
+	if err := invitation.UseInvitation(db, *user); err == nil {
+		t.Fatalf("second invitation use should fail")
+	}
+	if got := user.GetQuota(db); got != 11 {
+		t.Fatalf("expected quota to be granted once, got %f", got)
+	}
+}
+
+func TestPackageGrantIsSingleGrant(t *testing.T) {
+	db := openAuthSecurityTestDB(t)
+	connection.CreatePackageTable(db)
+
+	user := GetUserByName(db, "root")
+	if user == nil {
+		t.Fatalf("expected root user")
+	}
+	if !user.SetQuota(db, 0) {
+		t.Fatalf("set quota")
+	}
+
+	if !NewCertPackage(db, user) {
+		t.Fatalf("first package grant should succeed")
+	}
+	if NewCertPackage(db, user) {
+		t.Fatalf("second package grant should fail")
+	}
+	if got := user.GetQuota(db); got != 50 {
+		t.Fatalf("expected package quota to be granted once, got %f", got)
+	}
+}

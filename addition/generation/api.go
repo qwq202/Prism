@@ -2,14 +2,17 @@ package generation
 
 import (
 	"chat/auth"
+	"chat/billing"
 	"chat/globals"
 	"chat/utils"
+	"database/sql"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
 )
 
 type WebsocketGenerationForm struct {
@@ -49,6 +52,49 @@ func downloadProjectFile(c *gin.Context, path string, filename string) {
 	c.File(path)
 }
 
+func generationQuota(buffer *utils.Buffer) float32 {
+	if buffer == nil {
+		return 0
+	}
+	return buffer.GetRecordQuota()
+}
+
+func settleGenerationQuota(db *sql.DB, cache *redis.Client, user *auth.User, model string, buffer *utils.Buffer, plan bool) {
+	if user == nil || buffer == nil || buffer.IsEmpty() {
+		return
+	}
+
+	quota := buffer.GetRecordQuota()
+	if quota <= 0 {
+		return
+	}
+
+	if plan {
+		consumed := auth.FinalizeSubscriptionUsageAmount(db, cache, user, model, quota)
+		if consumed+0.0001 < quota {
+			user.ChargeQuota(db, quota-consumed)
+		}
+		return
+	}
+
+	user.ChargeQuota(db, quota)
+}
+
+func createGenerationBillingRecord(db *sql.DB, user *auth.User, model string, buffer *utils.Buffer) {
+	if db == nil || user == nil || buffer == nil || buffer.IsEmpty() {
+		return
+	}
+
+	billing.CreateRecord(
+		db, auth.GetId(db, user), user.Username, "consume",
+		buffer.GetTokenName(), model,
+		int64(buffer.CountRecordInputToken()), int64(buffer.CountRecordOutputToken()),
+		float64(buffer.GetRecordQuota()), buffer.GetDuration(),
+		buffer.GetBillingDetail(), buffer.GetRecordPrompts(), buffer.GetRecordResponsePrompts(),
+		buffer.GetChannelId(), buffer.GetChannelName(),
+	)
+}
+
 func GenerateAPI(c *gin.Context) {
 	var conn *utils.WebSocket
 	if conn = utils.NewWebsocket(c, false); conn == nil {
@@ -75,7 +121,7 @@ func GenerateAPI(c *gin.Context) {
 		return
 	}
 
-	check, plan := auth.CanEnableModelWithSubscription(db, cache, user, form.Model, []globals.Message{})
+	check, plan := auth.CanEnableModelWithSubscription(db, cache, user, form.Model, GenerateMessage(form.Prompt))
 	if check != nil {
 		conn.Send(globals.GenerationSegmentResponse{
 			Message: check.Error(),
@@ -100,23 +146,27 @@ func GenerateAPI(c *gin.Context) {
 		},
 	)
 
-	if instance != nil && !plan && instance.GetQuota() > 0 && user != nil {
-		user.UseQuota(db, instance.GetQuota())
-	}
-
 	if err != nil {
-		auth.RevertSubscriptionUsage(db, cache, user, form.Model)
+		if instance != nil && instance.HasVisiblePayload() {
+			settleGenerationQuota(db, cache, user, form.Model, instance, plan)
+			createGenerationBillingRecord(db, user, form.Model, instance)
+		} else {
+			auth.RevertSubscriptionUsage(db, cache, user, form.Model)
+		}
 		conn.Send(globals.GenerationSegmentResponse{
 			End:   true,
 			Error: err.Error(),
-			Quota: instance.GetQuota(),
+			Quota: generationQuota(instance),
 		})
 		return
 	}
 
+	settleGenerationQuota(db, cache, user, form.Model, instance, plan)
+	createGenerationBillingRecord(db, user, form.Model, instance)
+
 	conn.Send(globals.GenerationSegmentResponse{
 		End:   true,
 		Hash:  hash,
-		Quota: instance.GetQuota(),
+		Quota: generationQuota(instance),
 	})
 }

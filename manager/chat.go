@@ -225,25 +225,26 @@ func sendToolResultEvents(conn *Connection, calls *globals.ToolCalls, toolMessag
 
 func CollectQuota(c *gin.Context, user *auth.User, buffer *utils.Buffer, uncountable bool, err error) {
 	db := utils.GetDBFromContext(c)
-	quota := buffer.GetQuota()
-
-	if user == nil || quota <= 0 {
+	if user == nil || buffer == nil {
 		return
 	}
 
-	if buffer.IsEmpty() || err != nil {
+	quota := buffer.GetRecordQuota()
+	if quota <= 0 {
 		return
+	}
+
+	if buffer.IsEmpty() {
+		return
+	}
+	if err != nil {
+		globals.Warn(fmt.Sprintf("charging visible partial response after request error (model: %s): %s", buffer.GetModel(), err.Error()))
 	}
 
 	if uncountable {
 		consumed := auth.FinalizeSubscriptionUsageAmount(db, utils.GetCacheFromContext(c), user, buffer.GetModel(), quota)
 		if consumed+0.0001 < quota {
-			globals.Warn(fmt.Sprintf(
-				"subscription usage only covered %.4f/%.4f quota (model: %s); realtime quota limiter should stop requests before overflow",
-				consumed,
-				quota,
-				buffer.GetModel(),
-			))
+			collectUserQuota(db, user, quota-consumed)
 		}
 		return
 	}
@@ -252,9 +253,23 @@ func CollectQuota(c *gin.Context, user *auth.User, buffer *utils.Buffer, uncount
 }
 
 func collectUserQuota(db *sql.DB, user *auth.User, quota float32) {
-	if !user.UseQuota(db, quota) {
-		user.ForceUseQuota(db, quota)
+	user.ChargeQuota(db, quota)
+}
+
+func createChatBillingRecord(db *sql.DB, user *auth.User, model string, buffer *utils.Buffer) {
+	if db == nil || user == nil || buffer == nil || buffer.IsEmpty() {
+		return
 	}
+
+	userId := auth.GetId(db, user)
+	billing.CreateRecord(
+		db, userId, user.Username, "consume",
+		buffer.GetTokenName(), model,
+		int64(buffer.CountRecordInputToken()), int64(buffer.CountRecordOutputToken()),
+		float64(buffer.GetRecordQuota()), buffer.GetDuration(),
+		buffer.GetBillingDetail(), buffer.GetRecordPrompts(), buffer.GetRecordResponsePrompts(),
+		buffer.GetChannelId(), buffer.GetChannelName(),
+	)
 }
 
 const realtimeQuotaEpsilon = float32(0.0001)
@@ -1430,7 +1445,7 @@ func extractAssistantMessageFromBuffer(buffer *utils.Buffer, interrupted bool, p
 		Plan:                 plan,
 	}
 	if buffer.GetCharge() != nil {
-		message.Quota = buffer.GetQuota()
+		message.Quota = buffer.GetRecordQuota()
 	}
 
 	// Interrupted streams may contain partial/incomplete tool payloads.
@@ -1518,7 +1533,12 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 	if adapter.IsAvailableError(err) {
 		globals.Warn(fmt.Sprintf("%s (model: %s, client: %s)", err, model, conn.GetCtx().ClientIP()))
 
-		auth.RevertSubscriptionUsage(db, cache, user, model)
+		if !hit && buffer.HasVisiblePayload() {
+			CollectQuota(conn.GetCtx(), user, buffer, plan, err)
+			createChatBillingRecord(db, user, model, buffer)
+		} else {
+			auth.RevertSubscriptionUsage(db, cache, user, model)
+		}
 		conn.Send(globals.ChatSegmentResponse{
 			Message: err.Error(),
 			End:     true,
@@ -1533,16 +1553,8 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 		CollectQuota(conn.GetCtx(), user, buffer, plan, err)
 	}
 
-	if !adapter.IsAvailableError(err) && user != nil && !buffer.IsEmpty() {
-		userId := auth.GetId(db, user)
-		billing.CreateRecord(
-			db, userId, user.Username, "consume",
-			buffer.GetTokenName(), model,
-			int64(buffer.CountInputToken()), int64(buffer.CountOutputToken(false)),
-			float64(buffer.GetRecordQuota()), buffer.GetDuration(),
-			buffer.GetBillingDetail(), buffer.GetRecordPrompts(), buffer.GetRecordResponsePrompts(),
-			buffer.GetChannelId(), buffer.GetChannelName(),
-		)
+	if !adapter.IsAvailableError(err) {
+		createChatBillingRecord(db, user, model, buffer)
 	}
 
 	if interrupted {
@@ -1572,7 +1584,7 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 
 	conn.Send(globals.ChatSegmentResponse{
 		End:   true,
-		Quota: buffer.GetQuota(),
+		Quota: buffer.GetRecordQuota(),
 		Plan:  plan,
 	})
 

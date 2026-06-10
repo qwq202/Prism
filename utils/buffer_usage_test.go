@@ -2,9 +2,21 @@ package utils
 
 import (
 	"chat/globals"
+	"math"
 	"strings"
 	"testing"
 )
+
+type usageTestCharge struct{}
+
+func (usageTestCharge) GetType() string             { return globals.TokenBilling }
+func (usageTestCharge) GetModels() []string         { return nil }
+func (usageTestCharge) GetInput() float32           { return 1 }
+func (usageTestCharge) GetOutput() float32          { return 2 }
+func (usageTestCharge) SupportAnonymous() bool      { return true }
+func (usageTestCharge) IsBilling() bool             { return true }
+func (usageTestCharge) IsBillingType(t string) bool { return t == globals.TokenBilling }
+func (usageTestCharge) GetLimit() float32           { return 0 }
 
 func TestBufferRecordsOfficialUsage(t *testing.T) {
 	buffer := &Buffer{}
@@ -72,5 +84,25 @@ func TestBufferMergesOfficialUsage(t *testing.T) {
 	}
 	if usage.PromptCacheHitTokens != 21 || usage.PromptCacheMissTokens != 9 {
 		t.Fatalf("unexpected merged cache tokens: %#v", usage)
+	}
+}
+
+func TestBufferRecordQuotaUsesOfficialUsageWhenPresent(t *testing.T) {
+	buffer := NewBuffer(globals.GPT3Turbo, nil, usageTestCharge{})
+	buffer.Write("visible")
+	buffer.SetUsage(&globals.TokenUsage{
+		PromptTokens:     1000,
+		CompletionTokens: 2000,
+		TotalTokens:      3000,
+	})
+
+	if got := buffer.CountRecordInputToken(); got != 1000 {
+		t.Fatalf("expected official prompt tokens, got %d", got)
+	}
+	if got := buffer.CountRecordOutputToken(); got != 2000 {
+		t.Fatalf("expected official completion tokens, got %d", got)
+	}
+	if got := buffer.GetRecordQuota(); math.Abs(float64(got-5)) > 0.001 {
+		t.Fatalf("expected official usage quota 5, got %f", got)
 	}
 }

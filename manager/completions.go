@@ -90,7 +90,8 @@ func NativeChatHandler(c *gin.Context, user *auth.User, model string, message []
 
 	if !hit {
 		CollectQuota(c, user, buffer, plan, err)
+		createChatBillingRecord(db, user, model, buffer)
 	}
 
-	return buffer.ReadWithDefault(defaultMessage), buffer.GetQuota()
+	return buffer.ReadWithDefault(defaultMessage), buffer.GetRecordQuota()
 }

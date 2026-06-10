@@ -70,10 +70,21 @@ func (i *Invitation) IsUsed() bool {
 }
 
 func (i *Invitation) Use(db *sql.DB, userId int64) error {
-	_, err := globals.ExecDb(db, `
-		UPDATE invitation SET used = TRUE, used_id = ? WHERE id = ?
+	result, err := globals.ExecDb(db, `
+		UPDATE invitation SET used = TRUE, used_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND used = FALSE
 	`, userId, i.Id)
-	return err
+	if err != nil {
+		return err
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 func (i *Invitation) GetQuota() float32 {
@@ -81,11 +92,24 @@ func (i *Invitation) GetQuota() float32 {
 }
 
 func (i *Invitation) UseInvitation(db *sql.DB, user User) error {
+	if i == nil {
+		return fmt.Errorf("invalid invitation request")
+	}
 	if i.IsUsed() {
 		return fmt.Errorf("this invitation has been used")
 	}
 
-	if err := i.Use(db, user.GetID(db)); err != nil {
+	userID := user.GetID(db)
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to start invitation transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	result, err := globals.ExecTx(tx, `
+		UPDATE invitation SET used = TRUE, used_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND used = FALSE
+	`, userID, i.Id)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("invitation code not found")
 		} else if errors.Is(err, sql.ErrTxDone) {
@@ -94,11 +118,19 @@ func (i *Invitation) UseInvitation(db *sql.DB, user User) error {
 		return fmt.Errorf("failed to use invitation: %w", err)
 	}
 
-	if !user.IncreaseQuota(db, i.GetQuota()) {
-		return fmt.Errorf("failed to increase quota for user")
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to confirm invitation usage: %w", err)
+	}
+	if affected != 1 {
+		return fmt.Errorf("this invitation has been used")
 	}
 
-	return nil
+	if err := increaseQuotaByUserIDTx(tx, userID, i.GetQuota()); err != nil {
+		return fmt.Errorf("failed to increase quota for user: %w", err)
+	}
+
+	return tx.Commit()
 }
 
 func (u *User) UseInvitation(db *sql.DB, code string) (float32, error) {

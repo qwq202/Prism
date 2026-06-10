@@ -96,7 +96,11 @@ func (b *Buffer) GetQuota() float32 {
 }
 
 func (b *Buffer) GetRecordQuota() float32 {
-	// end of the buffer, the output token is counted using the times
+	if b.Charge.IsBillingType(globals.TokenBilling) && !b.Usage.IsEmpty() {
+		return CountInputQuota(b.Charge, b.CountRecordInputToken()) +
+			CountOutputToken(b.Charge, b.CountRecordOutputToken())
+	}
+
 	return b.Quota + CountOutputToken(b.Charge, b.CountOutputToken(false))
 }
 
@@ -430,6 +434,22 @@ func (b *Buffer) CountInputToken() int {
 	return b.InputTokens
 }
 
+func (b *Buffer) CountRecordInputToken() int {
+	tokens := b.CountInputToken()
+	if b.Usage.IsEmpty() {
+		return tokens
+	}
+
+	usageTokens := b.Usage.PromptTokens
+	if usageTokens == 0 {
+		usageTokens = b.Usage.PromptCacheHitTokens + b.Usage.PromptCacheMissTokens
+	}
+	if usageTokens > tokens {
+		return usageTokens
+	}
+	return tokens
+}
+
 func (b *Buffer) CountOutputToken(running bool) int {
 	if running {
 		// performance optimization:
@@ -438,6 +458,31 @@ func (b *Buffer) CountOutputToken(running bool) int {
 	}
 
 	return NumTokensFromResponse(b.Read(), b.Model)
+}
+
+func (b *Buffer) CountRecordOutputToken() int {
+	tokens := b.CountOutputToken(false)
+	if b.Usage.IsEmpty() {
+		return tokens
+	}
+
+	usageTokens := b.Usage.CompletionTokens
+	if usageTokens == 0 {
+		promptTokens := b.Usage.PromptTokens
+		if promptTokens == 0 {
+			promptTokens = b.Usage.PromptCacheHitTokens + b.Usage.PromptCacheMissTokens
+		}
+		if b.Usage.TotalTokens > promptTokens {
+			usageTokens = b.Usage.TotalTokens - promptTokens
+		}
+	}
+	if reasoningTokens := b.Usage.CompletionTokensDetails.ReasoningTokens; reasoningTokens > usageTokens {
+		usageTokens = reasoningTokens
+	}
+	if usageTokens > tokens {
+		return usageTokens
+	}
+	return tokens
 }
 
 func (b *Buffer) CountToken() int {

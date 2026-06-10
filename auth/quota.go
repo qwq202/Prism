@@ -50,6 +50,17 @@ func (u *User) IncreaseQuota(db *sql.DB, quota float32) bool {
 	return err == nil
 }
 
+func increaseQuotaByUserIDTx(tx *sql.Tx, userID int64, quota float32) error {
+	if quota <= 0 {
+		return nil
+	}
+
+	_, err := globals.ExecTx(tx, `
+		INSERT INTO quota (user_id, quota, used) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE quota = quota + ?
+	`, userID, quota, 0., quota)
+	return err
+}
+
 func (u *User) IncreaseUsedQuota(db *sql.DB, used float32) bool {
 	_, err := globals.ExecDb(db, `
 		INSERT INTO quota (user_id, quota, used) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE used = used + ?
@@ -91,6 +102,19 @@ func (u *User) ForceUseQuota(db *sql.DB, quota float32) bool {
 		INSERT INTO quota (user_id, quota, used) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE quota = quota - ?, used = used + ?
 	`, u.GetID(db), -quota, quota, quota, quota)
 	return err == nil
+}
+
+func (u *User) ChargeQuota(db *sql.DB, quota float32) bool {
+	if quota <= 0 {
+		return true
+	}
+	if u == nil || db == nil {
+		return false
+	}
+	if u.UseQuota(db, quota) {
+		return true
+	}
+	return u.ForceUseQuota(db, quota)
 }
 
 func (u *User) PayedQuota(db *sql.DB, quota float32) bool {

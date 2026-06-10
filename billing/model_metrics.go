@@ -89,8 +89,8 @@ func RecordModelUsageMetric(db *sql.DB, model string, buffer *utils.Buffer, err 
 	var outputTokens int64
 	var duration float32
 	if buffer != nil {
-		inputTokens = int64(buffer.CountInputToken())
-		outputTokens = int64(buffer.CountOutputToken(false))
+		inputTokens = int64(buffer.CountRecordInputToken())
+		outputTokens = int64(buffer.CountRecordOutputToken())
 		duration = buffer.GetDuration()
 	}
 

@@ -28,37 +28,39 @@ func (u *User) HasTeenagerPackage(db *sql.DB) bool {
 }
 
 func NewPackage(db *sql.DB, user *User, _t string) bool {
+	return grantPackageQuota(db, user, _t, 0)
+}
+
+func grantPackageQuota(db *sql.DB, user *User, _t string, quota float32) bool {
+	if user == nil {
+		return false
+	}
+
 	id := user.GetID(db)
 
-	var count int
-	if err := globals.QueryRowDb(db, `SELECT COUNT(*) FROM package where user_id = ? AND type = ?`, id, _t).Scan(&count); err != nil {
+	tx, err := db.Begin()
+	if err != nil {
+		return false
+	}
+	defer tx.Rollback()
+
+	if _, err := globals.ExecTx(tx, `INSERT INTO package (user_id, type) VALUES (?, ?)`, id, _t); err != nil {
 		return false
 	}
 
-	if count > 0 {
+	if err := increaseQuotaByUserIDTx(tx, id, quota); err != nil {
 		return false
 	}
 
-	_ = globals.QueryRowDb(db, `INSERT INTO package (user_id, type) VALUES (?, ?)`, id, _t)
-	return true
+	return tx.Commit() == nil
 }
 
 func NewCertPackage(db *sql.DB, user *User) bool {
-	res := NewPackage(db, user, "cert")
-	if !res {
-		return false
-	}
-
-	return user.IncreaseQuota(db, 50)
+	return grantPackageQuota(db, user, "cert", 50)
 }
 
 func NewTeenagerPackage(db *sql.DB, user *User) bool {
-	res := NewPackage(db, user, "teenager")
-	if !res {
-		return false
-	}
-
-	return user.IncreaseQuota(db, 150)
+	return grantPackageQuota(db, user, "teenager", 150)
 }
 
 func RefreshPackage(db *sql.DB, user *User) *GiftResponse {

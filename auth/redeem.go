@@ -63,10 +63,21 @@ func (r *Redeem) IsUsed() bool {
 }
 
 func (r *Redeem) Use(db *sql.DB) error {
-	_, err := globals.ExecDb(db, `
-		UPDATE redeem SET used = TRUE WHERE id = ? AND used = FALSE
+	result, err := globals.ExecDb(db, `
+		UPDATE redeem SET used = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND used = FALSE
 	`, r.Id)
-	return err
+	if err != nil {
+		return err
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 func (r *Redeem) GetQuota() float32 {
@@ -74,11 +85,24 @@ func (r *Redeem) GetQuota() float32 {
 }
 
 func (r *Redeem) UseRedeem(db *sql.DB, user *User) error {
+	if r == nil || user == nil {
+		return fmt.Errorf("invalid redeem request")
+	}
 	if r.IsUsed() {
 		return fmt.Errorf("this redeem code has been used")
 	}
 
-	if err := r.Use(db); err != nil {
+	userID := user.GetID(db)
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to start redeem transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	result, err := globals.ExecTx(tx, `
+		UPDATE redeem SET used = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND used = FALSE
+	`, r.Id)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("redeem code not found")
 		} else if errors.Is(err, sql.ErrTxDone) {
@@ -87,11 +111,19 @@ func (r *Redeem) UseRedeem(db *sql.DB, user *User) error {
 		return fmt.Errorf("failed to use redeem code: %w", err)
 	}
 
-	if !user.IncreaseQuota(db, r.GetQuota()) {
-		return fmt.Errorf("failed to increase quota for user")
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to confirm redeem code usage: %w", err)
+	}
+	if affected != 1 {
+		return fmt.Errorf("this redeem code has been used")
 	}
 
-	return nil
+	if err := increaseQuotaByUserIDTx(tx, userID, r.GetQuota()); err != nil {
+		return fmt.Errorf("failed to increase quota for user: %w", err)
+	}
+
+	return tx.Commit()
 }
 
 func (u *User) UseRedeem(db *sql.DB, cache *redis.Client, code string) (float32, error) {
