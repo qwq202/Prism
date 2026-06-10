@@ -2,7 +2,7 @@
 # License: Apache-2.0
 # Description: Dockerfile for chatnio
 
-FROM --platform=$TARGETPLATFORM golang:1.25-alpine AS backend
+FROM golang:1.25-alpine AS backend
 
 WORKDIR /backend
 COPY . .
