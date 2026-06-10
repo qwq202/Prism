@@ -238,6 +238,9 @@ func TestRealtimeQuotaLimiterAllowsSubscriptionOverflowWhenFallbackEnabled(t *te
 	if !user.SetQuota(db, 10) {
 		t.Fatalf("set quota")
 	}
+	if !user.SetAllowSubscriptionQuotaFallback(db, true) {
+		t.Fatalf("enable subscription quota fallback")
+	}
 
 	previousPlan := channel.PlanInstance
 	channel.PlanInstance = &channel.PlanManager{
@@ -296,6 +299,9 @@ func TestCollectQuotaChargesUserBalanceForSubscriptionOverflow(t *testing.T) {
 	}
 	if !user.SetQuota(db, 10) {
 		t.Fatalf("set quota")
+	}
+	if !user.SetAllowSubscriptionQuotaFallback(db, true) {
+		t.Fatalf("enable subscription quota fallback")
 	}
 
 	previousPlan := channel.PlanInstance

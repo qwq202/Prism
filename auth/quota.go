@@ -6,7 +6,7 @@ import (
 	"database/sql"
 )
 
-const defaultAllowSubscriptionQuotaFallback = true
+const defaultAllowSubscriptionQuotaFallback = false
 
 func (u *User) CreateInitialQuota(db *sql.DB) bool {
 	_, err := globals.ExecDb(db, `

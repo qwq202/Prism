@@ -81,7 +81,7 @@ func doMysqlMigration(execer migrationExecer) error {
 
 	if err := execSql(execer, `
 		ALTER TABLE quota
-		ADD COLUMN allow_subscription_quota_fallback BOOLEAN DEFAULT TRUE;
+		ADD COLUMN allow_subscription_quota_fallback BOOLEAN DEFAULT FALSE;
 	`); err != nil {
 		return err
 	}
@@ -212,7 +212,7 @@ func doSqliteMigration(execer migrationExecer) error {
 	// v4 migration
 	if err := execSql(execer, `
 		ALTER TABLE quota
-		ADD COLUMN allow_subscription_quota_fallback BOOLEAN DEFAULT TRUE;
+		ADD COLUMN allow_subscription_quota_fallback BOOLEAN DEFAULT FALSE;
 	`); err != nil {
 		return err
 	}

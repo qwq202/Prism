@@ -6,7 +6,7 @@ export const quotaSlice = createSlice({
   name: "quota",
   initialState: {
     quota: 0,
-    allow_subscription_quota_fallback: true,
+    allow_subscription_quota_fallback: false,
   },
   reducers: {
     setQuota: (state, action) => {

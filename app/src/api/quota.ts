@@ -29,7 +29,7 @@ export async function getQuota(): Promise<QuotaPreference | null> {
         ? {
             quota,
             allow_subscription_quota_fallback:
-              response.data.allow_subscription_quota_fallback !== false,
+              response.data.allow_subscription_quota_fallback === true,
           }
         : null;
     }
