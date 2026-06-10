@@ -6,6 +6,7 @@
   "login": "登入",
   "register": "註冊",
   "reset": "重設",
+  "default-config": "預設配置",
   "login-require": "您需要登入才能使用此功能",
   "logout": "登出",
   "quota": "點數",

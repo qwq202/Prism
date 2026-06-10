@@ -36,7 +36,7 @@
   position: relative;
   display: grid;
   grid-gap: 12px;
-  height: 100%;
+  height: clamp(320px, 50vh, 760px);
 
   &.show-editor {
     grid-template-columns: 1fr;
@@ -57,16 +57,26 @@
   }
 }
 
+.full-screen .editor-object {
+  height: calc(100vh - 8.5rem);
+}
+
+.full-screen .editor-input,
+.full-screen .editor-preview {
+  min-height: 0 !important;
+}
+
 .editor-input {
   grid-area: editor;
   scrollbar-width: thin;
-  height: max-content;
+  height: 100% !important;
   transition: .1s;
-  min-height: 50vh !important;
+  min-height: 0 !important;
   color: hsl(var(--text));
   font-size: 16px !important;
   padding: 14px 12px !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  resize: none;
 }
 
 .editor-preview {
@@ -79,7 +89,7 @@
   border: 1px solid hsl(var(--border));
   scrollbar-width: thin;
   transition: 0.1s;
-  min-height: 50vh !important;
+  min-height: 0 !important;
   font-size: 16px;
   text-align: left;
 }

@@ -11,6 +11,7 @@
   "login-action": "登录以享受更多功能",
   "register": "注册",
   "reset": "重置",
+  "default-config": "默认配置",
   "anonymous": "未登录",
   "login-require": "您需要登录才能使用此功能",
   "coming-soon": "此功能开发中, 敬请期待!",

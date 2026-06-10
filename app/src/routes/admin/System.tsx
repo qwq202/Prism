@@ -114,6 +114,31 @@ const systemTimeZoneSuggestions = [
   "America/Los_Angeles",
 ];
 
+const defaultPwaManifest = JSON.stringify(
+  {
+    name: "Prism",
+    short_name: "Prism",
+    icons: [
+      {
+        src: "/service/android-chrome-192x192.png",
+        sizes: "192x192",
+        type: "image/png",
+      },
+      {
+        src: "/service/android-chrome-512x512.png",
+        sizes: "512x512",
+        type: "image/png",
+      },
+    ],
+    start_url: "/",
+    theme_color: "#000",
+    background_color: "#000",
+    display: "standalone",
+  },
+  null,
+  2,
+);
+
 function RootDialog() {
   const { t } = useTranslation();
   const dispatch = useDispatch();
@@ -289,6 +314,8 @@ function General({ data, dispatch, onChange }: CompProps<GeneralState>) {
         <Label>PWA Manifest</Label>
         <JSONEditorProvider
           value={data.pwa_manifest ?? ""}
+          defaultValue={defaultPwaManifest}
+          defaultLabel={t("default-config")}
           onChange={(value) =>
             dispatch({ type: "update:general.pwa_manifest", value })
           }

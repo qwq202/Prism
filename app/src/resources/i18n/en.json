@@ -10,6 +10,7 @@
   "download": "Download",
   "offline": "App offline",
   "try-again": "Try again",
+  "default-config": "Default config",
   "invalid-token": "Invalid token",
   "invalid-token-prompt": "Please try again.",
   "login-failed": "Login failed",

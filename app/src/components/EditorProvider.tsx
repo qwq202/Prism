@@ -6,12 +6,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "./ui/dialog.tsx";
-import { Maximize, Image, MenuSquare, PanelRight, Eraser } from "lucide-react";
+import {
+  Maximize,
+  Image,
+  MenuSquare,
+  PanelRight,
+  Eraser,
+  RotateCcw,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import "@/assets/common/editor.less";
 import { Textarea } from "./ui/textarea.tsx";
 import Markdown from "./Markdown.tsx";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Toggle } from "./ui/toggle.tsx";
 import { mobile } from "@/utils/device.ts";
 import { Button } from "./ui/button.tsx";
@@ -26,6 +33,8 @@ type RichEditorProps = {
   formatter?: (value: string) => string;
   isInvalid?: (value: string) => boolean;
   title?: string;
+  defaultValue?: string;
+  defaultLabel?: string;
 
   open?: boolean;
   setOpen?: (open: boolean) => void;
@@ -46,6 +55,8 @@ function RichEditor({
   onSubmit,
   setOpen,
   closeOnSubmit,
+  defaultValue,
+  defaultLabel,
 }: RichEditorProps) {
   const { t } = useTranslation();
   const input = useRef(null);
@@ -59,31 +70,25 @@ function RichEditor({
     return isInvalid ? isInvalid(value) : false;
   }, [value, isInvalid]);
 
-  const handler = useCallback(() => {
+  useEffect(() => {
     if (!input.current) return;
     const target = input.current as HTMLElement;
-    const preview = target.parentElement?.querySelector(
-      ".editor-preview",
-    ) as HTMLElement | null;
-    if (!preview) {
-      setTimeout(handler, 100);
-      return;
-    }
 
-    const listener = () => {
-      preview.style.height = `${target.clientHeight}px`;
-    };
-    target.addEventListener("transitionstart", listener);
-    setInterval(listener, 250);
-    target.addEventListener("scroll", () => {
+    const syncScroll = () => {
+      const preview = target.parentElement?.querySelector(
+        ".editor-preview",
+      ) as HTMLElement | null;
+      if (!preview) return;
       preview.scrollTop = target.scrollTop;
-    });
+    };
 
-    preview.style.height = `${target.clientHeight}px`;
-
+    target.addEventListener("scroll", syncScroll);
     if (openInput) target.focus();
-  }, [openInput]);
-  useEffect(handler, [handler]);
+
+    return () => {
+      target.removeEventListener("scroll", syncScroll);
+    };
+  }, [openInput, openPreview]);
 
   return (
     <div className={`editor-container`}>
@@ -95,6 +100,17 @@ function RichEditor({
         >
           <Eraser className={`h-3.5 w-3.5`} />
         </Button>
+        {typeof defaultValue === "string" && (
+          <Button
+            variant={`outline`}
+            className={`h-8 w-8 p-0`}
+            title={defaultLabel ?? t("default-config")}
+            aria-label={defaultLabel ?? t("default-config")}
+            onClick={() => onChange(defaultValue)}
+          >
+            <RotateCcw className={`h-3.5 w-3.5`} />
+          </Button>
+        )}
         <div className={`grow`} />
         <Toggle
           variant={`outline`}
@@ -145,7 +161,7 @@ function RichEditor({
               placeholder={t("chat.placeholder-raw")}
               value={value}
               className={cn(
-                `editor-input transition-all`,
+                `editor-input thin-scrollbar transition-all`,
                 invalid && `error-border`,
               )}
               id={`editor`}
@@ -157,12 +173,12 @@ function RichEditor({
           {openPreview &&
             (formattedValue ? (
               <Markdown
-                className={`editor-preview`}
+                className={`editor-preview thin-scrollbar`}
                 children={formattedValue}
               />
             ) : (
               <div
-                className={`editor-preview inline-flex text-secondary text-xs items-center justify-center whitespace-pre-wrap`}
+                className={`editor-preview thin-scrollbar inline-flex text-secondary text-xs items-center justify-center whitespace-pre-wrap`}
               >
                 <Image
                   className={`h-3.5 w-3.5 mr-1 shrink-0 inline-flex translate-y-[1px]`}

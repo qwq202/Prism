@@ -6,6 +6,7 @@
   "login": "ログイン",
   "login-require": "この機能を使用するにはログインする必要があります",
   "logout": "サインアウト",
+  "default-config": "デフォルト設定",
   "quota": "Whirlies",
   "download": "ダウンロード",
   "offline": "オフラインで適用",
