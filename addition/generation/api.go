@@ -72,7 +72,11 @@ func settleGenerationQuota(db *sql.DB, cache *redis.Client, user *auth.User, mod
 	if plan {
 		consumed := auth.FinalizeSubscriptionUsageAmount(db, cache, user, model, quota)
 		if consumed+0.0001 < quota {
-			user.ChargeQuota(db, quota-consumed)
+			if user.AllowSubscriptionQuotaFallback(db) {
+				user.ChargeQuota(db, quota-consumed)
+			} else {
+				globals.Warn("generation exceeded subscription quota and credit fallback is disabled")
+			}
 		}
 		return
 	}

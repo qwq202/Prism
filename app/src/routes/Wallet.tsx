@@ -2,12 +2,7 @@ import "@/assets/pages/quota.less";
 import "@/assets/pages/subscription.less";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import { useTranslation } from "react-i18next";
-import {
-  ArrowRight,
-  BadgeCheck,
-  Cloud,
-  Gift,
-} from "lucide-react";
+import { ArrowRight, BadgeCheck, Cloud, Coins, Gift } from "lucide-react";
 import { cn } from "@/components/ui/lib/utils.ts";
 import { useEffect, useMemo, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
@@ -21,7 +16,12 @@ import {
   refreshSubscription,
 } from "@/store/subscription.ts";
 import { subscriptionDataSelector } from "@/store/globals.ts";
-import { quotaSelector, refreshQuota } from "@/store/quota.ts";
+import {
+  allowSubscriptionQuotaFallbackSelector,
+  quotaSelector,
+  refreshQuota,
+  setAllowSubscriptionQuotaFallback,
+} from "@/store/quota.ts";
 import { AppDispatch } from "@/store";
 import { motion } from "framer-motion";
 import { getPlan, getPlanName } from "@/conf/subscription.tsx";
@@ -42,6 +42,8 @@ import {
 } from "@/components/ui/dialog.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { useRedeem as redeemCode } from "@/api/redeem.ts";
+import { Switch } from "@/components/ui/switch.tsx";
+import { updateSubscriptionQuotaFallback } from "@/api/quota.ts";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
@@ -62,9 +64,11 @@ function getPlanIcon(level: number) {
 
 function getPlanIconClass(level: number) {
   return cn("w-10 h-10 p-2.5 rounded-xl shrink-0", {
-    "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400": level === 1,
+    "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400":
+      level === 1,
     "bg-primary/10 text-primary": level === 2,
-    "bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400": level === 3,
+    "bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400":
+      level === 3,
     "bg-muted text-muted-foreground": level === 0,
   });
 }
@@ -109,10 +113,19 @@ function RedeemDialog({ open, onOpenChange }: RedeemDialogProps) {
           />
         </div>
         <DialogFooter>
-          <Button variant="outline" unClickable onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            unClickable
+            onClick={() => onOpenChange(false)}
+          >
             {t("cancel")}
           </Button>
-          <Button unClickable disabled={!code.trim()} loading onClick={doRedeem}>
+          <Button
+            unClickable
+            disabled={!code.trim()}
+            loading
+            onClick={doRedeem}
+          >
             {t("buy.redeem")}
           </Button>
         </DialogFooter>
@@ -125,6 +138,9 @@ function WalletPage() {
   const { t } = useTranslation();
   const dispatch: AppDispatch = useDispatch();
   const quota = useSelector(quotaSelector);
+  const allowSubscriptionQuotaFallback = useSelector(
+    allowSubscriptionQuotaFallbackSelector,
+  );
   const subscription = useSelector(isSubscribedSelector);
   const level = useSelector(levelSelector);
   const expired = useSelector(expiredSelector);
@@ -132,6 +148,7 @@ function WalletPage() {
   const usage = useSelector(usageSelector);
   const subscriptionData = useSelector(subscriptionDataSelector);
   const [redeemOpen, setRedeemOpen] = useState(false);
+  const [savingFallback, setSavingFallback] = useState(false);
 
   const plan = useMemo(
     () => getPlan(subscriptionData, level),
@@ -148,6 +165,30 @@ function WalletPage() {
     void dispatch(refreshQuota());
     void dispatch(refreshSubscription());
   }, [dispatch]);
+
+  const updateFallbackPreference = async (checked: boolean) => {
+    const previous = allowSubscriptionQuotaFallback;
+    dispatch(setAllowSubscriptionQuotaFallback(checked));
+    setSavingFallback(true);
+
+    const res = await updateSubscriptionQuotaFallback(checked);
+    setSavingFallback(false);
+
+    if (res.status) {
+      dispatch(
+        setAllowSubscriptionQuotaFallback(
+          res.allow_subscription_quota_fallback ?? checked,
+        ),
+      );
+      toast.success(t("buy.subscription-fallback-save-success"));
+      return;
+    }
+
+    dispatch(setAllowSubscriptionQuotaFallback(previous));
+    toast.error(t("buy.subscription-fallback-save-failed"), {
+      description: res.error,
+    });
+  };
 
   return (
     <ScrollArea className="w-full h-full bg-muted/25">
@@ -212,10 +253,15 @@ function WalletPage() {
 
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3 min-w-0">
-                  <Icon icon={getPlanIcon(level)} className={getPlanIconClass(level)} />
+                  <Icon
+                    icon={getPlanIcon(level)}
+                    className={getPlanIconClass(level)}
+                  />
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-xl font-semibold">{t(`sub.${planName}`)}</h2>
+                      <h2 className="text-xl font-semibold">
+                        {t(`sub.${planName}`)}
+                      </h2>
                       {isSubscribed && (
                         <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200/70 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-950/30 dark:text-emerald-400">
                           <BadgeCheck className="h-3 w-3" />
@@ -248,6 +294,28 @@ function WalletPage() {
                   <ArrowRight className="h-3 w-3 ml-0.5" />
                 </Link>
               </p>
+
+              {subscription && (
+                <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border bg-muted/20 px-3 py-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <Coins className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">
+                        {t("buy.subscription-fallback-title")}
+                      </p>
+                      <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                        {t("buy.subscription-fallback-desc")}
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={allowSubscriptionQuotaFallback}
+                    disabled={savingFallback}
+                    onCheckedChange={updateFallbackPreference}
+                    aria-label={t("buy.subscription-fallback-title")}
+                  />
+                </div>
+              )}
             </div>
 
             {/* 额度区块 — 和头部同色，用细线分隔 */}

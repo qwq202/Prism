@@ -6,6 +6,8 @@ import (
 	"database/sql"
 )
 
+const defaultAllowSubscriptionQuotaFallback = true
+
 func (u *User) CreateInitialQuota(db *sql.DB) bool {
 	_, err := globals.ExecDb(db, `
 		INSERT INTO quota (user_id, quota, used) VALUES (?, ?, ?)
@@ -27,6 +29,48 @@ func (u *User) GetUsedQuota(db *sql.DB) float32 {
 		return 0.
 	}
 	return quota
+}
+
+func (u *User) AllowSubscriptionQuotaFallback(db *sql.DB) bool {
+	if u == nil || db == nil {
+		return defaultAllowSubscriptionQuotaFallback
+	}
+
+	var allow sql.NullBool
+	if err := globals.QueryRowDb(db, "SELECT allow_subscription_quota_fallback FROM quota WHERE user_id = ?", u.GetID(db)).Scan(&allow); err != nil {
+		return defaultAllowSubscriptionQuotaFallback
+	}
+	if !allow.Valid {
+		return defaultAllowSubscriptionQuotaFallback
+	}
+	return allow.Bool
+}
+
+func (u *User) SetAllowSubscriptionQuotaFallback(db *sql.DB, allow bool) bool {
+	if u == nil || db == nil {
+		return false
+	}
+
+	userID := u.GetID(db)
+	result, err := globals.ExecDb(db, `
+		UPDATE quota
+		SET allow_subscription_quota_fallback = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE user_id = ?
+	`, allow, userID)
+	if err != nil {
+		return false
+	}
+
+	affected, err := result.RowsAffected()
+	if err == nil && affected > 0 {
+		return true
+	}
+
+	_, err = globals.ExecDb(db, `
+		INSERT INTO quota (user_id, quota, used, allow_subscription_quota_fallback)
+		VALUES (?, ?, ?, ?)
+	`, userID, 0., 0., allow)
+	return err == nil
 }
 
 func (u *User) SetQuota(db *sql.DB, quota float32) bool {

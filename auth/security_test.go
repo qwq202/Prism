@@ -346,6 +346,84 @@ func TestCanEnableModelRequiresMinimumBillingQuota(t *testing.T) {
 	}
 }
 
+func TestCanEnableModelWithSubscriptionBlocksCreditFallbackWhenDisabled(t *testing.T) {
+	db := openAuthSecurityTestDB(t)
+	connection.CreateSubscriptionTable(db)
+
+	user := GetUserByName(db, "root")
+	if user == nil {
+		t.Fatalf("expected root user")
+	}
+	if !user.SetQuota(db, 100) {
+		t.Fatalf("set quota")
+	}
+	if !user.SetAllowSubscriptionQuotaFallback(db, false) {
+		t.Fatalf("disable subscription quota fallback")
+	}
+
+	previousCharge := channel.ChargeInstance
+	channel.ChargeInstance = &channel.ChargeManager{
+		Models: map[string]*channel.Charge{
+			"paid-model": {
+				Type:   globals.TimesBilling,
+				Output: 9,
+			},
+		},
+	}
+	t.Cleanup(func() {
+		channel.ChargeInstance = previousCharge
+	})
+
+	previousPlan := channel.PlanInstance
+	channel.PlanInstance = &channel.PlanManager{
+		Enabled: true,
+		Plans: []channel.Plan{
+			{
+				Level: 1,
+				Quota: 1,
+				Items: []channel.PlanItem{
+					{Id: "included", Models: []string{"paid-model"}},
+				},
+			},
+		},
+	}
+	t.Cleanup(func() {
+		channel.PlanInstance = previousPlan
+	})
+
+	if _, err := globals.ExecDb(
+		db,
+		"INSERT INTO subscription (user_id, level, expired_at) VALUES (?, ?, ?)",
+		user.GetID(db),
+		1,
+		time.Now().Add(24*time.Hour).Format("2006-01-02 15:04:05"),
+	); err != nil {
+		t.Fatalf("insert subscription: %v", err)
+	}
+
+	cache := redis.NewClient(&redis.Options{
+		Addr:         "127.0.0.1:1",
+		MaxRetries:   -1,
+		DialTimeout:  time.Millisecond,
+		ReadTimeout:  time.Millisecond,
+		WriteTimeout: time.Millisecond,
+	})
+	t.Cleanup(func() {
+		_ = cache.Close()
+	})
+
+	err, usePlan := CanEnableModelWithSubscription(db, cache, user, "paid-model", nil)
+	if err == nil {
+		t.Fatalf("expected disabled fallback to block subscription overflow")
+	}
+	if usePlan {
+		t.Fatalf("expected request not to use plan after preflight failure")
+	}
+	if !strings.Contains(err.Error(), "credit fallback is disabled") {
+		t.Fatalf("expected fallback disabled error, got %q", err.Error())
+	}
+}
+
 func TestForceUseQuotaRecordsDebtAndUsage(t *testing.T) {
 	db := openAuthSecurityTestDB(t)
 	user := GetUserByName(db, "root")

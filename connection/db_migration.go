@@ -79,6 +79,13 @@ func doMysqlMigration(execer migrationExecer) error {
 		return err
 	}
 
+	if err := execSql(execer, `
+		ALTER TABLE quota
+		ADD COLUMN allow_subscription_quota_fallback BOOLEAN DEFAULT TRUE;
+	`); err != nil {
+		return err
+	}
+
 	// add new field `is_banned` in `auth` table
 	if err := execSql(execer, `
 		ALTER TABLE auth
@@ -203,6 +210,13 @@ func doSqliteMigration(execer migrationExecer) error {
 	// v3.10 added sqlite support, no migration needed before this version
 
 	// v4 migration
+	if err := execSql(execer, `
+		ALTER TABLE quota
+		ADD COLUMN allow_subscription_quota_fallback BOOLEAN DEFAULT TRUE;
+	`); err != nil {
+		return err
+	}
+
 	// add new field `task_id` in `conversation` table to store task id (e.g., video job id)
 	if err := execSql(execer, `
 		ALTER TABLE conversation

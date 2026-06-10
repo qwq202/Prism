@@ -57,6 +57,10 @@ type SubscribeForm struct {
 	Month int `json:"month" binding:"required"`
 }
 
+type SubscriptionQuotaFallbackForm struct {
+	Allow bool `json:"allow"`
+}
+
 func GetUser(c *gin.Context) *User {
 	if c.GetBool("auth") {
 		return &User{
@@ -415,8 +419,39 @@ func QuotaAPI(c *gin.Context) {
 
 	db := utils.GetDBFromContext(c)
 	c.JSON(200, gin.H{
-		"status": true,
-		"quota":  user.GetQuota(db),
+		"status":                            true,
+		"quota":                             user.GetQuota(db),
+		"allow_subscription_quota_fallback": user.AllowSubscriptionQuotaFallback(db),
+	})
+}
+
+func UpdateSubscriptionQuotaFallbackAPI(c *gin.Context) {
+	user := GetUserByCtx(c)
+	if user == nil {
+		return
+	}
+
+	var form SubscriptionQuotaFallbackForm
+	if err := c.ShouldBindJSON(&form); err != nil {
+		c.JSON(200, gin.H{
+			"status": false,
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	db := utils.GetDBFromContext(c)
+	if !user.SetAllowSubscriptionQuotaFallback(db, form.Allow) {
+		c.JSON(200, gin.H{
+			"status": false,
+			"error":  "failed to update subscription quota fallback preference",
+		})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"status":                            true,
+		"allow_subscription_quota_fallback": form.Allow,
 	})
 }
 

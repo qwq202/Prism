@@ -13,10 +13,11 @@ import (
 )
 
 const (
-	ErrNotAuthenticated = "not authenticated error (model: %s)"
-	ErrNotSetPrice      = "the price of the model is not set (model: %s)"
-	ErrNotEnoughQuota   = "user quota is not enough error (model: %s, minimum quota: %s, your quota: %s)"
-	ErrEstimatedCost    = "estimated cost exceeds user quota (model: %s, estimated cost: %s, your quota: %s)"
+	ErrNotAuthenticated  = "not authenticated error (model: %s)"
+	ErrNotSetPrice       = "the price of the model is not set (model: %s)"
+	ErrNotEnoughQuota    = "user quota is not enough error (model: %s, minimum quota: %s, your quota: %s)"
+	ErrEstimatedCost     = "estimated cost exceeds user quota (model: %s, estimated cost: %s, your quota: %s)"
+	ErrSubscriptionQuota = "subscription quota is not enough and credit fallback is disabled (model: %s)"
 )
 
 func formatQuotaValue(value float32) string {
@@ -96,6 +97,12 @@ func CanEnableModelWithSubscription(db *sql.DB, cache *redis.Client, user *User,
 	}
 	if user != nil && HandleSubscriptionUsage(db, cache, user, model, subscriptionPreflightCost) {
 		return nil, true
+	}
+	if !disableSubscription() && user != nil && user.IsSubscribe(db) {
+		plan := user.GetPlan(db)
+		if plan.IncludesModel(model) && !user.AllowSubscriptionQuotaFallback(db) {
+			return fmt.Errorf(ErrSubscriptionQuota, model), false
+		}
 	}
 	return CanEnableModel(db, user, model, messages), false
 }

@@ -302,6 +302,10 @@
     "deeptrain-step-3": "After the top-up is successful, return here to buy again",
     "deeptrain-step-4": "(If the wallet has enough balance, it will be automatically recharged after purchase)",
     "plan-info": "Subscriptions allow use of in-subscription models at a fixed price per cycle, suitable for fixed long-term use options.",
+    "subscription-fallback-title": "Use credits after subscription quota runs out",
+    "subscription-fallback-desc": "When enabled, covered models keep responding and charge your credits after the subscription window is exhausted. When disabled, requests stop instead.",
+    "subscription-fallback-save-success": "Preference saved",
+    "subscription-fallback-save-failed": "Failed to save preference",
     "buy-description": "Please select the credits you want to buy",
     "redeem-title": "Redeem Code",
     "redeem-description": "Please enter your redemption code to claim your credits"

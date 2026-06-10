@@ -244,7 +244,16 @@ func CollectQuota(c *gin.Context, user *auth.User, buffer *utils.Buffer, uncount
 	if uncountable {
 		consumed := auth.FinalizeSubscriptionUsageAmount(db, utils.GetCacheFromContext(c), user, buffer.GetModel(), quota)
 		if consumed+0.0001 < quota {
-			collectUserQuota(db, user, quota-consumed)
+			if user.AllowSubscriptionQuotaFallback(db) {
+				collectUserQuota(db, user, quota-consumed)
+			} else {
+				globals.Warn(fmt.Sprintf(
+					"subscription usage only covered %.4f/%.4f quota and credit fallback is disabled (model: %s)",
+					consumed,
+					quota,
+					buffer.GetModel(),
+				))
+			}
 		}
 		return
 	}
@@ -293,6 +302,12 @@ func newRealtimeQuotaLimiter(db *sql.DB, cache *redis.Client, user *auth.User, m
 		limit, ok := auth.GetSubscriptionQuotaBudget(db, cache, user, model)
 		if !ok {
 			return realtimeQuotaLimiter{}
+		}
+		if user.AllowSubscriptionQuotaFallback(db) {
+			userQuota := user.GetQuota(db)
+			if userQuota > 0 && limit < 1e30 {
+				limit += userQuota
+			}
 		}
 		return realtimeQuotaLimiter{enabled: true, limit: limit}
 	}

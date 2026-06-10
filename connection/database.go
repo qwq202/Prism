@@ -216,6 +216,7 @@ func CreateQuotaTable(db *sql.DB) {
 		  user_id INT UNIQUE,
 		  quota DECIMAL(24, 6),
 		  used DECIMAL(24, 6),
+		  allow_subscription_quota_fallback BOOLEAN DEFAULT TRUE,
 		  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		  FOREIGN KEY (user_id) REFERENCES auth(id)

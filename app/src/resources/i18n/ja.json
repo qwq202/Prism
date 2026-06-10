@@ -302,6 +302,10 @@
     "deeptrain-step-3": "チャージが完了したら、ここに戻って再度購入してください",
     "deeptrain-step-4": "（ウォレットに十分な残高がある場合、購入後に自動的にチャージされます）",
     "plan-info": "サブスクリプションは、サイクルごとに固定された価格でサブスクリプションモデルを使用でき、固定された長期使用オプションに適しています。",
+    "subscription-fallback-title": "サブスク枠不足時にクレジットを使用",
+    "subscription-fallback-desc": "オンの場合、サブスク枠がなくなると通常クレジットを消費して応答を続けます。オフの場合、不足時にリクエストを停止します。",
+    "subscription-fallback-save-success": "設定を保存しました",
+    "subscription-fallback-save-failed": "設定の保存に失敗しました",
     "buy-description": "購入したいクレジットを選択してください",
     "redeem-title": "コードを利用する",
     "redeem-description": "クレジットを受け取るには、引き換えコードを入力してください"
