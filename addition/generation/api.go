@@ -145,7 +145,7 @@ func GenerateAPI(c *gin.Context) {
 			conn.Send(globals.GenerationSegmentResponse{
 				End:     false,
 				Message: data,
-				Quota:   buffer.GetQuota(),
+				Quota:   buffer.GetRecordQuota(),
 			})
 		},
 	)

@@ -41,6 +41,7 @@ func NativeChatHandler(c *gin.Context, user *auth.User, model string, message []
 	}
 
 	buffer := utils.NewBuffer(model, segment, channel.ChargeInstance.GetCharge(model))
+	limiter := newRealtimeQuotaLimiter(db, cache, user, model, plan)
 	buildProps := func(
 		segment []globals.Message,
 		requestBuffer *utils.Buffer,
@@ -48,7 +49,7 @@ func NativeChatHandler(c *gin.Context, user *auth.User, model string, message []
 		toolChoice *interface{},
 		disableCache bool,
 	) *adaptercommon.ChatProps {
-		return adaptercommon.CreateChatProps(&adaptercommon.ChatProps{
+		props := adaptercommon.CreateChatProps(&adaptercommon.ChatProps{
 			Model:            model,
 			OriginalModel:    model,
 			Message:          segment,
@@ -61,6 +62,8 @@ func NativeChatHandler(c *gin.Context, user *auth.User, model string, message []
 			ClientContext:    extractClientContext(c),
 			DisableCache:     disableCache,
 		}, requestBuffer)
+		limiter.applyMaxOutputTokens(props, buffer)
+		return props
 	}
 
 	var hit bool

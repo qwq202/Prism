@@ -203,6 +203,14 @@ func doMysqlMigration(execer migrationExecer) error {
 		return err
 	}
 
+	if err := execSql(execer, `
+		UPDATE quota
+		SET quota = 0
+		WHERE quota < 0;
+	`); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -325,6 +333,14 @@ func doSqliteMigration(execer migrationExecer) error {
 	if err := execSql(execer, `
 		CREATE INDEX IF NOT EXISTS idx_model_usage_metrics_model_created_at
 		ON model_usage_metrics (model, created_at);
+	`); err != nil {
+		return err
+	}
+
+	if err := execSql(execer, `
+		UPDATE quota
+		SET quota = 0
+		WHERE quota < 0;
 	`); err != nil {
 		return err
 	}

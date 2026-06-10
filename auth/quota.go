@@ -113,10 +113,24 @@ func (u *User) IncreaseUsedQuota(db *sql.DB, used float32) bool {
 }
 
 func (u *User) DecreaseQuota(db *sql.DB, quota float32) bool {
-	_, err := globals.ExecDb(db, `
-		INSERT INTO quota (user_id, quota, used) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE quota = quota - ?
-	`, u.GetID(db), quota, 0., quota)
-	return err == nil
+	if quota <= 0 {
+		return true
+	}
+	if u == nil || db == nil {
+		return false
+	}
+
+	result, err := globals.ExecDb(db, `
+		UPDATE quota
+		SET quota = quota - ?, updated_at = CURRENT_TIMESTAMP
+		WHERE user_id = ? AND quota >= ?
+	`, quota, u.GetID(db), quota)
+	if err != nil {
+		return false
+	}
+
+	affected, err := result.RowsAffected()
+	return err == nil && affected > 0
 }
 
 func (u *User) UseQuota(db *sql.DB, quota float32) bool {
@@ -141,11 +155,23 @@ func (u *User) ForceUseQuota(db *sql.DB, quota float32) bool {
 	if quota <= 0 {
 		return true
 	}
+	if u == nil || db == nil {
+		return false
+	}
 
-	_, err := globals.ExecDb(db, `
-		INSERT INTO quota (user_id, quota, used) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE quota = quota - ?, used = used + ?
-	`, u.GetID(db), -quota, quota, quota, quota)
-	return err == nil
+	result, err := globals.ExecDb(db, `
+		UPDATE quota
+		SET used = used + CASE WHEN quota >= ? THEN ? ELSE quota END,
+			quota = CASE WHEN quota >= ? THEN quota - ? ELSE 0 END,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE user_id = ? AND quota > 0
+	`, quota, quota, quota, quota, u.GetID(db))
+	if err != nil {
+		return false
+	}
+
+	affected, err := result.RowsAffected()
+	return err == nil && affected > 0
 }
 
 func (u *User) ChargeQuota(db *sql.DB, quota float32) bool {
@@ -158,7 +184,8 @@ func (u *User) ChargeQuota(db *sql.DB, quota float32) bool {
 	if u.UseQuota(db, quota) {
 		return true
 	}
-	return u.ForceUseQuota(db, quota)
+	u.ForceUseQuota(db, quota)
+	return false
 }
 
 func (u *User) PayedQuota(db *sql.DB, quota float32) bool {

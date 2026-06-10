@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"runtime/debug"
 	"strings"
 
@@ -262,7 +263,13 @@ func CollectQuota(c *gin.Context, user *auth.User, buffer *utils.Buffer, uncount
 }
 
 func collectUserQuota(db *sql.DB, user *auth.User, quota float32) {
-	user.ChargeQuota(db, quota)
+	if !user.ChargeQuota(db, quota) {
+		globals.Warn(fmt.Sprintf(
+			"user quota only partially covered %.4f quota; balance has been drained without creating debt (user: %s)",
+			quota,
+			user.Username,
+		))
+	}
 }
 
 func createChatBillingRecord(db *sql.DB, user *auth.User, model string, buffer *utils.Buffer) {
@@ -286,6 +293,13 @@ const realtimeQuotaEpsilon = float32(0.0001)
 type realtimeQuotaLimiter struct {
 	enabled bool
 	limit   float32
+}
+
+func realtimeQuotaForBuffer(buffer *utils.Buffer) float32 {
+	if buffer == nil {
+		return 0
+	}
+	return buffer.GetRecordQuota()
 }
 
 func newRealtimeQuotaLimiter(db *sql.DB, cache *redis.Client, user *auth.User, model string, plan bool) realtimeQuotaLimiter {
@@ -323,6 +337,43 @@ func (l realtimeQuotaLimiter) exhausted(quota float32) bool {
 	return l.enabled && quota+realtimeQuotaEpsilon >= l.limit
 }
 
+func (l realtimeQuotaLimiter) maxOutputTokens(buffer *utils.Buffer) *int {
+	if !l.enabled || buffer == nil || l.limit >= 1e30 {
+		return nil
+	}
+
+	charge := buffer.GetCharge()
+	if charge == nil || !charge.IsBillingType(globals.TokenBilling) || charge.GetOutput() <= 0 {
+		return nil
+	}
+
+	remainingQuota := l.limit - realtimeQuotaForBuffer(buffer)
+	if remainingQuota <= 0 {
+		tokens := 1
+		return &tokens
+	}
+
+	tokens := int(math.Floor(float64(remainingQuota / charge.GetOutput() * 1000)))
+	if tokens < 1 {
+		tokens = 1
+	}
+	return &tokens
+}
+
+func (l realtimeQuotaLimiter) applyMaxOutputTokens(props *adaptercommon.ChatProps, buffer *utils.Buffer) {
+	if props == nil {
+		return
+	}
+
+	maxTokens := l.maxOutputTokens(buffer)
+	if maxTokens == nil {
+		return
+	}
+	if props.MaxTokens == nil || *props.MaxTokens > *maxTokens {
+		props.MaxTokens = maxTokens
+	}
+}
+
 func (l realtimeQuotaLimiter) allowsProjectedChunk(buffer *utils.Buffer, chunk *globals.Chunk) bool {
 	if !l.enabled || buffer == nil {
 		return true
@@ -330,7 +381,7 @@ func (l realtimeQuotaLimiter) allowsProjectedChunk(buffer *utils.Buffer, chunk *
 
 	preview := *buffer
 	preview.WriteChunk(chunk)
-	return l.allows(preview.GetQuota())
+	return l.allows(realtimeQuotaForBuffer(&preview))
 }
 
 func (l realtimeQuotaLimiter) allowsProjectedText(buffer *utils.Buffer, content string) bool {
@@ -340,7 +391,7 @@ func (l realtimeQuotaLimiter) allowsProjectedText(buffer *utils.Buffer, content 
 
 	preview := *buffer
 	preview.Write(content)
-	return l.allows(preview.GetQuota())
+	return l.allows(realtimeQuotaForBuffer(&preview))
 }
 
 type partialChunk struct {
@@ -586,6 +637,12 @@ func createRoundTask(
 		stopPolling()
 	}()
 
+	quotaBuffer := streamBuffer
+	if quotaBuffer == nil {
+		quotaBuffer = captureBuffer
+	}
+	limiter.applyMaxOutputTokens(props, quotaBuffer)
+
 	go func() {
 		defer func() {
 			if r := recover(); r != nil && !strings.Contains(fmt.Sprintf("%s", r), "closed channel") {
@@ -651,7 +708,7 @@ func createRoundTask(
 				if !limiter.allowsProjectedChunk(captureBuffer, chunk) {
 					quota := float32(0)
 					if quotaBuffer != nil {
-						quota = quotaBuffer.GetQuota()
+						quota = realtimeQuotaForBuffer(quotaBuffer)
 					}
 					globals.Info(fmt.Sprintf("realtime quota limit reached for chat request (model: %s, client: %s)", props.Model, conn.GetCtx().ClientIP()))
 					_ = conn.SendClient(globals.ChatSegmentResponse{
@@ -666,7 +723,7 @@ func createRoundTask(
 			} else if chunk != nil && !limiter.allowsProjectedText(quotaBuffer, chunk.Content) {
 				quota := float32(0)
 				if quotaBuffer != nil {
-					quota = quotaBuffer.GetQuota()
+					quota = realtimeQuotaForBuffer(quotaBuffer)
 				}
 				globals.Info(fmt.Sprintf("realtime quota limit reached for chat request (model: %s, client: %s)", props.Model, conn.GetCtx().ClientIP()))
 				_ = conn.SendClient(globals.ChatSegmentResponse{
@@ -693,19 +750,20 @@ func createRoundTask(
 						streamBuffer.Write(content)
 					}
 				}
+				quota := realtimeQuotaForBuffer(streamBuffer)
 
 				if !conn.TrySendClient(globals.ChatSegmentResponse{
 					Message: content,
-					Quota:   streamBuffer.GetQuota(),
+					Quota:   quota,
 					End:     false,
 					Plan:    plan,
 				}) {
 					continue
 				}
-				if limiter.exhausted(streamBuffer.GetQuota()) {
+				if limiter.exhausted(quota) {
 					globals.Info(fmt.Sprintf("realtime quota exhausted for chat request (model: %s, client: %s)", props.Model, conn.GetCtx().ClientIP()))
 					_ = conn.SendClient(globals.ChatSegmentResponse{
-						Quota: streamBuffer.GetQuota(),
+						Quota: quota,
 						End:   true,
 						Plan:  plan,
 					})
@@ -718,9 +776,9 @@ func createRoundTask(
 			if signal {
 				quota := float32(0)
 				if streamBuffer != nil {
-					quota = streamBuffer.GetQuota()
+					quota = realtimeQuotaForBuffer(streamBuffer)
 				} else if captureBuffer != nil {
-					quota = captureBuffer.GetQuota()
+					quota = realtimeQuotaForBuffer(captureBuffer)
 				}
 
 				globals.Info(fmt.Sprintf("client stopped the chat request (model: %s, client: %s)", props.Model, conn.GetCtx().ClientIP()))
@@ -1018,7 +1076,7 @@ func createToolChatTask(
 			summarizeToolCalls(assistant.ToolCalls),
 		))
 
-		if err := sendToolCallEvents(conn, assistant.ToolCalls, "executing", liveBuffer.GetQuota(), plan); err != nil {
+		if err := sendToolCallEvents(conn, assistant.ToolCalls, "executing", realtimeQuotaForBuffer(liveBuffer), plan); err != nil {
 			return hit, err, true
 		}
 
@@ -1032,7 +1090,7 @@ func createToolChatTask(
 				summarizeToolCallArguments(toolMessage.Content),
 			))
 		}
-		if err := sendToolResultEvents(conn, assistant.ToolCalls, toolMessages, liveBuffer.GetQuota(), plan); err != nil {
+		if err := sendToolResultEvents(conn, assistant.ToolCalls, toolMessages, realtimeQuotaForBuffer(liveBuffer), plan); err != nil {
 			return hit, err, true
 		}
 		workingSegment = append(workingSegment, assistant)
@@ -1304,27 +1362,30 @@ func createChatTask(
 			return
 		}
 
+		props := adaptercommon.CreateChatProps(&adaptercommon.ChatProps{
+			Model:                model,
+			Message:              segment,
+			CustomInstruction:    instance.GetCustomInstruction(),
+			EnableWeb:            instance.IsEnableWeb(),
+			EnableWebSearch:      instance.IsEnableWebSearch(),
+			EnableURLContext:     instance.IsEnableURLContext(),
+			EnableXSearch:        instance.IsEnableXSearch(),
+			GeminiThinkingBudget: instance.GetGeminiThinkingBudget(),
+			MaxTokens:            instance.GetMaxTokens(),
+			Temperature:          instance.GetTemperature(),
+			TopP:                 instance.GetTopP(),
+			TopK:                 instance.GetTopK(),
+			PresencePenalty:      instance.GetPresencePenalty(),
+			FrequencyPenalty:     instance.GetFrequencyPenalty(),
+			RepetitionPenalty:    instance.GetRepetitionPenalty(),
+			ClientContext:        extractClientContext(conn.GetCtx()),
+		}, buffer)
+		limiter.applyMaxOutputTokens(props, buffer)
+
 		hit, err := channel.NewChatRequestWithCache(
 			cache, buffer,
 			auth.GetGroup(db, user),
-			adaptercommon.CreateChatProps(&adaptercommon.ChatProps{
-				Model:                model,
-				Message:              segment,
-				CustomInstruction:    instance.GetCustomInstruction(),
-				EnableWeb:            instance.IsEnableWeb(),
-				EnableWebSearch:      instance.IsEnableWebSearch(),
-				EnableURLContext:     instance.IsEnableURLContext(),
-				EnableXSearch:        instance.IsEnableXSearch(),
-				GeminiThinkingBudget: instance.GetGeminiThinkingBudget(),
-				MaxTokens:            instance.GetMaxTokens(),
-				Temperature:          instance.GetTemperature(),
-				TopP:                 instance.GetTopP(),
-				TopK:                 instance.GetTopK(),
-				PresencePenalty:      instance.GetPresencePenalty(),
-				FrequencyPenalty:     instance.GetFrequencyPenalty(),
-				RepetitionPenalty:    instance.GetRepetitionPenalty(),
-				ClientContext:        extractClientContext(conn.GetCtx()),
-			}, buffer),
+			props,
 
 			// the function to handle the chunk data
 			func(data *globals.Chunk) error {
@@ -1374,7 +1435,7 @@ func createChatTask(
 			}
 
 			if data.Chunk != nil && data.Chunk.ToolCall != nil {
-				if err := sendToolCallEvents(conn, data.Chunk.ToolCall, "start", buffer.GetQuota(), plan); err != nil {
+				if err := sendToolCallEvents(conn, data.Chunk.ToolCall, "start", realtimeQuotaForBuffer(buffer), plan); err != nil {
 					globals.Warn(fmt.Sprintf("failed to send tool call event to client: %s", err.Error()))
 					signalInterrupt(interruptSignal, err)
 					waitForRoundTaskEnd(chunkChan)
@@ -1385,7 +1446,7 @@ func createChatTask(
 			if !limiter.allowsProjectedChunk(buffer, data.Chunk) {
 				globals.Info(fmt.Sprintf("realtime quota limit reached for chat request (model: %s, client: %s)", model, conn.GetCtx().ClientIP()))
 				_ = conn.SendClient(globals.ChatSegmentResponse{
-					Quota: buffer.GetQuota(),
+					Quota: realtimeQuotaForBuffer(buffer),
 					End:   true,
 					Plan:  plan,
 				})
@@ -1395,18 +1456,19 @@ func createChatTask(
 			}
 
 			message := buffer.WriteChunk(data.Chunk)
+			quota := realtimeQuotaForBuffer(buffer)
 			if !conn.TrySendClient(globals.ChatSegmentResponse{
 				Message: message,
-				Quota:   buffer.GetQuota(),
+				Quota:   quota,
 				End:     false,
 				Plan:    plan,
 			}) {
 				continue
 			}
-			if limiter.exhausted(buffer.GetQuota()) {
+			if limiter.exhausted(quota) {
 				globals.Info(fmt.Sprintf("realtime quota exhausted for chat request (model: %s, client: %s)", model, conn.GetCtx().ClientIP()))
 				_ = conn.SendClient(globals.ChatSegmentResponse{
-					Quota: buffer.GetQuota(),
+					Quota: quota,
 					End:   true,
 					Plan:  plan,
 				})
@@ -1420,7 +1482,7 @@ func createChatTask(
 			if signal {
 				globals.Info(fmt.Sprintf("client stopped the chat request (model: %s, client: %s)", model, conn.GetCtx().ClientIP()))
 				_ = conn.SendClient(globals.ChatSegmentResponse{
-					Quota: buffer.GetQuota(),
+					Quota: realtimeQuotaForBuffer(buffer),
 					End:   true,
 					Plan:  plan,
 				})

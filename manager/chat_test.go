@@ -32,6 +32,17 @@ func (chatTestCharge) IsBilling() bool             { return true }
 func (chatTestCharge) IsBillingType(t string) bool { return t == globals.TimesBilling }
 func (chatTestCharge) GetLimit() float32           { return 9 }
 
+type chatTokenTestCharge struct{}
+
+func (chatTokenTestCharge) GetType() string             { return globals.TokenBilling }
+func (chatTokenTestCharge) GetModels() []string         { return nil }
+func (chatTokenTestCharge) GetInput() float32           { return 0 }
+func (chatTokenTestCharge) GetOutput() float32          { return 1 }
+func (chatTokenTestCharge) SupportAnonymous() bool      { return true }
+func (chatTokenTestCharge) IsBilling() bool             { return true }
+func (chatTokenTestCharge) IsBillingType(t string) bool { return t == globals.TokenBilling }
+func (chatTokenTestCharge) GetLimit() float32           { return 1 }
+
 func openChatQuotaTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 
@@ -105,6 +116,25 @@ func useChatTestChargeInstance(t *testing.T) {
 	})
 }
 
+func useChatTokenTestChargeInstance(t *testing.T) {
+	t.Helper()
+
+	previousCharge := channel.ChargeInstance
+	channel.ChargeInstance = &channel.ChargeManager{
+		Models: map[string]*channel.Charge{
+			globals.GPT3Turbo: {
+				Type:   globals.TokenBilling,
+				Models: []string{globals.GPT3Turbo},
+				Input:  0,
+				Output: 1,
+			},
+		},
+	}
+	t.Cleanup(func() {
+		channel.ChargeInstance = previousCharge
+	})
+}
+
 func TestLatestMessageContentHandlesEmptySegment(t *testing.T) {
 	if content, ok := latestMessageContent(nil); ok || content != "" {
 		t.Fatalf("expected empty segment to be rejected, got content=%q ok=%v", content, ok)
@@ -132,7 +162,7 @@ func TestExtractAssistantMessageFromBufferPersistsBillingMetadata(t *testing.T) 
 	}
 }
 
-func TestCollectQuotaRecordsDebtWhenFinalCostExceedsBalance(t *testing.T) {
+func TestCollectQuotaDrainsBalanceWithoutDebtWhenFinalCostExceedsBalance(t *testing.T) {
 	db := openChatQuotaTestDB(t)
 	user := auth.GetUserByName(db, "root")
 	if user == nil {
@@ -147,11 +177,11 @@ func TestCollectQuotaRecordsDebtWhenFinalCostExceedsBalance(t *testing.T) {
 
 	CollectQuota(newCollectQuotaTestContext(t, db), user, buffer, false, nil)
 
-	if got := user.GetQuota(db); math.Abs(float64(got-(-8))) > 0.001 {
-		t.Fatalf("expected quota debt -8, got %f", got)
+	if got := user.GetQuota(db); math.Abs(float64(got)) > 0.001 {
+		t.Fatalf("expected quota to be drained to 0, got %f", got)
 	}
-	if got := user.GetUsedQuota(db); math.Abs(float64(got-9)) > 0.001 {
-		t.Fatalf("expected used quota 9, got %f", got)
+	if got := user.GetUsedQuota(db); math.Abs(float64(got-1)) > 0.001 {
+		t.Fatalf("expected used quota to record only paid balance 1, got %f", got)
 	}
 }
 
@@ -279,6 +309,77 @@ func TestRealtimeQuotaLimiterAllowsSubscriptionOverflowWhenFallbackEnabled(t *te
 	}
 }
 
+func TestRealtimeQuotaLimiterRejectsOfficialUsageOverflow(t *testing.T) {
+	useChatTokenTestChargeInstance(t)
+
+	db := openChatQuotaTestDB(t)
+	server, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("start miniredis: %v", err)
+	}
+	cache := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	t.Cleanup(func() {
+		_ = cache.Close()
+		server.Close()
+	})
+
+	user := auth.GetUserByName(db, "root")
+	if user == nil {
+		t.Fatalf("expected root user")
+	}
+	if !user.SetQuota(db, 10) {
+		t.Fatalf("set quota")
+	}
+	if !user.SetAllowSubscriptionQuotaFallback(db, false) {
+		t.Fatalf("disable subscription quota fallback")
+	}
+
+	previousPlan := channel.PlanInstance
+	channel.PlanInstance = &channel.PlanManager{
+		Enabled: true,
+		Plans: []channel.Plan{
+			{
+				Level: 1,
+				Quota: 0.49,
+				Items: []channel.PlanItem{
+					{Id: "included", Models: []string{globals.GPT3Turbo}},
+				},
+			},
+		},
+	}
+	t.Cleanup(func() {
+		channel.PlanInstance = previousPlan
+	})
+
+	if _, err := globals.ExecDb(
+		db,
+		"INSERT INTO subscription (user_id, level, expired_at) VALUES (?, ?, ?)",
+		user.GetID(db),
+		1,
+		time.Now().Add(24*time.Hour).Format("2006-01-02 15:04:05"),
+	); err != nil {
+		t.Fatalf("insert subscription: %v", err)
+	}
+
+	buffer := utils.NewBuffer(globals.GPT3Turbo, nil, chatTokenTestCharge{})
+	limiter := newRealtimeQuotaLimiter(db, cache, user, globals.GPT3Turbo, true)
+	maxTokens := limiter.maxOutputTokens(buffer)
+	if maxTokens == nil || *maxTokens != 490 {
+		t.Fatalf("expected max output tokens to be capped at 490, got %#v", maxTokens)
+	}
+	if limiter.allowsProjectedChunk(buffer, &globals.Chunk{
+		Usage: &globals.TokenUsage{
+			CompletionTokens: 720,
+			TotalTokens:      720,
+		},
+	}) {
+		t.Fatalf("expected realtime limiter to reject official usage above subscription budget")
+	}
+	if !buffer.IsEmpty() {
+		t.Fatalf("expected rejected projected usage not to mutate buffer")
+	}
+}
+
 func TestCollectQuotaChargesUserBalanceForSubscriptionOverflow(t *testing.T) {
 	useChatTestChargeInstance(t)
 
@@ -345,6 +446,75 @@ func TestCollectQuotaChargesUserBalanceForSubscriptionOverflow(t *testing.T) {
 	}
 	if got := user.GetUsedQuota(db); math.Abs(float64(got-8)) > 0.001 {
 		t.Fatalf("expected used quota to record subscription overflow, got %f", got)
+	}
+}
+
+func TestCollectQuotaCapsSubscriptionFallbackAtUserBalance(t *testing.T) {
+	useChatTestChargeInstance(t)
+
+	db := openChatQuotaTestDB(t)
+	server, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("start miniredis: %v", err)
+	}
+	cache := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	t.Cleanup(func() {
+		_ = cache.Close()
+		server.Close()
+	})
+
+	user := auth.GetUserByName(db, "root")
+	if user == nil {
+		t.Fatalf("expected root user")
+	}
+	if !user.SetQuota(db, 3) {
+		t.Fatalf("set quota")
+	}
+	if !user.SetAllowSubscriptionQuotaFallback(db, true) {
+		t.Fatalf("enable subscription quota fallback")
+	}
+
+	previousPlan := channel.PlanInstance
+	channel.PlanInstance = &channel.PlanManager{
+		Enabled: true,
+		Plans: []channel.Plan{
+			{
+				Level: 1,
+				Quota: 1,
+				Items: []channel.PlanItem{
+					{Id: "included", Models: []string{globals.GPT3Turbo}},
+				},
+			},
+		},
+	}
+	t.Cleanup(func() {
+		channel.PlanInstance = previousPlan
+	})
+
+	if _, err := globals.ExecDb(
+		db,
+		"INSERT INTO subscription (user_id, level, expired_at) VALUES (?, ?, ?)",
+		user.GetID(db),
+		1,
+		time.Now().Add(24*time.Hour).Format("2006-01-02 15:04:05"),
+	); err != nil {
+		t.Fatalf("insert subscription: %v", err)
+	}
+
+	buffer := utils.NewBuffer(globals.GPT3Turbo, nil, chatTestCharge{})
+	buffer.Write("hello")
+
+	CollectQuota(newCollectQuotaTestContextWithCache(t, db, cache), user, buffer, true, nil)
+
+	plan := channel.PlanInstance.GetPlan(1)
+	if got := plan.GetPointUsage(user, cache); math.Abs(float64(got-1)) > 0.001 {
+		t.Fatalf("expected subscription usage to consume available 1 quota, got %f", got)
+	}
+	if got := user.GetQuota(db); math.Abs(float64(got)) > 0.001 {
+		t.Fatalf("expected user quota to be drained to 0, got %f", got)
+	}
+	if got := user.GetUsedQuota(db); math.Abs(float64(got-3)) > 0.001 {
+		t.Fatalf("expected used quota to record only available balance 3, got %f", got)
 	}
 }
 
