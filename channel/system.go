@@ -4,6 +4,7 @@ import (
 	"chat/globals"
 	"chat/utils"
 	"fmt"
+	"net/mail"
 	"strings"
 	"time"
 
@@ -357,8 +358,29 @@ func (c *SystemConfig) GetMail() *utils.SmtpPoster {
 		c.Mail.Port,
 		c.Mail.Username,
 		c.Mail.Password,
-		c.Mail.From,
+		c.GetMailFrom(),
 	)
+}
+
+func (c *SystemConfig) GetMailFrom() string {
+	from := strings.TrimSpace(c.Mail.From)
+	if from == "" {
+		return ""
+	}
+
+	address, err := mail.ParseAddress(from)
+	if err != nil {
+		return from
+	}
+
+	if strings.TrimSpace(address.Name) != "" {
+		return address.String()
+	}
+
+	return (&mail.Address{
+		Name:    c.GetAppName(),
+		Address: address.Address,
+	}).String()
 }
 
 func (c *SystemConfig) IsMailValid() bool {

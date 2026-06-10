@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/mail"
 	"os"
 	"strings"
 	"testing"
@@ -178,6 +179,34 @@ func TestSystemConfigNormalizeUsesRuntimeSafeValues(t *testing.T) {
 		conf.Auth.Passkey.AuthenticatorAttachment != "cross-platform" ||
 		conf.Auth.Passkey.Origins != "https://one.example.com\nhttps://two.example.com" {
 		t.Fatalf("unexpected normalized passkey config: %#v", conf.Auth.Passkey)
+	}
+}
+
+func TestSystemConfigGetMailFromUsesSiteNameForBareAddress(t *testing.T) {
+	conf := &SystemConfig{
+		General: generalState{
+			Title: "Prism",
+		},
+		Mail: mailState{
+			From: "noreply@example.com",
+		},
+	}
+
+	address, err := mail.ParseAddress(conf.GetMailFrom())
+	if err != nil {
+		t.Fatalf("expected valid site sender address: %v", err)
+	}
+	if address.Name != "Prism" || address.Address != "noreply@example.com" {
+		t.Fatalf("expected site name sender, got %#v", address)
+	}
+
+	conf.Mail.From = "Support <noreply@example.com>"
+	address, err = mail.ParseAddress(conf.GetMailFrom())
+	if err != nil {
+		t.Fatalf("expected valid custom sender address: %v", err)
+	}
+	if address.Name != "Support" || address.Address != "noreply@example.com" {
+		t.Fatalf("expected custom sender name to be preserved, got %#v", address)
 	}
 }
 
