@@ -666,6 +666,14 @@ function Account() {
                         </DialogTitle>
                         <DialogDescription>
                           {t("account.change-password-description")}
+                          <button
+                            type="button"
+                            className="ml-1 text-xs underline-offset-4 transition-colors hover:text-foreground hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+                            onClick={requestPasswordReset}
+                            disabled={passwordResetLoading}
+                          >
+                            {t("account.forgot-password")}
+                          </button>
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
@@ -705,14 +713,6 @@ function Account() {
                             }))
                           }
                         />
-                        <button
-                          type="button"
-                          className="w-fit text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline disabled:cursor-not-allowed disabled:opacity-60"
-                          onClick={requestPasswordReset}
-                          disabled={passwordResetLoading}
-                        >
-                          {t("account.forgot-password")}
-                        </button>
                       </div>
                       <DialogFooter>
                         <DialogCancel>{t("cancel")}</DialogCancel>
