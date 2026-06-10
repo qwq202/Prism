@@ -2,6 +2,7 @@ import type { ConversationInstance } from "@/api/types.tsx";
 import { apiEndpoint, tokenField } from "@/conf/bootstrap.ts";
 import {
   getClientCache,
+  getClientCacheUpdateStorageKey,
   getClientCacheStorageKey,
   removeClientCache,
   removeClientCachesByPrefix,
@@ -45,7 +46,10 @@ function getConversationCacheKeyPrefix(): string {
 export function isConversationListCacheStorageKey(
   key: string | null,
 ): boolean {
-  return key === getClientCacheStorageKey(getConversationListCacheKey());
+  return (
+    key === getClientCacheStorageKey(getConversationListCacheKey()) ||
+    key === getClientCacheUpdateStorageKey(getConversationListCacheKey())
+  );
 }
 
 export async function getCachedConversationList(): Promise<
