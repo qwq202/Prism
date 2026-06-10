@@ -124,6 +124,12 @@
   "authenticating-prompt": "稍等片刻，我们正在认证您的账户...",
   "oops-quota-exceeded": "糟糕，余额不足",
   "oops-quota-exceeded-tip": "您的余额不足，请前往购买点数或订阅计划以继续",
+  "oops-user-quota-exceeded": "糟糕，点数不足",
+  "oops-user-quota-exceeded-tip": "您的个人点数余额不足，请购买点数或调整订阅设置后继续。",
+  "oops-subscription-quota-exceeded": "糟糕，订阅额度不足",
+  "oops-subscription-quota-exceeded-tip": "订阅 5h 额度不足，且当前未允许使用个人点数补扣。",
+  "subscription-5h-remaining": "订阅 5h 剩余",
+  "subscription-5h-minimum": "最低需要",
   "auth": {
     "username": "用户名",
     "username-placeholder": "请输入用户名",

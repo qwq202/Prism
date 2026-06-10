@@ -419,8 +419,11 @@ func TestCanEnableModelWithSubscriptionBlocksCreditFallbackWhenDisabled(t *testi
 	if usePlan {
 		t.Fatalf("expected request not to use plan after preflight failure")
 	}
-	if !strings.Contains(err.Error(), "credit fallback is disabled") {
+	if !strings.Contains(err.Error(), "credit fallback: disabled") {
 		t.Fatalf("expected fallback disabled error, got %q", err.Error())
+	}
+	if !strings.Contains(err.Error(), "remaining percent: 100.00") || !strings.Contains(err.Error(), "minimum percent: 900.00") {
+		t.Fatalf("expected subscription quota percentages in error, got %q", err.Error())
 	}
 }
 

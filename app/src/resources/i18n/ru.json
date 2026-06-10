@@ -1659,6 +1659,12 @@
   "model": "модель",
   "min-quota": "Минимальный баланс",
   "your-quota": "Ваш баланс",
+  "oops-user-quota-exceeded": "Недостаточно кредитов",
+  "oops-user-quota-exceeded-tip": "Недостаточно личных кредитов. Купите кредиты или измените настройки подписки.",
+  "oops-subscription-quota-exceeded": "Недостаточно квоты подписки",
+  "oops-subscription-quota-exceeded-tip": "Недостаточно 5-часовой квоты подписки, а списание личных кредитов сейчас отключено.",
+  "subscription-5h-remaining": "Остаток 5ч подписки",
+  "subscription-5h-minimum": "Минимум требуется",
   "title": "заглавие",
   "my-account": "Моя учетная запись",
   "payment": {

@@ -1687,6 +1687,12 @@
   "model": "Model",
   "min-quota": "Minimum Balance",
   "your-quota": "Your balance",
+  "oops-user-quota-exceeded": "Not enough credits",
+  "oops-user-quota-exceeded-tip": "Your personal credit balance is not enough. Buy credits or adjust subscription settings to continue.",
+  "oops-subscription-quota-exceeded": "Subscription quota is not enough",
+  "oops-subscription-quota-exceeded-tip": "Your 5h subscription quota is not enough, and credit fallback is currently disabled.",
+  "subscription-5h-remaining": "5h subscription left",
+  "subscription-5h-minimum": "Minimum required",
   "title": "Title",
   "my-account": "My Account",
   "payment": {

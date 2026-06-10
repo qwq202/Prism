@@ -60,6 +60,12 @@
   "model": "模型",
   "min-quota": "最低餘額",
   "your-quota": "您的餘額",
+  "oops-user-quota-exceeded": "糟糕，點數不足",
+  "oops-user-quota-exceeded-tip": "您的個人點數餘額不足，請購買點數或調整訂閱設定後繼續。",
+  "oops-subscription-quota-exceeded": "糟糕，訂閱額度不足",
+  "oops-subscription-quota-exceeded-tip": "訂閱 5h 額度不足，且目前未允許使用個人點數補扣。",
+  "subscription-5h-remaining": "訂閱 5h 剩餘",
+  "subscription-5h-minimum": "最低需要",
   "title": "標題",
   "my-account": "我的帳戶",
   "auth": {

@@ -1659,6 +1659,12 @@
   "model": "モデル",
   "min-quota": "最低残高",
   "your-quota": "残高",
+  "oops-user-quota-exceeded": "クレジットが不足しています",
+  "oops-user-quota-exceeded-tip": "個人クレジット残高が不足しています。クレジットを購入するか、サブスク設定を調整してください。",
+  "oops-subscription-quota-exceeded": "サブスク枠が不足しています",
+  "oops-subscription-quota-exceeded-tip": "5h サブスク枠が不足しており、クレジット補填は現在オフです。",
+  "subscription-5h-remaining": "5h サブスク残り",
+  "subscription-5h-minimum": "最低必要",
   "title": "タイトル",
   "my-account": "マイアカウント",
   "payment": {
