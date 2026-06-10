@@ -706,6 +706,15 @@ export async function testStorageConfig(
   }
 }
 
+export async function testMailConfig(email: string): Promise<CommonResponse> {
+  try {
+    const response = await axios.post(`/admin/config/test/mail`, { email });
+    return response.data as CommonResponse;
+  } catch (e) {
+    return { status: false, error: getErrorMessage(e) };
+  }
+}
+
 export enum AuditTypes {
   None = "none",
   Dict = "dict",

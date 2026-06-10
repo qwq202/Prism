@@ -13,6 +13,7 @@ func Register(app *gin.RouterGroup) {
 	app.GET("/admin/config/test/search", web.TestSearch)
 	app.POST("/admin/config/test/search/usage", web.TestTavilyUsage)
 	app.POST("/admin/config/test/storage", channel.TestStorageConfig)
+	app.POST("/admin/config/test/mail", channel.TestMailConfig)
 
 	app.GET("/admin/analytics/info", InfoAPI)
 	app.GET("/admin/analytics/model", ModelAnalysisAPI)

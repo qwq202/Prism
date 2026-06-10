@@ -46,13 +46,13 @@ import {
   SiteState,
   SystemProps,
   TavilyUsage,
+  testMailConfig,
   testStorageConfig,
   testWebSearching,
   updateRootPassword,
 } from "@/admin/api/system.ts";
 import { useEffectAsync } from "@/utils/hook.ts";
 import { CommonResponse, withNotify } from "@/api/common.ts";
-import { doVerify } from "@/api/auth.ts";
 import {
   Dialog,
   DialogContent,
@@ -375,9 +375,16 @@ function Mail({ data, dispatch, onChange }: CompProps<MailState>) {
   }, [data]);
 
   const onTest = async () => {
-    if (!email.trim()) return;
-    await onChange(false);
-    const res = await doVerify(email);
+    const target = email.trim();
+    if (!target) return;
+
+    const saveRes = await onChange(false);
+    if (!saveRes.status) {
+      withNotify(t, saveRes, true);
+      return;
+    }
+
+    const res = await testMailConfig(target);
     withNotify(t, res, true);
 
     if (res.status) setMailDialog(false);

@@ -431,6 +431,20 @@ func (c *SystemConfig) SendVerifyMail(email string, code string) error {
 	)
 }
 
+func (c *SystemConfig) SendTestMail(email string) error {
+	type Temp struct {
+		Title string `json:"title"`
+		Logo  string `json:"logo"`
+	}
+
+	return c.GetMail().RenderMail(
+		"test.html",
+		Temp{Title: c.GetAppName(), Logo: strings.TrimSpace(c.General.Logo)},
+		email,
+		fmt.Sprintf("%s | Mail Test", c.GetAppName()),
+	)
+}
+
 func (c *SystemConfig) GetSearchCropLength() int {
 	if c.Search.CropLen <= 0 {
 		return 1000

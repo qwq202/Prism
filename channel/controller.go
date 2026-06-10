@@ -4,11 +4,17 @@ import (
 	"chat/utils"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"net/mail"
+	"strings"
 )
 
 type SyncChargeForm struct {
 	Overwrite bool           `json:"overwrite"`
 	Data      ChargeSequence `json:"data"`
+}
+
+type TestMailForm struct {
+	Email string `json:"email" binding:"required"`
 }
 
 func GetInfo(c *gin.Context) {
@@ -231,6 +237,36 @@ func TestStorageConfig(c *gin.Context) {
 	}
 	if err == nil {
 		response["message"] = "storage test passed"
+	}
+	c.JSON(http.StatusOK, response)
+}
+
+func TestMailConfig(c *gin.Context) {
+	var form TestMailForm
+	if err := c.ShouldBindJSON(&form); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status": false,
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	address, err := mail.ParseAddress(strings.TrimSpace(form.Email))
+	if err != nil || address.Address == "" {
+		c.JSON(http.StatusOK, gin.H{
+			"status": false,
+			"error":  "invalid email format",
+		})
+		return
+	}
+
+	err = SystemInstance.SendTestMail(address.Address)
+	response := gin.H{
+		"status": err == nil,
+		"error":  utils.GetError(err),
+	}
+	if err == nil {
+		response["message"] = "mail test passed"
 	}
 	c.JSON(http.StatusOK, response)
 }

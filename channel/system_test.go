@@ -210,6 +210,44 @@ func TestSystemConfigGetMailFromUsesSiteNameForBareAddress(t *testing.T) {
 	}
 }
 
+func TestSystemConfigTestMailTemplateRendersWithoutOTPContent(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working directory: %v", err)
+	}
+	if strings.HasSuffix(cwd, "/channel") {
+		t.Chdir("..")
+	}
+
+	conf := &SystemConfig{
+		General: generalState{
+			Title: "Prism",
+		},
+	}
+
+	body, err := conf.GetMail().RenderTemplate("test.html", struct {
+		Title string
+		Logo  string
+	}{
+		Title: conf.GetAppName(),
+		Logo:  "",
+	})
+	if err != nil {
+		t.Fatalf("render test mail template: %v", err)
+	}
+
+	for _, forbidden := range []string{"One-Time Password", "OTP Verification", "{{.Code}}"} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("test mail template should not contain %q: %s", forbidden, body)
+		}
+	}
+	for _, expected := range []string{"Mail configuration test", "SMTP configuration is working", "Prism"} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("test mail template should contain %q: %s", expected, body)
+		}
+	}
+}
+
 func TestPasskeyGettersReturnValidBrowserEnums(t *testing.T) {
 	conf := &SystemConfig{
 		Auth: authState{
