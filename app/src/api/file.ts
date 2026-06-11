@@ -24,8 +24,6 @@ export type FileArray = FileObject[];
 
 const GROK_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/jpg", "image/png"]);
 const GROK_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png"]);
-const LOCAL_ATTACHMENT_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
-const BLOCKED_ATTACHMENT_HOST_SUFFIXES = ["r2.cloudflarestorage.com"];
 
 function getFileExtension(filename: string): string {
   const segments = filename.toLowerCase().split(".");
@@ -42,37 +40,6 @@ function isGrokCompatibleImage(file: File): boolean {
     return true;
   }
   return GROK_IMAGE_EXTENSIONS.has(getFileExtension(file.name));
-}
-
-function normalizeAttachmentUrl(url: string): string {
-  if (!url) {
-    return "";
-  }
-
-  try {
-    const baseUrl =
-      typeof axios.defaults.baseURL === "string" && axios.defaults.baseURL.length > 0
-        ? axios.defaults.baseURL
-        : window.location.origin;
-    const resolved = new URL(url, baseUrl);
-    if (LOCAL_ATTACHMENT_HOSTS.has(resolved.hostname)) {
-      return "";
-    }
-    if (
-      BLOCKED_ATTACHMENT_HOST_SUFFIXES.some(
-        (suffix) =>
-          resolved.hostname === suffix || resolved.hostname.endsWith(`.${suffix}`),
-      )
-    ) {
-      console.warn(
-        `[parser] attachment url "${resolved.hostname}" looks like an object storage api endpoint, fallback to base64`,
-      );
-      return "";
-    }
-    return resolved.toString();
-  } catch {
-    return "";
-  }
 }
 
 async function decodeImageFile(file: File): Promise<HTMLImageElement> {
@@ -196,12 +163,10 @@ export async function quickBlobParser(
     console.log("[parser] hit image/* file, using local parser");
     const imageFile = await ensureGrokCompatibleImage(file, model);
     onProgress?.(40);
-    if (isXAIChannelModel(model)) {
-      const attachmentUrl = await uploadXAIImage(imageFile);
-      if (attachmentUrl) {
-        onProgress?.(100);
-        return attachmentUrl;
-      }
+    const attachmentUrl = await uploadImageAttachment(imageFile);
+    if (attachmentUrl) {
+      onProgress?.(100);
+      return attachmentUrl;
     }
     const base64 = await fileToBase64(imageFile);
     onProgress?.(100);
@@ -212,7 +177,7 @@ export async function quickBlobParser(
   }
 }
 
-async function uploadXAIImage(file: File): Promise<string> {
+async function uploadImageAttachment(file: File): Promise<string> {
   try {
     const formData = new FormData();
     formData.append("file", file);
@@ -228,9 +193,9 @@ async function uploadXAIImage(file: File): Promise<string> {
       return "";
     }
 
-    return normalizeAttachmentUrl(data.url);
+    return data.url;
   } catch (error) {
-    console.warn("[parser] failed to upload xai image attachment, fallback to base64:", error);
+    console.warn("[parser] failed to upload image attachment, fallback to base64:", error);
     return "";
   }
 }

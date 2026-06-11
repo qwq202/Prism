@@ -246,7 +246,7 @@ func NewImage(url string) (*Image, error) {
 		return &Image{Object: img, Content: url}, nil
 	}
 
-	data, _, err := readRemoteImageBytes(url, maxRemoteImageBytes)
+	data, _, err := readStoredImageSource(url)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +290,7 @@ func ConvertToBase64(url string) (string, error) {
 		return data[1], nil
 	}
 
-	data, _, err := readRemoteImageBytes(url, maxRemoteImageBytes)
+	data, _, err := readStoredImageSource(url)
 	if err != nil {
 		return "", err
 	}
@@ -303,12 +303,19 @@ func IsInternalAttachmentURL(source string) bool {
 		return false
 	}
 
-	instance, err := neturl.Parse(source)
-	if err != nil {
-		return false
+	_, ok := attachmentNameFromSource(source)
+	return ok
+}
+
+func NormalizeInternalAttachmentImageURL(source string) (string, error) {
+	if !IsInternalAttachmentURL(source) {
+		return source, nil
+	}
+	if _, err := validateRemoteImageURL(source); err == nil {
+		return source, nil
 	}
 
-	return strings.Contains(instance.Path, "/attachments/")
+	return NormalizeImageToVisionDataURL(source)
 }
 
 func NormalizeImageToVisionDataURL(source string) (string, error) {

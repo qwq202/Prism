@@ -137,6 +137,51 @@ func ExtractAttachmentNames(data string) []string {
 	return result
 }
 
+func attachmentNameFromSource(source string) (string, bool) {
+	match := attachmentNamePattern.FindStringSubmatch(strings.TrimSpace(source))
+	if len(match) < 2 {
+		return "", false
+	}
+
+	name, err := validateStoredAttachmentName(match[1])
+	if err != nil {
+		return "", false
+	}
+
+	return name, true
+}
+
+func readStoredAttachmentData(name string) ([]byte, string, error) {
+	name, err := validateStoredAttachmentName(name)
+	if err != nil {
+		return nil, "", err
+	}
+
+	localPath := AttachmentLocalPath(name)
+	if IsFileExist(localPath) {
+		data, err := os.ReadFile(localPath)
+		if err != nil {
+			return nil, "", err
+		}
+
+		return data, normalizeContentType(http.DetectContentType(data)), nil
+	}
+
+	if storageModeReady() {
+		data, contentType, err := readAttachmentS3(context.Background(), name)
+		if err != nil {
+			return nil, "", err
+		}
+		if contentType == "" {
+			contentType = normalizeContentType(http.DetectContentType(data))
+		}
+
+		return data, contentType, nil
+	}
+
+	return nil, "", fmt.Errorf("attachment not found")
+}
+
 func s3StorageReady() bool {
 	return storageReadyWithConfig(currentStorageConfig())
 }
@@ -439,6 +484,20 @@ func readStoredImageSource(source string) ([]byte, string, error) {
 		}
 
 		return decoded, contentType, nil
+	}
+
+	if name, ok := attachmentNameFromSource(source); ok {
+		data, contentType, err := readStoredAttachmentData(name)
+		if err == nil {
+			if int64(len(data)) > maxRemoteImageBytes {
+				return nil, "", remoteImageSizeError(maxRemoteImageBytes)
+			}
+
+			return data, contentType, nil
+		}
+		if _, remoteErr := validateRemoteImageURL(source); remoteErr != nil {
+			return nil, "", err
+		}
 	}
 
 	data, contentType, err := readRemoteImageBytes(source, maxRemoteImageBytes)

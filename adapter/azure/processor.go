@@ -14,7 +14,13 @@ func formatMessages(props *adaptercommon.ChatProps) interface{} {
 		return utils.Each[globals.Message, Message](props.Message, func(message globals.Message) Message {
 			if message.Role == globals.User {
 				raw, urls := utils.ExtractImages(message.Content, true)
-				images := utils.EachNotNil[string, MessageContent](urls, func(url string) *MessageContent {
+				images := utils.EachNotNil[string, MessageContent](urls, func(rawURL string) *MessageContent {
+					url, normalizeErr := utils.NormalizeInternalAttachmentImageURL(rawURL)
+					if normalizeErr != nil {
+						globals.Warn(fmt.Sprintf("[azure] cannot normalize attachment image: %s", normalizeErr.Error()))
+						url = rawURL
+					}
+
 					obj, err := utils.NewImage(url)
 					if err != nil {
 						globals.Info(fmt.Sprintf("cannot process image: %s (source: %s)", err.Error(), utils.Extract(url, 24, "...")))

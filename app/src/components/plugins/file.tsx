@@ -17,6 +17,9 @@ type MarkdownFileProps = {
   acceptDownload?: boolean;
 };
 
+const imageUrlPattern =
+  /(https?:\/\/\S+\.(?:png|jpg|jpeg|gif|webp|heif|heic|bmp)(?:\?\S*)?|\/attachments\/[a-f0-9]{32}\.[A-Za-z0-9]+)/i;
+
 export function MarkdownFile({ children, acceptDownload }: MarkdownFileProps) {
   const data = children?.toString() || "";
   const filename = data.split("\n")[0].replace("[[", "").replace("]]", "");
@@ -28,8 +31,8 @@ export function MarkdownFile({ children, acceptDownload }: MarkdownFileProps) {
   // }, [filename]);
 
   const image = useMemo(() => {
-    // get image url from content (like: https://i.imgur.com/xxxxx.png)
-    const match = content.match(/(https?:\/\/.*\.(?:png|jpg|jpeg|gif))/);
+    // get image url from content (like: https://i.imgur.com/xxxxx.png or /attachments/xxxxx.png)
+    const match = content.match(imageUrlPattern);
     return match ? match[0] : "";
   }, [content]);
 

@@ -27,13 +27,10 @@ func formatInputMessage(props *adaptercommon.ChatProps, message globals.Message)
 		}
 
 		for _, rawURL := range urls {
-			url := rawURL
-			if utils.IsInternalAttachmentURL(url) {
-				if normalized, err := utils.NormalizeImageToVisionDataURL(url); err == nil {
-					url = normalized
-				} else {
-					globals.Warn(fmt.Sprintf("[xai] cannot normalize attachment image: %s", err.Error()))
-				}
+			url, err := utils.NormalizeInternalAttachmentImageURL(rawURL)
+			if err != nil {
+				globals.Warn(fmt.Sprintf("[xai] cannot normalize attachment image: %s", err.Error()))
+				url = rawURL
 			}
 			if props.Buffer != nil {
 				if obj, err := utils.NewImage(url); err == nil {

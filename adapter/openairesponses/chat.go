@@ -29,7 +29,11 @@ func formatInputMessage(props *adaptercommon.ChatProps, message globals.Message)
 		}
 
 		for _, rawURL := range urls {
-			url := rawURL
+			url, err := utils.NormalizeInternalAttachmentImageURL(rawURL)
+			if err != nil {
+				globals.Warn(fmt.Sprintf("[openai-responses] cannot normalize attachment image: %s", err.Error()))
+				url = rawURL
+			}
 			if props.Buffer != nil {
 				if obj, err := utils.NewImage(url); err == nil {
 					props.Buffer.AddImage(obj)

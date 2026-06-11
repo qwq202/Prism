@@ -1,7 +1,12 @@
 package utils
 
 import (
+	"bytes"
 	"chat/globals"
+	"encoding/base64"
+	"image"
+	"image/color"
+	"image/png"
 	"os"
 	"path/filepath"
 	"strings"
@@ -87,6 +92,76 @@ func TestListConfiguredStoredAttachmentsSkipsInvalidNames(t *testing.T) {
 	}
 	if len(attachments) != 1 || attachments[0].Name != valid {
 		t.Fatalf("expected only valid attachment, got %#v", attachments)
+	}
+}
+
+func TestLocalAttachmentImageSourceIsExtractedAndReadable(t *testing.T) {
+	withStorageGlobals(t)
+
+	previousWorkingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working dir: %v", err)
+	}
+	workingDir := t.TempDir()
+	if err := os.Chdir(workingDir); err != nil {
+		t.Fatalf("chdir temp dir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(previousWorkingDir)
+	})
+
+	pixel := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	pixel.Set(0, 0, color.RGBA{R: 255, A: 255})
+	var buffer bytes.Buffer
+	if err := png.Encode(&buffer, pixel); err != nil {
+		t.Fatalf("encode png fixture: %v", err)
+	}
+	imageBytes := buffer.Bytes()
+	rawBase64 := base64.StdEncoding.EncodeToString(imageBytes)
+
+	name := "0123456789abcdef0123456789abcdef.png"
+	if err := os.MkdirAll(filepath.Dir(AttachmentLocalPath(name)), 0o755); err != nil {
+		t.Fatalf("create attachment dir: %v", err)
+	}
+	if err := os.WriteFile(AttachmentLocalPath(name), imageBytes, 0o644); err != nil {
+		t.Fatalf("write attachment: %v", err)
+	}
+
+	url := "/attachments/" + name
+	if !IsInternalAttachmentURL(url) {
+		t.Fatalf("expected %q to be recognized as internal attachment", url)
+	}
+
+	content, images := ExtractImages("before "+url+" after", true)
+	if len(images) != 1 || images[0] != url {
+		t.Fatalf("expected attachment image to be extracted, got %#v", images)
+	}
+	if strings.Contains(content, url) {
+		t.Fatalf("expected attachment url to be stripped from text content, got %q", content)
+	}
+
+	encoded, err := ConvertToBase64(url)
+	if err != nil {
+		t.Fatalf("convert attachment to base64: %v", err)
+	}
+	if encoded != rawBase64 {
+		t.Fatalf("unexpected base64 conversion")
+	}
+
+	normalized, err := NormalizeInternalAttachmentImageURL(url)
+	if err != nil {
+		t.Fatalf("normalize attachment image url: %v", err)
+	}
+	if !strings.HasPrefix(normalized, "data:image/png;base64,") {
+		t.Fatalf("expected short attachment url to normalize to data url, got %q", normalized)
+	}
+
+	decoded, err := NewImage(url)
+	if err != nil {
+		t.Fatalf("decode attachment image: %v", err)
+	}
+	if decoded.GetWidth() != 1 || decoded.GetHeight() != 1 {
+		t.Fatalf("expected 1x1 image, got %dx%d", decoded.GetWidth(), decoded.GetHeight())
 	}
 }
 

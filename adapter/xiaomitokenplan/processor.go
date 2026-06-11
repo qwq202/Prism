@@ -20,7 +20,13 @@ func formatMessages(props *adaptercommon.ChatProps) interface{} {
 				Text: &text,
 			})
 
-			for _, url := range urls {
+			for _, rawURL := range urls {
+				url, normalizeErr := utils.NormalizeInternalAttachmentImageURL(rawURL)
+				if normalizeErr != nil {
+					globals.Warn(fmt.Sprintf("[xiaomi-token-plan] cannot normalize attachment image: %s", normalizeErr.Error()))
+					url = rawURL
+				}
+
 				obj, err := utils.NewImage(url)
 				if props.Buffer != nil {
 					props.Buffer.AddImage(obj)

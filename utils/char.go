@@ -284,7 +284,7 @@ func ExtractBase64Images(data string) []string {
 func ExtractExternalImages(data string) []string {
 	// https://platform.openai.com/docs/guides/vision/what-type-of-files-can-i-upload
 
-	re := regexp.MustCompile(`(https?://\S+\.(?:png|jpg|jpeg|gif|webp|heif|heic|bmp|svg|ico)(?:\?\S+)?)`)
+	re := regexp.MustCompile(`(https?://\S+\.(?:png|jpg|jpeg|gif|webp|heif|heic|bmp|svg|ico)(?:\?\S+)?|/attachments/[a-f0-9]{32}\.[A-Za-z0-9]+)`)
 	return re.FindAllString(data, -1)
 }
 
