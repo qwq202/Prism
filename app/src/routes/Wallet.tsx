@@ -2,7 +2,7 @@ import "@/assets/pages/quota.less";
 import "@/assets/pages/subscription.less";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import { useTranslation } from "react-i18next";
-import { ArrowRight, BadgeCheck, Cloud, Coins, Gift } from "lucide-react";
+import { ArrowRight, BadgeCheck, Cloud, Gift } from "lucide-react";
 import { cn } from "@/components/ui/lib/utils.ts";
 import { useEffect, useMemo, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
@@ -16,12 +16,7 @@ import {
   refreshSubscription,
 } from "@/store/subscription.ts";
 import { subscriptionDataSelector } from "@/store/globals.ts";
-import {
-  allowSubscriptionQuotaFallbackSelector,
-  quotaSelector,
-  refreshQuota,
-  setAllowSubscriptionQuotaFallback,
-} from "@/store/quota.ts";
+import { quotaSelector, refreshQuota } from "@/store/quota.ts";
 import { AppDispatch } from "@/store";
 import { motion } from "framer-motion";
 import { getPlan, getPlanName } from "@/conf/subscription.tsx";
@@ -42,8 +37,6 @@ import {
 } from "@/components/ui/dialog.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { useRedeem as redeemCode } from "@/api/redeem.ts";
-import { Switch } from "@/components/ui/switch.tsx";
-import { updateSubscriptionQuotaFallback } from "@/api/quota.ts";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
@@ -138,9 +131,6 @@ function WalletPage() {
   const { t } = useTranslation();
   const dispatch: AppDispatch = useDispatch();
   const quota = useSelector(quotaSelector);
-  const allowSubscriptionQuotaFallback = useSelector(
-    allowSubscriptionQuotaFallbackSelector,
-  );
   const subscription = useSelector(isSubscribedSelector);
   const level = useSelector(levelSelector);
   const expired = useSelector(expiredSelector);
@@ -148,7 +138,6 @@ function WalletPage() {
   const usage = useSelector(usageSelector);
   const subscriptionData = useSelector(subscriptionDataSelector);
   const [redeemOpen, setRedeemOpen] = useState(false);
-  const [savingFallback, setSavingFallback] = useState(false);
 
   const plan = useMemo(
     () => getPlan(subscriptionData, level),
@@ -165,30 +154,6 @@ function WalletPage() {
     void dispatch(refreshQuota());
     void dispatch(refreshSubscription());
   }, [dispatch]);
-
-  const updateFallbackPreference = async (checked: boolean) => {
-    const previous = allowSubscriptionQuotaFallback;
-    dispatch(setAllowSubscriptionQuotaFallback(checked));
-    setSavingFallback(true);
-
-    const res = await updateSubscriptionQuotaFallback(checked);
-    setSavingFallback(false);
-
-    if (res.status) {
-      dispatch(
-        setAllowSubscriptionQuotaFallback(
-          res.allow_subscription_quota_fallback ?? checked,
-        ),
-      );
-      toast.success(t("buy.subscription-fallback-save-success"));
-      return;
-    }
-
-    dispatch(setAllowSubscriptionQuotaFallback(previous));
-    toast.error(t("buy.subscription-fallback-save-failed"), {
-      description: res.error,
-    });
-  };
 
   return (
     <ScrollArea className="w-full h-full bg-muted/25">
@@ -295,27 +260,6 @@ function WalletPage() {
                 </Link>
               </p>
 
-              {subscription && (
-                <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border bg-muted/20 px-3 py-3">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <Coins className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground">
-                        {t("buy.subscription-fallback-title")}
-                      </p>
-                      <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
-                        {t("buy.subscription-fallback-desc")}
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={allowSubscriptionQuotaFallback}
-                    disabled={savingFallback}
-                    onCheckedChange={updateFallbackPreference}
-                    aria-label={t("buy.subscription-fallback-title")}
-                  />
-                </div>
-              )}
             </div>
 
             {/* 额度区块 — 和头部同色，用细线分隔 */}

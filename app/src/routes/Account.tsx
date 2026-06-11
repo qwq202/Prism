@@ -22,6 +22,7 @@ import {
   Clock,
   Cloud,
   CloudRain,
+  Coins,
   ExternalLink,
   Fingerprint,
   HandIcon,
@@ -52,7 +53,17 @@ import {
 } from "@/api/auth.ts";
 import { withNotify } from "@/api/common.ts";
 import { goAuth } from "@/utils/app.ts";
-import { quotaSelector, refreshQuota, setQuota } from "@/store/quota.ts";
+import {
+  allowSubscriptionQuotaFallbackSelector,
+  quotaSelector,
+  refreshQuota,
+  setAllowSubscriptionQuotaFallback,
+  setQuota,
+} from "@/store/quota.ts";
+import {
+  isSubscribedSelector,
+  refreshSubscription,
+} from "@/store/subscription.ts";
 import Tips from "@/components/Tips.tsx";
 import { getSharedLink, SharingPreviewForm } from "@/api/sharing.ts";
 import { openWindow } from "@/utils/device.ts";
@@ -88,6 +99,8 @@ import { motion } from "framer-motion";
 import { isEmailValid, isTextInRange } from "@/utils/form.ts";
 import { getErrorMessage } from "@/utils/base.ts";
 import { localizeError } from "@/utils/error.ts";
+import { Switch } from "@/components/ui/switch.tsx";
+import { updateSubscriptionQuotaFallback } from "@/api/quota.ts";
 
 type AccountCardProps = {
   title: string;
@@ -250,6 +263,10 @@ function Account() {
   const username = useSelector(selectUsername);
   const auth = useSelector(selectAuthenticated);
   const quota = useSelector(quotaSelector);
+  const subscription = useSelector(isSubscribedSelector);
+  const allowSubscriptionQuotaFallback = useSelector(
+    allowSubscriptionQuotaFallbackSelector,
+  );
   const copy = useClipboard();
   const group = useGroup(true);
 
@@ -329,6 +346,7 @@ function Account() {
     }
 
     await dispatch(refreshQuota());
+    await dispatch(refreshSubscription());
   }, [auth, location.key]);
 
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
@@ -336,6 +354,7 @@ function Account() {
   const [passwordResetDialogOpen, setPasswordResetDialogOpen] =
     useState(false);
   const [passwordResetLoading, setPasswordResetLoading] = useState(false);
+  const [savingFallback, setSavingFallback] = useState(false);
   const [emailForm, setEmailForm] = useState({ email: "", code: "" });
   const [passwordForm, setPasswordForm] = useState({
     oldPassword: "",
@@ -361,6 +380,30 @@ function Account() {
     }
   };
   useEffectAsync(refreshPasskeys, [auth, location.key]);
+
+  const updateFallbackPreference = async (checked: boolean) => {
+    const previous = allowSubscriptionQuotaFallback;
+    dispatch(setAllowSubscriptionQuotaFallback(checked));
+    setSavingFallback(true);
+
+    const res = await updateSubscriptionQuotaFallback(checked);
+    setSavingFallback(false);
+
+    if (res.status) {
+      dispatch(
+        setAllowSubscriptionQuotaFallback(
+          res.allow_subscription_quota_fallback ?? checked,
+        ),
+      );
+      toast.success(t("buy.subscription-fallback-save-success"));
+      return;
+    }
+
+    dispatch(setAllowSubscriptionQuotaFallback(previous));
+    toast.error(t("buy.subscription-fallback-save-failed"), {
+      description: res.error,
+    });
+  };
 
   async function sendEmailChangeCode() {
     const email = emailForm.email.trim();
@@ -851,6 +894,39 @@ function Account() {
             </motion.div>
           </AccountCard>
         </motion.div>
+        {auth && subscription && (
+          <motion.div variants={cardVariants}>
+            <AccountCard
+              title={"account.subscription-management"}
+              description={"account.subscription-management-description"}
+              icon={<Coins />}
+            >
+              <motion.div
+                className="flex flex-col gap-3 rounded-lg border bg-muted/10 p-4 md:flex-row md:items-center md:justify-between"
+                variants={contentVariants}
+              >
+                <div className="flex min-w-0 items-start gap-3">
+                  <Coins className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">
+                      {t("buy.subscription-fallback-title")}
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      {t("buy.subscription-fallback-desc")}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={allowSubscriptionQuotaFallback}
+                  disabled={savingFallback}
+                  onCheckedChange={updateFallbackPreference}
+                  aria-label={t("buy.subscription-fallback-title")}
+                  className="shrink-0"
+                />
+              </motion.div>
+            </AccountCard>
+          </motion.div>
+        )}
         <DeeptrainOnly>
           <motion.div variants={cardVariants}>
             <AccountCard

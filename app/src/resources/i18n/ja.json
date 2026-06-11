@@ -1840,6 +1840,8 @@
   "account": {
     "title": "アカウント管理",
     "my-account": "マイアカウント",
+    "subscription-management": "サブスクリプション管理",
+    "subscription-management-description": "サブスクリプション設定と枠不足時の動作を管理します",
     "change-email": "メールを変更",
     "change-email-description": "新しいメールアドレスを確認してからアカウントに紐づけます。",
     "change-password": "パスワードを変更",

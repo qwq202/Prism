@@ -1868,6 +1868,8 @@
   "account": {
     "title": "Account Management",
     "my-account": "My account",
+    "subscription-management": "Subscription management",
+    "subscription-management-description": "Manage subscription preferences and what happens when quota runs out",
     "change-email": "Change Email",
     "change-email-description": "Verify the new email address before binding it to your account.",
     "change-password": "Change Password",

@@ -1961,6 +1961,8 @@
     "deeptrain": "DeepTrain 統一帳號管理",
     "my-account": "我的帳號",
     "my-account-description": "您的帳號資訊、第三方帳號綁定資訊等",
+    "subscription-management": "訂閱管理",
+    "subscription-management-description": "管理你的訂閱偏好和額度不足時的處理方式",
     "change-email": "修改信箱",
     "change-email-description": "驗證新的信箱地址後即可綁定到目前帳號。",
     "change-password": "修改密碼",

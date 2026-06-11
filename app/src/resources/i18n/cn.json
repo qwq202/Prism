@@ -1965,6 +1965,8 @@
     "deeptrain": "DeepTrain 统一账号管理",
     "my-account": "我的账号",
     "my-account-description": "您的账号信息、第三方账号绑定信息等",
+    "subscription-management": "订阅管理",
+    "subscription-management-description": "管理你的订阅偏好和额度不足时的处理方式",
     "change-email": "修改邮箱",
     "change-email-description": "验证新的邮箱地址后即可绑定到当前账号。",
     "change-password": "修改密码",
