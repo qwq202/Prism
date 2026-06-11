@@ -346,14 +346,37 @@ func (l realtimeQuotaLimiter) allowsProjectedChunk(buffer *utils.Buffer, chunk *
 	return l.allows(realtimeQuotaForBuffer(&preview))
 }
 
-func (l realtimeQuotaLimiter) allowsProjectedText(buffer *utils.Buffer, content string) bool {
-	if !l.enabled || buffer == nil || content == "" {
-		return true
+func projectedRealtimeQuotaForChunk(buffer *utils.Buffer, chunk *globals.Chunk) float32 {
+	if buffer == nil {
+		return 0
 	}
 
 	preview := *buffer
-	preview.Write(content)
-	return l.allows(realtimeQuotaForBuffer(&preview))
+	preview.WriteChunk(chunk)
+	return realtimeQuotaForBuffer(&preview)
+}
+
+func (l realtimeQuotaLimiter) projectedSplitChunkQuota(streamBuffer *utils.Buffer, captureBuffer *utils.Buffer, chunk *globals.Chunk) float32 {
+	if streamBuffer == nil || captureBuffer == nil || streamBuffer == captureBuffer {
+		if streamBuffer != nil {
+			return projectedRealtimeQuotaForChunk(streamBuffer, chunk)
+		}
+		return projectedRealtimeQuotaForChunk(captureBuffer, chunk)
+	}
+
+	delta := projectedRealtimeQuotaForChunk(captureBuffer, chunk) - realtimeQuotaForBuffer(captureBuffer)
+	if delta < 0 {
+		delta = 0
+	}
+	return realtimeQuotaForBuffer(streamBuffer) + delta
+}
+
+func (l realtimeQuotaLimiter) allowsProjectedSplitChunk(streamBuffer *utils.Buffer, captureBuffer *utils.Buffer, chunk *globals.Chunk) bool {
+	if !l.enabled {
+		return true
+	}
+
+	return l.allows(l.projectedSplitChunkQuota(streamBuffer, captureBuffer, chunk))
 }
 
 type partialChunk struct {
@@ -676,7 +699,7 @@ func createRoundTask(
 					waitForRoundTaskEnd(chunkChan)
 					return hit, nil, true
 				}
-			} else if chunk != nil && !limiter.allowsProjectedText(quotaBuffer, chunk.Content) {
+			} else if !limiter.allowsProjectedSplitChunk(streamBuffer, captureBuffer, chunk) {
 				quota := float32(0)
 				if quotaBuffer != nil {
 					quota = realtimeQuotaForBuffer(quotaBuffer)
@@ -1015,13 +1038,13 @@ func createToolChatTask(
 		streamBuffer := liveBuffer
 
 		hit, err, interrupted = createRoundTask(conn, user, roundBuffer, streamBuffer, db, cache, group, props, plan, createRemoveSignalHandler(db, instance), limiter)
+		syncToolFinalMetadata(liveBuffer, roundBuffer)
 		if err != nil || interrupted {
 			return hit, err, interrupted
 		}
 
 		assistant := extractAssistantMessageFromBuffer(roundBuffer, false, false)
 		if assistant.ToolCalls == nil || len(*assistant.ToolCalls) == 0 {
-			syncToolFinalMetadata(liveBuffer, roundBuffer)
 			return hit, nil, false
 		}
 
@@ -1087,11 +1110,10 @@ func createToolChatTask(
 	)
 
 	hit, err, interrupted = createRoundTask(conn, user, finalBuffer, liveBuffer, db, cache, group, props, plan, createRemoveSignalHandler(db, instance), limiter)
+	syncToolFinalMetadata(liveBuffer, finalBuffer)
 	if err != nil || interrupted {
 		return hit, err, interrupted
 	}
-
-	syncToolFinalMetadata(liveBuffer, finalBuffer)
 
 	return hit, nil, false
 }
@@ -1568,6 +1590,11 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 		if !hit && buffer.HasVisiblePayload() {
 			CollectQuota(conn.GetCtx(), user, buffer, plan, err)
 			createChatBillingRecord(db, user, model, buffer)
+			conn.Send(globals.ChatSegmentResponse{
+				Message: err.Error(),
+				End:     true,
+			})
+			return extractAssistantMessageFromBuffer(buffer, true, plan)
 		} else {
 			auth.RevertSubscriptionUsage(db, cache, user, model)
 		}

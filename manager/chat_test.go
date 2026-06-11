@@ -376,6 +376,44 @@ func TestRealtimeQuotaLimiterRejectsOfficialUsageOverflow(t *testing.T) {
 	}
 }
 
+func TestRealtimeQuotaLimiterRejectsSplitBufferOfficialUsageOverflow(t *testing.T) {
+	liveBuffer := utils.NewBuffer(globals.GPT3Turbo, nil, chatTokenTestCharge{})
+	roundBuffer := utils.NewBuffer(globals.GPT3Turbo, nil, chatTokenTestCharge{})
+	limiter := realtimeQuotaLimiter{enabled: true, limit: 0.49}
+
+	chunk := &globals.Chunk{
+		Usage: &globals.TokenUsage{
+			CompletionTokens: 720,
+			TotalTokens:      720,
+		},
+	}
+
+	if limiter.allowsProjectedSplitChunk(liveBuffer, roundBuffer, chunk) {
+		t.Fatalf("expected split-buffer limiter to reject official usage above budget")
+	}
+	if !liveBuffer.IsEmpty() || !roundBuffer.IsEmpty() {
+		t.Fatalf("expected split-buffer projection not to mutate buffers")
+	}
+}
+
+func TestToolRoundUsageMergesIntoLiveBilling(t *testing.T) {
+	liveBuffer := utils.NewBuffer(globals.GPT3Turbo, nil, chatTokenTestCharge{})
+	roundBuffer := utils.NewBuffer(globals.GPT3Turbo, nil, chatTokenTestCharge{})
+	roundBuffer.WriteChunk(&globals.Chunk{
+		Usage: &globals.TokenUsage{
+			PromptTokens:     30,
+			CompletionTokens: 720,
+			TotalTokens:      750,
+		},
+	})
+
+	syncToolFinalMetadata(liveBuffer, roundBuffer)
+
+	if got := liveBuffer.GetRecordQuota(); math.Abs(float64(got-0.72)) > 0.001 {
+		t.Fatalf("expected live billing to include tool round official usage, got %f", got)
+	}
+}
+
 func TestCollectQuotaChargesUserBalanceForSubscriptionOverflow(t *testing.T) {
 	useChatTestChargeInstance(t)
 
