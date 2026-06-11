@@ -3,7 +3,17 @@ import { MarkdownProgressbar } from "@/components/plugins/progress.tsx";
 import { cn } from "@/components/ui/lib/utils.ts";
 import { copyClipboard } from "@/utils/dom.ts";
 import { Check, Copy } from "lucide-react";
-import { LightAsync as SyntaxHighlighter } from "react-syntax-highlighter";
+import { Light as SyntaxHighlighter } from "react-syntax-highlighter";
+import bash from "react-syntax-highlighter/dist/esm/languages/hljs/bash";
+import css from "react-syntax-highlighter/dist/esm/languages/hljs/css";
+import go from "react-syntax-highlighter/dist/esm/languages/hljs/go";
+import htmlbars from "react-syntax-highlighter/dist/esm/languages/hljs/htmlbars";
+import javascript from "react-syntax-highlighter/dist/esm/languages/hljs/javascript";
+import json from "react-syntax-highlighter/dist/esm/languages/hljs/json";
+import markdown from "react-syntax-highlighter/dist/esm/languages/hljs/markdown";
+import python from "react-syntax-highlighter/dist/esm/languages/hljs/python";
+import rust from "react-syntax-highlighter/dist/esm/languages/hljs/rust";
+import typescript from "react-syntax-highlighter/dist/esm/languages/hljs/typescript";
 import { atomOneDark as style } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import React, { Suspense, useMemo } from "react";
 
@@ -22,6 +32,17 @@ const LanguageMap: Record<string, string> = {
   rs: "rust",
   py: "python",
 };
+
+SyntaxHighlighter.registerLanguage("bash", bash);
+SyntaxHighlighter.registerLanguage("css", css);
+SyntaxHighlighter.registerLanguage("go", go);
+SyntaxHighlighter.registerLanguage("htmlbars", htmlbars);
+SyntaxHighlighter.registerLanguage("javascript", javascript);
+SyntaxHighlighter.registerLanguage("json", json);
+SyntaxHighlighter.registerLanguage("markdown", markdown);
+SyntaxHighlighter.registerLanguage("python", python);
+SyntaxHighlighter.registerLanguage("rust", rust);
+SyntaxHighlighter.registerLanguage("typescript", typescript);
 
 export type CodeProps = {
   inline?: boolean;
