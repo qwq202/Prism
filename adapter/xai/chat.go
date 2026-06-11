@@ -10,6 +10,15 @@ import (
 	"strings"
 )
 
+func normalizeImageInput(rawURL string) (string, error) {
+	image, err := adaptercommon.NormalizeImageForCapability(rawURL, adaptercommon.URLImageInputCapability)
+	if err != nil {
+		return "", err
+	}
+
+	return image.Source, nil
+}
+
 func (c *ChatInstance) GetChatEndpoint() string {
 	return fmt.Sprintf("%s/v1/responses", c.GetEndpoint())
 }
@@ -27,7 +36,7 @@ func formatInputMessage(props *adaptercommon.ChatProps, message globals.Message)
 		}
 
 		for _, rawURL := range urls {
-			url, err := utils.NormalizeInternalAttachmentImageURL(rawURL)
+			url, err := normalizeImageInput(rawURL)
 			if err != nil {
 				globals.Warn(fmt.Sprintf("[xai] cannot normalize attachment image: %s", err.Error()))
 				url = rawURL

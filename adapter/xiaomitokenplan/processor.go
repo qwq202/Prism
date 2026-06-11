@@ -8,6 +8,15 @@ import (
 	"fmt"
 )
 
+func normalizeImageInput(rawURL string) (string, error) {
+	image, err := adaptercommon.NormalizeImageForCapability(rawURL, adaptercommon.URLImageInputCapability)
+	if err != nil {
+		return "", err
+	}
+
+	return image.Source, nil
+}
+
 func formatMessages(props *adaptercommon.ChatProps) interface{} {
 	return utils.Each[globals.Message, Message](props.Message, func(message globals.Message) Message {
 		content := interface{}(message.Content)
@@ -21,7 +30,7 @@ func formatMessages(props *adaptercommon.ChatProps) interface{} {
 			})
 
 			for _, rawURL := range urls {
-				url, normalizeErr := utils.NormalizeInternalAttachmentImageURL(rawURL)
+				url, normalizeErr := normalizeImageInput(rawURL)
 				if normalizeErr != nil {
 					globals.Warn(fmt.Sprintf("[xiaomi-token-plan] cannot normalize attachment image: %s", normalizeErr.Error()))
 					url = rawURL

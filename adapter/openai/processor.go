@@ -10,13 +10,22 @@ import (
 	"strings"
 )
 
+func normalizeImageInput(rawURL string) (string, error) {
+	image, err := adaptercommon.NormalizeImageForCapability(rawURL, adaptercommon.URLImageInputCapability)
+	if err != nil {
+		return "", err
+	}
+
+	return image.Source, nil
+}
+
 func formatMessages(props *adaptercommon.ChatProps) interface{} {
 	if globals.IsVisionModel(props.Model) {
 		return utils.Each[globals.Message, Message](props.Message, func(message globals.Message) Message {
 			if message.Role == globals.User {
 				content, urls := utils.ExtractImages(message.Content, true)
 				images := utils.EachNotNil[string, MessageContent](urls, func(rawURL string) *MessageContent {
-					url, err := utils.NormalizeInternalAttachmentImageURL(rawURL)
+					url, err := normalizeImageInput(rawURL)
 					if err != nil {
 						globals.Warn(fmt.Sprintf("[openai] cannot normalize attachment image: %s", err.Error()))
 						url = rawURL

@@ -154,18 +154,25 @@ func (c *ChatInstance) getTextBlocks(props *adaptercommon.ChatProps, message glo
 
 		for _, url := range urls {
 			obj, err := utils.NewImage(url)
-			props.Buffer.AddImage(obj)
+			if props.Buffer != nil {
+				props.Buffer.AddImage(obj)
+			}
 			if err != nil {
 				globals.Info(fmt.Sprintf("cannot process image: %s (source: %s)", err.Error(), utils.Extract(url, 24, "...")))
 			}
 
-			image := utils.NewImageContent(url)
+			image, err := getInlineBase64Image(url)
+			if err != nil {
+				globals.Info(fmt.Sprintf("cannot normalize image input: %s (source: %s)", err.Error(), utils.Extract(url, 24, "...")))
+				continue
+			}
+
 			blocks = append(blocks, ContentBlock{
 				Type: "image",
 				Source: &MessageImage{
 					Type:      "base64",
-					MediaType: image.GetType(),
-					Data:      image.ToRawBase64(),
+					MediaType: image.MIMEType,
+					Data:      image.RawBase64,
 				},
 			})
 		}
@@ -183,6 +190,10 @@ func (c *ChatInstance) getTextBlocks(props *adaptercommon.ChatProps, message glo
 			Text: &content,
 		},
 	}
+}
+
+func getInlineBase64Image(url string) (*adaptercommon.NormalizedImageInput, error) {
+	return adaptercommon.NormalizeImageForCapability(url, adaptercommon.InlineBase64ImageInputCapability)
 }
 
 func getToolUseBlocks(toolCalls *globals.ToolCalls) []ContentBlock {

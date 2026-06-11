@@ -37,6 +37,31 @@ type Image struct {
 }
 type Images []Image
 
+type ImageInputMode string
+
+const (
+	ImageInputModeURL           ImageInputMode = "url"
+	ImageInputModeVisionDataURL ImageInputMode = "vision_data_url"
+	ImageInputModeInlineBase64  ImageInputMode = "inline_base64"
+)
+
+type ImageInputCapability struct {
+	Mode ImageInputMode
+}
+
+var (
+	URLImageInputCapability           = ImageInputCapability{Mode: ImageInputModeURL}
+	VisionDataURLImageInputCapability = ImageInputCapability{Mode: ImageInputModeVisionDataURL}
+	InlineBase64ImageInputCapability  = ImageInputCapability{Mode: ImageInputModeInlineBase64}
+)
+
+type NormalizedImageInput struct {
+	Source    string
+	MIMEType  string
+	RawBase64 string
+	Mode      ImageInputMode
+}
+
 func remoteImageSizeError(maxBytes int64) error {
 	return fmt.Errorf("remote image exceeds %dMB limit", maxBytes/1024/1024)
 }
@@ -298,6 +323,109 @@ func ConvertToBase64(url string) (string, error) {
 	return Base64EncodeBytes(data), nil
 }
 
+func NormalizeImageForCapability(source string, capability ImageInputCapability) (*NormalizedImageInput, error) {
+	mode := normalizeImageInputMode(capability.Mode)
+	switch mode {
+	case ImageInputModeURL:
+		return normalizeImageForURL(source)
+	case ImageInputModeVisionDataURL:
+		return normalizeImageToVisionDataURL(source)
+	case ImageInputModeInlineBase64:
+		return normalizeImageForInlineBase64(source)
+	default:
+		return normalizeImageForURL(source)
+	}
+}
+
+func normalizeImageInputMode(mode ImageInputMode) ImageInputMode {
+	switch mode {
+	case ImageInputModeURL, ImageInputModeVisionDataURL, ImageInputModeInlineBase64:
+		return mode
+	default:
+		return ImageInputModeURL
+	}
+}
+
+func normalizeImageForURL(source string) (*NormalizedImageInput, error) {
+	source = strings.TrimSpace(source)
+	if source == "" {
+		return nil, fmt.Errorf("image source is empty")
+	}
+
+	if strings.HasPrefix(source, "data:image/") {
+		return &NormalizedImageInput{
+			Source: source,
+			Mode:   ImageInputModeVisionDataURL,
+		}, nil
+	}
+
+	if _, err := validateRemoteImageURL(source); err == nil {
+		return &NormalizedImageInput{
+			Source: source,
+			Mode:   ImageInputModeURL,
+		}, nil
+	}
+
+	if IsInternalAttachmentURL(source) {
+		if publicURL := publicAttachmentImageURL(source); publicURL != "" {
+			return &NormalizedImageInput{
+				Source: publicURL,
+				Mode:   ImageInputModeURL,
+			}, nil
+		}
+
+		dataURL, err := NormalizeImageToVisionDataURL(source)
+		if err != nil {
+			return nil, err
+		}
+		return &NormalizedImageInput{
+			Source: dataURL,
+			Mode:   ImageInputModeVisionDataURL,
+		}, nil
+	}
+
+	return &NormalizedImageInput{
+		Source: source,
+		Mode:   ImageInputModeURL,
+	}, nil
+}
+
+func normalizeImageToVisionDataURL(source string) (*NormalizedImageInput, error) {
+	dataURL, err := NormalizeImageToVisionDataURL(source)
+	if err != nil {
+		return nil, err
+	}
+
+	return &NormalizedImageInput{
+		Source:   dataURL,
+		MIMEType: "image/png",
+		Mode:     ImageInputModeVisionDataURL,
+	}, nil
+}
+
+func normalizeImageForInlineBase64(source string) (*NormalizedImageInput, error) {
+	data, contentType, err := readStoredImageSource(source)
+	if err != nil {
+		return nil, err
+	}
+
+	rawBase64 := Base64EncodeBytes(data)
+	normalizedType := normalizeContentType(contentType)
+	if normalizedType == "" {
+		normalizedType = NewImageContent(source).GetType()
+	}
+	if normalizedType == "" {
+		normalizedType = "image/png"
+	}
+
+	return &NormalizedImageInput{
+		Source:    fmt.Sprintf("data:%s;base64,%s", normalizedType, rawBase64),
+		MIMEType:  normalizedType,
+		RawBase64: rawBase64,
+		Mode:      ImageInputModeInlineBase64,
+	}, nil
+}
+
 func IsInternalAttachmentURL(source string) bool {
 	if source == "" || strings.HasPrefix(source, "data:image/") {
 		return false
@@ -315,7 +443,12 @@ func NormalizeInternalAttachmentImageURL(source string) (string, error) {
 		return source, nil
 	}
 
-	return NormalizeImageToVisionDataURL(source)
+	result, err := NormalizeImageForCapability(source, VisionDataURLImageInputCapability)
+	if err != nil {
+		return "", err
+	}
+
+	return result.Source, nil
 }
 
 func NormalizeImageToVisionDataURL(source string) (string, error) {

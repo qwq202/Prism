@@ -70,20 +70,32 @@ func getGeminiContent(parts []GeminiChatPart, content string, model string) []Ge
 	}
 
 	for _, url := range urls {
-		data, err := utils.ConvertToBase64(url)
-		if err != nil {
+		data, mimeType := getGeminiInlineBase64Image(url)
+		if data == "" {
 			continue
+		}
+		if mimeType == "" {
+			mimeType = getMimeType(url)
 		}
 
 		parts = append(parts, GeminiChatPart{
 			InlineData: &GeminiInlineData{
-				MimeType: getMimeType(url),
+				MimeType: mimeType,
 				Data:     data,
 			},
 		})
 	}
 
 	return parts
+}
+
+func getGeminiInlineBase64Image(url string) (string, string) {
+	result, err := adaptercommon.NormalizeImageForCapability(url, adaptercommon.InlineBase64ImageInputCapability)
+	if err != nil {
+		return "", ""
+	}
+
+	return result.RawBase64, result.MIMEType
 }
 
 func toJSONObject(data string) interface{} {

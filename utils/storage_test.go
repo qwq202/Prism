@@ -165,6 +165,162 @@ func TestLocalAttachmentImageSourceIsExtractedAndReadable(t *testing.T) {
 	}
 }
 
+func TestNormalizeImageForCapabilityKeepsPublicURLWhenAvailable(t *testing.T) {
+	withStorageGlobals(t)
+
+	previousWorkingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working dir: %v", err)
+	}
+	workingDir := t.TempDir()
+	if err := os.Chdir(workingDir); err != nil {
+		t.Fatalf("chdir temp dir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(previousWorkingDir)
+	})
+
+	pixel := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	pixel.Set(0, 0, color.RGBA{A: 255, B: 255})
+	var buffer bytes.Buffer
+	if err := png.Encode(&buffer, pixel); err != nil {
+		t.Fatalf("encode png fixture: %v", err)
+	}
+	name := "0123456789abcdef0123456789abcdef.png"
+	if err := os.MkdirAll(filepath.Dir(AttachmentLocalPath(name)), 0o755); err != nil {
+		t.Fatalf("create attachment dir: %v", err)
+	}
+	if err := os.WriteFile(AttachmentLocalPath(name), buffer.Bytes(), 0o644); err != nil {
+		t.Fatalf("write attachment: %v", err)
+	}
+
+	globals.NotifyUrl = "https://media.example.com"
+
+	url := "/attachments/" + name
+	normalized, err := NormalizeImageForCapability(url, ImageInputCapability{Mode: ImageInputModeURL})
+	if err != nil {
+		t.Fatalf("normalize attachment image for url mode: %v", err)
+	}
+	if normalized.Source != globals.NotifyUrl+"/attachments/"+name {
+		t.Fatalf("expected attachment to stay as public url, got %q", normalized.Source)
+	}
+	if normalized.Mode != ImageInputModeURL {
+		t.Fatalf("expected url mode, got %q", normalized.Mode)
+	}
+}
+
+func TestNormalizeImageForCapabilityKeepsPublicAttachmentURL(t *testing.T) {
+	withStorageGlobals(t)
+
+	source := "https://media.example.com/attachments/0123456789abcdef0123456789abcdef.png"
+	normalized, err := NormalizeImageForCapability(source, URLImageInputCapability)
+	if err != nil {
+		t.Fatalf("normalize public attachment image url: %v", err)
+	}
+	if normalized.Source != source {
+		t.Fatalf("expected public attachment url to stay unchanged, got %q", normalized.Source)
+	}
+	if normalized.Mode != ImageInputModeURL {
+		t.Fatalf("expected url mode, got %q", normalized.Mode)
+	}
+}
+
+func TestNormalizeImageForCapabilityFallsBackToDataURLForInaccessibleAttachment(t *testing.T) {
+	withStorageGlobals(t)
+
+	previousWorkingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working dir: %v", err)
+	}
+	workingDir := t.TempDir()
+	if err := os.Chdir(workingDir); err != nil {
+		t.Fatalf("chdir temp dir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(previousWorkingDir)
+	})
+
+	pixel := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	pixel.Set(0, 0, color.RGBA{R: 128, G: 64, B: 32, A: 255})
+	var buffer bytes.Buffer
+	if err := png.Encode(&buffer, pixel); err != nil {
+		t.Fatalf("encode png fixture: %v", err)
+	}
+	name := "0123456789abcdef0123456789abcdee.png"
+	if err := os.MkdirAll(filepath.Dir(AttachmentLocalPath(name)), 0o755); err != nil {
+		t.Fatalf("create attachment dir: %v", err)
+	}
+	if err := os.WriteFile(AttachmentLocalPath(name), buffer.Bytes(), 0o644); err != nil {
+		t.Fatalf("write attachment: %v", err)
+	}
+
+	url := "/attachments/" + name
+	normalized, err := NormalizeImageForCapability(url, ImageInputCapability{Mode: ImageInputModeURL})
+	if err != nil {
+		t.Fatalf("normalize attachment image for url mode: %v", err)
+	}
+
+	if !strings.HasPrefix(normalized.Source, "data:image/png;base64,") {
+		t.Fatalf("expected inaccessible attachment to normalize to vision data url, got %q", normalized.Source)
+	}
+	if normalized.Mode != ImageInputModeVisionDataURL {
+		t.Fatalf("expected data url mode, got %q", normalized.Mode)
+	}
+}
+
+func TestNormalizeImageForCapabilityProvidesInlineBase64AndMimeType(t *testing.T) {
+	withStorageGlobals(t)
+
+	previousWorkingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working dir: %v", err)
+	}
+	workingDir := t.TempDir()
+	if err := os.Chdir(workingDir); err != nil {
+		t.Fatalf("chdir temp dir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(previousWorkingDir)
+	})
+
+	pixel := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	pixel.Set(0, 0, color.RGBA{G: 64, B: 128, A: 255})
+	var buffer bytes.Buffer
+	if err := png.Encode(&buffer, pixel); err != nil {
+		t.Fatalf("encode png fixture: %v", err)
+	}
+	name := "0123456789abcdef0123456789abcdef.png"
+	if err := os.MkdirAll(filepath.Dir(AttachmentLocalPath(name)), 0o755); err != nil {
+		t.Fatalf("create attachment dir: %v", err)
+	}
+	if err := os.WriteFile(AttachmentLocalPath(name), buffer.Bytes(), 0o644); err != nil {
+		t.Fatalf("write attachment: %v", err)
+	}
+
+	url := "/attachments/" + name
+	normalized, err := NormalizeImageForCapability(url, ImageInputCapability{Mode: ImageInputModeInlineBase64})
+	if err != nil {
+		t.Fatalf("normalize attachment image for inline-base64 mode: %v", err)
+	}
+	if normalized.Mode != ImageInputModeInlineBase64 {
+		t.Fatalf("expected inline-base64 mode, got %q", normalized.Mode)
+	}
+	if normalized.MIMEType != "image/png" {
+		t.Fatalf("expected inline-base64 mime image/png, got %q", normalized.MIMEType)
+	}
+
+	raw, err := ConvertToBase64(url)
+	if err != nil {
+		t.Fatalf("convert attachment to base64: %v", err)
+	}
+	if normalized.RawBase64 != raw {
+		t.Fatalf("expected inline raw base64 to match ConvertToBase64 result")
+	}
+	if !strings.HasPrefix(normalized.Source, "data:image/png;base64,") {
+		t.Fatalf("expected inline source to include data url prefix, got %q", normalized.Source)
+	}
+}
+
 func withStorageGlobals(t *testing.T) {
 	t.Helper()
 

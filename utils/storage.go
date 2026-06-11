@@ -101,6 +101,20 @@ func AttachmentPublicURL(name string) string {
 	return fmt.Sprintf("/attachments/%s", name)
 }
 
+func publicAttachmentImageURL(source string) string {
+	name, ok := attachmentNameFromSource(source)
+	if !ok {
+		return ""
+	}
+
+	publicURL := AttachmentPublicURL(name)
+	if _, err := validateRemoteImageURL(publicURL); err != nil {
+		return ""
+	}
+
+	return publicURL
+}
+
 func validateStoredAttachmentName(name string) (string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {

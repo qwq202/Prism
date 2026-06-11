@@ -7,6 +7,8 @@ import (
 	"testing"
 )
 
+const minimaxInlineBase64Png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=="
+
 func TestGetMessagesReplaysThinkingToolsAndToolResults(t *testing.T) {
 	instance := NewChatInstance("https://api.minimaxi.com/anthropic", "test")
 	toolCalls := globals.ToolCalls{
@@ -170,5 +172,51 @@ func TestParseEventJoinsMultilineData(t *testing.T) {
 	}
 	if payload != "{\"a\":\n1}" {
 		t.Fatalf("expected joined payload, got %q", payload)
+	}
+}
+
+func TestGetTextBlocksUsesInlineBase64ImageCapability(t *testing.T) {
+	instance := NewChatInstance("https://api.minimaxi.com/anthropic", "test")
+	url := "data:image/png;base64," + minimaxInlineBase64Png
+
+	props := &adaptercommon.ChatProps{
+		Model: globals.Claude3,
+		Message: []globals.Message{
+			{
+				Role:    globals.User,
+				Content: "look this " + url,
+			},
+		},
+	}
+
+	messages := instance.GetMessages(props)
+	if len(messages) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(messages))
+	}
+
+	blocks := messages[0].Content
+	if len(blocks) != 2 {
+		t.Fatalf("expected text + image blocks, got %#v", blocks)
+	}
+
+	if blocks[0].Type != "text" || blocks[0].Text == nil || *blocks[0].Text != "look this" {
+		t.Fatalf("unexpected text block: %#v", blocks[0])
+	}
+
+	if blocks[1].Type != "image" || blocks[1].Source == nil {
+		t.Fatalf("expected image block, got %#v", blocks[1])
+	}
+	if blocks[1].Source.Type != "base64" {
+		t.Fatalf("expected image source type to remain base64, got %q", blocks[1].Source.Type)
+	}
+
+	mediaType, ok := blocks[1].Source.MediaType.(string)
+	if !ok || mediaType != "image/png" {
+		t.Fatalf("expected inline-base64 image media type image/png, got %#v", blocks[1].Source.MediaType)
+	}
+
+	data, ok := blocks[1].Source.Data.(string)
+	if !ok || data != minimaxInlineBase64Png {
+		t.Fatalf("expected inline-base64 image data %q, got %#v", minimaxInlineBase64Png, data)
 	}
 }
