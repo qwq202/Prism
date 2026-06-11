@@ -3,6 +3,7 @@ import { saveAsFile, saveBlobAsFile, saveImageAsFile } from "@/utils/dom.ts";
 import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import FileViewer from "@/components/FileViewer.tsx";
+import axios from "axios";
 
 /**
  * file format:
@@ -18,7 +19,28 @@ type MarkdownFileProps = {
 };
 
 const imageUrlPattern =
-  /(https?:\/\/\S+\.(?:png|jpg|jpeg|gif|webp|heif|heic|bmp)(?:\?\S*)?|\/attachments\/[a-f0-9]{32}\.[A-Za-z0-9]+)/i;
+  /(https?:\/\/\S+\.(?:png|jpg|jpeg|gif|webp|heif|heic|bmp)(?:\?\S*)?|(?:\/api)?\/attachments\/[a-f0-9]{32}\.[A-Za-z0-9]+)/i;
+
+function normalizeImageURL(url: string): string {
+  if (!url || url.startsWith("data:image/")) return url;
+
+  try {
+    const parsed = new URL(url);
+    return parsed.href;
+  } catch {
+    // Relative URL. Continue below.
+  }
+
+  const baseURL = (axios.defaults.baseURL || "").replace(/\/+$/, "");
+  if (!url.startsWith("/") || !baseURL) return url;
+
+  if (baseURL.startsWith("http://") || baseURL.startsWith("https://")) {
+    return new URL(url, baseURL).href;
+  }
+
+  if (url === baseURL || url.startsWith(`${baseURL}/`)) return url;
+  return `${baseURL}${url}`;
+}
 
 export function MarkdownFile({ children, acceptDownload }: MarkdownFileProps) {
   const data = children?.toString() || "";
@@ -35,6 +57,7 @@ export function MarkdownFile({ children, acceptDownload }: MarkdownFileProps) {
     const match = content.match(imageUrlPattern);
     return match ? match[0] : "";
   }, [content]);
+  const imageURL = useMemo(() => normalizeImageURL(image), [image]);
 
   const b64image = useMemo(() => {
     // get base64 image from content (like: data:image/png;base64,xxxxx)
@@ -59,7 +82,7 @@ export function MarkdownFile({ children, acceptDownload }: MarkdownFileProps) {
         <Paperclip className={`mr-1 !bg-transparent`} />
         <span className={`name mr-2`}>{filename}</span>
         <div className={`grow`} />
-        {image || b64image ? (
+        {imageURL || b64image ? (
           <Button
             variant={`ghost`}
             size={`icon`}
@@ -69,7 +92,7 @@ export function MarkdownFile({ children, acceptDownload }: MarkdownFileProps) {
                 saveImageAsFile(filename, b64image);
                 return;
               }
-              const res = await fetch(image);
+              const res = await fetch(imageURL);
               saveBlobAsFile(filename, await res.blob());
             }}
           >
@@ -83,7 +106,7 @@ export function MarkdownFile({ children, acceptDownload }: MarkdownFileProps) {
           </FileViewer>
         )}
       </div>
-      {image && <img src={image} className={`file-image`} alt={""} />}
+      {imageURL && <img src={imageURL} className={`file-image`} alt={""} />}
       {b64image && <img src={b64image} className={`file-image`} alt={""} />}
     </div>
   );
