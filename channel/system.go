@@ -18,6 +18,8 @@ var saveSystemConfig = func(config *SystemConfig) error {
 	return config.SaveConfig()
 }
 
+var serverRuntimeID = fmt.Sprintf("%d", time.Now().UnixNano())
+
 type ApiInfo struct {
 	Title        string   `json:"title"`
 	Logo         string   `json:"logo"`
@@ -34,6 +36,7 @@ type ApiInfo struct {
 	Generation   []string `json:"generation"`
 	WebSearch    bool     `json:"web_search"`
 	HasTaskModel bool     `json:"has_task_model"`
+	RuntimeID    string   `json:"runtime_id"`
 }
 
 type generalState struct {
@@ -274,6 +277,7 @@ func (c *SystemConfig) AsInfo() ApiInfo {
 		Generation:   c.Common.Generation,
 		WebSearch:    strings.TrimSpace(globals.SearchApiKey) != "",
 		HasTaskModel: globals.GetTaskModel() != "",
+		RuntimeID:    serverRuntimeID,
 	}
 }
 

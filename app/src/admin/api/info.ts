@@ -31,6 +31,7 @@ export type SiteInfo = {
   payment_aggregation: boolean;
   ga_tracking_id?: string;
   broadcast?: BroadcastEvent;
+  runtime_id?: string;
 };
 
 export async function getSiteInfo(): Promise<SiteInfo> {

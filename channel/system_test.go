@@ -90,6 +90,14 @@ func TestSystemConfigUnmarshalLoadsSnakeCaseKeys(t *testing.T) {
 	}
 }
 
+func TestSystemConfigAsInfoIncludesRuntimeID(t *testing.T) {
+	conf := &SystemConfig{}
+	info := conf.AsInfo()
+	if strings.TrimSpace(info.RuntimeID) == "" {
+		t.Fatalf("expected runtime id in public info")
+	}
+}
+
 func TestSystemConfigNormalizeUsesRuntimeSafeValues(t *testing.T) {
 	conf := &SystemConfig{
 		General: generalState{
