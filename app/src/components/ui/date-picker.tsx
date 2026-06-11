@@ -110,9 +110,9 @@ const DatePicker = ({
   }, [date, open]);
 
   const updateDate = React.useCallback(
-    (next?: Date) => {
+    (next?: Date, options: { close?: boolean } = { close: true }) => {
       onValueChange?.(next ? format(next, "yyyy-MM-dd") : "");
-      if (next) setOpen(false);
+      if (next && options.close !== false) setOpen(false);
     },
     [onValueChange],
   );
@@ -125,6 +125,7 @@ const DatePicker = ({
         current.getMonth(),
         current.getDate(),
       ),
+      { close: false },
     );
   };
 
@@ -136,6 +137,7 @@ const DatePicker = ({
         current.getMonth(),
         current.getDate(),
       ),
+      { close: false },
     );
   };
 
