@@ -1,4 +1,8 @@
-import localforage from "localforage";
+import {
+  clientCacheStoreName,
+  createBrowserStorageStore,
+  legacyBrowserStorageDatabaseName,
+} from "@/utils/browser-storage.ts";
 
 type CacheEnvelope<T> = {
   version: 1;
@@ -11,6 +15,7 @@ const cacheUpdateSignalSuffix = ":updated";
 const maxLegacyCachePayloadLength = 1_500_000;
 
 let cacheStore: LocalForage | null = null;
+let legacyCacheStore: LocalForage | null = null;
 
 function isBrowser(): boolean {
   return typeof window !== "undefined";
@@ -20,14 +25,23 @@ function getCacheStore(): LocalForage | null {
   if (!isBrowser()) return null;
 
   if (!cacheStore) {
-    cacheStore = localforage.createInstance({
-      driver: localforage.INDEXEDDB,
-      name: "coai",
-      storeName: "client-cache",
-    });
+    cacheStore = createBrowserStorageStore(clientCacheStoreName);
   }
 
   return cacheStore;
+}
+
+function getLegacyCacheStore(): LocalForage | null {
+  if (!isBrowser()) return null;
+
+  if (!legacyCacheStore) {
+    legacyCacheStore = createBrowserStorageStore(
+      clientCacheStoreName,
+      legacyBrowserStorageDatabaseName,
+    );
+  }
+
+  return legacyCacheStore;
 }
 
 function getCacheKey(key: string): string {
@@ -294,6 +308,8 @@ export async function setClientCache<T>(key: string, data: T): Promise<void> {
 export async function migrateLegacyClientCaches(): Promise<void> {
   if (!isBrowser()) return;
 
+  await migrateLegacyIndexedDBClientCaches();
+
   await Promise.all(
     listLegacyCacheStorageKeys().map(async (storageKey) => {
       if (storageKey.endsWith(cacheUpdateSignalSuffix)) {
@@ -309,6 +325,37 @@ export async function migrateLegacyClientCaches(): Promise<void> {
       }
     }),
   );
+}
+
+async function migrateLegacyIndexedDBClientCaches(): Promise<void> {
+  const legacyStore = getLegacyCacheStore();
+  const store = getCacheStore();
+  if (!legacyStore || !store) return;
+
+  try {
+    const keys = await legacyStore.keys();
+    await Promise.all(
+      keys.map(async (storageKey) => {
+        const fromLegacy = parseEnvelope<unknown>(
+          await legacyStore.getItem<unknown>(storageKey),
+        );
+        if (!fromLegacy) return;
+
+        const fromCurrent = parseEnvelope<unknown>(
+          await store.getItem<unknown>(storageKey),
+        );
+
+        if (!fromCurrent || fromLegacy.updatedAt > fromCurrent.updatedAt) {
+          await store.setItem(storageKey, fromLegacy);
+        }
+      }),
+    );
+  } catch (error) {
+    console.debug(
+      "[client-cache] failed to migrate legacy IndexedDB cache",
+      error,
+    );
+  }
 }
 
 export async function removeClientCache(key: string): Promise<void> {

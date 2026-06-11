@@ -1,10 +1,15 @@
-import localforage from "localforage";
+import {
+  createBrowserStorageStore,
+  legacyBrowserStorageDatabaseName,
+  memoryStoreName,
+} from "@/utils/browser-storage.ts";
 
 const volatileKeys = new Set<string>();
 const memorySnapshot = new Map<string, string>();
 const clientCacheStoragePrefix = "api-cache:";
 
 let memoryStore: LocalForage | null = null;
+let legacyMemoryStore: LocalForage | null = null;
 let memoryInitialization: Promise<void> | null = null;
 
 function isBrowser(): boolean {
@@ -15,14 +20,23 @@ function getMemoryStore(): LocalForage | null {
   if (!isBrowser()) return null;
 
   if (!memoryStore) {
-    memoryStore = localforage.createInstance({
-      driver: localforage.INDEXEDDB,
-      name: "coai",
-      storeName: "memory",
-    });
+    memoryStore = createBrowserStorageStore(memoryStoreName);
   }
 
   return memoryStore;
+}
+
+function getLegacyMemoryStore(): LocalForage | null {
+  if (!isBrowser()) return null;
+
+  if (!legacyMemoryStore) {
+    legacyMemoryStore = createBrowserStorageStore(
+      memoryStoreName,
+      legacyBrowserStorageDatabaseName,
+    );
+  }
+
+  return legacyMemoryStore;
 }
 
 function normalizeMemoryValue(value: string): string {
@@ -228,12 +242,36 @@ export async function initializeMemoryStorage(): Promise<void> {
 
   if (!memoryInitialization) {
     memoryInitialization = (async () => {
+      await migrateLegacyIndexedDBMemory();
       await loadPersistentMemorySnapshot();
       await migrateLegacyMemory();
     })();
   }
 
   await memoryInitialization;
+}
+
+async function migrateLegacyIndexedDBMemory(): Promise<void> {
+  const legacyStore = getLegacyMemoryStore();
+  const store = getMemoryStore();
+  if (!legacyStore || !store) return;
+
+  try {
+    const keys = await legacyStore.keys();
+    await Promise.all(
+      keys.map(async (key) => {
+        const value = await legacyStore.getItem<unknown>(key);
+        if (typeof value !== "string") return;
+
+        const current = await store.getItem<unknown>(key);
+        if (current === null) {
+          await store.setItem(key, normalizeMemoryValue(value));
+        }
+      }),
+    );
+  } catch (error) {
+    console.debug("[memory] failed to migrate legacy IndexedDB memory", error);
+  }
 }
 
 export function markVolatileMemoryKey(key: string) {
