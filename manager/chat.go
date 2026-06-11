@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"runtime/debug"
 	"strings"
 
@@ -337,43 +336,6 @@ func (l realtimeQuotaLimiter) exhausted(quota float32) bool {
 	return l.enabled && quota+realtimeQuotaEpsilon >= l.limit
 }
 
-func (l realtimeQuotaLimiter) maxOutputTokens(buffer *utils.Buffer) *int {
-	if !l.enabled || buffer == nil || l.limit >= 1e30 {
-		return nil
-	}
-
-	charge := buffer.GetCharge()
-	if charge == nil || !charge.IsBillingType(globals.TokenBilling) || charge.GetOutput() <= 0 {
-		return nil
-	}
-
-	remainingQuota := l.limit - realtimeQuotaForBuffer(buffer)
-	if remainingQuota <= 0 {
-		tokens := 1
-		return &tokens
-	}
-
-	tokens := int(math.Floor(float64(remainingQuota / charge.GetOutput() * 1000)))
-	if tokens < 1 {
-		tokens = 1
-	}
-	return &tokens
-}
-
-func (l realtimeQuotaLimiter) applyMaxOutputTokens(props *adaptercommon.ChatProps, buffer *utils.Buffer) {
-	if props == nil {
-		return
-	}
-
-	maxTokens := l.maxOutputTokens(buffer)
-	if maxTokens == nil {
-		return
-	}
-	if props.MaxTokens == nil || *props.MaxTokens > *maxTokens {
-		props.MaxTokens = maxTokens
-	}
-}
-
 func (l realtimeQuotaLimiter) allowsProjectedChunk(buffer *utils.Buffer, chunk *globals.Chunk) bool {
 	if !l.enabled || buffer == nil {
 		return true
@@ -636,12 +598,6 @@ func createRoundTask(
 	defer func() {
 		stopPolling()
 	}()
-
-	quotaBuffer := streamBuffer
-	if quotaBuffer == nil {
-		quotaBuffer = captureBuffer
-	}
-	limiter.applyMaxOutputTokens(props, quotaBuffer)
 
 	go func() {
 		defer func() {
@@ -1380,7 +1336,6 @@ func createChatTask(
 			RepetitionPenalty:    instance.GetRepetitionPenalty(),
 			ClientContext:        extractClientContext(conn.GetCtx()),
 		}, buffer)
-		limiter.applyMaxOutputTokens(props, buffer)
 
 		hit, err := channel.NewChatRequestWithCache(
 			cache, buffer,

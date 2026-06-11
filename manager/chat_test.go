@@ -363,10 +363,6 @@ func TestRealtimeQuotaLimiterRejectsOfficialUsageOverflow(t *testing.T) {
 
 	buffer := utils.NewBuffer(globals.GPT3Turbo, nil, chatTokenTestCharge{})
 	limiter := newRealtimeQuotaLimiter(db, cache, user, globals.GPT3Turbo, true)
-	maxTokens := limiter.maxOutputTokens(buffer)
-	if maxTokens == nil || *maxTokens != 490 {
-		t.Fatalf("expected max output tokens to be capped at 490, got %#v", maxTokens)
-	}
 	if limiter.allowsProjectedChunk(buffer, &globals.Chunk{
 		Usage: &globals.TokenUsage{
 			CompletionTokens: 720,
