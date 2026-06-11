@@ -291,6 +291,26 @@ export async function setClientCache<T>(key: string, data: T): Promise<void> {
   }
 }
 
+export async function migrateLegacyClientCaches(): Promise<void> {
+  if (!isBrowser()) return;
+
+  await Promise.all(
+    listLegacyCacheStorageKeys().map(async (storageKey) => {
+      if (storageKey.endsWith(cacheUpdateSignalSuffix)) {
+        removeLegacyLocalStorage(storageKey);
+        return;
+      }
+
+      const envelope = readLegacyLocalStorage<unknown>(storageKey);
+      if (!envelope) return;
+
+      if (await writeToIndexedDB(storageKey, envelope)) {
+        removeLegacyLocalStorage(storageKey);
+      }
+    }),
+  );
+}
+
 export async function removeClientCache(key: string): Promise<void> {
   if (!isBrowser()) return;
 

@@ -1,11 +1,10 @@
 import { updateDocumentTitle, updateFavicon } from "@/utils/dom.ts";
-import { setMemory } from "@/utils/memory.ts";
+import { getMemory, setMemory } from "@/utils/memory.ts";
 
 export let appName =
-  localStorage.getItem("app_name") || import.meta.env.VITE_APP_NAME || "Prism";
+  getMemory("app_name", import.meta.env.VITE_APP_NAME || "Prism") || "Prism";
 export let appLogo =
-  localStorage.getItem("app_logo") ||
-  import.meta.env.VITE_APP_LOGO ||
+  getMemory("app_logo", import.meta.env.VITE_APP_LOGO || "/favicon.svg") ||
   "/favicon.svg";
 const safeExternalProtocols = new Set(["http:", "https:", "mailto:", "tel:"]);
 
@@ -25,11 +24,11 @@ function normalizeExternalUrl(
 }
 
 export let docsEndpoint = normalizeExternalUrl(
-  localStorage.getItem("docs_url") || import.meta.env.VITE_DOCS_ENDPOINT,
+  getMemory("docs_url", import.meta.env.VITE_DOCS_ENDPOINT),
   "https://coai.dev",
 );
 export let buyLink = normalizeExternalUrl(
-  localStorage.getItem("buy_link") || import.meta.env.VITE_BUY_LINK,
+  getMemory("buy_link", import.meta.env.VITE_BUY_LINK),
   "",
 );
 
@@ -73,8 +72,7 @@ export function getWebsocketApi(deploy: boolean): string {
   if (!deploy) return "ws://localhost:8094";
 
   const apiEndpoint = backendEndpoint;
-  if (apiEndpoint.startsWith("http://"))
-    return `ws://${apiEndpoint.slice(7)}`;
+  if (apiEndpoint.startsWith("http://")) return `ws://${apiEndpoint.slice(7)}`;
   if (apiEndpoint.startsWith("https://"))
     return `wss://${apiEndpoint.slice(8)}`;
   if (apiEndpoint.startsWith("/"))
@@ -86,14 +84,14 @@ export function getWebsocketApi(deploy: boolean): string {
 
 export function getTokenField(deploy: boolean): string {
   /**
-   * return the token field name in localStorage
+   * return the token field name in persistent browser storage
    */
   return deploy ? "token" : "token-dev";
 }
 
 export function setAppName(name: string): void {
   /**
-   * set the app name in localStorage
+   * set the app name in persistent browser storage
    */
   name = name.trim() || "Prism";
   setMemory("app_name", name);
@@ -104,7 +102,7 @@ export function setAppName(name: string): void {
 
 export function setAppLogo(logo: string): void {
   /**
-   * set the app logo in localStorage
+   * set the app logo in persistent browser storage
    */
   logo = logo.trim() || "/favicon.svg";
   setMemory("app_logo", logo);
@@ -115,7 +113,7 @@ export function setAppLogo(logo: string): void {
 
 export function setDocsUrl(url: string): void {
   /**
-   * set the docs url in localStorage
+   * set the docs url in persistent browser storage
    */
   url = normalizeExternalUrl(url, "https://coai.dev");
   setMemory("docs_url", url);
@@ -124,7 +122,7 @@ export function setDocsUrl(url: string): void {
 
 export function setBuyLink(link: string): void {
   /**
-   * set the buy link in localStorage
+   * set the buy link in persistent browser storage
    */
   link = normalizeExternalUrl(link, "");
   setMemory("buy_link", link);
