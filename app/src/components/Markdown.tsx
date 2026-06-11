@@ -19,7 +19,10 @@ type RehypePlugin = NonNullable<
 >[number];
 
 const rehypeRawPlugin = rehypeRaw as unknown as RehypePlugin;
-const rehypeKatexPlugin = rehypeKatex as unknown as RehypePlugin;
+const rehypeKatexPlugin = [
+  rehypeKatex,
+  { strict: false },
+] as unknown as RehypePlugin;
 const maxRichMarkdownLength = 200_000;
 
 type HastNode = {
