@@ -10,7 +10,7 @@ const clientCacheStoragePrefix = "api-cache:";
 
 let memoryStore: LocalForage | null = null;
 let legacyMemoryStore: LocalForage | null = null;
-let memoryInitialization: Promise<void> | null = null;
+let memoryInitialization: Promise<boolean> | null = null;
 
 function isBrowser(): boolean {
   return typeof window !== "undefined";
@@ -186,9 +186,9 @@ async function clearPersistentMemory(): Promise<void> {
   clearLegacyMemory();
 }
 
-async function loadPersistentMemorySnapshot(): Promise<void> {
+async function loadPersistentMemorySnapshot(): Promise<boolean> {
   const store = getMemoryStore();
-  if (!store) return;
+  if (!store) return false;
 
   try {
     const keys = await store.keys();
@@ -200,24 +200,26 @@ async function loadPersistentMemorySnapshot(): Promise<void> {
         }
       }),
     );
+    return true;
   } catch (error) {
     console.debug("[memory] failed to read from IndexedDB", error);
+    return false;
   }
 }
 
-async function migrateLegacyMemory(): Promise<void> {
-  if (!isBrowser()) return;
+async function migrateLegacyMemory(): Promise<boolean> {
+  if (!isBrowser()) return true;
 
   const keys = listLegacyMemoryKeys().filter(
     (key) => !key.startsWith(clientCacheStoragePrefix),
   );
 
-  await Promise.all(
+  const results = await Promise.all(
     keys.map(async (key) => {
       const value = getLegacyMemory(key);
       if (!value) {
         removeLegacyMemory(key);
-        return;
+        return true;
       }
 
       const normalized = normalizeMemoryValue(value);
@@ -227,50 +229,72 @@ async function migrateLegacyMemory(): Promise<void> {
         }
         memorySnapshot.delete(key);
         removeLegacyMemory(key);
-        return;
+        return true;
       }
 
       if (await setPersistentMemory(key, normalized)) {
         memorySnapshot.set(key, normalized);
+        return true;
       }
+
+      return false;
     }),
   );
+
+  return results.every(Boolean);
 }
 
-export async function initializeMemoryStorage(): Promise<void> {
-  if (!isBrowser()) return;
+export async function initializeMemoryStorage(): Promise<boolean> {
+  if (!isBrowser()) return true;
 
   if (!memoryInitialization) {
     memoryInitialization = (async () => {
-      await migrateLegacyIndexedDBMemory();
-      await loadPersistentMemorySnapshot();
-      await migrateLegacyMemory();
+      const legacyIndexedDBMigrated = await migrateLegacyIndexedDBMemory();
+      const snapshotLoaded = await loadPersistentMemorySnapshot();
+      const legacyLocalStorageMigrated = await migrateLegacyMemory();
+
+      return (
+        legacyIndexedDBMigrated && snapshotLoaded && legacyLocalStorageMigrated
+      );
     })();
   }
 
-  await memoryInitialization;
+  return await memoryInitialization;
 }
 
-async function migrateLegacyIndexedDBMemory(): Promise<void> {
+async function migrateLegacyIndexedDBMemory(): Promise<boolean> {
   const legacyStore = getLegacyMemoryStore();
   const store = getMemoryStore();
-  if (!legacyStore || !store) return;
+  if (!legacyStore || !store) return false;
 
   try {
     const keys = await legacyStore.keys();
-    await Promise.all(
+    const results = await Promise.all(
       keys.map(async (key) => {
-        const value = await legacyStore.getItem<unknown>(key);
-        if (typeof value !== "string") return;
+        try {
+          const value = await legacyStore.getItem<unknown>(key);
+          if (typeof value !== "string") return true;
 
-        const current = await store.getItem<unknown>(key);
-        if (current === null) {
-          await store.setItem(key, normalizeMemoryValue(value));
+          const current = await store.getItem<unknown>(key);
+          if (current === null) {
+            await store.setItem(key, normalizeMemoryValue(value));
+          }
+          return true;
+        } catch (error) {
+          console.debug(
+            "[memory] failed to migrate legacy IndexedDB memory key",
+            key,
+            error,
+          );
+          return false;
         }
       }),
     );
+
+    return results.every(Boolean);
   } catch (error) {
     console.debug("[memory] failed to migrate legacy IndexedDB memory", error);
+    return false;
   }
 }
 

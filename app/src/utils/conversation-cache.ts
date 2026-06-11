@@ -14,6 +14,7 @@ type ConversationSerializedCache = {
   model?: string;
   messages: ConversationInstance["message"];
   updated_at?: string;
+  cache_complete?: boolean;
 };
 
 function hashCacheScope(value: string): string {
@@ -43,9 +44,7 @@ function getConversationCacheKeyPrefix(): string {
   return `conversation:${getCacheScope()}:`;
 }
 
-export function isConversationListCacheStorageKey(
-  key: string | null,
-): boolean {
+export function isConversationListCacheStorageKey(key: string | null): boolean {
   return (
     key === getClientCacheStorageKey(getConversationListCacheKey()) ||
     key === getClientCacheUpdateStorageKey(getConversationListCacheKey())

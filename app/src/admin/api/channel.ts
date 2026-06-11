@@ -2,6 +2,7 @@ import { Channel } from "@/admin/channel.ts";
 import axios from "axios";
 import { getErrorMessage } from "@/utils/base.ts";
 import { CommonResponse } from "@/api/common.ts";
+import { asArray, asNumber, asRecord, asString } from "./normalize.ts";
 
 const adminAnalyticsNoCacheConfig = {
   prismCache: false,
@@ -10,24 +11,6 @@ const adminAnalyticsNoCacheConfig = {
     Pragma: "no-cache",
   },
 } as const;
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value !== null && typeof value === "object"
-    ? (value as Record<string, unknown>)
-    : {};
-}
-
-function asArray<T>(value: unknown): T[] {
-  return Array.isArray(value) ? (value as T[]) : [];
-}
-
-function asNumber(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-function asString(value: unknown): string {
-  return typeof value === "string" ? value : "";
-}
 
 export type ChannelListResponse = CommonResponse & {
   data: Channel[];

@@ -114,6 +114,7 @@ export type ConversationSerialized = {
   model?: string;
   messages: Message[];
   updated_at?: string;
+  cache_complete?: boolean;
   local_pending_until?: number;
   local_revision?: number;
 };
@@ -378,6 +379,8 @@ function shouldReplaceConversation(
     return false;
   }
 
+  if (currentConversation.cache_complete === false) return true;
+
   if (incoming.message.length < currentConversation.messages.length) {
     if (isStreamingConversation(currentConversation)) return false;
     if (currentVersion !== undefined && incomingVersion !== undefined) {
@@ -393,53 +396,17 @@ function shouldReplaceConversation(
     }
   }
 
-  if (
-    isAttachmentContentRegression(
-      currentConversation.messages,
-      incoming.message,
-    )
-  ) {
-    return false;
-  }
-
   return incoming.message.length >= currentConversation.messages.length;
 }
 
-function countFileAttachmentMarkers(content: string): number {
-  return content.match(/```file\n\[\[[^\n]*]]/g)?.length ?? 0;
-}
-
-function getAttachmentContentStats(messages: Message[]): {
-  markers: number;
-  contentLength: number;
-} {
-  return messages.reduce(
-    (stats, message) => {
-      const markers = countFileAttachmentMarkers(message.content);
-      if (markers === 0) return stats;
-
-      return {
-        markers: stats.markers + markers,
-        contentLength: stats.contentLength + message.content.length,
-      };
-    },
-    { markers: 0, contentLength: 0 },
-  );
-}
-
-function isAttachmentContentRegression(
-  currentMessages: Message[],
-  incomingMessages: Message[],
+function shouldReplaceCachedConversation(
+  currentConversation: ConversationSerialized | undefined,
+  incomingConversation: ConversationSerialized,
 ): boolean {
-  const current = getAttachmentContentStats(currentMessages);
-  if (current.markers === 0) return false;
-
-  const incoming = getAttachmentContentStats(incomingMessages);
-  if (incoming.markers < current.markers) return true;
-
+  if (!currentConversation) return true;
   return (
-    incoming.markers === current.markers &&
-    incoming.contentLength < current.contentLength
+    incomingConversation.cache_complete !== false ||
+    currentConversation.cache_complete === false
   );
 }
 
@@ -1161,6 +1128,12 @@ const chatSlice = createSlice({
         id: number;
       };
 
+      if (
+        !shouldReplaceCachedConversation(state.conversations[id], conversation)
+      ) {
+        return;
+      }
+
       state.conversations[id] = conversation;
       if (state.current === id) {
         state.loadingConversationId = null;
@@ -1187,6 +1160,7 @@ const chatSlice = createSlice({
         model: conversation.model,
         messages: conversation.message,
         updated_at: conversation.updated_at,
+        cache_complete: true,
       };
       state.conversations[id] = nextConversation;
       if (state.current === id) {
@@ -1763,6 +1737,7 @@ export function useConversationActions() {
           model: cached.model,
           messages: cached.messages,
           updated_at: cached.updated_at,
+          cache_complete: cached.cache_complete === true,
         };
         dispatch(
           setConversation({

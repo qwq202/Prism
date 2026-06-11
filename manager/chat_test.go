@@ -376,6 +376,26 @@ func TestRealtimeQuotaLimiterRejectsOfficialUsageOverflow(t *testing.T) {
 	}
 }
 
+func TestRealtimeQuotaLimiterGuardReturnsInterruptWithoutMutatingBuffer(t *testing.T) {
+	useChatTokenTestChargeInstance(t)
+
+	buffer := utils.NewBuffer(globals.GPT3Turbo, nil, chatTokenTestCharge{})
+	limiter := realtimeQuotaLimiter{enabled: true, limit: 0.49}
+
+	err := limiter.guardProjectedChunk(buffer, &globals.Chunk{
+		Usage: &globals.TokenUsage{
+			CompletionTokens: 720,
+			TotalTokens:      720,
+		},
+	}, globals.GPT3Turbo, "test")
+	if !isRealtimeQuotaLimitError(err) {
+		t.Fatalf("expected realtime quota interrupt error, got %v", err)
+	}
+	if !buffer.IsEmpty() {
+		t.Fatalf("expected rejected projected usage not to mutate buffer")
+	}
+}
+
 func TestRealtimeQuotaLimiterRejectsSplitBufferOfficialUsageOverflow(t *testing.T) {
 	liveBuffer := utils.NewBuffer(globals.GPT3Turbo, nil, chatTokenTestCharge{})
 	roundBuffer := utils.NewBuffer(globals.GPT3Turbo, nil, chatTokenTestCharge{})

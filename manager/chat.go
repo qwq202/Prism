@@ -288,6 +288,9 @@ func createChatBillingRecord(db *sql.DB, user *auth.User, model string, buffer *
 }
 
 const realtimeQuotaEpsilon = float32(0.0001)
+const realtimeQuotaLimitErrorMessage = "interrupted: quota limit"
+
+var errRealtimeQuotaLimit = errors.New(realtimeQuotaLimitErrorMessage)
 
 type realtimeQuotaLimiter struct {
 	enabled bool
@@ -377,6 +380,28 @@ func (l realtimeQuotaLimiter) allowsProjectedSplitChunk(streamBuffer *utils.Buff
 	}
 
 	return l.allows(l.projectedSplitChunkQuota(streamBuffer, captureBuffer, chunk))
+}
+
+func isRealtimeQuotaLimitError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), realtimeQuotaLimitErrorMessage)
+}
+
+func (l realtimeQuotaLimiter) guardProjectedChunk(buffer *utils.Buffer, chunk *globals.Chunk, model string, clientIP string) error {
+	if l.allowsProjectedChunk(buffer, chunk) {
+		return nil
+	}
+
+	globals.Info(fmt.Sprintf("realtime quota limit reached for chat request (model: %s, client: %s)", model, clientIP))
+	return errRealtimeQuotaLimit
+}
+
+func (l realtimeQuotaLimiter) guardProjectedSplitChunk(streamBuffer *utils.Buffer, captureBuffer *utils.Buffer, chunk *globals.Chunk, model string, clientIP string) error {
+	if l.allowsProjectedSplitChunk(streamBuffer, captureBuffer, chunk) {
+		return nil
+	}
+
+	globals.Info(fmt.Sprintf("realtime quota limit reached for chat request (model: %s, client: %s)", model, clientIP))
+	return errRealtimeQuotaLimit
 }
 
 type partialChunk struct {
@@ -1150,9 +1175,11 @@ func createNativeToolChatTask(
 	baseBuffer *utils.Buffer,
 	model string,
 	group string,
+	clientIP string,
 	segment []globals.Message,
 	tools *globals.FunctionTools,
 	maxToolRounds int,
+	limiter realtimeQuotaLimiter,
 	buildProps nativeToolPropsBuilder,
 ) (hit bool, err error) {
 	if tools == nil || len(*tools) == 0 {
@@ -1182,9 +1209,15 @@ func createNativeToolChatTask(
 			props.OriginalModel = model
 		}
 		if err = channel.NewChatRequest(group, props, func(resp *globals.Chunk) error {
+			if err := limiter.guardProjectedSplitChunk(baseBuffer, roundBuffer, resp, model, clientIP); err != nil {
+				return err
+			}
 			roundBuffer.WriteChunk(resp)
 			return nil
 		}); err != nil {
+			if isRealtimeQuotaLimitError(err) {
+				appendNativeFinalResponse(baseBuffer, roundBuffer)
+			}
 			return hit, err
 		}
 
@@ -1235,9 +1268,15 @@ func createNativeToolChatTask(
 		props.OriginalModel = model
 	}
 	if err = channel.NewChatRequest(group, props, func(resp *globals.Chunk) error {
+		if err := limiter.guardProjectedSplitChunk(baseBuffer, finalBuffer, resp, model, clientIP); err != nil {
+			return err
+		}
 		finalBuffer.WriteChunk(resp)
 		return nil
 	}); err != nil {
+		if isRealtimeQuotaLimitError(err) {
+			appendNativeFinalResponse(baseBuffer, finalBuffer)
+		}
 		return hit, err
 	}
 

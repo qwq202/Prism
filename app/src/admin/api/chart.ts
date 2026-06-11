@@ -14,12 +14,19 @@ import {
   RegistrationChartResponse,
   RequestChartResponse,
   UserData,
-  UserSubscriptionWindowData,
   UserResponse,
   UserTypeChartResponse,
 } from "@/admin/types.ts";
 import axios, { type AxiosRequestConfig } from "axios";
 import { getErrorMessage } from "@/utils/base.ts";
+import {
+  asArray,
+  asNumber,
+  asRecord,
+  asString,
+  asUserRecord,
+  normalizeSubscriptionWindows,
+} from "./normalize.ts";
 
 export const initialAdminInfoState: InfoResponse = {
   subscription_count: 0,
@@ -65,24 +72,6 @@ const initialUserTypeChartState: UserTypeChartResponse = {
   pro_plan: 0,
 };
 
-function asRecord(value: unknown): Record<string, unknown> {
-  return value !== null && typeof value === "object"
-    ? (value as Record<string, unknown>)
-    : {};
-}
-
-function asArray<T>(value: unknown): T[] {
-  return Array.isArray(value) ? (value as T[]) : [];
-}
-
-function asString(value: unknown): string {
-  return typeof value === "string" ? value : "";
-}
-
-function asNumber(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
 function normalizeStringArray(value: unknown): string[] {
   return asArray<unknown>(value).map((item) => String(item ?? ""));
 }
@@ -116,7 +105,9 @@ function normalizeModelChart(value: unknown): ModelChartResponse {
           data: normalizeNumberArray(record.data),
         };
       })
-      .filter((item): item is ModelChartResponse["value"][number] => item !== null),
+      .filter(
+        (item): item is ModelChartResponse["value"][number] => item !== null,
+      ),
   };
 }
 
@@ -157,12 +148,13 @@ function normalizeFunnel(value: unknown): ConversionFunnelResponse {
 }
 
 function normalizeUser(value: unknown): UserData | null {
-  if (value === null || typeof value !== "object") return null;
+  const user = asUserRecord(value);
+  if (!user) return null;
+  const userData = user as Omit<UserData, "subscription_windows">;
 
-  const user = value as UserData & { subscription_windows?: unknown };
   return {
-    ...user,
-    subscription_windows: asArray<UserSubscriptionWindowData>(
+    ...userData,
+    subscription_windows: normalizeSubscriptionWindows(
       user.subscription_windows,
     ),
   };
@@ -521,7 +513,10 @@ export async function releaseAllUsageOperation(
   type: ReleaseUsageType,
 ): Promise<CommonResponse> {
   try {
-    const response = await axios.post("/admin/user/release", { all: true, type });
+    const response = await axios.post("/admin/user/release", {
+      all: true,
+      type,
+    });
     return response.data as CommonResponse;
   } catch (e) {
     return { status: false, message: getErrorMessage(e) };

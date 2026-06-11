@@ -41,6 +41,7 @@ func NativeChatHandler(c *gin.Context, user *auth.User, model string, message []
 	}
 
 	buffer := utils.NewBuffer(model, segment, channel.ChargeInstance.GetCharge(model))
+	limiter := newRealtimeQuotaLimiter(db, cache, user, model, plan)
 	buildProps := func(
 		segment []globals.Message,
 		requestBuffer *utils.Buffer,
@@ -68,13 +69,16 @@ func NativeChatHandler(c *gin.Context, user *auth.User, model string, message []
 	webSearchToolEnabled := canUseTavilySearchTool(enableWeb, model, toolCallsSupported)
 	tools := buildAvailableToolDefinitions(false, false, webSearchToolEnabled)
 	if tools != nil {
-		hit, err = createNativeToolChatTask(buffer, model, group, segment, tools, memory.MaxToolRounds, buildProps)
+		hit, err = createNativeToolChatTask(buffer, model, group, c.ClientIP(), segment, tools, memory.MaxToolRounds, limiter, buildProps)
 	} else {
 		hit, err = channel.NewChatRequestWithCache(
 			cache, buffer,
 			group,
 			buildProps(segment, buffer, nil, nil, false),
 			func(resp *globals.Chunk) error {
+				if err := limiter.guardProjectedChunk(buffer, resp, model, c.ClientIP()); err != nil {
+					return err
+				}
 				buffer.WriteChunk(resp)
 				return nil
 			},
@@ -84,6 +88,12 @@ func NativeChatHandler(c *gin.Context, user *auth.User, model string, message []
 	admin.AnalyseRequest(model, buffer, err)
 	billing.RecordModelUsageMetric(db, model, buffer, err)
 	if err != nil {
+		if isRealtimeQuotaLimitError(err) && buffer.HasVisiblePayload() {
+			CollectQuota(c, user, buffer, plan, err)
+			createChatBillingRecord(db, user, model, buffer)
+			return buffer.ReadWithDefault(defaultMessage), buffer.GetRecordQuota()
+		}
+
 		auth.RevertSubscriptionUsage(db, cache, user, model)
 		return err.Error(), 0
 	}

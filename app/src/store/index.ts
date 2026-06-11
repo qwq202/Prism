@@ -48,8 +48,10 @@ function getCacheableConversation(conversation: ConversationSerialized): {
   model: ConversationSerialized["model"];
   messages: ConversationSerialized["messages"];
   updated_at: ConversationSerialized["updated_at"];
+  cache_complete: ConversationSerialized["cache_complete"];
 } {
-  const messages = isStreamingConversation(conversation)
+  const streaming = isStreamingConversation(conversation);
+  const messages = streaming
     ? conversation.messages.slice(0, -1)
     : conversation.messages;
 
@@ -57,6 +59,7 @@ function getCacheableConversation(conversation: ConversationSerialized): {
     model: conversation.model,
     messages,
     updated_at: conversation.updated_at,
+    cache_complete: !streaming && conversation.cache_complete !== false,
   };
 }
 

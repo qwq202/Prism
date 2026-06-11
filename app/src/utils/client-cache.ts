@@ -242,6 +242,46 @@ async function writeToIndexedDB<T>(
   }
 }
 
+async function writeToIndexedDBIfNewer<T>(
+  storageKey: string,
+  envelope: CacheEnvelope<T>,
+): Promise<boolean> {
+  const store = getCacheStore();
+  if (!store) return false;
+
+  try {
+    const current = parseEnvelope<T>(await store.getItem<unknown>(storageKey));
+    if (current && current.updatedAt >= envelope.updatedAt) return true;
+
+    await store.setItem(storageKey, envelope);
+    return true;
+  } catch (error) {
+    console.debug(
+      "[client-cache] failed to migrate to IndexedDB",
+      storageKey,
+      error,
+    );
+    return false;
+  }
+}
+
+type CacheCandidate<T> = {
+  source: "indexeddb" | "legacy";
+  envelope: CacheEnvelope<T>;
+};
+
+function getFreshestCacheCandidate<T>(
+  candidates: CacheCandidate<T>[],
+): CacheCandidate<T> | undefined {
+  return candidates.reduce<CacheCandidate<T> | undefined>((freshest, item) => {
+    if (!freshest || item.envelope.updatedAt > freshest.envelope.updatedAt) {
+      return item;
+    }
+
+    return freshest;
+  }, undefined);
+}
+
 export async function getClientCache<T>(
   key: string,
   maxAgeMs?: number,
@@ -252,10 +292,7 @@ export async function getClientCache<T>(
   const fromIndexedDB = await readFromIndexedDB<T>(storageKey);
   const fromLegacy = readLegacyLocalStorage<T>(storageKey);
 
-  const candidates: {
-    source: "indexeddb" | "legacy";
-    envelope: CacheEnvelope<T>;
-  }[] = [];
+  const candidates: CacheCandidate<T>[] = [];
 
   if (fromIndexedDB && !isExpired(fromIndexedDB.updatedAt, maxAgeMs)) {
     candidates.push({ source: "indexeddb", envelope: fromIndexedDB });
@@ -264,14 +301,11 @@ export async function getClientCache<T>(
     candidates.push({ source: "legacy", envelope: fromLegacy });
   }
 
-  if (candidates.length === 0) return undefined;
-
-  const selected = candidates.sort(
-    (left, right) => right.envelope.updatedAt - left.envelope.updatedAt,
-  )[0];
+  const selected = getFreshestCacheCandidate(candidates);
+  if (!selected) return undefined;
 
   if (selected.source === "legacy") {
-    if (await writeToIndexedDB(storageKey, selected.envelope)) {
+    if (await writeToIndexedDBIfNewer(storageKey, selected.envelope)) {
       removeLegacyLocalStorage(storageKey);
     }
   } else if (
@@ -305,56 +339,57 @@ export async function setClientCache<T>(key: string, data: T): Promise<void> {
   }
 }
 
-export async function migrateLegacyClientCaches(): Promise<void> {
-  if (!isBrowser()) return;
+export async function migrateLegacyClientCaches(): Promise<boolean> {
+  if (!isBrowser()) return true;
 
-  await migrateLegacyIndexedDBClientCaches();
+  const indexedDBMigrated = await migrateLegacyIndexedDBClientCaches();
 
-  await Promise.all(
+  const localStorageResults = await Promise.all(
     listLegacyCacheStorageKeys().map(async (storageKey) => {
       if (storageKey.endsWith(cacheUpdateSignalSuffix)) {
         removeLegacyLocalStorage(storageKey);
-        return;
+        return true;
       }
 
       const envelope = readLegacyLocalStorage<unknown>(storageKey);
-      if (!envelope) return;
+      if (!envelope) return true;
 
-      if (await writeToIndexedDB(storageKey, envelope)) {
+      if (await writeToIndexedDBIfNewer(storageKey, envelope)) {
         removeLegacyLocalStorage(storageKey);
+        return true;
       }
+
+      return false;
     }),
   );
+
+  return indexedDBMigrated && localStorageResults.every(Boolean);
 }
 
-async function migrateLegacyIndexedDBClientCaches(): Promise<void> {
+async function migrateLegacyIndexedDBClientCaches(): Promise<boolean> {
   const legacyStore = getLegacyCacheStore();
-  const store = getCacheStore();
-  if (!legacyStore || !store) return;
+  if (!legacyStore || !getCacheStore()) return false;
 
   try {
     const keys = await legacyStore.keys();
-    await Promise.all(
+    const results = await Promise.all(
       keys.map(async (storageKey) => {
         const fromLegacy = parseEnvelope<unknown>(
           await legacyStore.getItem<unknown>(storageKey),
         );
-        if (!fromLegacy) return;
+        if (!fromLegacy) return true;
 
-        const fromCurrent = parseEnvelope<unknown>(
-          await store.getItem<unknown>(storageKey),
-        );
-
-        if (!fromCurrent || fromLegacy.updatedAt > fromCurrent.updatedAt) {
-          await store.setItem(storageKey, fromLegacy);
-        }
+        return await writeToIndexedDBIfNewer(storageKey, fromLegacy);
       }),
     );
+
+    return results.every(Boolean);
   } catch (error) {
     console.debug(
       "[client-cache] failed to migrate legacy IndexedDB cache",
       error,
     );
+    return false;
   }
 }
 
