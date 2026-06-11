@@ -119,15 +119,6 @@ async function ensureGrokCompatibleImage(file: File, model: Model): Promise<File
   }
 }
 
-export async function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error("Failed to read file"));
-  });
-}
-
 export function checkFileSuffix(
   filename: string,
   suffixes: string | string[],
@@ -168,9 +159,7 @@ export async function quickBlobParser(
       onProgress?.(100);
       return attachmentUrl;
     }
-    const base64 = await fileToBase64(imageFile);
-    onProgress?.(100);
-    return base64;
+    throw new Error("Failed to upload image attachment");
   } catch (e) {
     console.error("[parser] local image parser failed:", e);
     throw e instanceof Error ? e : new Error("Failed to process image");
@@ -195,7 +184,7 @@ async function uploadImageAttachment(file: File): Promise<string> {
 
     return data.url;
   } catch (error) {
-    console.warn("[parser] failed to upload image attachment, fallback to base64:", error);
+    console.warn("[parser] failed to upload image attachment:", error);
     return "";
   }
 }
