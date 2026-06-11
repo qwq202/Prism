@@ -393,7 +393,54 @@ function shouldReplaceConversation(
     }
   }
 
+  if (
+    isAttachmentContentRegression(
+      currentConversation.messages,
+      incoming.message,
+    )
+  ) {
+    return false;
+  }
+
   return incoming.message.length >= currentConversation.messages.length;
+}
+
+function countFileAttachmentMarkers(content: string): number {
+  return content.match(/```file\n\[\[[^\n]*]]/g)?.length ?? 0;
+}
+
+function getAttachmentContentStats(messages: Message[]): {
+  markers: number;
+  contentLength: number;
+} {
+  return messages.reduce(
+    (stats, message) => {
+      const markers = countFileAttachmentMarkers(message.content);
+      if (markers === 0) return stats;
+
+      return {
+        markers: stats.markers + markers,
+        contentLength: stats.contentLength + message.content.length,
+      };
+    },
+    { markers: 0, contentLength: 0 },
+  );
+}
+
+function isAttachmentContentRegression(
+  currentMessages: Message[],
+  incomingMessages: Message[],
+): boolean {
+  const current = getAttachmentContentStats(currentMessages);
+  if (current.markers === 0) return false;
+
+  const incoming = getAttachmentContentStats(incomingMessages);
+  if (incoming.markers < current.markers) return true;
+
+  return (
+    incoming.markers === current.markers &&
+    incoming.contentLength < current.contentLength
+  );
 }
 
 function markConversationPending(conversation: ConversationSerialized) {

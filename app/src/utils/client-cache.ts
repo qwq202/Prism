@@ -8,6 +8,7 @@ type CacheEnvelope<T> = {
 
 const cachePrefix = "api-cache:";
 const cacheUpdateSignalSuffix = ":updated";
+const maxLegacyCachePayloadLength = 1_500_000;
 
 let cacheStore: LocalForage | null = null;
 
@@ -81,6 +82,88 @@ function removeLegacyLocalStorage(storageKey: string): void {
   }
 }
 
+function isStorageQuotaError(error: unknown): boolean {
+  if (error instanceof DOMException) {
+    return (
+      error.name === "QuotaExceededError" ||
+      error.name === "NS_ERROR_DOM_QUOTA_REACHED"
+    );
+  }
+
+  return String(error).includes("QuotaExceeded");
+}
+
+function removeOldestLegacyCacheEntries(
+  exceptKey: string,
+  count: number,
+): void {
+  listLegacyCacheStorageKeys()
+    .filter((key) => key !== exceptKey)
+    .map((key) => ({
+      key,
+      updatedAt:
+        readLegacyLocalStorage<unknown>(key)?.updatedAt ??
+        Number.NEGATIVE_INFINITY,
+    }))
+    .sort((left, right) => left.updatedAt - right.updatedAt)
+    .slice(0, count)
+    .forEach(({ key }) => removeLegacyLocalStorage(key));
+}
+
+function writeLegacyLocalStorage<T>(
+  storageKey: string,
+  envelope: CacheEnvelope<T>,
+): boolean {
+  if (!isBrowser()) return false;
+
+  let value: string;
+  try {
+    value = JSON.stringify(envelope);
+  } catch {
+    return false;
+  }
+
+  if (value.length > maxLegacyCachePayloadLength) return false;
+
+  try {
+    localStorage.setItem(storageKey, value);
+    return true;
+  } catch (error) {
+    if (!isStorageQuotaError(error)) {
+      console.debug(
+        "[client-cache] failed to write to localStorage fallback",
+        storageKey,
+        error,
+      );
+      return false;
+    }
+  }
+
+  const cacheKeys = listLegacyCacheStorageKeys().filter(
+    (item) => item !== storageKey,
+  );
+  const step = Math.max(1, Math.ceil(cacheKeys.length / 3));
+
+  for (let removed = step; removed <= cacheKeys.length; removed += step) {
+    removeOldestLegacyCacheEntries(storageKey, step);
+    try {
+      localStorage.setItem(storageKey, value);
+      return true;
+    } catch (error) {
+      if (!isStorageQuotaError(error)) {
+        console.debug(
+          "[client-cache] failed to write to localStorage fallback",
+          storageKey,
+          error,
+        );
+        return false;
+      }
+    }
+  }
+
+  return false;
+}
+
 function writeCacheUpdateSignal(storageKey: string): void {
   if (!isBrowser()) return;
 
@@ -152,22 +235,39 @@ export async function getClientCache<T>(
   if (!isBrowser()) return undefined;
 
   const storageKey = getCacheKey(key);
-
   const fromIndexedDB = await readFromIndexedDB<T>(storageKey);
-  if (fromIndexedDB) {
-    if (isExpired(fromIndexedDB.updatedAt, maxAgeMs)) return undefined;
-    return fromIndexedDB.data;
+  const fromLegacy = readLegacyLocalStorage<T>(storageKey);
+
+  const candidates: {
+    source: "indexeddb" | "legacy";
+    envelope: CacheEnvelope<T>;
+  }[] = [];
+
+  if (fromIndexedDB && !isExpired(fromIndexedDB.updatedAt, maxAgeMs)) {
+    candidates.push({ source: "indexeddb", envelope: fromIndexedDB });
+  }
+  if (fromLegacy && !isExpired(fromLegacy.updatedAt, maxAgeMs)) {
+    candidates.push({ source: "legacy", envelope: fromLegacy });
   }
 
-  const fromLegacy = readLegacyLocalStorage<T>(storageKey);
-  if (!fromLegacy) return undefined;
-  if (isExpired(fromLegacy.updatedAt, maxAgeMs)) return undefined;
+  if (candidates.length === 0) return undefined;
 
-  if (await writeToIndexedDB(storageKey, fromLegacy)) {
+  const selected = candidates.sort(
+    (left, right) => right.envelope.updatedAt - left.envelope.updatedAt,
+  )[0];
+
+  if (selected.source === "legacy") {
+    if (await writeToIndexedDB(storageKey, selected.envelope)) {
+      removeLegacyLocalStorage(storageKey);
+    }
+  } else if (
+    fromLegacy &&
+    fromLegacy.updatedAt <= selected.envelope.updatedAt
+  ) {
     removeLegacyLocalStorage(storageKey);
   }
 
-  return fromLegacy.data;
+  return selected.envelope.data;
 }
 
 export async function setClientCache<T>(key: string, data: T): Promise<void> {
@@ -182,6 +282,11 @@ export async function setClientCache<T>(key: string, data: T): Promise<void> {
 
   if (await writeToIndexedDB(storageKey, envelope)) {
     removeLegacyLocalStorage(storageKey);
+    writeCacheUpdateSignal(storageKey);
+    return;
+  }
+
+  if (writeLegacyLocalStorage(storageKey, envelope)) {
     writeCacheUpdateSignal(storageKey);
   }
 }
