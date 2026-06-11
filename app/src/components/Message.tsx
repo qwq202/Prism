@@ -14,10 +14,14 @@ import {
   RotateCcw,
   Trash,
 } from "lucide-react";
-import { filterMessage } from "@/utils/processor.ts";
+import {
+  filterMessage,
+  getFileMarkdown,
+  splitFileMessage,
+} from "@/utils/processor.ts";
 import { copyClipboard, isContainDom, saveAsFile } from "@/utils/dom.ts";
 import { useTranslation } from "react-i18next";
-import React, { Ref, useRef, useState } from "react";
+import React, { Ref, useMemo, useRef, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,6 +41,7 @@ import { ToolCallStatus } from "@/components/ToolCallStatus";
 import { parseThinkContent } from "@/utils/thinking";
 import { showQuotaSelector } from "@/store/settings.ts";
 import { getVisibleToolCalls } from "@/api/tool-calls.ts";
+import { MarkdownFile } from "@/components/plugins/file.tsx";
 
 type MessageProps = {
   index: number;
@@ -266,6 +271,46 @@ function MessageMenu({
   );
 }
 
+type MessageMarkdownProps = {
+  content: string;
+  loading?: boolean;
+};
+
+function MessageMarkdown({ content, loading }: MessageMarkdownProps) {
+  const parts = useMemo(() => splitFileMessage(content), [content]);
+  const hasFiles = parts.some((part) => part.type === "file");
+
+  if (!hasFiles) {
+    return <Markdown loading={loading} children={content} acceptHtml={false} />;
+  }
+
+  return (
+    <>
+      {parts.map((part, index) => {
+        if (part.type === "text") {
+          if (part.content.trim().length === 0) return null;
+
+          return (
+            <Markdown
+              key={`text-${index}`}
+              loading={loading}
+              children={part.content}
+              acceptHtml={false}
+            />
+          );
+        }
+
+        return (
+          <MarkdownFile
+            key={`file-${index}`}
+            children={getFileMarkdown(part.file)}
+          />
+        );
+      })}
+    </>
+  );
+}
+
 function MessageContent({
   message,
   end,
@@ -365,18 +410,16 @@ function MessageContent({
                   isComplete={parsedContent.isComplete}
                 />
                 {parsedContent.restContent && (
-                  <Markdown
+                  <MessageMarkdown
                     loading={message.end === false}
-                    children={parsedContent.restContent}
-                    acceptHtml={false}
+                    content={parsedContent.restContent}
                   />
                 )}
               </>
             ) : (
-              <Markdown
+              <MessageMarkdown
                 loading={message.end === false}
-                children={message.content}
-                acceptHtml={false}
+                content={message.content}
               />
             )}
           </>

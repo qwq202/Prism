@@ -106,3 +106,32 @@ func TestBufferRecordQuotaUsesOfficialUsageWhenPresent(t *testing.T) {
 		t.Fatalf("expected official usage quota 5, got %f", got)
 	}
 }
+
+func TestNewBufferDoesNotCountBase64FileContentForConfiguredVisionModel(t *testing.T) {
+	originalResolver := globals.VisionModelResolver
+	globals.VisionModelResolver = func(model string) bool {
+		return model == "custom-vision-model"
+	}
+	defer func() {
+		globals.VisionModelResolver = originalResolver
+	}()
+
+	image := "data:image/png;base64," + strings.Repeat("A", 20000)
+	history := []globals.Message{
+		{
+			Role: globals.User,
+			Content: "```file\n[[plot.png]]\n" +
+				image +
+				"\n```\n\n怎么分析这张图？",
+		},
+	}
+	rawTokens := NumTokensFromMessages(history, globals.GPT3Turbo, false)
+	buffer := NewBuffer("custom-vision-model", history, usageTestCharge{})
+
+	if buffer.CountInputToken() >= rawTokens {
+		t.Fatalf("expected configured vision buffer to strip base64 before text token count, got %d >= %d", buffer.CountInputToken(), rawTokens)
+	}
+	if buffer.CountInputToken() > 200 {
+		t.Fatalf("expected only surrounding text to be counted, got %d tokens", buffer.CountInputToken())
+	}
+}

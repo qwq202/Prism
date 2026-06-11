@@ -85,8 +85,9 @@ function ChatInput({
       }}
       // on transfer file
       onPaste={(e) => {
-        const items = e.clipboardData.items;
-        const hasFile = Array.from(items).some((item) => item.kind === "file");
+        const items = Array.from(e.clipboardData.items);
+        const files = items.filter((item) => item.kind === "file");
+        const hasFile = files.length > 0;
         const text = e.clipboardData.getData("text/plain");
         if (!hasFile && text.trim().length >= 2000) {
           e.preventDefault();
@@ -94,12 +95,14 @@ function ChatInput({
           return;
         }
 
-        for (let i = 0; i < items.length; i++) {
-          const item = items[i];
-          if (item.kind === "file") {
-            const file = item.getAsFile();
-            file && blobEvent.emit(file);
-          }
+        if (!hasFile) {
+          return;
+        }
+
+        e.preventDefault();
+        for (const item of files) {
+          const file = item.getAsFile();
+          file && blobEvent.emit(file);
         }
       }}
     />

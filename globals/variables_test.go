@@ -27,6 +27,20 @@ func TestIsOpenAIResponsesNativeWebModel(t *testing.T) {
 	}
 }
 
+func TestIsVisionModelUsesConfiguredResolver(t *testing.T) {
+	originalResolver := VisionModelResolver
+	VisionModelResolver = func(model string) bool {
+		return model == "custom-vision-model"
+	}
+	defer func() {
+		VisionModelResolver = originalResolver
+	}()
+
+	if !IsVisionModel("custom-vision-model") {
+		t.Fatalf("expected configured vision model to be recognized")
+	}
+}
+
 func TestNormalizeOpenAIResponsesReasoningEffort(t *testing.T) {
 	if got := NormalizeOpenAIResponsesReasoningEffort("gpt-5.2", "xhigh", false); got != "xhigh" {
 		t.Fatalf("expected xhigh for gpt-5.2, got %q", got)

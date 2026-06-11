@@ -367,7 +367,11 @@ func IsGoogleImagenModel(model string) bool {
 }
 
 func IsVisionModel(model string) bool {
-	return in(model, VisionModels) && !in(model, VisionSkipModels)
+	if in(model, VisionSkipModels) {
+		return IsConfiguredVisionModel(model)
+	}
+
+	return in(model, VisionModels) || IsConfiguredVisionModel(model)
 }
 
 func IsVideoModel(model string) bool {
