@@ -80,10 +80,16 @@ function StatCard({
   return (
     <Card className={cn("flex-1", className)}>
       <CardContent className="pt-4 pb-4">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
             <p className="text-sm text-muted-foreground">{title}</p>
-            <p className="text-2xl font-bold mt-1">{value}</p>
+            <p
+              className="invisible mt-2 truncate text-xs text-muted-foreground"
+              aria-hidden="true"
+            >
+              —
+            </p>
+            <p className="mt-1 truncate text-2xl font-bold">{value}</p>
           </div>
           <div className="text-muted-foreground">{icon}</div>
         </div>

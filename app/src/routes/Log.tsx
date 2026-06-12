@@ -155,11 +155,17 @@ function MetricCard({
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm font-medium text-foreground">{title}</p>
-          <div className="mt-2 flex min-h-7 items-center gap-1.5">
+          <p
+            className="invisible mt-3 truncate text-xs font-medium text-muted-foreground"
+            aria-hidden="true"
+          >
+            —
+          </p>
+          <div className="mt-1 flex min-h-7 items-center gap-1.5">
             {loading ? (
               <Skeleton className="h-7 w-20" />
             ) : (
-              <span className="text-2xl font-semibold leading-none tracking-normal">
+              <span className="truncate text-2xl font-semibold leading-none tracking-normal">
                 {value}
               </span>
             )}
