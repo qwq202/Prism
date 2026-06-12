@@ -3,7 +3,7 @@ import { saveAsFile, saveBlobAsFile, saveImageAsFile } from "@/utils/dom.ts";
 import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import FileViewer from "@/components/FileViewer.tsx";
-import axios from "axios";
+import { normalizeImageURL } from "@/utils/image-url.ts";
 
 /**
  * file format:
@@ -20,27 +20,6 @@ type MarkdownFileProps = {
 
 const imageUrlPattern =
   /(https?:\/\/\S+\.(?:png|jpg|jpeg|gif|webp|heif|heic|bmp)(?:\?\S*)?|(?:\/api)?\/attachments\/[a-f0-9]{32}\.[A-Za-z0-9]+)/i;
-
-function normalizeImageURL(url: string): string {
-  if (!url || url.startsWith("data:image/")) return url;
-
-  try {
-    const parsed = new URL(url);
-    return parsed.href;
-  } catch {
-    // Relative URL. Continue below.
-  }
-
-  const baseURL = (axios.defaults.baseURL || "").replace(/\/+$/, "");
-  if (!url.startsWith("/") || !baseURL) return url;
-
-  if (baseURL.startsWith("http://") || baseURL.startsWith("https://")) {
-    return new URL(url, baseURL).href;
-  }
-
-  if (url === baseURL || url.startsWith(`${baseURL}/`)) return url;
-  return `${baseURL}${url}`;
-}
 
 export function MarkdownFile({ children, acceptDownload }: MarkdownFileProps) {
   const data = children?.toString() || "";

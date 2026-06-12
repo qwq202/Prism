@@ -51,6 +51,7 @@ import { Badge } from "./ui/badge.tsx";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "./ui/lib/utils.ts";
 import { Progress } from "./ui/progress.tsx";
+import { normalizeImageURL } from "@/utils/image-url.ts";
 
 const MaxFileSize = 1024 * 1024 * 100; // 100MB File Size Limit
 const MaxPromptSize = 10 * 1024; // 10KB Prompt Size Limit (to avoid token overflow)
@@ -388,6 +389,30 @@ function getFileExtension(name: string) {
   return name.split(".").pop()?.toLowerCase() || "";
 }
 
+const previewImageExtensions = new Set([
+  "jpg",
+  "jpeg",
+  "png",
+  "gif",
+  "webp",
+  "heif",
+  "heic",
+  "bmp",
+  "svg",
+]);
+
+function isPreviewableImageFile(name: string): boolean {
+  return previewImageExtensions.has(getFileExtension(name));
+}
+
+function getFilePreviewImageURL(file: FileObject): string {
+  if (!isPreviewableImageFile(file.name) && !isB64Image(file.content)) {
+    return "";
+  }
+
+  return normalizeImageURL(file.content);
+}
+
 function getFileIcon(name: string) {
   const extension = getFileExtension(name);
   switch (extension) {
@@ -566,57 +591,71 @@ function FileList({ value, removeFile, previewFile }: FileListProps) {
       variants={listVariants}
     >
       <AnimatePresence>
-        {value.map((file, index) => (
-          <motion.div
-            className={`relative h-fit pt-3 flex flex-col items-center justify-between bg-gradient-to-tr from-background to-muted/25 border hover:border-primary/40 cursor-pointer rounded-lg p-2 shadow-sm transition-all duration-200 ease-in-out group md:pt-4 md:p-3`}
-            key={index}
-            initial="hidden"
-            animate="visible"
-            exit="hidden"
-            variants={itemVariants}
-            transition={{ delay: index * 0.1 }}
-            role="button"
-            tabIndex={0}
-            onClick={() => previewFile(file)}
-            onKeyDown={(event) => {
-              if (event.target !== event.currentTarget) return;
-              if (event.key !== "Enter" && event.key !== " ") return;
+        {value.map((file, index) => {
+          const imageURL = getFilePreviewImageURL(file);
 
-              event.preventDefault();
-              previewFile(file);
-            }}
-          >
-            <div className="flex pt-1 flex-col items-center w-full h-fit">
-              <FileIconObject name={file.name} />
-              <span
-                className={`mt-0.5 text-xs font-medium truncate max-w-[95%] text-center md:mt-1 md:text-sm`}
-              >
-                {file.name}
-              </span>
-            </div>
-            <div className="flex flex-col items-center">
-              <span
-                className={`text-[10px] text-muted-foreground flex flex-row items-center mt-0.5 md:text-xs`}
-              >
-                <FileBadge name={file.name} />
-                {((file.size || file.content.length) / 1024).toFixed(2)}KB
-              </span>
-              <button
-                type="button"
-                aria-label={t("remove")}
-                className="absolute group w-fit h-fit top-1 right-1 p-0.5 rounded-full hover:bg-secondary/10 transition-colors duration-200 md:top-2 md:right-2 md:p-1"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeFile(index);
-                }}
-              >
-                <X
-                  className={`h-3 w-3 text-secondary hover:text-destructive transition-colors duration-200 md:h-4 md:w-4`}
-                />
-              </button>
-            </div>
-          </motion.div>
-        ))}
+          return (
+            <motion.div
+              className={`relative h-fit pt-3 flex flex-col items-center justify-between bg-gradient-to-tr from-background to-muted/25 border hover:border-primary/40 cursor-pointer rounded-lg p-2 shadow-sm transition-all duration-200 ease-in-out group md:pt-4 md:p-3`}
+              key={index}
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
+              variants={itemVariants}
+              transition={{ delay: index * 0.1 }}
+              role="button"
+              tabIndex={0}
+              onClick={() => previewFile(file)}
+              onKeyDown={(event) => {
+                if (event.target !== event.currentTarget) return;
+                if (event.key !== "Enter" && event.key !== " ") return;
+
+                event.preventDefault();
+                previewFile(file);
+              }}
+            >
+              <div className="flex pt-1 flex-col items-center w-full h-fit">
+                {imageURL ? (
+                  <div className="mb-1 flex h-24 w-full items-center justify-center overflow-hidden rounded-md bg-muted/40">
+                    <img
+                      src={imageURL}
+                      alt={file.name}
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                ) : (
+                  <FileIconObject name={file.name} />
+                )}
+                <span
+                  className={`mt-0.5 text-xs font-medium truncate max-w-[95%] text-center md:mt-1 md:text-sm`}
+                >
+                  {file.name}
+                </span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span
+                  className={`text-[10px] text-muted-foreground flex flex-row items-center mt-0.5 md:text-xs`}
+                >
+                  <FileBadge name={file.name} />
+                  {((file.size || file.content.length) / 1024).toFixed(2)}KB
+                </span>
+                <button
+                  type="button"
+                  aria-label={t("remove")}
+                  className="absolute group w-fit h-fit top-1 right-1 p-0.5 rounded-full hover:bg-secondary/10 transition-colors duration-200 md:top-2 md:right-2 md:p-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeFile(index);
+                  }}
+                >
+                  <X
+                    className={`h-3 w-3 text-secondary hover:text-destructive transition-colors duration-200 md:h-4 md:w-4`}
+                  />
+                </button>
+              </div>
+            </motion.div>
+          );
+        })}
       </AnimatePresence>
     </motion.div>
   );
@@ -629,6 +668,10 @@ type FilePreviewDialogProps = {
 
 function FilePreviewDialog({ file, onOpenChange }: FilePreviewDialogProps) {
   const { t } = useTranslation();
+  const imageURL = useMemo(
+    () => (file ? getFilePreviewImageURL(file) : ""),
+    [file],
+  );
 
   return (
     <Dialog open={Boolean(file)} onOpenChange={onOpenChange}>
@@ -641,11 +684,17 @@ function FilePreviewDialog({ file, onOpenChange }: FilePreviewDialogProps) {
         </DialogHeader>
         {file && (
           <div className="flex max-h-[70vh] min-h-48 items-center justify-center overflow-auto rounded-md bg-muted/30 p-2">
-            <img
-              src={file.content}
-              alt={file.name}
-              className="max-h-[68vh] max-w-full rounded-sm object-contain"
-            />
+            {imageURL ? (
+              <img
+                src={imageURL}
+                alt={file.name}
+                className="max-h-[68vh] max-w-full rounded-sm object-contain"
+              />
+            ) : (
+              <pre className="max-h-[68vh] w-full whitespace-pre-wrap break-words rounded-sm p-2 text-sm">
+                {file.content}
+              </pre>
+            )}
           </div>
         )}
       </DialogContent>
