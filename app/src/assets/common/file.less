@@ -103,6 +103,25 @@
   }
 }
 
+.file-list.compact-file-list {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.file-card-compact {
+  flex: 0 1 210px;
+  min-width: 0;
+  min-height: 64px;
+}
+
+@media (max-width: 640px) {
+  .file-card-compact {
+    flex-basis: 100%;
+  }
+}
+
 .file-name {
   word-wrap: anywhere;
   word-break: break-all;

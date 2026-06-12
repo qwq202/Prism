@@ -585,7 +585,7 @@ function FileList({ value, removeFile, previewFile }: FileListProps) {
 
   return (
     <motion.div
-      className={`file-list grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 md:gap-2.5 justify-center`}
+      className={`file-list compact-file-list`}
       initial="hidden"
       animate="visible"
       variants={listVariants}
@@ -593,7 +593,7 @@ function FileList({ value, removeFile, previewFile }: FileListProps) {
       <AnimatePresence>
         {value.map((file, index) => (
           <motion.div
-            className={`relative h-fit pt-3 flex flex-col items-center justify-between bg-gradient-to-tr from-background to-muted/25 border hover:border-primary/40 cursor-pointer rounded-lg p-2 shadow-sm transition-all duration-200 ease-in-out group md:pt-4 md:p-3`}
+            className={`file-card-compact group relative flex cursor-pointer flex-row items-center gap-2 rounded-lg border bg-gradient-to-tr from-background to-muted/25 p-2 pr-8 shadow-sm transition-all duration-200 ease-in-out hover:border-primary/40`}
             key={index}
             initial="hidden"
             animate="visible"
@@ -611,35 +611,35 @@ function FileList({ value, removeFile, previewFile }: FileListProps) {
               previewFile(file);
             }}
           >
-            <div className="flex pt-1 flex-col items-center w-full h-fit">
+            <div className="flex h-fit shrink-0 items-center">
               <FileIconObject name={file.name} />
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col">
               <span
-                className={`mt-0.5 text-xs font-medium truncate max-w-[95%] text-center md:mt-1 md:text-sm`}
+                className={`truncate text-sm font-medium text-foreground`}
               >
                 {file.name}
               </span>
-            </div>
-            <div className="flex flex-col items-center">
               <span
-                className={`text-[10px] text-muted-foreground flex flex-row items-center mt-0.5 md:text-xs`}
+                className={`mt-1 flex flex-row items-center text-xs text-muted-foreground`}
               >
                 <FileBadge name={file.name} />
                 {((file.size || file.content.length) / 1024).toFixed(2)}KB
               </span>
-              <button
-                type="button"
-                aria-label={t("remove")}
-                className="absolute group w-fit h-fit top-1 right-1 p-0.5 rounded-full hover:bg-secondary/10 transition-colors duration-200 md:top-2 md:right-2 md:p-1"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeFile(index);
-                }}
-              >
-                <X
-                  className={`h-3 w-3 text-secondary hover:text-destructive transition-colors duration-200 md:h-4 md:w-4`}
-                />
-              </button>
             </div>
+            <button
+              type="button"
+              aria-label={t("remove")}
+              className="absolute right-2 top-2 h-fit w-fit rounded-full p-1 transition-colors duration-200 hover:bg-secondary/10"
+              onClick={(e) => {
+                e.stopPropagation();
+                removeFile(index);
+              }}
+            >
+              <X
+                className={`h-4 w-4 text-secondary transition-colors duration-200 hover:text-destructive`}
+              />
+            </button>
           </motion.div>
         ))}
       </AnimatePresence>
@@ -695,7 +695,12 @@ type FileInputProps = {
   handleEvent: (files: (File | null)[]) => void;
 };
 
-function FileInput({ id, loading, className, handleEvent }: FileInputProps) {
+function FileInput({
+  id,
+  loading,
+  className,
+  handleEvent,
+}: FileInputProps) {
   const { t } = useTranslation();
   const ref = useRef(null);
 
