@@ -195,7 +195,7 @@
     "url-context-tip": "Контекст URL может читать ссылки в сообщении и потреблять больше токенов.",
     "xai-web-search": "Web Search",
     "xai-x-search": "X Search",
-    "xai-web-enable-tip": "При использовании нативного поиска xAI вы можете отдельно включать Web Search и X Search. Эти возможности могут потреблять дополнительные токены или тарифицируемые вызовы инструментов.",
+    "xai-web-enable-tip": "Web Search: ищет веб-содержимое. X Search: ищет содержимое на платформе X.",
     "gemini-thinking": "Отражения Близнецов",
     "gemini-thinking-enable": "Включить мышление Близнецов",
     "gemini-thinking-depth": "Глубина интеллекта:",

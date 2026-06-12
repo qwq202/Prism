@@ -195,7 +195,7 @@
     "url-context-tip": "URLコンテキストはメッセージ内のリンク内容を読み取り、より多くのトークンを消費する場合があります。",
     "xai-web-search": "Web Search",
     "xai-x-search": "X Search",
-    "xai-web-enable-tip": "xAIのネイティブ検索では、Web Search と X Search を個別に有効化できます。これらの機能は追加のトークンやツール呼び出し料金を消費する場合があります。",
+    "xai-web-enable-tip": "Web Search：ウェブ上の内容を検索します。X Search：X 上の内容を検索します。",
     "gemini-thinking": "ジェミニの反射",
     "gemini-thinking-enable": "ジェミニ思考を有効にする",
     "gemini-thinking-depth": "思考度:",

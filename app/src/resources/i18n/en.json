@@ -202,7 +202,7 @@
     "learning-mode": "Learning Mode",
     "learning-mode-enable": "Enable Learning Mode",
     "learning-mode-tip": "When enabled, the AI guides you with questions and hints instead of giving the final answer immediately.",
-    "xai-web-enable-tip": "When using xAI native search, you can enable Web Search and X Search independently. These capabilities may consume extra tokens or tool invocation fees.",
+    "xai-web-enable-tip": "Web Search: retrieves web content. X Search: retrieves content from X.",
     "gemini-thinking": "Gemini Reflections",
     "openai-reasoning": "{{model}} Reasoning",
     "openai-reasoning-enable": "Enable {{model}} Reasoning",

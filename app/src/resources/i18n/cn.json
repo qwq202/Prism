@@ -322,7 +322,7 @@
     "web-aria": "切换网络搜索功能",
     "web-enable-toast": "已开启联网搜索",
     "web-enable-tip": "联网搜索可能会消耗更多 Token",
-    "xai-web-enable-tip": "使用 xAI 原生搜索能力时，可分别开启 Web Search 与 X Search，这些能力会额外消耗 Token 或工具调用费用。",
+    "xai-web-enable-tip": "Web Search：检索网页内容。X Search：检索 X 平台内容。",
     "gemini-thinking-tip": "支持 Gemini 原生思考。开启后会按思考深度消耗更多 Token。",
     "openai-web-enable-tip": "使用 OpenAI 原生 Web Search，会消耗额外的工具调用费用或 Token。",
     "fetch-tip": "开启后，发送消息里的网页链接会由应用抓取正文，并提供给 AI 阅读。仅支持公开的 http/https 网页。",

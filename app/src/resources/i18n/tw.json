@@ -284,7 +284,7 @@
     "url-context-tip": "網頁上下文會讀取訊息中的連結內容，可能會消耗更多 Token。",
     "xai-web-search": "Web Search",
     "xai-x-search": "X Search",
-    "xai-web-enable-tip": "使用 xAI 原生搜尋時，你可以分別開啟 Web Search 與 X Search，這些能力可能會額外消耗 Token 或工具調用費用。",
+    "xai-web-enable-tip": "Web Search：檢索網頁內容。X Search：檢索 X 平台內容。",
     "gemini-thinking": "Gemini 思考",
     "gemini-thinking-enable": "啟用Gemini 思考",
     "gemini-thinking-depth": "思考深度",
