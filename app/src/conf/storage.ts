@@ -1,5 +1,6 @@
 import { getMemory, setMemory } from "@/utils/memory.ts";
 import { Model, Plan } from "@/api/types.tsx";
+import { normalizeModelDisplayNames } from "@/conf/model.ts";
 
 export function savePreferenceModels(models: Model[]): void {
   setMemory("model_preference", models.map((item) => item.id).join(","));
@@ -27,7 +28,7 @@ export function loadPreferenceModels(models: Model[]): Model[] {
   //   return aIndex - bIndex;
   // });
 
-  return models;
+  return normalizeModelDisplayNames(models);
 }
 
 export function setOfflineModels(models: Model[]): void {

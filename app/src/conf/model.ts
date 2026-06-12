@@ -1,5 +1,42 @@
 import { Model } from "@/api/types.tsx";
 
+export function getGrokModelName(id: string): string | null {
+  const match = id.trim().match(/(?:^|\/)grok-(.+)$/i);
+  if (!match) return null;
+
+  const segments = match[1].split("-").filter(Boolean);
+  const versionSegments: string[] = [];
+
+  while (segments.length > 0 && /^\d+(?:\.\d+)?$/.test(segments[0])) {
+    const segment = segments.shift();
+    if (segment) versionSegments.push(segment);
+  }
+
+  const nameParts = [
+    "Grok",
+    versionSegments.length ? versionSegments.join(".") : "",
+    ...segments.map((segment) =>
+      segment.replace(/\b\w/g, (letter) => letter.toUpperCase()),
+    ),
+  ].filter(Boolean);
+
+  return nameParts.join(" ");
+}
+
+export function normalizeModelDisplayNames<T extends Pick<Model, "id" | "name">>(
+  models: T[],
+): T[] {
+  return models.map((model) => {
+    const grokName = getGrokModelName(model.id);
+    if (!grokName || grokName === model.name) return model;
+
+    return {
+      ...model,
+      name: grokName,
+    } as T;
+  });
+}
+
 export function getModelFromId(market: Model[], id: string): Model | undefined {
   return market.find((model) => model.id === id);
 }

@@ -2,6 +2,10 @@ import axios from "axios";
 import { Model, Plan } from "@/api/types.tsx";
 import { ChargeProps, nonBilling } from "@/admin/charge.ts";
 import { getErrorMessage } from "@/utils/base.ts";
+import {
+  getGrokModelName,
+  normalizeModelDisplayNames,
+} from "@/conf/model.ts";
 
 type v1Options = {
   endpoint?: string;
@@ -56,29 +60,6 @@ export const initialApiKey: v1ApiKey = {
   token_group: "default",
   disabled: false,
 };
-
-function getGrokModelName(id: string): string | null {
-  const match = id.trim().match(/(?:^|\/)grok-(.+)$/i);
-  if (!match) return null;
-
-  const segments = match[1].split("-").filter(Boolean);
-  const versionSegments: string[] = [];
-
-  while (segments.length > 0 && /^\d+(?:\.\d+)?$/.test(segments[0])) {
-    const segment = segments.shift();
-    if (segment) versionSegments.push(segment);
-  }
-
-  const nameParts = [
-    "Grok",
-    versionSegments.length ? versionSegments.join(".") : "",
-    ...segments.map((segment) =>
-      segment.replace(/\b\w/g, (letter) => letter.toUpperCase()),
-    ),
-  ].filter(Boolean);
-
-  return nameParts.join(" ");
-}
 
 export function getModelName(id: string): string {
   const grokName = getGrokModelName(id);
@@ -158,7 +139,7 @@ export async function getApiPlans(options?: v1Options): Promise<Plan[]> {
 export async function getApiMarket(options?: v1Options): Promise<Model[]> {
   try {
     const res = await axios.get(getV1Path("/v1/market", options));
-    return (res.data || []) as Model[];
+    return normalizeModelDisplayNames((res.data || []) as Model[]);
   } catch (e) {
     console.warn(e);
     return [];
