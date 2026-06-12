@@ -41,6 +41,7 @@ import {
   removeCachedConversationFromList,
   setCachedConversation,
 } from "@/utils/conversation-cache.ts";
+import { logClientEvent } from "@/utils/client-logger.ts";
 import { isHiddenToolCallName } from "@/api/tool-calls.ts";
 import { CustomMask, Mask } from "@/masks/types.ts";
 import { listMasks } from "@/api/mask.ts";
@@ -434,6 +435,34 @@ function isStreamingConversation(
 ): boolean {
   const last = conversation.messages[conversation.messages.length - 1];
   return last?.role === AssistantRole && last.end === false;
+}
+
+function summarizeIncomingStreamMessage(
+  message: StreamMessage,
+): Record<string, unknown> {
+  return {
+    conversation: message.conversation,
+    message_length:
+      typeof message.message === "string" ? message.message.length : undefined,
+    end: message.end,
+    keyword: message.keyword,
+    quota: message.quota,
+    plan: message.plan,
+    has_title: Boolean(message.title),
+    response_type: message.response_type,
+    search_query_count: message.search_query?.search_queries.length,
+    search_result_count: message.search_result?.search_results.length,
+    search_index_count: message.search_index?.search_indexes.length,
+    tool_call: message.tool_call
+      ? {
+          name: message.tool_call.name,
+          status: message.tool_call.status,
+          has_arguments: Boolean(message.tool_call.arguments),
+          has_result: Boolean(message.tool_call.result),
+          has_error: Boolean(message.tool_call.error),
+        }
+      : undefined,
+  };
 }
 
 function hasAssistantStreamPayload(message: StreamMessage): boolean {
@@ -1660,7 +1689,9 @@ export function useConversationActions() {
   const applyConversationListResult = async (
     resp: Awaited<ReturnType<typeof fetchConversationList>>,
   ): Promise<boolean> => {
-    if (!(await isCurrentConversationListCacheGeneration(resp.cacheGeneration))) {
+    if (
+      !(await isCurrentConversationListCacheGeneration(resp.cacheGeneration))
+    ) {
       return false;
     }
 
@@ -1980,7 +2011,18 @@ export function useMessageActions() {
 
   return {
     send: async (message: string, using_model?: string) => {
-      if (conversationLoading) return false;
+      if (conversationLoading) {
+        logClientEvent(
+          "chat.action",
+          "send-blocked-loading",
+          {
+            current,
+            loading_conversation_id: conversationLoading,
+          },
+          "warn",
+        );
+        return false;
+      }
 
       const conversationModel =
         current === -1 ? conversations[-1]?.model : undefined;
@@ -2017,6 +2059,61 @@ export function useMessageActions() {
 
       const shouldPreflightHistory =
         current === -1 && conversations[-1].messages.length === 0;
+      const requestSummary = {
+        current,
+        target_model: targetModel,
+        message_length: message.length,
+        new_conversation: current === -1,
+        should_preflight_history: shouldPreflightHistory,
+        existing_message_count: conversations[current]?.messages.length ?? 0,
+        web: enableGeminiNativeWeb
+          ? gemini_google_search || gemini_url_context
+          : enableXAINativeWeb
+            ? xai_web_search || xai_x_search
+            : enableOpenAINativeWeb
+              ? openai_responses_web_search
+              : web,
+        web_search: enableGeminiNativeWeb
+          ? gemini_google_search
+          : enableXAINativeWeb
+            ? xai_web_search
+            : enableOpenAINativeWeb
+              ? openai_responses_web_search
+              : false,
+        url_context: enableGeminiNativeWeb ? gemini_url_context : false,
+        x_search: enableXAINativeWeb ? xai_x_search : false,
+        fetch: enableGeminiNativeWeb ? false : fetch,
+        learning_mode,
+        context: history,
+        ignore_context: !context,
+        memory_enabled,
+        memory_history_enabled,
+        max_tokens: max_tokens > 0 ? max_tokens : undefined,
+        temperature,
+        top_p,
+        top_k,
+        presence_penalty,
+        frequency_penalty,
+        repetition_penalty,
+        gemini_thinking_budget: supportsGeminiThinkingBudgetControl(targetModel)
+          ? gemini_thinking_budget
+          : undefined,
+        deepseek_thinking_enabled: enableDeepSeekThinkingControl
+          ? targetDeepSeekThinkingEnabled
+          : undefined,
+        deepseek_reasoning_effort:
+          enableDeepSeekThinkingControl && targetDeepSeekThinkingEnabled
+            ? targetDeepSeekReasoningEffort
+            : undefined,
+        openai_reasoning_effort: enableOpenAIReasoningControl
+          ? openAIReasoningEffortForRequest
+          : undefined,
+        openai_reasoning_summary: openAIReasoningCapabilities.reasoningSummary
+          ? openai_reasoning_summary
+          : undefined,
+      };
+
+      logClientEvent("chat.action", "send-start", requestSummary);
 
       if (!stack.hasConnection(current)) {
         stack.createConnection(current);
@@ -2078,7 +2175,15 @@ export function useMessageActions() {
         frequency_penalty,
         repetition_penalty,
       });
-      if (!state) return false;
+      if (!state) {
+        logClientEvent(
+          "chat.action",
+          "send-failed-no-connection",
+          requestSummary,
+          "error",
+        );
+        return false;
+      }
 
       if (shouldPreflightHistory) {
         dispatch(
@@ -2089,6 +2194,10 @@ export function useMessageActions() {
             name: message,
           }),
         );
+        logClientEvent("chat.action", "preflight-history", {
+          current,
+          target_model: targetModel,
+        });
       }
 
       dispatch(
@@ -2102,15 +2211,43 @@ export function useMessageActions() {
         }),
       );
 
+      logClientEvent("chat.action", "send-dispatched", {
+        current,
+        target_model: targetModel,
+      });
       return true;
     },
     stop: () => {
-      if (!stack.hasConnection(current)) return;
+      if (!stack.hasConnection(current)) {
+        logClientEvent(
+          "chat.action",
+          "stop-ignored-no-connection",
+          {
+            current,
+          },
+          "warn",
+        );
+        return;
+      }
+      logClientEvent("chat.action", "stop", {
+        current,
+      });
       stack.sendStopEvent(current, t);
       dispatch(stopMessage(current));
     },
     restart: () => {
-      if (conversationLoading) return;
+      if (conversationLoading) {
+        logClientEvent(
+          "chat.action",
+          "restart-blocked-loading",
+          {
+            current,
+            loading_conversation_id: conversationLoading,
+          },
+          "warn",
+        );
+        return;
+      }
 
       const enableGeminiNativeWeb = isGeminiModelId(model);
       const enableXAINativeWeb = isXAIModelId(model);
@@ -2140,6 +2277,11 @@ export function useMessageActions() {
       if (!stack.hasConnection(current)) {
         stack.createConnection(current);
       }
+      logClientEvent("chat.action", "restart", {
+        current,
+        model,
+        message_count: conversations[current]?.messages.length ?? 0,
+      });
       stack.sendRestartEvent(current, t, {
         web: enableGeminiNativeWeb
           ? gemini_google_search || gemini_url_context
@@ -2196,9 +2338,25 @@ export function useMessageActions() {
     },
     remove: (idx: number) => {
       const conversation = conversations[current];
-      if (!conversation || idx < 0 || idx >= conversation.messages.length)
+      if (!conversation || idx < 0 || idx >= conversation.messages.length) {
+        logClientEvent(
+          "chat.action",
+          "remove-ignored-invalid-index",
+          {
+            current,
+            index: idx,
+            message_count: conversation?.messages.length,
+          },
+          "warn",
+        );
         return;
+      }
 
+      logClientEvent("chat.action", "remove-message", {
+        current,
+        index: idx,
+        message_count: conversation.messages.length,
+      });
       dispatch(removeMessage({ id: current, idx }));
 
       if (!stack.hasConnection(current)) stack.createConnection(current);
@@ -2206,14 +2364,45 @@ export function useMessageActions() {
     },
     edit: (idx: number, message: string) => {
       const conversation = conversations[current];
-      if (!conversation || idx < 0 || idx >= conversation.messages.length)
+      if (!conversation || idx < 0 || idx >= conversation.messages.length) {
+        logClientEvent(
+          "chat.action",
+          "edit-ignored-invalid-index",
+          {
+            current,
+            index: idx,
+            message_count: conversation?.messages.length,
+          },
+          "warn",
+        );
         return;
+      }
 
+      logClientEvent("chat.action", "edit-message", {
+        current,
+        index: idx,
+        message_count: conversation.messages.length,
+        next_message_length: message.length,
+      });
       dispatch(editMessage({ id: current, idx, message }));
       if (!stack.hasConnection(current)) stack.createConnection(current);
       stack.sendEditEvent(current, t, idx, message);
     },
     receive: async (id: number, message: StreamMessage) => {
+      if (
+        message.end ||
+        message.conversation ||
+        message.title ||
+        message.tool_call ||
+        message.search_query ||
+        message.search_result ||
+        message.search_index
+      ) {
+        logClientEvent("chat.action", "receive-important", {
+          id,
+          ...summarizeIncomingStreamMessage(message),
+        });
+      }
       const conversationModel = conversations[id]?.model;
       dispatch(updateMessage({ id, message, model: conversationModel }));
       if (message.title) {
@@ -2223,6 +2412,10 @@ export function useMessageActions() {
       // raise conversation if it is -1
       if (id === -1 && message.conversation) {
         const target: number = message.conversation;
+        logClientEvent("chat.action", "raise-conversation", {
+          from: id,
+          to: target,
+        });
         dispatch(raiseConversation(target));
         setNumberMemory("history_conversation", target);
         stack.raiseConnection(target);

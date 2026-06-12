@@ -1,11 +1,14 @@
 import ReactDOM from "react-dom/client";
 import { dropLegacyBrowserStorageDatabase } from "@/utils/browser-storage.ts";
 import { migrateLegacyClientCaches } from "@/utils/client-cache.ts";
+import { installClientLogger } from "@/utils/client-logger.ts";
 import { initializeMemoryStorage } from "@/utils/memory.ts";
 import "./assets/main.less";
 import "./assets/globals.less";
 
 async function main() {
+  installClientLogger();
+
   const memoryMigrated = await initializeMemoryStorage();
   const clientCachesMigrated = await migrateLegacyClientCaches();
   if (memoryMigrated && clientCachesMigrated) {

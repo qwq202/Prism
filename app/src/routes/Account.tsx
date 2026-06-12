@@ -13,7 +13,7 @@ import {
 } from "@/store/auth.ts";
 import type { AppDispatch } from "@/store";
 import { Badge } from "@/components/ui/badge.tsx";
-import { useClipboard } from "@/utils/dom.ts";
+import { saveAsFile, useClipboard } from "@/utils/dom.ts";
 import { useGroup } from "@/utils/groups.ts";
 import { useTranslation } from "react-i18next";
 import Icon from "@/components/utils/Icon.tsx";
@@ -24,6 +24,7 @@ import {
   CloudRain,
   Coins,
   ExternalLink,
+  FileDown,
   Fingerprint,
   HandIcon,
   HelpCircle,
@@ -67,7 +68,12 @@ import {
 import Tips from "@/components/Tips.tsx";
 import { getSharedLink, SharingPreviewForm } from "@/api/sharing.ts";
 import { openWindow } from "@/utils/device.ts";
-import { dataSelector, deleteData, setData, syncData } from "@/store/sharing.ts";
+import {
+  dataSelector,
+  deleteData,
+  setData,
+  syncData,
+} from "@/store/sharing.ts";
 import { DeeptrainOnly } from "@/conf/deeptrain.tsx";
 import { deeptrainEndpoint } from "@/conf/env.ts";
 import { Input } from "@/components/ui/input.tsx";
@@ -101,6 +107,7 @@ import { getErrorMessage } from "@/utils/base.ts";
 import { localizeError } from "@/utils/error.ts";
 import { Switch } from "@/components/ui/switch.tsx";
 import { updateSubscriptionQuotaFallback } from "@/api/quota.ts";
+import { getClientDiagnosticLogFile } from "@/utils/client-logger.ts";
 
 type AccountCardProps = {
   title: string;
@@ -351,8 +358,7 @@ function Account() {
 
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
-  const [passwordResetDialogOpen, setPasswordResetDialogOpen] =
-    useState(false);
+  const [passwordResetDialogOpen, setPasswordResetDialogOpen] = useState(false);
   const [passwordResetLoading, setPasswordResetLoading] = useState(false);
   const [savingFallback, setSavingFallback] = useState(false);
   const [emailForm, setEmailForm] = useState({ email: "", code: "" });
@@ -593,6 +599,20 @@ function Account() {
     }
   }
 
+  function exportDiagnosticLog() {
+    try {
+      const { filename, content } = getClientDiagnosticLogFile();
+      saveAsFile(filename, content);
+      toast.success(t("account.diagnostic-log-exported"), {
+        description: t("account.diagnostic-log-exported-description"),
+      });
+    } catch (error) {
+      toast.error(t("account.diagnostic-log-export-failed"), {
+        description: localizeError(t, getErrorMessage(error)),
+      });
+    }
+  }
+
   return (
     <ScrollArea
       className={`relative w-full h-full flex flex-col bg-background`}
@@ -610,16 +630,33 @@ function Account() {
             description={t("account.my-account-description")}
             footer={
               !auth ? (
-                <Button
-                  classNameWrapper={`ml-auto`}
-                  className={`flex flex-row items-center`}
-                  onClick={goAuth}
-                >
-                  <HandIcon className={`h-4 w-4 mr-1.5`} />
-                  {t("login")}
-                </Button>
+                <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    className={`flex flex-row items-center`}
+                    onClick={exportDiagnosticLog}
+                  >
+                    <FileDown className={`h-4 w-4 mr-1.5`} />
+                    {t("account.export-diagnostic-log")}
+                  </Button>
+                  <Button
+                    className={`flex flex-row items-center`}
+                    onClick={goAuth}
+                  >
+                    <HandIcon className={`h-4 w-4 mr-1.5`} />
+                    {t("login")}
+                  </Button>
+                </div>
               ) : (
                 <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex flex-row items-center"
+                    onClick={exportDiagnosticLog}
+                  >
+                    <FileDown className="h-4 w-4 mr-1.5" />
+                    {t("account.export-diagnostic-log")}
+                  </Button>
                   <Dialog
                     open={emailDialogOpen}
                     onOpenChange={setEmailDialogOpen}

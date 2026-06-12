@@ -3,6 +3,7 @@ import { getMemory } from "@/utils/memory.ts";
 import { getErrorMessage } from "@/utils/base.ts";
 import { Mask } from "@/masks/types.ts";
 import type { TFunction } from "i18next";
+import { logClientEvent } from "@/utils/client-logger.ts";
 
 export const endpoint = `${websocketEndpoint}/chat`;
 export const maxRetry = 60; // 30s max websocket retry
@@ -88,11 +89,77 @@ export type ChatProps = {
 
 type StreamCallback = (id: number, message: StreamMessage) => void;
 
+function summarizeChatProps(data: ChatProps): Record<string, unknown> {
+  return {
+    type: data.type ?? "chat",
+    model: data.model,
+    message_length:
+      typeof data.message === "string" ? data.message.length : undefined,
+    web: data.web,
+    web_search: data.web_search,
+    url_context: data.url_context,
+    x_search: data.x_search,
+    fetch: data.fetch,
+    learning_mode: data.learning_mode,
+    context: data.context,
+    ignore_context: data.ignore_context,
+    memory_enabled: data.memory_enabled,
+    memory_history_enabled: data.memory_history_enabled,
+    max_tokens: data.max_tokens,
+    temperature: data.temperature,
+    top_p: data.top_p,
+    top_k: data.top_k,
+    presence_penalty: data.presence_penalty,
+    frequency_penalty: data.frequency_penalty,
+    repetition_penalty: data.repetition_penalty,
+    gemini_thinking_budget: data.gemini_thinking_budget,
+    deepseek_thinking_enabled: data.deepseek_thinking_enabled,
+    deepseek_reasoning_effort: data.deepseek_reasoning_effort,
+    openai_reasoning_effort: data.openai_reasoning_effort,
+    openai_reasoning_summary: data.openai_reasoning_summary,
+    enable_mcp: data.enable_mcp,
+    mcp_plugin_id: data.mcp_plugin_id,
+  };
+}
+
+function summarizeStreamMessage(
+  message: StreamMessage,
+): Record<string, unknown> {
+  return {
+    conversation: message.conversation,
+    message_length:
+      typeof message.message === "string" ? message.message.length : undefined,
+    end: message.end,
+    keyword: message.keyword,
+    quota: message.quota,
+    plan: message.plan,
+    has_title: Boolean(message.title),
+    response_type: message.response_type,
+    search_query_count: message.search_query?.search_queries.length,
+    search_result_count: message.search_result?.search_results.length,
+    search_index_count: message.search_index?.search_indexes.length,
+    tool_call: message.tool_call
+      ? {
+          name: message.tool_call.name,
+          status: message.tool_call.status,
+          has_arguments: Boolean(message.tool_call.arguments),
+          has_result: Boolean(message.tool_call.result),
+          has_error: Boolean(message.tool_call.error),
+        }
+      : undefined,
+  };
+}
+
 export class Connection {
   protected connection?: WebSocket;
   protected callback?: StreamCallback;
   protected reconnectTimer?: ReturnType<typeof setTimeout>;
   protected stack?: Record<string, unknown>;
+  protected streamStats: {
+    chunks: number;
+    totalMessageLength: number;
+    startedAt: number;
+  };
   protected disposed: boolean;
   public id: number;
   public state: boolean;
@@ -101,6 +168,11 @@ export class Connection {
     this.state = false;
     this.disposed = false;
     this.id = id;
+    this.streamStats = {
+      chunks: 0,
+      totalMessageLength: 0,
+      startedAt: performance.now(),
+    };
 
     callback && this.setCallback(callback);
   }
@@ -109,8 +181,15 @@ export class Connection {
     if (this.disposed) return;
     this.connection = new WebSocket(endpoint);
     this.state = false;
+    logClientEvent("chat.websocket", "init", {
+      id: this.id,
+      endpoint,
+    });
     this.connection.onopen = () => {
       this.state = true;
+      logClientEvent("chat.websocket", "open", {
+        id: this.id,
+      });
       this.send({
         token: getMemory(tokenField) || "anonymous",
         id: this.id,
@@ -126,11 +205,25 @@ export class Connection {
         reason: event.reason,
         endpoint: endpoint,
       };
+      logClientEvent(
+        "chat.websocket",
+        "close",
+        {
+          id: this.id,
+          code: event.code,
+          reason: event.reason,
+          was_clean: event.wasClean,
+        },
+        event.wasClean ? "info" : "warn",
+      );
 
       if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
       this.reconnectTimer = setTimeout(() => {
         if (this.disposed) return;
         console.debug(`[connection] reconnecting... (id: ${this.id})`);
+        logClientEvent("chat.websocket", "reconnect", {
+          id: this.id,
+        });
         this.init();
       }, 3000);
     };
@@ -141,6 +234,17 @@ export class Connection {
       } catch (e) {
         console.warn(
           `[connection] failed to parse websocket message: ${getErrorMessage(e)}`,
+        );
+        logClientEvent(
+          "chat.websocket",
+          "parse-error",
+          {
+            id: this.id,
+            error: getErrorMessage(e),
+            raw_length:
+              typeof event.data === "string" ? event.data.length : undefined,
+          },
+          "warn",
         );
       }
     };
@@ -164,9 +268,21 @@ export class Connection {
         this.init();
       }
       console.debug("[connection] connection not ready, retrying in 500ms...");
+      logClientEvent("chat.websocket", "send-not-ready", {
+        id: this.id,
+        ready_state: this.connection?.readyState,
+        type: data.type,
+      });
       return false;
     }
     this.connection.send(JSON.stringify(data));
+    logClientEvent("chat.websocket", "send", {
+      id: this.id,
+      type: data.type ?? "auth",
+      model: data.model,
+      message_length:
+        typeof data.message === "string" ? data.message.length : undefined,
+    });
     return true;
   }
 
@@ -178,6 +294,11 @@ export class Connection {
     try {
       if (!times || times < maxRetry) {
         if (!this.send(data)) {
+          logClientEvent("chat.websocket", "send-retry", {
+            id: this.id,
+            attempt: (times ?? 0) + 1,
+            ...summarizeChatProps(data),
+          });
           setTimeout(() => {
             this.sendWithRetry(t, data, (times ?? 0) + 1);
           }, 500);
@@ -188,6 +309,16 @@ export class Connection {
     } catch (e) {
       console.warn(
         `[connection] failed to send message: ${getErrorMessage(e)}`,
+      );
+      logClientEvent(
+        "chat.websocket",
+        "send-error",
+        {
+          id: this.id,
+          error: getErrorMessage(e),
+          ...summarizeChatProps(data),
+        },
+        "error",
       );
     }
 
@@ -206,6 +337,15 @@ export class Connection {
       2,
     );
     this.stack = undefined;
+    logClientEvent(
+      "chat.websocket",
+      "send-failed",
+      {
+        id: this.id,
+        ...summarizeChatProps(data),
+      },
+      "error",
+    );
 
     t &&
       this.triggerCallback({
@@ -259,6 +399,10 @@ export class Connection {
       this.reconnectTimer = undefined;
     }
     if (!this.connection) return;
+    logClientEvent("chat.websocket", "close-requested", {
+      id: this.id,
+      ready_state: this.connection.readyState,
+    });
     this.connection.close();
   }
 
@@ -267,7 +411,40 @@ export class Connection {
   }
 
   protected triggerCallback(message: StreamMessage): void {
+    this.streamStats.chunks += 1;
+    this.streamStats.totalMessageLength +=
+      typeof message.message === "string" ? message.message.length : 0;
+
+    const shouldLog =
+      this.streamStats.chunks === 1 ||
+      this.streamStats.chunks % 25 === 0 ||
+      message.end ||
+      Boolean(message.conversation) ||
+      Boolean(message.title) ||
+      Boolean(message.tool_call) ||
+      Boolean(message.search_query) ||
+      Boolean(message.search_result) ||
+      Boolean(message.search_index);
+
+    if (shouldLog) {
+      logClientEvent("chat.stream", message.end ? "end" : "progress", {
+        id: this.id,
+        chunks: this.streamStats.chunks,
+        total_message_length: this.streamStats.totalMessageLength,
+        elapsed_ms: Math.round(performance.now() - this.streamStats.startedAt),
+        ...summarizeStreamMessage(message),
+      });
+    }
+
     this.callback && this.callback(this.id, message);
+
+    if (message.end) {
+      this.streamStats = {
+        chunks: 0,
+        totalMessageLength: 0,
+        startedAt: performance.now(),
+      };
+    }
   }
 
   public setId(id: number): void {
@@ -304,11 +481,21 @@ export class ConnectionStack {
 
     const conn = new Connection(id, this.triggerCallback.bind(this));
     this.connections.push(conn);
+    logClientEvent("chat.connection-stack", "create", {
+      id,
+      size: this.connections.length,
+    });
 
     // max connection garbage collection
     if (this.connections.length > maxConnection) {
       const garbage = this.connections.shift();
-      garbage && garbage.close();
+      if (garbage) {
+        logClientEvent("chat.connection-stack", "garbage-collect", {
+          id: garbage.id,
+          size: this.connections.length,
+        });
+        garbage.close();
+      }
     }
     return conn;
   }
@@ -386,11 +573,16 @@ export class ConnectionStack {
     const conn = this.getConnection(id);
     conn && conn.close();
     this.connections = this.connections.filter((item) => item.id !== id);
+    logClientEvent("chat.connection-stack", "close", {
+      id,
+      size: this.connections.length,
+    });
   }
 
   public closeAll(): void {
     this.connections.forEach((conn) => conn.close());
     this.connections = [];
+    logClientEvent("chat.connection-stack", "close-all");
   }
 
   public reconnect(id: number): void {
@@ -413,6 +605,11 @@ export class ConnectionStack {
     }
 
     conn.setId(id);
+    logClientEvent("chat.connection-stack", "raise", {
+      from: -1,
+      to: id,
+      replaced_existing: Boolean(existing && existing !== conn),
+    });
   }
 
   public triggerCallback(id: number, message: StreamMessage): void {
