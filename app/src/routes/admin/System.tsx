@@ -76,6 +76,7 @@ import { JSONEditorProvider } from "@/components/EditorProvider.tsx";
 import { Combobox } from "@/components/ui/combo-box.tsx";
 import { validateToken } from "@/store/auth.ts";
 import { Progress } from "@/components/ui/progress.tsx";
+import { refreshSiteInfo } from "@/admin/api/info.ts";
 
 type FormAction = {
   type: string;
@@ -1718,6 +1719,11 @@ function System() {
     const res = await setConfig(data);
 
     if (doToast !== false) withNotify(t, res, true);
+    if (res.status) {
+      void refreshSiteInfo().catch((error) => {
+        console.debug("[system] failed to refresh site info after save", error);
+      });
+    }
     if (res.status && options?.refreshTavilyUsage) {
       setSearchUsageRefresh((current) => ({
         key: data.search.api_key.trim(),

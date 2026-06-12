@@ -104,16 +104,21 @@ function applySiteInfo(info: SiteInfo) {
   infoEvent.emit(info);
 }
 
+export async function refreshSiteInfo(): Promise<SiteInfo> {
+  const info = await getFreshSiteInfo();
+  info.broadcast = await getBroadcast();
+  void setClientCache(getSiteInfoCacheKey(), info);
+
+  applySiteInfo(info);
+  return info;
+}
+
 export function syncSiteInfo() {
   void getCachedSiteInfo().then((info) => {
     if (info) applySiteInfo(info);
   });
 
   setTimeout(async () => {
-    const info = await getSiteInfo();
-    info.broadcast = await getBroadcast();
-    void setClientCache(getSiteInfoCacheKey(), info);
-
-    applySiteInfo(info);
+    await refreshSiteInfo();
   }, 25);
 }
