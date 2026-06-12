@@ -591,71 +591,57 @@ function FileList({ value, removeFile, previewFile }: FileListProps) {
       variants={listVariants}
     >
       <AnimatePresence>
-        {value.map((file, index) => {
-          const imageURL = getFilePreviewImageURL(file);
+        {value.map((file, index) => (
+          <motion.div
+            className={`relative h-fit pt-3 flex flex-col items-center justify-between bg-gradient-to-tr from-background to-muted/25 border hover:border-primary/40 cursor-pointer rounded-lg p-2 shadow-sm transition-all duration-200 ease-in-out group md:pt-4 md:p-3`}
+            key={index}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+            variants={itemVariants}
+            transition={{ delay: index * 0.1 }}
+            role="button"
+            tabIndex={0}
+            onClick={() => previewFile(file)}
+            onKeyDown={(event) => {
+              if (event.target !== event.currentTarget) return;
+              if (event.key !== "Enter" && event.key !== " ") return;
 
-          return (
-            <motion.div
-              className={`relative h-fit pt-3 flex flex-col items-center justify-between bg-gradient-to-tr from-background to-muted/25 border hover:border-primary/40 cursor-pointer rounded-lg p-2 shadow-sm transition-all duration-200 ease-in-out group md:pt-4 md:p-3`}
-              key={index}
-              initial="hidden"
-              animate="visible"
-              exit="hidden"
-              variants={itemVariants}
-              transition={{ delay: index * 0.1 }}
-              role="button"
-              tabIndex={0}
-              onClick={() => previewFile(file)}
-              onKeyDown={(event) => {
-                if (event.target !== event.currentTarget) return;
-                if (event.key !== "Enter" && event.key !== " ") return;
-
-                event.preventDefault();
-                previewFile(file);
-              }}
-            >
-              <div className="flex pt-1 flex-col items-center w-full h-fit">
-                {imageURL ? (
-                  <div className="mb-1 flex h-24 w-full items-center justify-center overflow-hidden rounded-md bg-muted/40">
-                    <img
-                      src={imageURL}
-                      alt={file.name}
-                      className="h-full w-full object-contain"
-                    />
-                  </div>
-                ) : (
-                  <FileIconObject name={file.name} />
-                )}
-                <span
-                  className={`mt-0.5 text-xs font-medium truncate max-w-[95%] text-center md:mt-1 md:text-sm`}
-                >
-                  {file.name}
-                </span>
-              </div>
-              <div className="flex flex-col items-center">
-                <span
-                  className={`text-[10px] text-muted-foreground flex flex-row items-center mt-0.5 md:text-xs`}
-                >
-                  <FileBadge name={file.name} />
-                  {((file.size || file.content.length) / 1024).toFixed(2)}KB
-                </span>
-                <button
-                  type="button"
-                  aria-label={t("remove")}
-                  className="absolute group w-fit h-fit top-1 right-1 p-0.5 rounded-full hover:bg-secondary/10 transition-colors duration-200 md:top-2 md:right-2 md:p-1"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeFile(index);
-                  }}
-                >
-                  <X
-                    className={`h-3 w-3 text-secondary hover:text-destructive transition-colors duration-200 md:h-4 md:w-4`}
-                  />
-                </button>
-              </div>
-            </motion.div>
-          );
-        })}
+              event.preventDefault();
+              previewFile(file);
+            }}
+          >
+            <div className="flex pt-1 flex-col items-center w-full h-fit">
+              <FileIconObject name={file.name} />
+              <span
+                className={`mt-0.5 text-xs font-medium truncate max-w-[95%] text-center md:mt-1 md:text-sm`}
+              >
+                {file.name}
+              </span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span
+                className={`text-[10px] text-muted-foreground flex flex-row items-center mt-0.5 md:text-xs`}
+              >
+                <FileBadge name={file.name} />
+                {((file.size || file.content.length) / 1024).toFixed(2)}KB
+              </span>
+              <button
+                type="button"
+                aria-label={t("remove")}
+                className="absolute group w-fit h-fit top-1 right-1 p-0.5 rounded-full hover:bg-secondary/10 transition-colors duration-200 md:top-2 md:right-2 md:p-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeFile(index);
+                }}
+              >
+                <X
+                  className={`h-3 w-3 text-secondary hover:text-destructive transition-colors duration-200 md:h-4 md:w-4`}
+                />
+              </button>
+            </div>
+          </motion.div>
+        ))}
       </AnimatePresence>
     </motion.div>
   );
