@@ -57,7 +57,33 @@ export const initialApiKey: v1ApiKey = {
   disabled: false,
 };
 
+function getGrokModelName(id: string): string | null {
+  const match = id.trim().match(/(?:^|\/)grok-(.+)$/i);
+  if (!match) return null;
+
+  const segments = match[1].split("-").filter(Boolean);
+  const versionSegments: string[] = [];
+
+  while (segments.length > 0 && /^\d+(?:\.\d+)?$/.test(segments[0])) {
+    const segment = segments.shift();
+    if (segment) versionSegments.push(segment);
+  }
+
+  const nameParts = [
+    "Grok",
+    versionSegments.length ? versionSegments.join(".") : "",
+    ...segments.map((segment) =>
+      segment.replace(/\b\w/g, (letter) => letter.toUpperCase()),
+    ),
+  ].filter(Boolean);
+
+  return nameParts.join(" ");
+}
+
 export function getModelName(id: string): string {
+  const grokName = getGrokModelName(id);
+  if (grokName) return grokName;
+
   // replace all `-` to ` ` except first `-` keep it
   let begin = true;
 
