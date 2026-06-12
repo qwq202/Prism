@@ -7,7 +7,9 @@ import { getErrorMessage } from "@/utils/base.ts";
 import { VirtualWebSearchRole, VirtualRolePrefix, Message } from "./types.tsx";
 import { formatToolCallResult } from "@/api/plugin.ts";
 import {
+  getConversationListCacheGeneration,
   getCachedConversationList,
+  isCurrentConversationListCacheGeneration,
   setCachedConversationList,
 } from "@/utils/conversation-cache.ts";
 import { getVisibleToolCalls } from "@/api/tool-calls.ts";
@@ -15,6 +17,7 @@ import { getVisibleToolCalls } from "@/api/tool-calls.ts";
 type ConversationListResult = {
   conversations: ConversationInstance[];
   fromCache: boolean;
+  cacheGeneration: number;
 };
 
 type ConversationLoadResult =
@@ -102,10 +105,18 @@ function readConversationListPayload(
 }
 
 export async function getConversationList(): Promise<ConversationInstance[]> {
-  return (await fetchConversationList()).conversations;
+  const resp = await fetchConversationList();
+
+  if (!(await isCurrentConversationListCacheGeneration(resp.cacheGeneration))) {
+    return [];
+  }
+
+  return resp.conversations;
 }
 
 export async function fetchConversationList(): Promise<ConversationListResult> {
+  const cacheGeneration = await getConversationListCacheGeneration();
+
   try {
     const resp = await axios.get("/conversation/list", {
       headers: noCacheHeaders,
@@ -122,8 +133,9 @@ export async function fetchConversationList(): Promise<ConversationListResult> {
 
     void setCachedConversationList(
       conversations.filter((item) => item.id !== -1),
+      { ifGeneration: cacheGeneration },
     );
-    return { conversations, fromCache: false };
+    return { conversations, fromCache: false, cacheGeneration };
   } catch (e) {
     const message = getErrorMessage(e);
     const conversations = (await getCachedConversationList()) ?? [];
@@ -135,6 +147,7 @@ export async function fetchConversationList(): Promise<ConversationListResult> {
     return {
       conversations,
       fromCache: true,
+      cacheGeneration,
     };
   }
 }
@@ -143,6 +156,9 @@ export async function updateConversationList(
   dispatch: AppDispatch,
 ): Promise<void> {
   const resp = await fetchConversationList();
+  if (!(await isCurrentConversationListCacheGeneration(resp.cacheGeneration))) {
+    return;
+  }
   if (resp.fromCache && resp.conversations.length === 0) return;
 
   dispatch(

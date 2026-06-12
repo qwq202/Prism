@@ -34,8 +34,10 @@ import {
 import {
   clearCachedConversation,
   clearCachedConversations,
+  getConversationListCacheGeneration,
   getCachedConversation,
   getCachedConversationList,
+  isCurrentConversationListCacheGeneration,
   removeCachedConversationFromList,
   setCachedConversation,
 } from "@/utils/conversation-cache.ts";
@@ -1655,6 +1657,24 @@ export function useConversationActions() {
   const current = useSelector(selectCurrent);
   const mask = useSelector(selectMaskItem);
 
+  const applyConversationListResult = async (
+    resp: Awaited<ReturnType<typeof fetchConversationList>>,
+  ): Promise<boolean> => {
+    if (!(await isCurrentConversationListCacheGeneration(resp.cacheGeneration))) {
+      return false;
+    }
+
+    if (!resp.fromCache || resp.conversations.length > 0) {
+      dispatch(
+        resp.fromCache
+          ? setHistory(resp.conversations)
+          : setRemoteHistory(resp.conversations),
+      );
+    }
+
+    return true;
+  };
+
   const refreshConversationDetail = async (
     id: number,
     options?: { activate?: boolean; navigationRevision?: number },
@@ -1670,9 +1690,9 @@ export function useConversationActions() {
     if (result.status === "not_found") {
       const list = await fetchConversationList();
       if (!isLatestConversationDetailRequest(id, requestSeq)) return;
+      if (!(await applyConversationListResult(list))) return;
 
       if (!list.fromCache) {
-        dispatch(setRemoteHistory(list.conversations));
         if (!list.conversations.some((item) => item.id === id)) {
           dispatch(deleteRemoteConversation({ id, requestedRevision }));
           return;
@@ -1824,20 +1844,18 @@ export function useConversationActions() {
     refresh: async (options?: { useCache?: boolean }) => {
       const useCache = options?.useCache ?? true;
       if (useCache) {
+        const cacheGeneration = await getConversationListCacheGeneration();
         const cached = await getCachedConversationList();
-        if (cached) {
+        if (
+          cached &&
+          (await isCurrentConversationListCacheGeneration(cacheGeneration))
+        ) {
           dispatch(setHistory(cached));
         }
       }
 
       const resp = await fetchConversationList();
-      if (!resp.fromCache || resp.conversations.length > 0) {
-        dispatch(
-          resp.fromCache
-            ? setHistory(resp.conversations)
-            : setRemoteHistory(resp.conversations),
-        );
-      }
+      if (!(await applyConversationListResult(resp))) return [];
 
       const activeConversation = getNumberMemory(
         "history_conversation",
@@ -1853,9 +1871,13 @@ export function useConversationActions() {
     },
     restore: async (options?: { useCache?: boolean }) => {
       const useCache = options?.useCache ?? true;
+      const cacheGeneration = await getConversationListCacheGeneration();
       const cached = useCache ? await getCachedConversationList() : undefined;
       const stored = getNumberMemory("history_conversation", -1);
-      if (cached) {
+      if (
+        cached &&
+        (await isCurrentConversationListCacheGeneration(cacheGeneration))
+      ) {
         dispatch(setHistory(cached));
         if (
           stored !== -1 &&
@@ -1871,13 +1893,7 @@ export function useConversationActions() {
       }
 
       const resp = await fetchConversationList();
-      if (!resp.fromCache || resp.conversations.length > 0) {
-        dispatch(
-          resp.fromCache
-            ? setHistory(resp.conversations)
-            : setRemoteHistory(resp.conversations),
-        );
-      }
+      if (!(await applyConversationListResult(resp))) return [];
 
       if (
         stored !== -1 &&
