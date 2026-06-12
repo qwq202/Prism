@@ -1,6 +1,7 @@
 export const marketEditableTags = [
   "official",
   "multi-modal",
+  "reasoning",
   "web",
   "high-quality",
   "high-price",

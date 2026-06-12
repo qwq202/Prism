@@ -7,6 +7,7 @@ import {
   ArrowUpFromDot,
   Award,
   Bolt,
+  Brain,
   CheckCircle2,
   Clock3,
   Cloud,
@@ -82,6 +83,7 @@ const tagIcons: { [key: string]: React.ReactNode } = {
   "high-price": <DollarSign />,
   "open-source": <Github />,
   "image-generation": <Image />,
+  reasoning: <Brain />,
   fast: <Bolt />,
   unstable: <Snail />,
   "high-context": <Cpu />,
@@ -432,6 +434,7 @@ function ModelTagIcons({ tags, pro }: { tags: string[]; pro: boolean }) {
                     "bg-gray-500/20 text-gray-600": tag === "open-source",
                     "bg-indigo-500/20 text-indigo-600":
                       tag === "image-generation",
+                    "bg-cyan-500/20 text-cyan-600": tag === "reasoning",
                     "bg-yellow-500/20 text-yellow-600": tag === "fast",
                     "bg-orange-500/20 text-orange-600": tag === "unstable",
                     "bg-teal-500/20 text-teal-600": tag === "high-context",
@@ -1135,6 +1138,8 @@ function ModelDetailPanel({
                             tag === "open-source",
                           "text-indigo-600 dark:text-indigo-400 bg-indigo-100/80 dark:bg-indigo-900/30":
                             tag === "image-generation",
+                          "text-cyan-600 dark:text-cyan-400 bg-cyan-100/80 dark:bg-cyan-900/30":
+                            tag === "reasoning",
                           "text-yellow-600 dark:text-yellow-400 bg-yellow-100/80 dark:bg-yellow-900/30":
                             tag === "fast",
                           "text-orange-600 dark:text-orange-400 bg-orange-100/80 dark:bg-orange-900/30":

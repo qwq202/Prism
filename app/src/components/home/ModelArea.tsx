@@ -31,6 +31,7 @@ import {
   Snail,
   Cpu,
   Zap,
+  Brain,
 } from "lucide-react";
 import { goAuth } from "@/utils/app.ts";
 import { includingModelFromPlan } from "@/conf/subscription.tsx";
@@ -60,6 +61,7 @@ const tagIcons: { [key: string]: React.ReactNode } = {
   "high-price": <DollarSign />,
   "open-source": <Github />,
   "image-generation": <Image />,
+  reasoning: <Brain />,
   fast: <Bolt />,
   unstable: <Snail />,
   "high-context": <Cpu />,
