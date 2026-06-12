@@ -65,21 +65,12 @@ export function getModelName(id: string): string {
   const grokName = getGrokModelName(id);
   if (grokName) return grokName;
 
-  // replace all `-` to ` ` except first `-` keep it
-  let begin = true;
-
   return id
-    .replace(/-/g, (l) => {
-      if (begin) {
-        begin = false;
-        return l;
-      }
-      return " ";
-    })
+    .replace(/-/g, " ")
     .replace(/\b\w/g, (l) => l.toUpperCase())
     .replace(/Gpt/g, "GPT")
     .replace(/Tts/g, "TTS")
-    .replace(/Dall-E/g, "DALL-E")
+    .replace(/Dall E/g, "DALL E")
     .replace(/Dalle/g, "DALLE")
     .replace(/Glm/g, "GLM")
     .trim();

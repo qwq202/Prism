@@ -28,11 +28,12 @@ export function normalizeModelDisplayNames<T extends Pick<Model, "id" | "name">>
 ): T[] {
   return models.map((model) => {
     const grokName = getGrokModelName(model.id);
-    if (!grokName || grokName === model.name) return model;
+    const normalizedName = grokName ?? model.name.replace(/-/g, " ");
+    if (normalizedName === model.name) return model;
 
     return {
       ...model,
-      name: grokName,
+      name: normalizedName,
     } as T;
   });
 }
