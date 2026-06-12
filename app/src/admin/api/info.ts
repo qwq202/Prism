@@ -34,10 +34,28 @@ export type SiteInfo = {
   runtime_id?: string;
 };
 
+async function fetchSiteInfo(noCacheBust = false): Promise<SiteInfo> {
+  const response = await axios.get("/info", {
+    headers: {
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+    },
+    params: noCacheBust ? { _: Date.now() } : undefined,
+    prismCache: false,
+  });
+
+  return response.data as SiteInfo;
+}
+
+export async function getFreshSiteInfo(): Promise<SiteInfo> {
+  const info = await fetchSiteInfo(true);
+  void setClientCache(getSiteInfoCacheKey(), info);
+  return info;
+}
+
 export async function getSiteInfo(): Promise<SiteInfo> {
   try {
-    const response = await axios.get("/info");
-    const info = response.data as SiteInfo;
+    const info = await fetchSiteInfo();
     void setClientCache(getSiteInfoCacheKey(), info);
     return info;
   } catch (e) {

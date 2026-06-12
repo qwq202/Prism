@@ -98,6 +98,30 @@ func TestSystemConfigAsInfoIncludesRuntimeID(t *testing.T) {
 	}
 }
 
+func TestGetInfoDisablesCaching(t *testing.T) {
+	previous := SystemInstance
+	SystemInstance = &SystemConfig{}
+	t.Cleanup(func() {
+		SystemInstance = previous
+	})
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/info", nil)
+
+	GetInfo(context)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recorder.Code)
+	}
+	if got := recorder.Header().Get("Cache-Control"); got != "no-store, no-cache, must-revalidate, max-age=0" {
+		t.Fatalf("expected no-store cache control, got %q", got)
+	}
+	if got := recorder.Header().Get("Pragma"); got != "no-cache" {
+		t.Fatalf("expected no-cache pragma, got %q", got)
+	}
+}
+
 func TestSystemConfigNormalizeUsesRuntimeSafeValues(t *testing.T) {
 	conf := &SystemConfig{
 		General: generalState{

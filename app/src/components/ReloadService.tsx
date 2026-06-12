@@ -4,7 +4,7 @@ import { getMemory, setMemory } from "@/utils/memory.ts";
 import { Badge } from "@/components/ui/badge.tsx";
 import { toast } from "sonner";
 import { useEffect, useRef } from "react";
-import { getSiteInfo } from "@/admin/api/info.ts";
+import { getFreshSiteInfo } from "@/admin/api/info.ts";
 
 const serverUpdateCheckInterval = 60_000;
 
@@ -20,7 +20,7 @@ function ReloadPrompt() {
       if (document.visibilityState === "hidden") return;
 
       try {
-        const info = await getSiteInfo();
+        const info = await getFreshSiteInfo();
         const runtimeID = (info.runtime_id || "").trim();
         if (!runtimeID || closed) return;
 
