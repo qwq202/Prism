@@ -67,6 +67,8 @@ export function SingleGroupSelectItemBadge(props: SingleSelectItemBadgeProps) {
             props.variant === "open-source",
           "text-indigo-600 bg-indigo-500/20 hover:bg-indigo-500/30":
             props.variant === "image-generation",
+          "text-cyan-600 bg-cyan-500/20 hover:bg-cyan-500/30":
+            props.variant === "reasoning",
           "text-yellow-600 bg-yellow-500/20 hover:bg-yellow-500/30":
             props.variant === "fast",
           "text-orange-600 bg-orange-500/20 hover:bg-orange-500/30":
