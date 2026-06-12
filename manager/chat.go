@@ -288,6 +288,7 @@ func createChatBillingRecord(db *sql.DB, user *auth.User, model string, buffer *
 }
 
 const realtimeQuotaEpsilon = float32(0.0001)
+const realtimeQuotaPreciseCheckRatio = float32(0.9)
 const realtimeQuotaLimitErrorMessage = "interrupted: quota limit"
 
 var errRealtimeQuotaLimit = errors.New(realtimeQuotaLimitErrorMessage)
@@ -298,6 +299,16 @@ type realtimeQuotaLimiter struct {
 }
 
 func realtimeQuotaForBuffer(buffer *utils.Buffer) float32 {
+	if buffer == nil {
+		return 0
+	}
+	if !buffer.GetUsage().IsEmpty() {
+		return buffer.GetRecordQuota()
+	}
+	return buffer.GetQuota()
+}
+
+func preciseRealtimeQuotaForBuffer(buffer *utils.Buffer) float32 {
 	if buffer == nil {
 		return 0
 	}
@@ -339,6 +350,19 @@ func (l realtimeQuotaLimiter) exhausted(quota float32) bool {
 	return l.enabled && quota+realtimeQuotaEpsilon >= l.limit
 }
 
+func (l realtimeQuotaLimiter) shouldUsePreciseQuotaCheck(quota float32) bool {
+	if !l.enabled {
+		return false
+	}
+	if quota+realtimeQuotaEpsilon >= l.limit {
+		return true
+	}
+	if l.limit <= 0 {
+		return true
+	}
+	return quota >= l.limit*realtimeQuotaPreciseCheckRatio
+}
+
 func (l realtimeQuotaLimiter) allowsProjectedChunk(buffer *utils.Buffer, chunk *globals.Chunk) bool {
 	if !l.enabled || buffer == nil {
 		return true
@@ -346,32 +370,46 @@ func (l realtimeQuotaLimiter) allowsProjectedChunk(buffer *utils.Buffer, chunk *
 
 	preview := *buffer
 	preview.WriteChunk(chunk)
-	return l.allows(realtimeQuotaForBuffer(&preview))
+	quota := realtimeQuotaForBuffer(&preview)
+	if !l.shouldUsePreciseQuotaCheck(quota) {
+		return l.allows(quota)
+	}
+	return l.allows(preciseRealtimeQuotaForBuffer(&preview))
 }
 
-func projectedRealtimeQuotaForChunk(buffer *utils.Buffer, chunk *globals.Chunk) float32 {
+func projectedRealtimeQuotaForChunk(buffer *utils.Buffer, chunk *globals.Chunk, precise bool) float32 {
 	if buffer == nil {
 		return 0
 	}
 
 	preview := *buffer
 	preview.WriteChunk(chunk)
+	if precise {
+		return preciseRealtimeQuotaForBuffer(&preview)
+	}
 	return realtimeQuotaForBuffer(&preview)
 }
 
-func (l realtimeQuotaLimiter) projectedSplitChunkQuota(streamBuffer *utils.Buffer, captureBuffer *utils.Buffer, chunk *globals.Chunk) float32 {
+func (l realtimeQuotaLimiter) projectedSplitChunkQuota(streamBuffer *utils.Buffer, captureBuffer *utils.Buffer, chunk *globals.Chunk, precise bool) float32 {
 	if streamBuffer == nil || captureBuffer == nil || streamBuffer == captureBuffer {
 		if streamBuffer != nil {
-			return projectedRealtimeQuotaForChunk(streamBuffer, chunk)
+			return projectedRealtimeQuotaForChunk(streamBuffer, chunk, precise)
 		}
-		return projectedRealtimeQuotaForChunk(captureBuffer, chunk)
+		return projectedRealtimeQuotaForChunk(captureBuffer, chunk, precise)
 	}
 
-	delta := projectedRealtimeQuotaForChunk(captureBuffer, chunk) - realtimeQuotaForBuffer(captureBuffer)
+	currentCaptureQuota := realtimeQuotaForBuffer(captureBuffer)
+	currentStreamQuota := realtimeQuotaForBuffer(streamBuffer)
+	if precise {
+		currentCaptureQuota = preciseRealtimeQuotaForBuffer(captureBuffer)
+		currentStreamQuota = preciseRealtimeQuotaForBuffer(streamBuffer)
+	}
+
+	delta := projectedRealtimeQuotaForChunk(captureBuffer, chunk, precise) - currentCaptureQuota
 	if delta < 0 {
 		delta = 0
 	}
-	return realtimeQuotaForBuffer(streamBuffer) + delta
+	return currentStreamQuota + delta
 }
 
 func (l realtimeQuotaLimiter) allowsProjectedSplitChunk(streamBuffer *utils.Buffer, captureBuffer *utils.Buffer, chunk *globals.Chunk) bool {
@@ -379,7 +417,11 @@ func (l realtimeQuotaLimiter) allowsProjectedSplitChunk(streamBuffer *utils.Buff
 		return true
 	}
 
-	return l.allows(l.projectedSplitChunkQuota(streamBuffer, captureBuffer, chunk))
+	quota := l.projectedSplitChunkQuota(streamBuffer, captureBuffer, chunk, false)
+	if !l.shouldUsePreciseQuotaCheck(quota) {
+		return l.allows(quota)
+	}
+	return l.allows(l.projectedSplitChunkQuota(streamBuffer, captureBuffer, chunk, true))
 }
 
 func isRealtimeQuotaLimitError(err error) bool {

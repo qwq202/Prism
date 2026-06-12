@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -393,6 +394,36 @@ func TestRealtimeQuotaLimiterGuardReturnsInterruptWithoutMutatingBuffer(t *testi
 	}
 	if !buffer.IsEmpty() {
 		t.Fatalf("expected rejected projected usage not to mutate buffer")
+	}
+}
+
+func TestRealtimeQuotaForBufferUsesRunningQuotaWithoutOfficialUsage(t *testing.T) {
+	buffer := utils.NewBuffer(globals.GPT3Turbo, nil, chatTokenTestCharge{})
+	buffer.Write(strings.Repeat("hello ", 200))
+
+	runningQuota := buffer.GetQuota()
+	recordQuota := buffer.GetRecordQuota()
+	if runningQuota >= recordQuota {
+		t.Fatalf("expected record quota to tokenize the full text and exceed running quota: running=%f record=%f", runningQuota, recordQuota)
+	}
+
+	if got := realtimeQuotaForBuffer(buffer); got != runningQuota {
+		t.Fatalf("expected realtime quota to use lightweight running quota without official usage, got %f want %f", got, runningQuota)
+	}
+}
+
+func TestRealtimeQuotaForBufferUsesOfficialUsageWhenPresent(t *testing.T) {
+	buffer := utils.NewBuffer(globals.GPT3Turbo, nil, chatTokenTestCharge{})
+	buffer.WriteChunk(&globals.Chunk{
+		Content: "hi",
+		Usage: &globals.TokenUsage{
+			CompletionTokens: 720,
+			TotalTokens:      720,
+		},
+	})
+
+	if got := realtimeQuotaForBuffer(buffer); math.Abs(float64(got-0.72)) > 0.001 {
+		t.Fatalf("expected realtime quota to honor official usage, got %f", got)
 	}
 }
 
