@@ -39,8 +39,8 @@ import { Skeleton } from "@/components/ui/skeleton.tsx";
 import {
   RotateCw,
   Search,
-  Activity,
   DollarSign,
+  Hash,
   Zap,
   Clock,
 } from "lucide-react";
@@ -50,6 +50,7 @@ import { formatRecordTime } from "@/utils/record-time.ts";
 import { useSelector } from "react-redux";
 import { infoTimeZoneSelector } from "@/store/info.ts";
 import { withNotify } from "@/api/common.ts";
+import { getReadableTokenCount } from "@/utils/processor.ts";
 
 const defaultRecordQuery: RecordQuery = {
   type: RecordType.All,
@@ -83,6 +84,46 @@ function StatCard({
           <div>
             <p className="text-sm text-muted-foreground">{title}</p>
             <p className="text-2xl font-bold mt-1">{value}</p>
+          </div>
+          <div className="text-muted-foreground">{icon}</div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SplitStatCard({
+  title,
+  icon,
+  metrics,
+  className,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  metrics: {
+    label: string;
+    value: string | number;
+  }[];
+  className?: string;
+}) {
+  return (
+    <Card className={cn("flex-1", className)}>
+      <CardContent className="pt-4 pb-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-muted-foreground">{title}</p>
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              {metrics.map((metric) => (
+                <div key={metric.label} className="min-w-0">
+                  <p className="truncate text-xs text-muted-foreground">
+                    {metric.label}
+                  </p>
+                  <p className="mt-1 truncate text-2xl font-bold">
+                    {metric.value}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
           <div className="text-muted-foreground">{icon}</div>
         </div>
@@ -368,15 +409,19 @@ function AdminRecord() {
   return (
     <div className={cn("user-interface", mobile && "mobile")}>
       <div className="flex flex-wrap gap-3">
-        <StatCard
-          title={t("record.billing-today")}
-          value={stats ? stats.billing_today.toFixed(2) : "—"}
+        <SplitStatCard
+          title={t("record.types.consume")}
           icon={<DollarSign className="w-6 h-6" />}
-        />
-        <StatCard
-          title={t("record.billing-month")}
-          value={stats ? stats.billing_month.toFixed(2) : "—"}
-          icon={<Activity className="w-6 h-6" />}
+          metrics={[
+            {
+              label: t("record.billing-today"),
+              value: stats ? stats.billing_today.toFixed(2) : "—",
+            },
+            {
+              label: t("record.billing-month"),
+              value: stats ? stats.billing_month.toFixed(2) : "—",
+            },
+          ]}
         />
         <StatCard
           title={t("record.request-today")}
@@ -392,6 +437,11 @@ function AdminRecord() {
           title={t("record.tpm-tips")}
           value={stats ? stats.tpm : "—"}
           icon={<Clock className="w-6 h-6" />}
+        />
+        <StatCard
+          title={t("record.total-tokens")}
+          value={stats ? getReadableTokenCount(stats.total_tokens) : "—"}
+          icon={<Hash className="w-6 h-6" />}
         />
       </div>
 

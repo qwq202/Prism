@@ -6,7 +6,6 @@ import {
   Activity,
   BadgeCheck,
   Box,
-  CalendarDays,
   CircleDollarSign,
   Clock3,
   Cloud,
@@ -56,6 +55,7 @@ import {
 import { useSelector } from "react-redux";
 import { infoTimeZoneSelector } from "@/store/info.ts";
 import { withNotify } from "@/api/common.ts";
+import { getReadableTokenCount } from "@/utils/processor.ts";
 
 type LogFilters = {
   type: RecordType;
@@ -73,6 +73,16 @@ type MetricCardProps = {
   children?: ReactNode;
 };
 
+type SplitMetricCardProps = {
+  title: string;
+  icon: ReactNode;
+  loading?: boolean;
+  metrics: {
+    label: string;
+    value: string | number;
+  }[];
+};
+
 const emptyStats: RecordStats = {
   billing_today: 0,
   billing_month: 0,
@@ -80,6 +90,7 @@ const emptyStats: RecordStats = {
   request_month: 0,
   rpm: 0,
   tpm: 0,
+  total_tokens: 0,
 };
 
 const logContainerVariants = {
@@ -129,23 +140,6 @@ function formatQuota(value: number) {
   return Number.isFinite(value) ? value.toFixed(4).replace(/\.?0+$/, "") : "0";
 }
 
-function formatCompactTokenCount(value: number, unit: "K" | "M") {
-  const fractionDigits = Math.abs(value) >= 100 ? 0 : 1;
-  return `${value.toFixed(fractionDigits).replace(/\.0$/, "")}${unit}`;
-}
-
-function formatTokenCount(value: number) {
-  if (!Number.isFinite(value)) return "0";
-  const absValue = Math.abs(value);
-  if (absValue >= 1_000_000) {
-    return formatCompactTokenCount(value / 1_000_000, "M");
-  }
-  if (absValue >= 1_000) {
-    return formatCompactTokenCount(value / 1_000, "K");
-  }
-  return new Intl.NumberFormat().format(value);
-}
-
 function MetricCard({
   title,
   value,
@@ -175,6 +169,45 @@ function MetricCard({
         <div className="mt-1 text-foreground [&_svg]:h-6 [&_svg]:w-6 [&_svg]:stroke-[1.8]">
           {icon}
         </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function SplitMetricCard({
+  title,
+  icon,
+  loading,
+  metrics,
+}: SplitMetricCardProps) {
+  return (
+    <motion.div
+      className="rounded-md border bg-card px-4 py-4 shadow-sm sm:px-5"
+      variants={logItemVariants}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <p className="min-w-0 text-sm font-medium text-foreground">{title}</p>
+        <div className="mt-1 text-foreground [&_svg]:h-6 [&_svg]:w-6 [&_svg]:stroke-[1.8]">
+          {icon}
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        {metrics.map((metric) => (
+          <div key={metric.label} className="min-w-0">
+            <p className="truncate text-xs font-medium text-muted-foreground">
+              {metric.label}
+            </p>
+            <div className="mt-1 flex min-h-7 items-center">
+              {loading ? (
+                <Skeleton className="h-7 w-20" />
+              ) : (
+                <span className="truncate text-2xl font-semibold leading-none tracking-normal">
+                  {metric.value}
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
     </motion.div>
   );
@@ -364,7 +397,6 @@ function Log() {
   const timeZone = useSelector(infoTimeZoneSelector);
   const [records, setRecords] = useState<BillingRecord[]>([]);
   const [stats, setStats] = useState<RecordStats>(emptyStats);
-  const [totalTokens, setTotalTokens] = useState(0);
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(1);
   const [filters, setFilters] = useState<LogFilters>(() =>
@@ -378,8 +410,8 @@ function Log() {
 
   const initialLoading = loading && records.length === 0;
   const totalTokenLabel = useMemo(
-    () => formatTokenCount(totalTokens),
-    [totalTokens],
+    () => getReadableTokenCount(stats.total_tokens),
+    [stats.total_tokens],
   );
 
   const requestBadges = useMemo(
@@ -408,7 +440,6 @@ function Log() {
         if (resp.status && resp.data) {
           setRecords(resp.data.records ?? []);
           setTotal(resp.data.total ?? 1);
-          setTotalTokens(resp.data.total_tokens ?? 0);
         } else {
           withNotify(t, resp);
         }
@@ -465,25 +496,24 @@ function Log() {
         animate="visible"
       >
         <motion.div
-          className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-5"
+          className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-4"
           variants={logContainerVariants}
         >
-          <MetricCard
-            title={t("record.billing-today")}
-            value={stats.billing_today.toFixed(2)}
+          <SplitMetricCard
+            title={t("record.types.consume")}
             icon={<CircleDollarSign />}
             loading={statsLoading}
-          >
-            <Cloud className="h-3.5 w-3.5 stroke-[1.8]" />
-          </MetricCard>
-          <MetricCard
-            title={t("record.billing-month")}
-            value={stats.billing_month.toFixed(2)}
-            icon={<CalendarDays />}
-            loading={statsLoading}
-          >
-            <Cloud className="h-3.5 w-3.5 stroke-[1.8]" />
-          </MetricCard>
+            metrics={[
+              {
+                label: t("record.billing-today"),
+                value: stats.billing_today.toFixed(2),
+              },
+              {
+                label: t("record.billing-month"),
+                value: stats.billing_month.toFixed(2),
+              },
+            ]}
+          />
           <MetricCard
             title={t("record.request-today")}
             value={stats.request_today}
@@ -505,7 +535,7 @@ function Log() {
             title={t("record.total-tokens")}
             value={totalTokenLabel}
             icon={<Hash />}
-            loading={loading}
+            loading={statsLoading}
           />
         </motion.div>
 

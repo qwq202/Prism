@@ -35,6 +35,7 @@ export type RecordStats = {
   request_month: number;
   rpm: number;
   tpm: number;
+  total_tokens: number;
 };
 
 export type RecordUsageModel = {

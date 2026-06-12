@@ -70,6 +70,29 @@ func seedBillingRecordWithQuota(
 	}
 }
 
+func seedBillingRecordWithTokenUsage(
+	t *testing.T,
+	db *sql.DB,
+	userId int64,
+	username string,
+	recordType string,
+	inputTokens int64,
+	outputTokens int64,
+	createdAt string,
+) {
+	t.Helper()
+
+	if _, err := globals.ExecDb(db, `
+		INSERT INTO billing (
+			user_id, username, type, token_name, model,
+			input_tokens, output_tokens, quota, duration,
+			detail, prompts, response_prompts, channel, channel_name, created_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, userId, username, recordType, "stats-token", "deepseek-v4-flash", inputTokens, outputTokens, 1.25, 0.8, "", "", "", 0, "", createdAt); err != nil {
+		t.Fatalf("insert billing record with token usage: %v", err)
+	}
+}
+
 func TestListRecordsFiltersByPartialTokenNameAndInclusiveDate(t *testing.T) {
 	db := openBillingTestDB(t)
 
@@ -124,6 +147,31 @@ func TestListRecordsReturnsFilteredTokenTotals(t *testing.T) {
 	}
 	if data.TotalTokens != 60 {
 		t.Fatalf("expected filtered token total 60, got %d", data.TotalTokens)
+	}
+}
+
+func TestRecordStatsReturnConsumeTokenTotals(t *testing.T) {
+	db := openBillingTestDB(t)
+
+	seedBillingRecordWithTokenUsage(t, db, 1, "root", "consume", 10, 20, "2026-04-22 15:30:00")
+	seedBillingRecordWithTokenUsage(t, db, 1, "root", "consume", 30, 40, "2026-04-23 15:30:00")
+	seedBillingRecordWithTokenUsage(t, db, 1, "root", "topup", 100, 200, "2026-04-24 15:30:00")
+	seedBillingRecordWithTokenUsage(t, db, 2, "alice", "consume", 5, 6, "2026-04-25 15:30:00")
+
+	userStats, err := GetUserRecordStats(db, 1)
+	if err != nil {
+		t.Fatalf("get user record stats: %v", err)
+	}
+	if userStats.TotalTokens != 100 {
+		t.Fatalf("expected user consume token total 100, got %d", userStats.TotalTokens)
+	}
+
+	allStats, err := GetAllRecordTokenStats(db)
+	if err != nil {
+		t.Fatalf("get all record token stats: %v", err)
+	}
+	if allStats.TotalTokens != 111 {
+		t.Fatalf("expected all consume token total 111, got %d", allStats.TotalTokens)
 	}
 }
 

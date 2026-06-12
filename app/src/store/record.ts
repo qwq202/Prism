@@ -53,6 +53,7 @@ export const recordSlice = createSlice({
       request_month: 0,
       rpm: 0,
       tpm: 0,
+      total_tokens: 0,
     },
     walletUsageSummary: {
       model_count: 0,

@@ -162,6 +162,15 @@ func RecordStatsAPI(c *gin.Context) {
 		requestToday = requestData.Value[len(requestData.Value)-1]
 	}
 
+	tokenStats, err := GetAllRecordTokenStats(db)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": err.Error(),
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status": true,
 		"data": RecordStats{
@@ -171,6 +180,7 @@ func RecordStatsAPI(c *gin.Context) {
 			RequestMonth: 0,
 			Rpm:          rpm,
 			Tpm:          tpm,
+			TotalTokens:  tokenStats.TotalTokens,
 		},
 	})
 }

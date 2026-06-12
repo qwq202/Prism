@@ -70,6 +70,7 @@ type RecordStats struct {
 	RequestMonth int64   `json:"request_month"`
 	Rpm          int64   `json:"rpm"`
 	Tpm          int64   `json:"tpm"`
+	TotalTokens  int64   `json:"total_tokens"`
 }
 
 type RecordUsageModel struct {
@@ -237,12 +238,13 @@ func GetUserRecordStats(db *sql.DB, userId int64) (RecordStats, error) {
 	var stats RecordStats
 	err := globals.QueryRowDb(db, `
 		SELECT
-			COALESCE(SUM(CASE WHEN type = 'consume' AND created_at >= ? THEN quota ELSE 0 END), 0),
-			COALESCE(SUM(CASE WHEN type = 'consume' AND created_at >= ? THEN quota ELSE 0 END), 0),
-			COALESCE(SUM(CASE WHEN type = 'consume' AND created_at >= ? THEN 1 ELSE 0 END), 0),
-			COALESCE(SUM(CASE WHEN type = 'consume' AND created_at >= ? THEN 1 ELSE 0 END), 0)
-		FROM billing
-		WHERE user_id = ?
+				COALESCE(SUM(CASE WHEN type = 'consume' AND created_at >= ? THEN quota ELSE 0 END), 0),
+				COALESCE(SUM(CASE WHEN type = 'consume' AND created_at >= ? THEN quota ELSE 0 END), 0),
+				COALESCE(SUM(CASE WHEN type = 'consume' AND created_at >= ? THEN 1 ELSE 0 END), 0),
+				COALESCE(SUM(CASE WHEN type = 'consume' AND created_at >= ? THEN 1 ELSE 0 END), 0),
+				COALESCE(SUM(CASE WHEN type = 'consume' THEN input_tokens + output_tokens ELSE 0 END), 0)
+			FROM billing
+			WHERE user_id = ?
 	`,
 		today.Format("2006-01-02 15:04:05"),
 		month.Format("2006-01-02 15:04:05"),
@@ -254,7 +256,21 @@ func GetUserRecordStats(db *sql.DB, userId int64) (RecordStats, error) {
 		&stats.BillingMonth,
 		&stats.RequestToday,
 		&stats.RequestMonth,
+		&stats.TotalTokens,
 	)
+	if err != nil {
+		return RecordStats{}, err
+	}
+
+	return stats, nil
+}
+
+func GetAllRecordTokenStats(db *sql.DB) (RecordStats, error) {
+	var stats RecordStats
+	err := globals.QueryRowDb(db, `
+		SELECT COALESCE(SUM(CASE WHEN type = 'consume' THEN input_tokens + output_tokens ELSE 0 END), 0)
+		FROM billing
+	`).Scan(&stats.TotalTokens)
 	if err != nil {
 		return RecordStats{}, err
 	}

@@ -130,3 +130,19 @@ export function getReadableNumber(
     return (num / 1e3).toFixed(fixed) + "k";
   return num.toFixed(0);
 }
+
+function formatCompactTokenUnit(value: number, unit: "K" | "M" | "B"): string {
+  const fractionDigits = Math.abs(value) >= 100 ? 0 : 1;
+  return `${value.toFixed(fractionDigits).replace(/\.0$/, "")}${unit}`;
+}
+
+export function getReadableTokenCount(num: number): string {
+  if (!Number.isFinite(num)) return "0";
+
+  const absValue = Math.abs(num);
+  if (absValue >= 1e9) return formatCompactTokenUnit(num / 1e9, "B");
+  if (absValue >= 1e6) return formatCompactTokenUnit(num / 1e6, "M");
+  if (absValue >= 1e3) return formatCompactTokenUnit(num / 1e3, "K");
+
+  return new Intl.NumberFormat().format(num);
+}
