@@ -746,6 +746,8 @@
     "today": "Today",
     "active-user-chart": "Daily Active Users",
     "registration-chart": "New Registrations",
+    "active-users": "Active Users",
+    "new-users": "New Users",
     "conversion-funnel": "Conversion Funnel",
     "funnel-registered": "Registered",
     "funnel-ever-subscribed": "Ever Subscribed",

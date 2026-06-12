@@ -9,16 +9,15 @@ type RegistrationChartProps = {
   datasets: number[];
 };
 
-const SERIES = "New Users";
-
 function RegistrationChart({ labels, datasets }: RegistrationChartProps) {
   const { t } = useTranslation();
+  const newUsersLabel = t("admin.new-users");
   const data = useMemo(() => {
     return datasets.map((v, i) => ({
       date: labels[i],
-      [SERIES]: v,
+      [newUsersLabel]: v,
     }));
-  }, [labels, datasets]);
+  }, [labels, datasets, newUsersLabel]);
 
   const total = useMemo(() => datasets.reduce((a, b) => a + b, 0), [datasets]);
 
@@ -30,13 +29,13 @@ function RegistrationChart({ labels, datasets }: RegistrationChartProps) {
           <Loader2 className={`h-4 w-4 inline-block animate-spin`} />
         )}
         <div className={`ml-auto bg-emerald-500/20 text-emerald-500 px-1 rounded-sm text-xs py-0.5`}>
-          +{getReadableNumber(total)} {t("admin.times")}
+          +{getReadableNumber(total)} {newUsersLabel}
         </div>
       </div>
       <BarChart
         className={`common-chart`}
         data={data}
-        categories={[SERIES]}
+        categories={[newUsersLabel]}
         index={"date"}
         colors={["emerald"]}
         valueFormatter={(v) => getReadableNumber(v, 1)}

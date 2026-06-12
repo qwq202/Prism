@@ -9,16 +9,15 @@ type ActiveUserChartProps = {
   datasets: number[];
 };
 
-const SERIES = "DAU";
-
 function ActiveUserChart({ labels, datasets }: ActiveUserChartProps) {
   const { t } = useTranslation();
+  const activeUsersLabel = t("admin.active-users");
   const data = useMemo(() => {
     return datasets.map((v, i) => ({
       date: labels[i],
-      [SERIES]: v,
+      [activeUsersLabel]: v,
     }));
-  }, [labels, datasets]);
+  }, [labels, datasets, activeUsersLabel]);
 
   const total = useMemo(() => datasets.reduce((a, b) => a + b, 0), [datasets]);
 
@@ -30,13 +29,13 @@ function ActiveUserChart({ labels, datasets }: ActiveUserChartProps) {
           <Loader2 className={`h-4 w-4 inline-block animate-spin`} />
         )}
         <div className={`ml-auto bg-violet-500/20 text-violet-500 px-1 rounded-sm text-xs py-0.5`}>
-          {getReadableNumber(total)} {t("admin.times")}
+          {getReadableNumber(total)} {activeUsersLabel}
         </div>
       </div>
       <AreaChart
         className={`common-chart`}
         data={data}
-        categories={[SERIES]}
+        categories={[activeUsersLabel]}
         index={"date"}
         colors={["violet"]}
         valueFormatter={(v) => getReadableNumber(v, 1)}
