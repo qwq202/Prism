@@ -27,6 +27,8 @@ import {
   Zap,
 } from "lucide-react";
 
+const MAX_VISIBLE_MODELS = 5;
+
 function formatQuotaValue(value: number): string {
   return Number.isFinite(value)
     ? value.toLocaleString(undefined, { maximumFractionDigits: 4 })
@@ -148,7 +150,7 @@ export default function WalletStats() {
 
   const barListData = useMemo(
     () =>
-      modelUsage.slice(0, 8).map((m) => ({
+      modelUsage.slice(0, MAX_VISIBLE_MODELS).map((m) => ({
         name: m.name,
         value: m.value,
         count: m.count,
@@ -255,10 +257,10 @@ export default function WalletStats() {
                   </div>
                 ))}
               </div>
-              {modelUsage.length > 8 && (
+              {modelUsage.length > MAX_VISIBLE_MODELS && (
                 <p className="text-xs text-muted-foreground mt-2 text-right">
                   {t("bar.wallet-more-models", {
-                    count: modelUsage.length - 8,
+                    count: modelUsage.length - MAX_VISIBLE_MODELS,
                   })}
                 </p>
               )}
