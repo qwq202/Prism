@@ -30,6 +30,7 @@ const subscriptionGuideRoute = lazyFactor(
 );
 const accountRoute = lazyFactor(() => import("@/routes/Account.tsx"));
 const logRoute = lazyFactor(() => import("@/routes/Log.tsx"));
+const drawingRoute = lazyFactor(() => import("@/routes/Drawing.tsx"));
 
 const sharingRoute = lazyFactor(() => import("@/routes/Sharing.tsx"));
 
@@ -117,6 +118,15 @@ const router = createBrowserRouter([
         element: (
           <AuthRequired>
             {withSuspense(logRoute)}
+          </AuthRequired>
+        ),
+      },
+      {
+        id: "drawing",
+        path: "drawing",
+        element: (
+          <AuthRequired>
+            {withSuspense(drawingRoute)}
           </AuthRequired>
         ),
       },

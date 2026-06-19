@@ -20,6 +20,7 @@ import React from "react";
 import {
   LibraryBig,
   MessageCircle,
+  Palette,
   PieChart,
   Shield,
   Sparkles,
@@ -76,6 +77,7 @@ function MenuBar({ children, className }: MenuBarProps) {
               name={"personalization"}
             />
             <BarItem icon={<LibraryBig />} path={`/model`} name={"model"} />
+            <BarItem icon={<Palette />} path={`/drawing`} name={"drawing"} />
             {/* <BarItem icon={<Compass />} path={`/preset`} name={"preset"} /> */}
             <BarItem icon={<Wallet />} path={`/wallet`} name={"wallet"} />
             {/* <BarItem icon={<DraftingCompass />} path={`/key`} name={"key"} /> */}
