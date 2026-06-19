@@ -20,7 +20,7 @@ Prism is an AI gateway and chat platform. The backend is written in Go and expos
 - `auth/` — authentication, quotas, subscriptions, invitations, redeem codes, passkeys.
 - `admin/` — admin dashboard endpoints and analytics.
 - `billing/` — usage records and model performance metrics.
-- `addition/` — auxiliary features: article generation, web fetch, title auto-generation.
+- `addition/` — auxiliary features: web fetch, title auto-generation.
 - `middleware/` — auth, CORS, throttling, client IP utilities.
 - `connection/` — MySQL/Redis connections, migrations, background workers.
 - `utils/` — shared helpers: config I/O, buffer/usage counting, storage, tokenizer, websockets.

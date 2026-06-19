@@ -7,8 +7,6 @@ config.yaml
 config.dev.yaml
 storage
 
-addition/article/data/*
-!addition/article/data/.gitkeep
 sdk
 logs
 

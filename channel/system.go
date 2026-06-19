@@ -32,7 +32,6 @@ type ApiInfo struct {
 	Footer       string   `json:"footer"`
 	AuthFooter   bool     `json:"auth_footer"`
 	Mail         bool     `json:"mail"`
-	Article      []string `json:"article"`
 	WebSearch    bool     `json:"web_search"`
 	HasTaskModel bool     `json:"has_task_model"`
 	RuntimeID    string   `json:"runtime_id"`
@@ -122,7 +121,6 @@ type r2StorageState struct {
 }
 
 type commonState struct {
-	Article               []string       `json:"article" mapstructure:"article"`
 	Cache                 []string       `json:"cache" mapstructure:"cache"`
 	Expire                int64          `json:"expire" mapstructure:"expire"`
 	Size                  int64          `json:"size" mapstructure:"size"`
@@ -180,7 +178,6 @@ func (c *SystemConfig) Load() {
 
 	globals.CloseRegistration = c.Site.CloseRegister
 
-	globals.ArticlePermissionGroup = c.Common.Article
 	globals.CacheAcceptedModels = c.Common.Cache
 
 	globals.CacheAcceptedExpire = c.GetCacheAcceptedExpire()
@@ -270,7 +267,6 @@ func (c *SystemConfig) AsInfo() ApiInfo {
 		AuthFooter:   c.Site.AuthFooter,
 		BuyLink:      c.Site.BuyLink,
 		Mail:         c.IsMailValid(),
-		Article:      c.Common.Article,
 		WebSearch:    strings.TrimSpace(globals.SearchApiKey) != "",
 		HasTaskModel: globals.GetTaskModel() != "",
 		RuntimeID:    serverRuntimeID,

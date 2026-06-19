@@ -2,7 +2,6 @@ package main
 
 import (
 	"chat/adapter"
-	"chat/addition"
 	"chat/admin"
 	"chat/auth"
 	"chat/billing"
@@ -151,7 +150,6 @@ func registerApiRouter(engine *gin.Engine) {
 		admin.Register(app)
 		adapter.Register(app)
 		manager.Register(app)
-		addition.Register(app)
 		conversation.Register(app)
 		memory.Register(app)
 		billing.Register(app)
