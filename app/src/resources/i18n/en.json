@@ -497,16 +497,6 @@
     "vision-model-required": "The current model does not support image recognition",
     "files-cleared-on-model-switch": "After the model switch, the image to be sent has been automatically cleared"
   },
-  "generate": {
-    "title": "AI Project Generator",
-    "input-placeholder": "Generate a Python game",
-    "failed": "Generation failed",
-    "reason": "Reason: ",
-    "success": "Generation successful",
-    "success-prompt": "Project generated successfully! Please select the download format.",
-    "empty": "Generating...",
-    "download": "Download {{name}} format"
-  },
   "drawing": {
     "model": "Model",
     "manage": "Manage",

@@ -733,16 +733,6 @@
     "vision-model-required": "当前模型不支持图像识别",
     "files-cleared-on-model-switch": "模型切换后，待发送图片已自动清空"
   },
-  "generate": {
-    "title": "AI 项目生成器",
-    "input-placeholder": "生成一个python小游戏",
-    "failed": "生成失败",
-    "reason": "原因：",
-    "success": "生成成功",
-    "success-prompt": "成功生成项目！请选择下载格式。",
-    "empty": "生成中...",
-    "download": "下载 {{name}} 格式"
-  },
   "drawing": {
     "model": "模型",
     "manage": "管理",

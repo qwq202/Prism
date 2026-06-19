@@ -497,16 +497,6 @@
     "vision-model-required": "現在のモデルは画像認識に対応していません",
     "files-cleared-on-model-switch": "モデル切り替え後、送信する画像が自動的にクリアされました"
   },
-  "generate": {
-    "title": "AIプロジェクトビルダー",
-    "input-placeholder": "Pythonミニゲームを生成する",
-    "failed": "生成に失敗しました",
-    "reason": "理由",
-    "success": "正常に生成されました",
-    "success-prompt": "プロジェクトが正常に生成されました！ダウンロード形式を選択してください。",
-    "empty": "生成しています...",
-    "download": "{{name}}形式をダウンロード"
-  },
   "drawing": {
     "model": "モデル",
     "manage": "管理",

@@ -31,7 +31,6 @@ const subscriptionGuideRoute = lazyFactor(
 const accountRoute = lazyFactor(() => import("@/routes/Account.tsx"));
 const logRoute = lazyFactor(() => import("@/routes/Log.tsx"));
 
-const generationRoute = lazyFactor(() => import("@/routes/Generation.tsx"));
 const sharingRoute = lazyFactor(() => import("@/routes/Sharing.tsx"));
 const articleRoute = lazyFactor(() => import("@/routes/Article.tsx"));
 
@@ -242,16 +241,6 @@ const router = createBrowserRouter([
           },
         ],
         ErrorBoundary: AdminRouteError,
-      },
-      {
-        id: "generation",
-        path: "/generate",
-        element: (
-          <AuthRequired>
-            {withSuspense(generationRoute)}
-          </AuthRequired>
-        ),
-        ErrorBoundary: NotFound,
       },
       {
         id: "article",

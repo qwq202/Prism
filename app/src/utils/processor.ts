@@ -111,14 +111,6 @@ export function handleLine(
   }
 }
 
-export function handleGenerationData(data: string): string {
-  data = data
-    .replace(/{\s*"result":\s*{/g, "")
-    .trim()
-    .replace(/}\s*$/g, "");
-  return handleLine(escapeRegExp(data), 6);
-}
-
 export function getReadableNumber(
   num: number,
   fixed?: number,

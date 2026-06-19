@@ -585,16 +585,6 @@
     "vision-model-required": "當前模型不支援圖像識別",
     "files-cleared-on-model-switch": "模型切換後，待發送圖片已自動清空"
   },
-  "generate": {
-    "title": "AI 專案產生器",
-    "input-placeholder": "產生一個 Python 小遊戲",
-    "failed": "產生失敗",
-    "reason": "原因：",
-    "success": "產生成功",
-    "success-prompt": "成功產生專案！請選擇下載格式。",
-    "empty": "產生中...",
-    "download": "下載 {{name}} 格式"
-  },
   "drawing": {
     "model": "模型",
     "manage": "管理",
