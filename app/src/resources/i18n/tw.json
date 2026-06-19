@@ -792,19 +792,6 @@
       }
     }
   },
-  "article": {
-    "title": "批次產生文章",
-    "input-placeholder": "請輸入文章標題（一行一個）",
-    "prompt-placeholder": "請輸入預設（幫助 AI 產生文章，如：學術論文格式，800 字）",
-    "web-checkbox": "是否開啟網路搜尋功能",
-    "generate": "產生",
-    "progress-title": "產生中（總共 {{total}} 篇，{{current}} 篇已產生）",
-    "generate-success": "產生成功",
-    "generate-success-prompt": "文章產生成功！請選擇下載格式。",
-    "generate-failed": "產生失敗",
-    "generate-failed-prompt": "文章產生失敗，請檢查您的網路並再試一次。",
-    "download-format": "下載 {{name}} 格式"
-  },
   "admin": {
     "dashboard": "儀錶板",
     "users": "後台管理",

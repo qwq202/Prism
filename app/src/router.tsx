@@ -32,7 +32,6 @@ const accountRoute = lazyFactor(() => import("@/routes/Account.tsx"));
 const logRoute = lazyFactor(() => import("@/routes/Log.tsx"));
 
 const sharingRoute = lazyFactor(() => import("@/routes/Sharing.tsx"));
-const articleRoute = lazyFactor(() => import("@/routes/Article.tsx"));
 
 const adminPageRoute = lazyFactor(() => import("@/routes/Admin.tsx"));
 const adminDashboardRoute = lazyFactor(
@@ -241,16 +240,6 @@ const router = createBrowserRouter([
           },
         ],
         ErrorBoundary: AdminRouteError,
-      },
-      {
-        id: "article",
-        path: "/article",
-        element: (
-          <AuthRequired>
-            {withSuspense(articleRoute)}
-          </AuthRequired>
-        ),
-        ErrorBoundary: NotFound,
       },
       ...(useDeeptrain
         ? []

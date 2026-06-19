@@ -991,19 +991,6 @@
     "reset-settings": "重置全部设置",
     "reset-settings-description": "是否确定？此操作无法撤消。这将永久重置全部设置。"
   },
-  "article": {
-    "title": "批量生成文章",
-    "input-placeholder": "请输入文章标题（一行一个）",
-    "prompt-placeholder": "请输入预设（帮助 AI 生成文章，如：学术论文格式，800 字）",
-    "web-checkbox": "是否开启联网搜索功能",
-    "generate": "生成",
-    "progress-title": "生成中 （总共 {{total}} 篇， {{current}} 篇已生成）",
-    "generate-success": "生成成功",
-    "generate-success-prompt": "文章生成成功！请选择下载格式。",
-    "generate-failed": "生成失败",
-    "generate-failed-prompt": "文章生成失败，请检查您的网络并重试。",
-    "download-format": "下载 {{name}} 格式"
-  },
   "admin": {
     "dashboard": "数据分析",
     "users": "后台管理",

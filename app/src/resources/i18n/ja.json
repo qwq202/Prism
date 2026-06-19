@@ -704,19 +704,6 @@
       }
     }
   },
-  "article": {
-    "title": "投稿の一括生成",
-    "input-placeholder": "投稿タイトルを入力してください（ 1行に1つ）",
-    "prompt-placeholder": "プリセットを入力してください（ AIが記事を生成するのに役立ちます。例：学術論文フォーマット、800ワード）",
-    "web-checkbox": "ネットワーク検索機能をオンにするかどうか",
-    "generate": "生成",
-    "progress-title": "生成中（{{current}}生成中の{{total}}）",
-    "generate-success": "正常に生成されました",
-    "generate-success-prompt": "投稿が正常に生成されました！ダウンロード形式を選択してください。",
-    "generate-failed": "生成に失敗しました",
-    "generate-failed-prompt": "投稿の生成に失敗しました。ネットワークを確認して、もう一度お試しください。",
-    "download-format": "{{name}}形式をダウンロード"
-  },
   "admin": {
     "dashboard": "データ分析",
     "users": "ユーザー管理",

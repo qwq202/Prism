@@ -704,19 +704,6 @@
       }
     }
   },
-  "article": {
-    "title": "Batch Generate Articles",
-    "input-placeholder": "Please enter the article titles (one per line)",
-    "prompt-placeholder": "Please enter the preset (to help AI generate articles, e.g.: academic paper format, 800 words)",
-    "web-checkbox": "Enable web search function",
-    "generate": "Generate",
-    "progress-title": "Generating ({{current}}/{{total}})",
-    "generate-success": "Generation Successful",
-    "generate-success-prompt": "Articles generated successfully! Please select the download format.",
-    "generate-failed": "Generation Failed",
-    "generate-failed-prompt": "Failed to generate articles. Please check your network and try again.",
-    "download-format": "Download {{name}} format"
-  },
   "admin": {
     "dashboard": "Data analysis",
     "users": "Admin",
