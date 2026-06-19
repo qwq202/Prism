@@ -10,6 +10,7 @@ import {
   Sparkles,
   Wallet,
   LibraryBig,
+  Palette,
   User,
 } from "lucide-react";
 import React from "react";
@@ -123,6 +124,7 @@ function ToolBar() {
         name={"personalization"}
       />
       <BarItem icon={<LibraryBig />} path={`/model`} name={"model"} />
+      <BarItem icon={<Palette />} path={`/drawing`} name={"drawing"} />
       {/* <BarItem icon={<Compass />} path={`/preset`} name={"preset"} /> */}
       <BarItem icon={<Wallet />} path={`/wallet`} name={"wallet"} />
       {/* <BarItem icon={<DraftingCompass />} path={`/key`} name={"key"} /> */}
