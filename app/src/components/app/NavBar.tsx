@@ -8,7 +8,7 @@ import {
   validateToken,
 } from "@/store/auth.ts";
 import { Button } from "@/components/ui/button.tsx";
-import { Menu, Palette, Settings2 } from "lucide-react";
+import { Menu, Settings2 } from "lucide-react";
 import { useEffect } from "react";
 import { tokenField } from "@/conf/bootstrap.ts";
 import { toggleMenu } from "@/store/menu.ts";
@@ -105,17 +105,6 @@ function NavBar() {
         >
           <Settings2 className={`w-4 h-4`} />
         </Button>
-        {auth && (
-          <Button
-            size={`icon-md`}
-            variant={`outline`}
-            className={`rounded-full overflow-hidden`}
-            onClick={() => router.navigate("/drawing")}
-            title={t("bar.drawing")}
-          >
-            <Palette className={`w-4 h-4`} />
-          </Button>
-        )}
         {!init ? (
           <div className={`h-9 w-24 rounded-full`} />
         ) : auth ? (

@@ -21,6 +21,7 @@ import { selectMenu, setMenu } from "@/store/menu.ts";
 import {
   Copy,
   Eraser,
+  Palette,
   Paintbrush,
   Plus,
   RotateCw,
@@ -44,6 +45,7 @@ import { getSharedLink, shareConversation } from "@/api/sharing.ts";
 import { Input } from "@/components/ui/input.tsx";
 import { goAuth } from "@/utils/app.ts";
 import { cn } from "@/components/ui/lib/utils.ts";
+import router from "@/router.tsx";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { isConversationListCacheStorageKey } from "@/utils/conversation-cache.ts";
@@ -545,6 +547,15 @@ function SideBar() {
           operateConversation={operateConversation}
           setOperateConversation={setOperateConversation}
         />
+        {init && auth && (
+          <Button
+            className={`drawing-action min-h-10 h-max`}
+            variant={`outline`}
+            onClick={() => router.navigate("/drawing")}
+          >
+            <Palette className={`h-4 w-4 mr-1.5 shrink-0`} /> {t("bar.drawing")}
+          </Button>
+        )}
         {init && !auth && (
           <Button
             className={`login-action min-h-10 h-max`}
