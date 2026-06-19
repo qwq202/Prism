@@ -20,7 +20,6 @@ var AllowedOrigins []string
 var DebugMode bool
 var NotifyUrl = ""
 var ArticlePermissionGroup []string
-var GenerationPermissionGroup []string
 var CacheAcceptedModels []string
 var CacheAcceptedExpire int64
 var CacheAcceptedSize int64

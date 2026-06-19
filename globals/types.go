@@ -118,14 +118,6 @@ type ChatSegmentResponse struct {
 	Plan         bool                 `json:"plan"`
 }
 
-type GenerationSegmentResponse struct {
-	Quota   float32 `json:"quota"`
-	Message string  `json:"message"`
-	Hash    string  `json:"hash"`
-	End     bool    `json:"end"`
-	Error   string  `json:"error"`
-}
-
 type ListModels struct {
 	Object string           `json:"object"`
 	Data   []ListModelsItem `json:"data"`

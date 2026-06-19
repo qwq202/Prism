@@ -6,23 +6,23 @@ import (
 )
 
 func TestSafeJoinRejectsEscapingSegments(t *testing.T) {
-	if _, err := SafeJoin("storage/generation/data/hash", "../config.yaml"); err == nil {
+	if _, err := SafeJoin("storage/test/data/hash", "../config.yaml"); err == nil {
 		t.Fatalf("expected parent-directory segment to be rejected")
 	}
-	if _, err := SafeJoin("storage/generation/data/hash", "/tmp/evil.txt"); err == nil {
+	if _, err := SafeJoin("storage/test/data/hash", "/tmp/evil.txt"); err == nil {
 		t.Fatalf("expected absolute segment to be rejected")
 	}
-	if _, err := SafeJoin("storage/generation/data/hash", `..\evil.txt`); err == nil {
+	if _, err := SafeJoin("storage/test/data/hash", `..\evil.txt`); err == nil {
 		t.Fatalf("expected windows parent-directory segment to be rejected")
 	}
 }
 
 func TestSafeJoinAllowsNestedRelativePaths(t *testing.T) {
-	got, err := SafeJoin("storage/generation/data/hash", "src/main.go")
+	got, err := SafeJoin("storage/test/data/hash", "src/main.go")
 	if err != nil {
 		t.Fatalf("expected nested path to be accepted: %v", err)
 	}
-	if got != "storage/generation/data/hash/src/main.go" {
+	if got != "storage/test/data/hash/src/main.go" {
 		t.Fatalf("unexpected joined path %q", got)
 	}
 }

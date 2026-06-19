@@ -37,7 +37,6 @@ var limits = map[string]Limiter{
 	"/redeem":       {Duration: 1200, Count: 60},
 	"/dashboard":    {Duration: 1, Count: 5},
 	"/card":         {Duration: 1, Count: 5},
-	"/generation":   {Duration: 1, Count: 5},
 	"/article":      {Duration: 1, Count: 5},
 	"/broadcast":    {Duration: 1, Count: 2},
 }
