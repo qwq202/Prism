@@ -2,7 +2,6 @@ import { useState } from "react";
 import {
   Wand2,
   Settings,
-  Sparkles,
   Plus,
   Languages,
   SlidersHorizontal,
@@ -119,17 +118,12 @@ function Drawing() {
 
         {/* Empty Canvas */}
         <div className="flex-1 flex flex-col items-center justify-center pb-44 relative z-10">
-          <div className="flex flex-col items-center gap-3 select-none">
-            <div className="w-14 h-14 rounded-3xl bg-gradient-to-br from-violet-500/15 via-blue-500/10 to-transparent border border-border/50 flex items-center justify-center mb-1 shadow-inner">
-              <Sparkles className="w-6 h-6 text-muted-foreground/50" />
-            </div>
-            <p className="text-base font-semibold text-foreground/70 tracking-wide">
-              {t("drawing.emptyTitle")}
-            </p>
-            <p className="text-sm text-muted-foreground/50">
-              {t("drawing.emptyPrompt")}
-            </p>
-          </div>
+          <p className="text-base font-semibold text-foreground/70 tracking-wide">
+            {t("drawing.emptyTitle")}
+          </p>
+          <p className="text-sm text-muted-foreground/50 mt-3">
+            {t("drawing.emptyPrompt")}
+          </p>
         </div>
 
         {/* Floating Input */}
