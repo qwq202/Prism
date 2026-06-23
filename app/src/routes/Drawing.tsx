@@ -22,6 +22,7 @@ import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
 import { selectSupportModels } from "@/store/chat.ts";
 import { isDrawingModel } from "@/conf/model.ts";
+import ModelAvatar from "@/components/ModelAvatar.tsx";
 
 type Mode = "generate" | "edit";
 
@@ -239,12 +240,32 @@ function Drawing() {
               disabled={drawingModels.length === 0}
             >
               <SelectTrigger className="w-full h-10 text-sm border-border/60 bg-background/60">
-                <SelectValue placeholder={t("drawing.selectModel")} />
+                {selectedDrawingModel ? (
+                  <div className="flex min-w-0 items-center gap-2">
+                    <ModelAvatar
+                      model={selectedDrawingModel}
+                      size={22}
+                      className="shrink-0"
+                    />
+                    <span className="truncate">
+                      {selectedDrawingModel.name || selectedDrawingModel.id}
+                    </span>
+                  </div>
+                ) : (
+                  <SelectValue placeholder={t("drawing.selectModel")} />
+                )}
               </SelectTrigger>
               <SelectContent>
                 {drawingModels.map((model) => (
                   <SelectItem key={model.id} value={model.id}>
-                    {model.name || model.id}
+                    <div className="flex min-w-0 items-center gap-2">
+                      <ModelAvatar
+                        model={model}
+                        size={22}
+                        className="shrink-0"
+                      />
+                      <span className="truncate">{model.name || model.id}</span>
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
