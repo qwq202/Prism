@@ -519,7 +519,10 @@
       "ratio": "Формат"
     },
     "advanced": "Дополнительные параметры",
-    "generateImage": "Создать изображение"
+    "generateImage": "Создать изображение",
+    "addWorkspace": "Добавить рабочую область",
+    "workspaceTitle": "Рабочая область {{index}}",
+    "activeWorkspaceTitle": "Активная рабочая область {{index}}"
   },
   "service": {
     "title": "Доступна новая версия",

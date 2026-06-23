@@ -519,7 +519,10 @@
       "ratio": "Ratio"
     },
     "advanced": "Advanced settings",
-    "generateImage": "Generate image"
+    "generateImage": "Generate image",
+    "addWorkspace": "Add workspace",
+    "workspaceTitle": "Workspace {{index}}",
+    "activeWorkspaceTitle": "Active workspace {{index}}"
   },
   "service": {
     "title": "New Version Available",

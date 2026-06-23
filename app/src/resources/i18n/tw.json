@@ -607,7 +607,10 @@
       "ratio": "比例"
     },
     "advanced": "進階參數",
-    "generateImage": "生成圖片"
+    "generateImage": "生成圖片",
+    "addWorkspace": "新增工作區",
+    "workspaceTitle": "工作區 {{index}}",
+    "activeWorkspaceTitle": "目前工作區 {{index}}"
   },
   "service": {
     "title": "發現新版本",

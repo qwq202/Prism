@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Wand2,
   Settings,
@@ -22,11 +22,182 @@ import { useTranslation } from "react-i18next";
 
 type Mode = "generate" | "edit";
 
+type DrawingWorkspace = {
+  id: string;
+  mode: Mode;
+  prompt: string;
+  createdAt: number;
+  accent: number;
+};
+
+const DRAWING_WORKSPACES_KEY = "drawing.workspaces.v1";
+const DRAWING_ACTIVE_WORKSPACE_KEY = "drawing.activeWorkspaceId.v1";
+
+const WORKSPACE_ACCENTS = [
+  {
+    active: "from-violet-500/14 to-blue-500/12",
+    idle: "from-violet-500/8 to-blue-500/6",
+  },
+  {
+    active: "from-emerald-500/14 to-cyan-500/12",
+    idle: "from-emerald-500/8 to-cyan-500/6",
+  },
+  {
+    active: "from-rose-500/14 to-amber-500/12",
+    idle: "from-rose-500/8 to-amber-500/6",
+  },
+  {
+    active: "from-sky-500/14 to-indigo-500/12",
+    idle: "from-sky-500/8 to-indigo-500/6",
+  },
+];
+
+function createWorkspaceId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `workspace-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function createDrawingWorkspace(index = 0): DrawingWorkspace {
+  return {
+    id: createWorkspaceId(),
+    mode: "generate",
+    prompt: "",
+    createdAt: Date.now(),
+    accent: index % WORKSPACE_ACCENTS.length,
+  };
+}
+
+function loadDrawingWorkspaces(): DrawingWorkspace[] {
+  if (typeof window === "undefined") {
+    return [createDrawingWorkspace()];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(DRAWING_WORKSPACES_KEY);
+    if (!raw) {
+      return [createDrawingWorkspace()];
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [createDrawingWorkspace()];
+    }
+
+    const workspaces = parsed
+      .map((item, index): DrawingWorkspace | null => {
+        if (!item || typeof item !== "object") {
+          return null;
+        }
+
+        const workspace = item as Partial<DrawingWorkspace>;
+
+        return {
+          id:
+            typeof workspace.id === "string" && workspace.id
+              ? workspace.id
+              : createWorkspaceId(),
+          mode: workspace.mode === "edit" ? "edit" : "generate",
+          prompt: typeof workspace.prompt === "string" ? workspace.prompt : "",
+          createdAt:
+            typeof workspace.createdAt === "number" &&
+            Number.isFinite(workspace.createdAt)
+              ? workspace.createdAt
+              : Date.now(),
+          accent:
+            typeof workspace.accent === "number" &&
+            Number.isFinite(workspace.accent)
+              ? workspace.accent
+              : index,
+        };
+      })
+      .filter((workspace): workspace is DrawingWorkspace => Boolean(workspace));
+
+    return workspaces.length > 0 ? workspaces : [createDrawingWorkspace()];
+  } catch {
+    return [createDrawingWorkspace()];
+  }
+}
+
+function loadActiveWorkspaceId() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return window.localStorage.getItem(DRAWING_ACTIVE_WORKSPACE_KEY) ?? "";
+}
+
 function Drawing() {
   const { t } = useTranslation();
-  const [mode, setMode] = useState<Mode>("generate");
-  const [prompt, setPrompt] = useState("");
+  const [workspaces, setWorkspaces] = useState<DrawingWorkspace[]>(() =>
+    loadDrawingWorkspaces(),
+  );
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState(() =>
+    loadActiveWorkspaceId(),
+  );
   const [focused, setFocused] = useState(false);
+  const activeWorkspace =
+    workspaces.find((workspace) => workspace.id === activeWorkspaceId) ??
+    workspaces[0];
+  const activeWorkspaceIdForStorage = activeWorkspace?.id ?? "";
+  const mode = activeWorkspace?.mode ?? "generate";
+  const prompt = activeWorkspace?.prompt ?? "";
+
+  useEffect(() => {
+    const firstWorkspaceId = workspaces[0]?.id;
+    if (
+      firstWorkspaceId &&
+      !workspaces.some((workspace) => workspace.id === activeWorkspaceId)
+    ) {
+      setActiveWorkspaceId(firstWorkspaceId);
+    }
+  }, [activeWorkspaceId, workspaces]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(
+      DRAWING_WORKSPACES_KEY,
+      JSON.stringify(workspaces),
+    );
+  }, [workspaces]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !activeWorkspaceIdForStorage) {
+      return;
+    }
+
+    window.localStorage.setItem(
+      DRAWING_ACTIVE_WORKSPACE_KEY,
+      activeWorkspaceIdForStorage,
+    );
+  }, [activeWorkspaceIdForStorage]);
+
+  const updateActiveWorkspace = (
+    updates: Partial<Pick<DrawingWorkspace, "mode" | "prompt">>,
+  ) => {
+    if (!activeWorkspace) {
+      return;
+    }
+
+    setWorkspaces((current) =>
+      current.map((workspace) =>
+        workspace.id === activeWorkspace.id
+          ? { ...workspace, ...updates }
+          : workspace,
+      ),
+    );
+  };
+
+  const addWorkspace = () => {
+    const workspace = createDrawingWorkspace(workspaces.length);
+    setWorkspaces((current) => [...current, workspace]);
+    setActiveWorkspaceId(workspace.id);
+  };
 
   return (
     <div className="flex h-full min-h-0 w-full bg-background text-foreground overflow-hidden">
@@ -55,7 +226,6 @@ function Drawing() {
               </SelectContent>
             </Select>
           </div>
-
         </div>
       </aside>
 
@@ -71,16 +241,18 @@ function Drawing() {
             <div
               className={cn(
                 "pointer-events-none absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full bg-foreground shadow-sm transition-all duration-300 ease-out",
-                mode === "edit" && "translate-x-full"
+                mode === "edit" && "translate-x-full",
               )}
             />
             {(["generate", "edit"] as const).map((m) => (
               <button
                 key={m}
-                onClick={() => setMode(m)}
+                onClick={() => updateActiveWorkspace({ mode: m })}
                 className={cn(
                   "relative z-10 min-w-[76px] px-6 py-2 rounded-full text-sm font-medium transition-colors duration-300",
-                  mode === m ? "text-background" : "text-muted-foreground hover:text-foreground"
+                  mode === m
+                    ? "text-background"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
                 aria-pressed={mode === m}
               >
@@ -108,7 +280,7 @@ function Drawing() {
               "border bg-background/96 backdrop-blur-2xl",
               focused
                 ? "border-border shadow-[0_24px_64px_-12px_rgba(0,0,0,0.16),0_0_0_1px_rgba(0,0,0,0.02)] dark:shadow-[0_24px_64px_-12px_rgba(0,0,0,0.5)]"
-                : "border-border/55 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.1)] dark:shadow-[0_8px_32px_-8px_rgba(0,0,0,0.4)]"
+                : "border-border/55 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.1)] dark:shadow-[0_8px_32px_-8px_rgba(0,0,0,0.4)]",
             )}
           >
             {/* Meta row */}
@@ -135,7 +307,9 @@ function Drawing() {
             {/* Textarea */}
             <Textarea
               value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
+              onChange={(e) =>
+                updateActiveWorkspace({ prompt: e.target.value })
+              }
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
               className="min-h-[84px] w-full resize-none border-0 bg-transparent px-4 py-3 text-sm leading-relaxed text-foreground shadow-none placeholder:text-muted-foreground/35 focus-visible:ring-0 focus-visible:ring-offset-0"
@@ -172,7 +346,7 @@ function Drawing() {
                   "flex h-9 w-9 items-center justify-center rounded-full transition-all duration-150 shrink-0 select-none",
                   prompt.trim()
                     ? "bg-foreground text-background hover:opacity-85 active:scale-[0.96] shadow-sm"
-                    : "bg-muted/60 text-muted-foreground/40 cursor-not-allowed"
+                    : "bg-muted/60 text-muted-foreground/40 cursor-not-allowed",
                 )}
                 aria-label={t("drawing.generateImage")}
                 title={t("drawing.generateImage")}
@@ -187,19 +361,61 @@ function Drawing() {
       {/* Right Sidebar - History */}
       <aside className="w-[72px] min-h-0 bg-card/50 border-l border-border/60 flex flex-col z-10 shrink-0 backdrop-blur-sm">
         <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3 items-center no-scrollbar pt-4">
-          <button className="w-12 h-12 border-2 border-dashed border-border/60 rounded-2xl flex items-center justify-center text-muted-foreground/60 hover:border-primary/40 hover:text-primary/60 hover:bg-primary/5 transition-all duration-200 group">
+          <button
+            type="button"
+            onClick={addWorkspace}
+            className="w-12 h-12 border-2 border-dashed border-border/60 rounded-2xl flex items-center justify-center text-muted-foreground/60 hover:border-primary/40 hover:text-primary/60 hover:bg-primary/5 transition-all duration-200 group"
+            aria-label={t("drawing.addWorkspace")}
+            title={t("drawing.addWorkspace")}
+          >
             <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" />
           </button>
-          <div className="w-12 h-12 border-2 border-primary/60 rounded-2xl bg-gradient-to-br from-violet-500/10 to-blue-500/10 shadow-sm relative cursor-pointer overflow-hidden group ring-2 ring-primary/10">
-            <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-blue-500/5 group-hover:from-violet-500/10 group-hover:to-blue-500/10 transition-all" />
-          </div>
-          {[0.5, 0.3].map((opacity, i) => (
-            <div
-              key={i}
-              className="w-12 h-12 border border-border/50 rounded-2xl bg-muted/40 cursor-pointer hover:border-border hover:bg-muted/60 transition-all duration-200 overflow-hidden"
-              style={{ opacity }}
-            />
-          ))}
+          {workspaces.map((workspace, index) => {
+            const selected = workspace.id === activeWorkspaceIdForStorage;
+            const accent =
+              WORKSPACE_ACCENTS[workspace.accent % WORKSPACE_ACCENTS.length] ??
+              WORKSPACE_ACCENTS[0];
+            const label = selected
+              ? t("drawing.activeWorkspaceTitle", { index: index + 1 })
+              : t("drawing.workspaceTitle", { index: index + 1 });
+
+            return (
+              <button
+                key={workspace.id}
+                type="button"
+                onClick={() => setActiveWorkspaceId(workspace.id)}
+                className={cn(
+                  "relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br transition-all duration-200",
+                  selected
+                    ? "border-2 border-primary/60 shadow-sm ring-2 ring-primary/10"
+                    : "border border-border/50 hover:border-border hover:bg-muted/60",
+                  selected ? accent.active : accent.idle,
+                )}
+                aria-current={selected ? "true" : undefined}
+                aria-label={label}
+                title={label}
+              >
+                <span
+                  className={cn(
+                    "relative z-10 text-[11px] font-semibold transition-colors",
+                    selected
+                      ? "text-foreground/70"
+                      : "text-muted-foreground/45",
+                  )}
+                >
+                  {index + 1}
+                </span>
+                {workspace.prompt.trim() && (
+                  <span
+                    className={cn(
+                      "absolute bottom-1.5 h-1 w-4 rounded-full",
+                      selected ? "bg-foreground/40" : "bg-muted-foreground/25",
+                    )}
+                  />
+                )}
+              </button>
+            );
+          })}
         </div>
       </aside>
     </div>

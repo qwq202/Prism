@@ -519,7 +519,10 @@
       "ratio": "比率"
     },
     "advanced": "詳細設定",
-    "generateImage": "画像を生成"
+    "generateImage": "画像を生成",
+    "addWorkspace": "ワークスペースを追加",
+    "workspaceTitle": "ワークスペース {{index}}",
+    "activeWorkspaceTitle": "現在のワークスペース {{index}}"
   },
   "service": {
     "title": "新しいバージョンを発見する",
