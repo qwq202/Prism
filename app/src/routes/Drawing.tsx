@@ -8,8 +8,6 @@ import {
   Palette,
   Ratio,
   Upload,
-  ImagePlus,
-  ChevronRight,
   ArrowUp,
 } from "lucide-react";
 import {
@@ -59,29 +57,6 @@ function Drawing() {
             </Select>
           </div>
 
-          {/* Empty state */}
-          <div className="mt-2 flex-1 flex flex-col items-center justify-center text-center gap-4">
-            <div className="relative">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/10 to-blue-500/10 border border-border/60 flex items-center justify-center">
-                <ImagePlus className="w-7 h-7 text-muted-foreground/60" />
-              </div>
-              <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-400/80 flex items-center justify-center">
-                <span className="text-[8px] font-bold text-amber-950">!</span>
-              </div>
-            </div>
-            <div className="space-y-1.5 px-2">
-              <p className="text-sm font-medium text-foreground/80">
-                {t("drawing.noModels")}
-              </p>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                {t("drawing.noModelsPrompt")}
-              </p>
-            </div>
-            <button className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors group">
-              {t("drawing.goSettings")}
-              <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-            </button>
-          </div>
         </div>
       </aside>
 
