@@ -8,7 +8,7 @@ import {
   validateToken,
 } from "@/store/auth.ts";
 import { Button } from "@/components/ui/button.tsx";
-import { Menu, Settings2 } from "lucide-react";
+import { Github, Menu, Settings2 } from "lucide-react";
 import { useEffect } from "react";
 import { tokenField } from "@/conf/bootstrap.ts";
 import { toggleMenu } from "@/store/menu.ts";
@@ -26,6 +26,8 @@ import { openDialog } from "@/store/settings.ts";
 import { ThemeToggle } from "@/components/ThemeProviderComponent.tsx";
 import { infoTimeZoneSelector } from "@/store/info.ts";
 import { refreshWalletUsageSummary } from "@/store/record.ts";
+
+const GITHUB_REPOSITORY_URL = "https://github.com/qwq202/prism";
 
 function NavMenu() {
   const username = useSelector(selectUsername);
@@ -96,6 +98,22 @@ function NavBar() {
           />
         )}
         <div className={`grow`} />
+        <Button
+          asChild
+          size={`icon-md`}
+          variant={`outline`}
+          className={`rounded-full overflow-hidden`}
+        >
+          <a
+            href={GITHUB_REPOSITORY_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="GitHub"
+            title="GitHub"
+          >
+            <Github className={`w-4 h-4`} />
+          </a>
+        </Button>
         <ThemeToggle size="icon-md" className={`rounded-full overflow-hidden`} />
         <Button
           size={`icon-md`}
