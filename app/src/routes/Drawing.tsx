@@ -342,9 +342,6 @@ function Drawing() {
                 <span className="text-[13px] font-semibold text-foreground">
                   {t("drawing.promptLabel")}
                 </span>
-                <span className="text-[11px] text-muted-foreground/50 hidden sm:inline">
-                  {t("drawing.promptHint")}
-                </span>
               </div>
               <button
                 className="rounded-md p-1.5 text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50 transition-all duration-150"

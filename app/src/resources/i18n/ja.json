@@ -511,7 +511,6 @@
     "emptyTitle": "作成を始めましょう",
     "emptyPrompt": "下に作りたい画像を説明すると、AI が生成します。",
     "promptLabel": "画像プロンプト",
-    "promptHint": "· 正確な文字はダブルクォートで囲んでください",
     "uploadReference": "参照画像をアップロード",
     "promptPlaceholder": "生成したい画像を説明してください...",
     "tools": {

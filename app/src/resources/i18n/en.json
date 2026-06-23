@@ -511,7 +511,6 @@
     "emptyTitle": "Start creating",
     "emptyPrompt": "Describe the image you want below, and AI will create it.",
     "promptLabel": "Image prompt",
-    "promptHint": "· Wrap exact text in double quotes",
     "uploadReference": "Upload reference image",
     "promptPlaceholder": "Describe the image you want to generate...",
     "tools": {

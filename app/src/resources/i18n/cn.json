@@ -747,7 +747,6 @@
     "emptyTitle": "开始你的创作",
     "emptyPrompt": "在下方描述你想要的图像，AI 将为你实现",
     "promptLabel": "图像提示词",
-    "promptHint": "· 支持中文，文本用\"双引号\"包裹",
     "uploadReference": "上传参考图",
     "promptPlaceholder": "描述你想生成的图像...",
     "tools": {
