@@ -515,7 +515,6 @@
     "uploadReference": "Upload reference image",
     "promptPlaceholder": "Describe the image you want to generate...",
     "tools": {
-      "translate": "Translate",
       "style": "Style",
       "ratio": "Ratio"
     },

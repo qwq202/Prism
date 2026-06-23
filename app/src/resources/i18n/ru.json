@@ -515,7 +515,6 @@
     "uploadReference": "Загрузить референс",
     "promptPlaceholder": "Опишите изображение, которое хотите создать...",
     "tools": {
-      "translate": "Перевод",
       "style": "Стиль",
       "ratio": "Формат"
     },

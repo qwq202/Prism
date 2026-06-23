@@ -603,7 +603,6 @@
     "uploadReference": "上傳參考圖",
     "promptPlaceholder": "描述你想生成的圖像...",
     "tools": {
-      "translate": "翻譯",
       "style": "風格",
       "ratio": "比例"
     },

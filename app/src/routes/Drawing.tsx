@@ -3,7 +3,6 @@ import {
   Wand2,
   Settings,
   Plus,
-  Languages,
   SlidersHorizontal,
   Palette,
   Ratio,
@@ -147,7 +146,6 @@ function Drawing() {
             <div className="flex items-center justify-between px-2.5 pb-2.5 gap-2">
               <div className="flex items-center">
                 {[
-                  { icon: Languages, key: "translate" },
                   { icon: Palette, key: "style" },
                   { icon: Ratio, key: "ratio" },
                 ].map(({ icon: Icon, key }) => (

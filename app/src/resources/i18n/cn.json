@@ -751,7 +751,6 @@
     "uploadReference": "上传参考图",
     "promptPlaceholder": "描述你想生成的图像...",
     "tools": {
-      "translate": "翻译",
       "style": "风格",
       "ratio": "比例"
     },
