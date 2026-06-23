@@ -4,6 +4,7 @@ import { ChargeProps, nonBilling } from "@/admin/charge.ts";
 import { getErrorMessage } from "@/utils/base.ts";
 import {
   getGrokModelName,
+  isDrawingModel,
   normalizeModelDisplayNames,
 } from "@/conf/model.ts";
 
@@ -157,6 +158,7 @@ export async function getFilledApiMarket(
     free: false,
     auth: true,
     high_context: false,
+    drawing_model: isDrawingModel(id),
     price: {
       type: nonBilling,
       anonymous: false,

@@ -17,6 +17,7 @@ type ModelCapabilities struct {
 	ReasoningEfforts    []string
 	SamplingRestriction SamplingRestriction
 	Vision              bool
+	Drawing             bool
 	Video               bool
 	Search              bool
 }
@@ -27,6 +28,7 @@ type ProviderCapabilities struct {
 	XSearch         bool
 	Reasoning       bool
 	Vision          bool
+	Drawing         bool
 	Video           bool
 	Search          bool
 }
@@ -36,8 +38,9 @@ func CapabilitiesFor(channelType string, model string) ModelCapabilities {
 	normalizedModel := normalizeModelName(model)
 
 	capabilities := ModelCapabilities{
-		Vision: IsVisionModel(model),
-		Video:  IsVideoModel(model),
+		Vision:  IsVisionModel(model),
+		Drawing: IsDrawingModel(normalizedChannel, model),
+		Video:   IsVideoModel(model),
 	}
 
 	switch normalizedChannel {

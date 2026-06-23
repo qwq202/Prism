@@ -41,6 +41,72 @@ func TestIsVisionModelUsesConfiguredResolver(t *testing.T) {
 	}
 }
 
+func TestIsDrawingModelUsesInternalProviderAwareList(t *testing.T) {
+	tests := []struct {
+		name        string
+		channelType string
+		model       string
+		want        bool
+	}{
+		{
+			name:        "openai gpt image",
+			channelType: OpenAIChannelType,
+			model:       GPTImage1,
+			want:        true,
+		},
+		{
+			name:        "azure dalle",
+			channelType: AzureOpenAIChannelType,
+			model:       Dalle3,
+			want:        true,
+		},
+		{
+			name:        "gemini image generation",
+			channelType: PalmChannelType,
+			model:       Gemini31FlashImage,
+			want:        true,
+		},
+		{
+			name:        "vertex express gemini image generation",
+			channelType: GeminiEnterpriseAgentPlatformChannelType,
+			model:       Gemini3ProImage,
+			want:        true,
+		},
+		{
+			name:        "gemini chat model is not drawing",
+			channelType: PalmChannelType,
+			model:       Gemini25Flash,
+			want:        false,
+		},
+		{
+			name:        "openrouter is not treated as drawing by model name alone",
+			channelType: OpenRouterChannelType,
+			model:       GPTImage1,
+			want:        false,
+		},
+		{
+			name:        "empty channel falls back to model list",
+			channelType: "",
+			model:       Gemini25FlashImage,
+			want:        true,
+		},
+		{
+			name:        "legacy gpt 4 dalle remains excluded",
+			channelType: OpenAIChannelType,
+			model:       GPT4Dalle,
+			want:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsDrawingModel(tt.channelType, tt.model); got != tt.want {
+				t.Fatalf("expected drawing=%v, got %v", tt.want, got)
+			}
+		})
+	}
+}
+
 func TestNormalizeOpenAIResponsesReasoningEffort(t *testing.T) {
 	if got := NormalizeOpenAIResponsesReasoningEffort("gpt-5.2", "xhigh", false); got != "xhigh" {
 		t.Fatalf("expected xhigh for gpt-5.2, got %q", got)

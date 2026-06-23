@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Wand2,
   Settings,
@@ -19,11 +19,15 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/components/ui/lib/utils";
 import { useTranslation } from "react-i18next";
+import { useSelector } from "react-redux";
+import { selectSupportModels } from "@/store/chat.ts";
+import { isDrawingModel } from "@/conf/model.ts";
 
 type Mode = "generate" | "edit";
 
 type DrawingWorkspace = {
   id: string;
+  model: string;
   mode: Mode;
   prompt: string;
   createdAt: number;
@@ -60,9 +64,10 @@ function createWorkspaceId() {
   return `workspace-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function createDrawingWorkspace(index = 0): DrawingWorkspace {
+function createDrawingWorkspace(index = 0, model = ""): DrawingWorkspace {
   return {
     id: createWorkspaceId(),
+    model,
     mode: "generate",
     prompt: "",
     createdAt: Date.now(),
@@ -99,6 +104,7 @@ function loadDrawingWorkspaces(): DrawingWorkspace[] {
             typeof workspace.id === "string" && workspace.id
               ? workspace.id
               : createWorkspaceId(),
+          model: typeof workspace.model === "string" ? workspace.model : "",
           mode: workspace.mode === "edit" ? "edit" : "generate",
           prompt: typeof workspace.prompt === "string" ? workspace.prompt : "",
           createdAt:
@@ -131,6 +137,7 @@ function loadActiveWorkspaceId() {
 
 function Drawing() {
   const { t } = useTranslation();
+  const supportModels = useSelector(selectSupportModels);
   const [workspaces, setWorkspaces] = useState<DrawingWorkspace[]>(() =>
     loadDrawingWorkspaces(),
   );
@@ -142,6 +149,14 @@ function Drawing() {
     workspaces.find((workspace) => workspace.id === activeWorkspaceId) ??
     workspaces[0];
   const activeWorkspaceIdForStorage = activeWorkspace?.id ?? "";
+  const drawingModels = useMemo(
+    () => supportModels.filter((model) => isDrawingModel(model)),
+    [supportModels],
+  );
+  const selectedDrawingModel =
+    drawingModels.find((model) => model.id === activeWorkspace?.model) ??
+    drawingModels[0];
+  const selectedDrawingModelId = selectedDrawingModel?.id ?? "";
   const mode = activeWorkspace?.mode ?? "generate";
   const prompt = activeWorkspace?.prompt ?? "";
 
@@ -178,7 +193,7 @@ function Drawing() {
   }, [activeWorkspaceIdForStorage]);
 
   const updateActiveWorkspace = (
-    updates: Partial<Pick<DrawingWorkspace, "mode" | "prompt">>,
+    updates: Partial<Pick<DrawingWorkspace, "model" | "mode" | "prompt">>,
   ) => {
     if (!activeWorkspace) {
       return;
@@ -194,7 +209,10 @@ function Drawing() {
   };
 
   const addWorkspace = () => {
-    const workspace = createDrawingWorkspace(workspaces.length);
+    const workspace = createDrawingWorkspace(
+      workspaces.length,
+      selectedDrawingModelId,
+    );
     setWorkspaces((current) => [...current, workspace]);
     setActiveWorkspaceId(workspace.id);
   };
@@ -215,16 +233,27 @@ function Drawing() {
                 {t("drawing.manage")}
               </button>
             </div>
-            <Select defaultValue="openai">
+            <Select
+              value={selectedDrawingModelId || undefined}
+              onValueChange={(model) => updateActiveWorkspace({ model })}
+              disabled={drawingModels.length === 0}
+            >
               <SelectTrigger className="w-full h-10 text-sm border-border/60 bg-background/60">
                 <SelectValue placeholder={t("drawing.selectModel")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="openai">OpenAI (DALL-E 3)</SelectItem>
-                <SelectItem value="midjourney">Midjourney</SelectItem>
-                <SelectItem value="sd">Stable Diffusion</SelectItem>
+                {drawingModels.map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    {model.name || model.id}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            {drawingModels.length === 0 && (
+              <p className="text-xs leading-relaxed text-muted-foreground/70">
+                {t("drawing.noModels")}
+              </p>
+            )}
           </div>
         </div>
       </aside>

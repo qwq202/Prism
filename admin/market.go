@@ -30,6 +30,7 @@ type MarketModelView struct {
 	Default      bool     `json:"default"`
 	HighContext  bool     `json:"high_context"`
 	VisionModel  bool     `json:"vision_model"`
+	DrawingModel bool     `json:"drawing_model"`
 	OCRModel     bool     `json:"ocr_model"`
 	ReverseModel bool     `json:"reverse_model"`
 	Avatar       string   `json:"avatar"`
@@ -80,6 +81,7 @@ func (m *Market) GetViewModels() []MarketModelView {
 			Default:      model.Default,
 			HighContext:  model.HighContext,
 			VisionModel:  model.VisionModel,
+			DrawingModel: globals.IsDrawingModel(channelType, model.Id),
 			OCRModel:     model.OCRModel,
 			ReverseModel: model.ReverseModel,
 			Avatar:       model.Avatar,

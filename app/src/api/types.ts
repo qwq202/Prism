@@ -83,6 +83,7 @@ export type Model = {
   auth: boolean;
   default: boolean;
   high_context: boolean;
+  drawing_model?: boolean;
   vision_model?: boolean;
   ocr_model?: boolean;
   reverse_model?: boolean;

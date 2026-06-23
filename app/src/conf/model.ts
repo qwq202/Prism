@@ -1,5 +1,12 @@
 import { Model } from "@/api/types.tsx";
 
+const OPENAI_DRAWING_MODELS = ["dalle", "dall-e-2", "dall-e-3", "gpt-image-1"];
+const GEMINI_DRAWING_MODELS = [
+  "gemini-2.5-flash-image",
+  "gemini-3.1-flash-image",
+  "gemini-3-pro-image",
+];
+
 export function getGrokModelName(id: string): string | null {
   const match = id.trim().match(/(?:^|\/)grok-(.+)$/i);
   if (!match) return null;
@@ -23,9 +30,9 @@ export function getGrokModelName(id: string): string | null {
   return nameParts.join(" ");
 }
 
-export function normalizeModelDisplayNames<T extends Pick<Model, "id" | "name">>(
-  models: T[],
-): T[] {
+export function normalizeModelDisplayNames<
+  T extends Pick<Model, "id" | "name">,
+>(models: T[]): T[] {
   return models.map((model) => {
     const grokName = getGrokModelName(model.id);
     const normalizedName = grokName ?? model.name.replace(/-/g, " ");
@@ -51,6 +58,54 @@ export function supportsImageUpload(
   model?: Pick<Model, "vision_model"> | null,
 ): boolean {
   return !!model?.vision_model;
+}
+
+function matchesDrawingModelList(modelId: string, list: string[]): boolean {
+  const normalized = modelId.trim().toLowerCase();
+  return list.some(
+    (model) => normalized === model || normalized.includes(model),
+  );
+}
+
+export function isDrawingModel(
+  model?: Pick<Model, "id" | "channel_type" | "drawing_model"> | string | null,
+): boolean {
+  if (!model) return false;
+
+  const modelId = typeof model === "string" ? model : model.id;
+  if (!modelId) return false;
+
+  if (typeof model !== "string" && model.drawing_model) return true;
+
+  const channelType =
+    typeof model === "string" ? "" : (model.channel_type || "").toLowerCase();
+  const isOpenAIImageModel = matchesDrawingModelList(
+    modelId,
+    OPENAI_DRAWING_MODELS,
+  );
+  const isGeminiImageModel = matchesDrawingModelList(
+    modelId,
+    GEMINI_DRAWING_MODELS,
+  );
+
+  switch (channelType) {
+    case "openai":
+    case "azure":
+      return (
+        isOpenAIImageModel && !modelId.toLowerCase().includes("gpt-4-dalle")
+      );
+    case "palm":
+    case "gemini-enterprise-agent-platform":
+      return isGeminiImageModel;
+    case "":
+      return (
+        (isOpenAIImageModel &&
+          !modelId.toLowerCase().includes("gpt-4-dalle")) ||
+        isGeminiImageModel
+      );
+    default:
+      return false;
+  }
 }
 
 export function getResolvedModelTags(model: Model): string[] {

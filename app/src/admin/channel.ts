@@ -111,6 +111,7 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "dalle",
       "dall-e-2",
       "dall-e-3",
+      "gpt-image-1",
     ],
   },
   openrouter: {
@@ -216,6 +217,7 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "dalle",
       "dall-e-2",
       "dall-e-3",
+      "gpt-image-1",
     ],
   },
   claude: {

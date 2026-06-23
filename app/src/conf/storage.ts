@@ -57,6 +57,7 @@ export function parseOfflineModels(models: string): Model[] {
           auth: item.auth || false,
           default: item.default || false,
           high_context: item.high_context || false,
+          drawing_model: item.drawing_model || false,
           vision_model: item.vision_model || false,
           ocr_model: item.ocr_model || false,
           reverse_model: item.reverse_model || false,

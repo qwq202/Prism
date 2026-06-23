@@ -214,6 +214,20 @@ func IsOpenAIDalleModel(model string) bool {
 	return in(model, OpenAIDalleModels) && !strings.Contains(model, "gpt-4-dalle")
 }
 
+func IsDrawingModel(channelType, model string) bool {
+	normalizedChannel := strings.TrimSpace(strings.ToLower(channelType))
+	switch normalizedChannel {
+	case OpenAIChannelType, AzureOpenAIChannelType:
+		return IsOpenAIDalleModel(model)
+	case PalmChannelType, GeminiEnterpriseAgentPlatformChannelType:
+		return IsGeminiImageGenerationModel(model)
+	case "":
+		return IsOpenAIDalleModel(model) || IsGeminiImageGenerationModel(model)
+	default:
+		return false
+	}
+}
+
 func IsGeminiModel(model string) bool {
 	return model == GeminiPro ||
 		model == GeminiProVision ||
