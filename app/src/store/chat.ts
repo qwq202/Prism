@@ -832,10 +832,10 @@ export function supportsGeminiThinkingBudgetControl(
     model.startsWith("gemini-3.1-pro-preview-") ||
     model === "gemini-3.1-pro-preview-customtools" ||
     model.startsWith("gemini-3.1-pro-preview-customtools-") ||
-    model === "gemini-3.1-flash-image-preview" ||
-    model.startsWith("gemini-3.1-flash-image-preview-") ||
-    model === "gemini-3-pro-image-preview" ||
-    model.startsWith("gemini-3-pro-image-preview-") ||
+    model === "gemini-3.1-flash-image" ||
+    model.startsWith("gemini-3.1-flash-image-") ||
+    model === "gemini-3-pro-image" ||
+    model.startsWith("gemini-3-pro-image-") ||
     model === "gemini-3-pro-preview" ||
     model.startsWith("gemini-3-pro-preview-")
   );

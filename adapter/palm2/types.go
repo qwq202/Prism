@@ -34,11 +34,12 @@ type GeminiChatBody struct {
 }
 
 type GeminiConfig struct {
-	Temperature     *float32              `json:"temperature,omitempty"`
-	MaxOutputTokens *int                  `json:"maxOutputTokens,omitempty"`
-	TopP            *float32              `json:"topP,omitempty"`
-	TopK            *int                  `json:"topK,omitempty"`
-	ThinkingConfig  *GeminiThinkingConfig `json:"thinkingConfig,omitempty"`
+	Temperature        *float32              `json:"temperature,omitempty"`
+	MaxOutputTokens    *int                  `json:"maxOutputTokens,omitempty"`
+	TopP               *float32              `json:"topP,omitempty"`
+	TopK               *int                  `json:"topK,omitempty"`
+	ThinkingConfig     *GeminiThinkingConfig `json:"thinkingConfig,omitempty"`
+	ResponseModalities []string              `json:"responseModalities,omitempty"`
 }
 
 type GeminiThinkingConfig struct {
@@ -54,7 +55,7 @@ type GeminiContent struct {
 
 type GeminiChatPart struct {
 	Text             *string                 `json:"text,omitempty"`
-	InlineData       *GeminiInlineData       `json:"inline_data,omitempty"`
+	InlineData       *GeminiInlineData       `json:"inlineData,omitempty"`
 	FunctionCall     *GeminiFunctionCall     `json:"functionCall,omitempty"`
 	FunctionResponse *GeminiFunctionResponse `json:"functionResponse,omitempty"`
 	Thought          bool                    `json:"thought,omitempty"`
@@ -62,7 +63,7 @@ type GeminiChatPart struct {
 }
 
 type GeminiInlineData struct {
-	MimeType string `json:"mime_type"`
+	MimeType string `json:"mimeType"`
 	Data     string `json:"data"`
 }
 
@@ -119,30 +120,4 @@ type GeminiChatErrorResponse struct {
 
 type GeminiStreamResponse struct {
 	Candidates []GeminiCandidate `json:"candidates"`
-}
-
-// ImageRequest is the native http request body for imagen
-type ImageRequest struct {
-	Instances  []ImageInstance `json:"instances"`
-	Parameters ImageParameters `json:"parameters"`
-}
-
-type ImageInstance struct {
-	Prompt string `json:"prompt"`
-}
-
-type ImageParameters struct {
-	SampleCount      int    `json:"sampleCount,omitempty"`
-	AspectRatio      string `json:"aspectRatio,omitempty"`
-	PersonGeneration string `json:"personGeneration,omitempty"`
-}
-
-// ImageResponse is the native http response body for imagen
-type ImageResponse struct {
-	Predictions []ImagePrediction `json:"predictions"`
-}
-
-type ImagePrediction struct {
-	MimeType           string `json:"mimeType"`
-	BytesBase64Encoded string `json:"bytesBase64Encoded"`
 }

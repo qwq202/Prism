@@ -120,18 +120,23 @@ func (c *ChatInstance) GetPalm2ChatBody(props *adaptercommon.ChatProps) *PalmCha
 }
 
 func (c *ChatInstance) GetGeminiChatBody(props *adaptercommon.ChatProps) *GeminiChatBody {
+	config := GeminiConfig{
+		Temperature:     props.Temperature,
+		MaxOutputTokens: props.MaxTokens,
+		TopP:            props.TopP,
+		TopK:            props.TopK,
+		ThinkingConfig:  getGeminiThinkingConfig(props),
+	}
+	if globals.IsGeminiImageGenerationModel(props.Model) {
+		config.ResponseModalities = []string{"TEXT", "IMAGE"}
+	}
+
 	return &GeminiChatBody{
 		SystemInstruction: c.GetGeminiSystemInstruction(props.Model, props.Message),
 		Contents:          c.GetGeminiContents(props.Model, props.Message),
 		Tools:             mergeGeminiTools(getGeminiBuiltinTools(props.EnableWebSearch, props.EnableURLContext), getGeminiTools(props.Tools)),
 		ToolConfig:        getGeminiToolConfig(props.ToolChoice),
-		GenerationConfig: GeminiConfig{
-			Temperature:     props.Temperature,
-			MaxOutputTokens: props.MaxTokens,
-			TopP:            props.TopP,
-			TopK:            props.TopK,
-			ThinkingConfig:  getGeminiThinkingConfig(props),
-		},
+		GenerationConfig:  config,
 	}
 }
 
@@ -206,13 +211,12 @@ func (c *ChatInstance) CreateChatRequest(props *adaptercommon.ChatProps) (string
 
 // CreateStreamChatRequest is the stream request for palm2
 func (c *ChatInstance) CreateStreamChatRequest(props *adaptercommon.ChatProps, callback globals.Hook) error {
-	// Handle imagen models
-	if globals.IsGoogleImagenModel(props.Model) {
-		response, err := c.CreateImage(props)
+	if globals.IsGeminiImageGenerationModel(props.Model) {
+		chunk, err := c.CreateGeminiChatRequest(props)
 		if err != nil {
 			return err
 		}
-		return callback(&globals.Chunk{Content: response})
+		return callback(chunk)
 	}
 
 	// Handle chat models

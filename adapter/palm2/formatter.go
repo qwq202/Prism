@@ -590,6 +590,39 @@ func (c *ChatInstance) GetGeminiText(parts []GeminiChatPart) string {
 	return builder.String()
 }
 
+func getGeminiInlineImageMarkdown(data *GeminiInlineData) string {
+	if data == nil {
+		return ""
+	}
+
+	mimeType := strings.TrimSpace(data.MimeType)
+	if mimeType == "" {
+		mimeType = "image/png"
+	}
+	if !strings.HasPrefix(strings.ToLower(mimeType), "image/") {
+		return ""
+	}
+
+	rawData := strings.TrimSpace(data.Data)
+	if rawData == "" {
+		return ""
+	}
+
+	url := utils.StoreImage(fmt.Sprintf("data:%s;base64,%s", mimeType, rawData))
+	return utils.GetImageMarkdown(url)
+}
+
+func appendGeminiInlineImageMarkdown(builder *strings.Builder, markdown string) {
+	if strings.TrimSpace(markdown) == "" {
+		return
+	}
+
+	if builder.Len() > 0 && !strings.HasSuffix(builder.String(), "\n") {
+		builder.WriteString("\n\n")
+	}
+	builder.WriteString(markdown)
+}
+
 func getGeminiReasoningText(parts []GeminiChatPart) string {
 	builder := strings.Builder{}
 
@@ -607,9 +640,14 @@ func getGeminiAnswerText(parts []GeminiChatPart) string {
 	builder := strings.Builder{}
 
 	for _, part := range parts {
-		if part.Text != nil && !part.Thought {
-			builder.WriteString(*part.Text)
+		if part.Thought {
+			continue
 		}
+		if part.Text != nil {
+			builder.WriteString(*part.Text)
+			continue
+		}
+		appendGeminiInlineImageMarkdown(&builder, getGeminiInlineImageMarkdown(part.InlineData))
 	}
 
 	return builder.String()
@@ -638,12 +676,16 @@ func (c *ChatInstance) GetGeminiStreamText(model string, parts []GeminiChatPart)
 	builder := strings.Builder{}
 
 	for _, part := range parts {
-		if part.Text == nil || *part.Text == "" {
+		imageMarkdown := getGeminiInlineImageMarkdown(part.InlineData)
+		if (part.Text == nil || *part.Text == "") && imageMarkdown == "" {
 			continue
 		}
 
 		if part.Thought {
 			if globals.IsGeminiNoThinkingModel(model) {
+				continue
+			}
+			if part.Text == nil || *part.Text == "" {
 				continue
 			}
 			if c.isFirstReasoning {
@@ -659,7 +701,11 @@ func (c *ChatInstance) GetGeminiStreamText(model string, parts []GeminiChatPart)
 			builder.WriteString("\n</think>\n\n")
 		}
 
-		builder.WriteString(*part.Text)
+		if part.Text != nil {
+			builder.WriteString(*part.Text)
+			continue
+		}
+		appendGeminiInlineImageMarkdown(&builder, imageMarkdown)
 	}
 
 	return builder.String()
