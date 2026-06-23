@@ -19,6 +19,10 @@ import type { ReactNode } from "react";
 import { cn } from "@/components/ui/lib/utils.ts";
 import { resolveChartColor } from "./chart-colors.ts";
 
+const chartGridStroke = "hsl(var(--border))";
+const chartTickColor = "hsl(var(--muted-foreground))";
+const chartCursorStroke = "hsl(var(--foreground) / 0.35)";
+
 type ChartDatum = Record<string, string | number | undefined>;
 
 type SeriesChartProps = {
@@ -71,21 +75,21 @@ function ChartTooltip({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="chart-tooltip min-w-44 w-max rounded-tremor-default border border-tremor-border bg-tremor-background p-2 text-tremor-default shadow-tremor-dropdown">
+    <div className="chart-tooltip min-w-44 w-max rounded-md border border-border bg-popover/95 p-2 text-sm text-popover-foreground shadow-lg backdrop-blur">
       <div className="space-y-1.5">
         {payload.map((item) => (
           <div
             className="flex items-center justify-between gap-8"
             key={`${String(item.dataKey)}-${String(item.name)}`}
           >
-            <span className="inline-flex min-w-0 items-center gap-2 text-tremor-content">
+            <span className="inline-flex min-w-0 items-center gap-2 text-muted-foreground">
               <span
                 className="h-2.5 w-2.5 shrink-0 rounded-full"
                 style={{ backgroundColor: item.color ?? item.fill }}
               />
               <span className="truncate">{String(item.name ?? "")}</span>
             </span>
-            <span className="whitespace-nowrap font-medium text-tremor-content-emphasis">
+            <span className="whitespace-nowrap font-medium text-foreground">
               {formatValue(item.value, valueFormatter)}
             </span>
           </div>
@@ -113,16 +117,16 @@ function DonutTooltip({
       : String(item.value ?? "");
 
   return (
-    <div className="chart-tooltip min-w-44 w-max rounded-tremor-default border border-tremor-border bg-tremor-background p-2 text-tremor-default shadow-tremor-dropdown">
+    <div className="chart-tooltip min-w-44 w-max rounded-md border border-border bg-popover/95 p-2 text-sm text-popover-foreground shadow-lg backdrop-blur">
       <div className="flex items-center justify-between gap-8">
-        <span className="inline-flex min-w-0 items-center gap-2 text-tremor-content">
+        <span className="inline-flex min-w-0 items-center gap-2 text-muted-foreground">
           <span
             className="h-2.5 w-2.5 shrink-0 rounded-full"
             style={{ backgroundColor: item.color ?? item.fill }}
           />
           <span className="truncate">{name}</span>
         </span>
-        <span className="whitespace-nowrap font-medium text-tremor-content-emphasis">
+        <span className="whitespace-nowrap font-medium text-foreground">
           {value}
           {tooltipSuffix}
         </span>
@@ -144,10 +148,30 @@ export function AreaChart({
     <div className={cn("common-chart", className)}>
       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         <RechartsAreaChart data={data} margin={{ left: 0, right: 8, top: 8 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey={index} tickLine={false} axisLine={false} />
-          <YAxis tickLine={false} axisLine={false} tickFormatter={(v) => formatValue(v, valueFormatter)} />
-          <Tooltip content={(props) => <ChartTooltip {...props} valueFormatter={valueFormatter} />} />
+          <CartesianGrid
+            stroke={chartGridStroke}
+            strokeDasharray="3 3"
+            strokeOpacity={0.7}
+            vertical={false}
+          />
+          <XAxis
+            dataKey={index}
+            tickLine={false}
+            axisLine={false}
+            tick={{ fill: chartTickColor }}
+          />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            tick={{ fill: chartTickColor }}
+            tickFormatter={(v) => formatValue(v, valueFormatter)}
+          />
+          <Tooltip
+            cursor={{ stroke: chartCursorStroke, strokeWidth: 1 }}
+            content={(props) => (
+              <ChartTooltip {...props} valueFormatter={valueFormatter} />
+            )}
+          />
           {categories.map((category, idx) => {
             const color = resolveChartColor(colors[idx] ?? "blue");
             return (
@@ -190,25 +214,53 @@ export function BarChart({
           layout={vertical ? "vertical" : "horizontal"}
           margin={{ left: vertical ? 8 : 0, right: 8, top: 8 }}
         >
-          <CartesianGrid strokeDasharray="3 3" horizontal={!vertical} vertical={vertical} />
+          <CartesianGrid
+            stroke={chartGridStroke}
+            strokeDasharray="3 3"
+            strokeOpacity={0.7}
+            horizontal={!vertical}
+            vertical={vertical}
+          />
           {vertical ? (
             <>
-              <XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(v) => formatValue(v, valueFormatter)} />
+              <XAxis
+                type="number"
+                tickLine={false}
+                axisLine={false}
+                tick={{ fill: chartTickColor }}
+                tickFormatter={(v) => formatValue(v, valueFormatter)}
+              />
               <YAxis
                 type="category"
                 dataKey={index}
                 width={90}
                 tickLine={false}
                 axisLine={false}
+                tick={{ fill: chartTickColor }}
               />
             </>
           ) : (
             <>
-              <XAxis dataKey={index} tickLine={false} axisLine={false} />
-              <YAxis tickLine={false} axisLine={false} tickFormatter={(v) => formatValue(v, valueFormatter)} />
+              <XAxis
+                dataKey={index}
+                tickLine={false}
+                axisLine={false}
+                tick={{ fill: chartTickColor }}
+              />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                tick={{ fill: chartTickColor }}
+                tickFormatter={(v) => formatValue(v, valueFormatter)}
+              />
             </>
           )}
-          <Tooltip content={(props) => <ChartTooltip {...props} valueFormatter={valueFormatter} />} />
+          <Tooltip
+            cursor={{ fill: "hsl(var(--muted-foreground) / 0.08)" }}
+            content={(props) => (
+              <ChartTooltip {...props} valueFormatter={valueFormatter} />
+            )}
+          />
           {categories.map((category, idx) => (
             <Bar
               key={category}
@@ -237,14 +289,26 @@ export function LineChart({
     <div className={cn("common-chart", className)}>
       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         <RechartsLineChart data={data} margin={{ left: 0, right: 8, top: 8 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey={index} tickLine={false} axisLine={false} />
+          <CartesianGrid
+            stroke={chartGridStroke}
+            strokeDasharray="3 3"
+            strokeOpacity={0.7}
+            vertical={false}
+          />
+          <XAxis
+            dataKey={index}
+            tickLine={false}
+            axisLine={false}
+            tick={{ fill: chartTickColor }}
+          />
           <YAxis
             tickLine={false}
             axisLine={false}
+            tick={{ fill: chartTickColor }}
             tickFormatter={(v) => formatValue(v, valueFormatter)}
           />
           <Tooltip
+            cursor={{ stroke: chartCursorStroke, strokeWidth: 1 }}
             content={(props) => (
               <ChartTooltip {...props} valueFormatter={valueFormatter} />
             )}
@@ -333,7 +397,9 @@ export function ChartLegend({
         <div className="flex min-w-0 items-center gap-2" key={category}>
           <span
             className="h-2.5 w-2.5 shrink-0 rounded-full"
-            style={{ backgroundColor: resolveChartColor(colors[idx] ?? "blue") }}
+            style={{
+              backgroundColor: resolveChartColor(colors[idx] ?? "blue"),
+            }}
           />
           <span className="truncate">{category}</span>
         </div>
