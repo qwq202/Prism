@@ -1,5 +1,6 @@
 import {
   type Dispatch,
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -114,11 +115,25 @@ function fileTaskReducer(
 type FileProviderProps = {
   files: FileArray;
   dispatch: Dispatch<FileProviderAction>;
+  modelId?: string;
+  forceImageUpload?: boolean;
+  trigger?: (props: {
+    disabled: boolean;
+    filesCount: number;
+    open: () => void;
+  }) => ReactNode;
 };
 
-function FileProvider({ files, dispatch }: FileProviderProps) {
+function FileProvider({
+  files,
+  dispatch,
+  modelId,
+  forceImageUpload = false,
+  trigger,
+}: FileProviderProps) {
   const { t } = useTranslation();
-  const model = useSelector(selectModel);
+  const selectedModel = useSelector(selectModel);
+  const model = modelId ?? selectedModel;
   const [open, setOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<FileObject | null>(null);
   const nextTaskId = useRef(0);
@@ -138,7 +153,16 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
       },
     [supportModels, model],
   );
-  const canUploadImage = supportsImageUpload(currentModelInfo);
+  const uploadModelInfo = useMemo(
+    () =>
+      forceImageUpload
+        ? { ...currentModelInfo, vision_model: true }
+        : currentModelInfo,
+    [currentModelInfo, forceImageUpload],
+  );
+  const canUploadImage =
+    model.trim().length > 0 &&
+    (forceImageUpload || supportsImageUpload(currentModelInfo));
   const canOpenFilePanel = canUploadImage || files.length > 0;
 
   const addFile = useCallback(
@@ -185,7 +209,7 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
             payload: { id, file, progress: 0 },
           });
 
-          const task = quickBlobParser(file, currentModelInfo, (progress) => {
+          const task = quickBlobParser(file, uploadModelInfo, (progress) => {
             console.debug(
               `[parser] task ${id} progress: ${progress.toFixed(2)}%`,
             );
@@ -223,7 +247,7 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
         }
       }
     },
-    [addFile, canUploadImage, currentModelInfo, t],
+    [addFile, canUploadImage, t, uploadModelInfo],
   );
 
   const handlePasteImages = useCallback(
@@ -267,6 +291,14 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
     dispatch({ type: "remove", payload: index });
   }
 
+  const openFilePanel = () => {
+    if (!canOpenFilePanel) {
+      toast.info(t("file.vision-model-required"));
+      return;
+    }
+    setOpen(true);
+  };
+
   return (
     <Dialog
       open={open}
@@ -278,22 +310,26 @@ function FileProvider({ files, dispatch }: FileProviderProps) {
         setOpen(next);
       }}
     >
-      <ChatAction
-        text={canOpenFilePanel ? t("file.file") : t("file.vision-model-required")}
-        active={files.length}
-        badge={files.length}
-        className={!canOpenFilePanel ? "opacity-50" : undefined}
-        disabled={!canOpenFilePanel}
-        onClick={() => {
-          if (!canOpenFilePanel) {
-            toast.info(t("file.vision-model-required"));
-            return;
+      {trigger ? (
+        trigger({
+          disabled: !canOpenFilePanel,
+          filesCount: files.length,
+          open: openFilePanel,
+        })
+      ) : (
+        <ChatAction
+          text={
+            canOpenFilePanel ? t("file.file") : t("file.vision-model-required")
           }
-          setOpen(true);
-        }}
-      >
-        <Paperclip className={`h-4 w-4`} />
-      </ChatAction>
+          active={files.length}
+          badge={files.length}
+          className={!canOpenFilePanel ? "opacity-50" : undefined}
+          disabled={!canOpenFilePanel}
+          onClick={openFilePanel}
+        >
+          <Paperclip className={`h-4 w-4`} />
+        </ChatAction>
+      )}
       <DialogContent
         className={`file-dialog flex-dialog`}
         onPaste={(event) => {

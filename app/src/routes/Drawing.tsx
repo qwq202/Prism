@@ -3,6 +3,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useReducer,
   useState,
 } from "react";
 import {
@@ -32,6 +33,11 @@ import { useSelector } from "react-redux";
 import { selectSupportModels, useMessageActions } from "@/store/chat.ts";
 import { isDrawingModel } from "@/conf/model.ts";
 import ModelAvatar from "@/components/ModelAvatar.tsx";
+import FileProvider, {
+  type FileProviderAction,
+} from "@/components/FileProvider.tsx";
+import type { FileArray } from "@/api/file.ts";
+import { formatMessage } from "@/utils/processor.ts";
 
 type Mode = "generate" | "edit";
 type GeminiImageAspectRatio =
@@ -170,6 +176,22 @@ function createDrawingWorkspace(index = 0, model = ""): DrawingWorkspace {
     createdAt: Date.now(),
     accent: index % WORKSPACE_ACCENTS.length,
   };
+}
+
+function drawingFileReducer(
+  state: FileArray,
+  action: FileProviderAction,
+): FileArray {
+  switch (action.type) {
+    case "add":
+      return [...state, action.payload];
+    case "remove":
+      return state.filter((_, index) => index !== action.payload);
+    case "clear":
+      return [];
+    default:
+      return state;
+  }
 }
 
 function hasStringOption<T extends string>(
@@ -400,6 +422,7 @@ function Drawing() {
   const supportModels = useSelector(selectSupportModels);
   const [requestedDrawingModelId] = useState(getRequestedDrawingModelId);
   const handledRequestedDrawingModel = useRef(false);
+  const [files, dispatchFiles] = useReducer(drawingFileReducer, []);
   const [workspaces, setWorkspaces] = useState<DrawingWorkspace[]>(() =>
     loadDrawingWorkspaces(),
   );
@@ -550,11 +573,15 @@ function Drawing() {
 
     setGenerating(true);
     try {
-      await send(
-        text,
-        selectedDrawingModelId,
-        buildDrawingRequestOptions(options, drawingModelCapabilities),
-      );
+      if (
+        await send(
+          formatMessage(files, text),
+          selectedDrawingModelId,
+          buildDrawingRequestOptions(options, drawingModelCapabilities),
+        )
+      ) {
+        dispatchFiles({ type: "clear" });
+      }
     } finally {
       setGenerating(false);
     }
@@ -742,12 +769,31 @@ function Drawing() {
                   {t("drawing.promptLabel")}
                 </span>
               </div>
-              <button
-                className="rounded-md p-1.5 text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50 transition-all duration-150"
-                title={t("drawing.uploadReference")}
-              >
-                <Upload className="h-3.5 w-3.5" />
-              </button>
+              <FileProvider
+                files={files}
+                dispatch={dispatchFiles}
+                modelId={selectedDrawingModelId}
+                forceImageUpload
+                trigger={({ disabled, filesCount, open }) => (
+                  <button
+                    type="button"
+                    onClick={open}
+                    disabled={disabled}
+                    className={cn(
+                      "relative rounded-md p-1.5 text-muted-foreground/50 transition-all duration-150 hover:bg-muted/50 hover:text-muted-foreground",
+                      disabled && "cursor-not-allowed opacity-50",
+                    )}
+                    title={t("drawing.uploadReference")}
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    {filesCount > 0 && (
+                      <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground">
+                        {filesCount}
+                      </span>
+                    )}
+                  </button>
+                )}
+              />
             </div>
 
             {/* Textarea */}
