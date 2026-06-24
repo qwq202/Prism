@@ -35,9 +35,9 @@ import { useDispatch, useSelector } from "react-redux";
 import {
   addModelList,
   removeModelList,
-  selectChatSupportModels,
   selectModel,
   selectModelList,
+  selectSupportModels,
   setModel,
 } from "@/store/chat.ts";
 import { levelSelector } from "@/store/subscription.ts";
@@ -119,7 +119,7 @@ function SearchBar({
 }: SearchBarProps) {
   const { t } = useTranslation();
 
-  const supportModels = useSelector(selectChatSupportModels);
+  const supportModels = useSelector(selectSupportModels);
   const availableTags = useMemo(
     () =>
       marketTags.filter((tag) =>
@@ -610,7 +610,7 @@ function MarketPlace({
 }: MarketPlaceProps) {
   const { t } = useTranslation();
   const select = useSelector(selectModel);
-  const supportModels = useSelector(selectChatSupportModels);
+  const supportModels = useSelector(selectSupportModels);
   const [metricsMap, setMetricsMap] = useState<Record<string, ModelUsageStats>>(
     {},
   );
