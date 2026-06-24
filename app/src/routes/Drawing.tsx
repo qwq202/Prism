@@ -1,4 +1,10 @@
-import { type ComponentType, useEffect, useMemo, useState } from "react";
+import {
+  type ComponentType,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Wand2,
   Settings,
@@ -27,7 +33,6 @@ import { useSelector } from "react-redux";
 import { selectSupportModels, useMessageActions } from "@/store/chat.ts";
 import { isDrawingModel } from "@/conf/model.ts";
 import ModelAvatar from "@/components/ModelAvatar.tsx";
-import { useSearchParams } from "react-router-dom";
 
 type Mode = "generate" | "edit";
 type GeminiImageAspectRatio =
@@ -74,6 +79,7 @@ type DrawingWorkspace = {
 
 const DRAWING_WORKSPACES_KEY = "drawing.workspaces.v1";
 const DRAWING_ACTIVE_WORKSPACE_KEY = "drawing.activeWorkspaceId.v1";
+const DRAWING_MODEL_QUERY_PARAM = "model";
 
 const WORKSPACE_ACCENTS = [
   {
@@ -324,6 +330,32 @@ function loadActiveWorkspaceId() {
   return window.localStorage.getItem(DRAWING_ACTIVE_WORKSPACE_KEY) ?? "";
 }
 
+function getRequestedDrawingModelId() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const url = new URL(window.location.href);
+  return url.searchParams.get(DRAWING_MODEL_QUERY_PARAM)?.trim() ?? "";
+}
+
+function clearRequestedDrawingModelId() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has(DRAWING_MODEL_QUERY_PARAM)) {
+    return;
+  }
+  url.searchParams.delete(DRAWING_MODEL_QUERY_PARAM);
+  window.history.replaceState(
+    window.history.state,
+    "",
+    `${url.pathname}${url.search}${url.hash}`,
+  );
+}
+
 type DrawingOptionSelectProps<T extends string> = {
   icon: ComponentType<{ className?: string }>;
   label: string;
@@ -367,8 +399,8 @@ function Drawing() {
   const { t } = useTranslation();
   const { send } = useMessageActions();
   const supportModels = useSelector(selectSupportModels);
-  const [searchParams, setSearchParams] = useSearchParams();
-  const requestedDrawingModelId = searchParams.get("model")?.trim() ?? "";
+  const [requestedDrawingModelId] = useState(getRequestedDrawingModelId);
+  const handledRequestedDrawingModel = useRef(false);
   const [workspaces, setWorkspaces] = useState<DrawingWorkspace[]>(() =>
     loadDrawingWorkspaces(),
   );
@@ -412,45 +444,43 @@ function Drawing() {
   }, [activeWorkspaceId, workspaces]);
 
   useEffect(() => {
-    if (!requestedDrawingModelId || !activeWorkspace) {
+    if (!requestedDrawingModelId || handledRequestedDrawingModel.current) {
       return;
     }
     if (drawingModels.length === 0) {
       return;
     }
 
+    handledRequestedDrawingModel.current = true;
     const requestedModel = drawingModels.find(
       (model) => model.id === requestedDrawingModelId,
     );
-    if (requestedModel) {
-      const capabilities = getDrawingModelCapabilities(requestedModel.id);
-      setWorkspaces((current) =>
-        current.map((workspace) =>
-          workspace.id === activeWorkspace.id
-            ? {
-                ...workspace,
-                model: requestedModel.id,
-                options: normalizeDrawingOptions(
-                  workspace.options,
-                  capabilities,
-                ),
-              }
-            : workspace,
-        ),
-      );
-      setActiveWorkspaceId(activeWorkspace.id);
+    clearRequestedDrawingModelId();
+    if (!requestedModel) {
+      return;
     }
 
-    const nextSearchParams = new URLSearchParams(searchParams);
-    nextSearchParams.delete("model");
-    setSearchParams(nextSearchParams, { replace: true });
-  }, [
-    activeWorkspace,
-    drawingModels,
-    requestedDrawingModelId,
-    searchParams,
-    setSearchParams,
-  ]);
+    const capabilities = getDrawingModelCapabilities(requestedModel.id);
+    setWorkspaces((current) => {
+      const targetWorkspaceId = activeWorkspaceIdForStorage || current[0]?.id;
+      if (!targetWorkspaceId) {
+        return current;
+      }
+
+      return current.map((workspace) =>
+        workspace.id === targetWorkspaceId
+          ? {
+              ...workspace,
+              model: requestedModel.id,
+              options: normalizeDrawingOptions(workspace.options, capabilities),
+            }
+          : workspace,
+      );
+    });
+    if (activeWorkspaceIdForStorage) {
+      setActiveWorkspaceId(activeWorkspaceIdForStorage);
+    }
+  }, [activeWorkspaceIdForStorage, drawingModels, requestedDrawingModelId]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
