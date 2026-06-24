@@ -63,8 +63,8 @@ func TestGeminiImageGenerationUsesInteractionsOutputImage(t *testing.T) {
 		ResponseFormat: map[string]interface{}{
 			"type":         "image",
 			"mime_type":    "image/jpeg",
-			"aspect_ratio": "16:9",
-			"image_size":   "2K",
+			"aspect_ratio": "1:8",
+			"image_size":   "512px",
 		},
 		Thinking: map[string]interface{}{
 			"thinking_level": "high",
@@ -75,8 +75,8 @@ func TestGeminiImageGenerationUsesInteractionsOutputImage(t *testing.T) {
 	}
 	if body.ResponseFormat == nil ||
 		body.ResponseFormat.MimeType != "image/jpeg" ||
-		body.ResponseFormat.AspectRatio != "16:9" ||
-		body.ResponseFormat.ImageSize != "2K" {
+		body.ResponseFormat.AspectRatio != "1:8" ||
+		body.ResponseFormat.ImageSize != "512px" {
 		t.Fatalf("expected official response_format, got %#v", body.ResponseFormat)
 	}
 	if body.GenerationConfig == nil || body.GenerationConfig.ThinkingLevel != "high" {
@@ -105,6 +105,80 @@ func TestGeminiImageGenerationUsesInteractionsOutputImage(t *testing.T) {
 	expectedImage := "![image](data:image/png;base64," + palm2InlineBase64Png + ")"
 	if !strings.Contains(content, expectedImage) {
 		t.Fatalf("expected inline image markdown %q, got %q", expectedImage, content)
+	}
+}
+
+func TestGemini3ProImageInteractionOptionsAreModelScoped(t *testing.T) {
+	instance := NewChatInstance("https://generativelanguage.googleapis.com", "test-key")
+
+	body := instance.GetGeminiInteractionBody(&adaptercommon.ChatProps{
+		Model: globals.Gemini3ProImage,
+		ResponseFormat: map[string]interface{}{
+			"type":         "image",
+			"mime_type":    "image/png",
+			"aspect_ratio": "1:8",
+			"image_size":   "512px",
+		},
+		Thinking: map[string]interface{}{
+			"thinking_level": "high",
+		},
+	})
+	if body.ResponseFormat == nil ||
+		body.ResponseFormat.AspectRatio != "1:1" ||
+		body.ResponseFormat.ImageSize != "1K" {
+		t.Fatalf("expected gemini 3 pro defaults for unsupported options, got %#v", body.ResponseFormat)
+	}
+	if body.GenerationConfig != nil {
+		t.Fatalf("gemini 3 pro image should not receive image thinking config, got %#v", body.GenerationConfig)
+	}
+
+	body = instance.GetGeminiInteractionBody(&adaptercommon.ChatProps{
+		Model: globals.Gemini3ProImage,
+		ResponseFormat: map[string]interface{}{
+			"type":         "image",
+			"aspect_ratio": "21:9",
+			"image_size":   "4K",
+		},
+	})
+	if body.ResponseFormat == nil ||
+		body.ResponseFormat.AspectRatio != "21:9" ||
+		body.ResponseFormat.ImageSize != "4K" {
+		t.Fatalf("expected gemini 3 pro supported options, got %#v", body.ResponseFormat)
+	}
+}
+
+func TestGemini25FlashImageInteractionOptionsOmitUnsupportedFields(t *testing.T) {
+	instance := NewChatInstance("https://generativelanguage.googleapis.com", "test-key")
+
+	body := instance.GetGeminiInteractionBody(&adaptercommon.ChatProps{
+		Model: globals.Gemini25FlashImage,
+		ResponseFormat: map[string]interface{}{
+			"type":         "image",
+			"aspect_ratio": "21:9",
+			"image_size":   "4K",
+		},
+		Thinking: map[string]interface{}{
+			"thinking_level": "high",
+		},
+	})
+	if body.ResponseFormat == nil ||
+		body.ResponseFormat.AspectRatio != "21:9" ||
+		body.ResponseFormat.ImageSize != "" {
+		t.Fatalf("expected gemini 2.5 flash image to omit image_size, got %#v", body.ResponseFormat)
+	}
+	if body.GenerationConfig != nil {
+		t.Fatalf("gemini 2.5 flash image should not receive thinking config, got %#v", body.GenerationConfig)
+	}
+
+	body = instance.GetGeminiInteractionBody(&adaptercommon.ChatProps{
+		Model: globals.Gemini25FlashImage,
+		ResponseFormat: map[string]interface{}{
+			"type":         "image",
+			"aspect_ratio": "1:8",
+		},
+	})
+	if body.ResponseFormat == nil || body.ResponseFormat.AspectRatio != "1:1" {
+		t.Fatalf("expected unsupported gemini 2.5 ratio to fall back to 1:1, got %#v", body.ResponseFormat)
 	}
 }
 

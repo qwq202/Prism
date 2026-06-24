@@ -55,6 +55,12 @@ type DrawingOptions = {
   thinkingLevel: GeminiImageThinkingLevel;
 };
 
+type DrawingModelCapabilities = {
+  aspectRatios: readonly GeminiImageAspectRatio[];
+  imageSizes: readonly GeminiImageSize[];
+  thinkingLevels: readonly GeminiImageThinkingLevel[];
+};
+
 type DrawingWorkspace = {
   id: string;
   model: string;
@@ -94,7 +100,7 @@ const DEFAULT_DRAWING_OPTIONS: DrawingOptions = {
   thinkingLevel: "minimal",
 };
 
-const ASPECT_RATIO_OPTIONS: GeminiImageAspectRatio[] = [
+const GEMINI_25_FLASH_IMAGE_ASPECT_RATIOS: readonly GeminiImageAspectRatio[] = [
   "1:1",
   "2:3",
   "3:2",
@@ -105,14 +111,40 @@ const ASPECT_RATIO_OPTIONS: GeminiImageAspectRatio[] = [
   "9:16",
   "16:9",
   "21:9",
+];
+const GEMINI_3_PRO_IMAGE_ASPECT_RATIOS =
+  GEMINI_25_FLASH_IMAGE_ASPECT_RATIOS;
+const GEMINI_31_FLASH_IMAGE_ASPECT_RATIOS: readonly GeminiImageAspectRatio[] = [
+  ...GEMINI_3_PRO_IMAGE_ASPECT_RATIOS,
   "1:4",
   "4:1",
   "1:8",
   "8:1",
 ];
-const IMAGE_SIZE_OPTIONS: GeminiImageSize[] = ["512px", "1K", "2K", "4K"];
-const MIME_TYPE_OPTIONS: GeminiImageMimeType[] = ["image/png", "image/jpeg"];
-const THINKING_LEVEL_OPTIONS: GeminiImageThinkingLevel[] = ["minimal", "high"];
+const GEMINI_31_FLASH_IMAGE_SIZES: readonly GeminiImageSize[] = [
+  "512px",
+  "1K",
+  "2K",
+  "4K",
+];
+const GEMINI_3_PRO_IMAGE_SIZES: readonly GeminiImageSize[] = [
+  "1K",
+  "2K",
+  "4K",
+];
+const MIME_TYPE_OPTIONS: readonly GeminiImageMimeType[] = [
+  "image/png",
+  "image/jpeg",
+];
+const GEMINI_31_FLASH_THINKING_LEVELS: readonly GeminiImageThinkingLevel[] = [
+  "minimal",
+  "high",
+];
+const DEFAULT_DRAWING_MODEL_CAPABILITIES: DrawingModelCapabilities = {
+  aspectRatios: GEMINI_25_FLASH_IMAGE_ASPECT_RATIOS,
+  imageSizes: [],
+  thinkingLevels: [],
+};
 
 function createWorkspaceId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -134,39 +166,100 @@ function createDrawingWorkspace(index = 0, model = ""): DrawingWorkspace {
   };
 }
 
-function normalizeDrawingOptions(options?: Partial<DrawingOptions>): DrawingOptions {
+function hasStringOption<T extends string>(
+  options: readonly T[],
+  value: unknown,
+): value is T {
+  return typeof value === "string" && options.includes(value as T);
+}
+
+function getDrawingModelCapabilities(modelId: string): DrawingModelCapabilities {
+  const normalizedModelId = modelId.trim().toLowerCase();
+
+  if (normalizedModelId.includes("gemini-3.1-flash-image")) {
+    return {
+      aspectRatios: GEMINI_31_FLASH_IMAGE_ASPECT_RATIOS,
+      imageSizes: GEMINI_31_FLASH_IMAGE_SIZES,
+      thinkingLevels: GEMINI_31_FLASH_THINKING_LEVELS,
+    };
+  }
+
+  if (normalizedModelId.includes("gemini-3-pro-image")) {
+    return {
+      aspectRatios: GEMINI_3_PRO_IMAGE_ASPECT_RATIOS,
+      imageSizes: GEMINI_3_PRO_IMAGE_SIZES,
+      thinkingLevels: [],
+    };
+  }
+
+  if (normalizedModelId.includes("gemini-2.5-flash-image")) {
+    return DEFAULT_DRAWING_MODEL_CAPABILITIES;
+  }
+
+  return DEFAULT_DRAWING_MODEL_CAPABILITIES;
+}
+
+function normalizeDrawingOptions(
+  options?: Partial<DrawingOptions>,
+  capabilities: DrawingModelCapabilities = DEFAULT_DRAWING_MODEL_CAPABILITIES,
+): DrawingOptions {
+  const aspectRatio = options?.aspectRatio;
+  const imageSize = options?.imageSize;
+  const mimeType = options?.mimeType;
+  const thinkingLevel = options?.thinkingLevel;
+
   return {
-    aspectRatio: ASPECT_RATIO_OPTIONS.includes(
-      options?.aspectRatio as GeminiImageAspectRatio,
-    )
-      ? (options?.aspectRatio as GeminiImageAspectRatio)
+    aspectRatio: hasStringOption(capabilities.aspectRatios, aspectRatio)
+      ? aspectRatio
       : DEFAULT_DRAWING_OPTIONS.aspectRatio,
-    imageSize: IMAGE_SIZE_OPTIONS.includes(options?.imageSize as GeminiImageSize)
-      ? (options?.imageSize as GeminiImageSize)
-      : DEFAULT_DRAWING_OPTIONS.imageSize,
-    mimeType: MIME_TYPE_OPTIONS.includes(options?.mimeType as GeminiImageMimeType)
-      ? (options?.mimeType as GeminiImageMimeType)
+    imageSize: hasStringOption(capabilities.imageSizes, imageSize)
+      ? imageSize
+      : (capabilities.imageSizes[0] ?? DEFAULT_DRAWING_OPTIONS.imageSize),
+    mimeType: hasStringOption(MIME_TYPE_OPTIONS, mimeType)
+      ? mimeType
       : DEFAULT_DRAWING_OPTIONS.mimeType,
-    thinkingLevel: THINKING_LEVEL_OPTIONS.includes(
-      options?.thinkingLevel as GeminiImageThinkingLevel,
+    thinkingLevel: hasStringOption(
+      capabilities.thinkingLevels,
+      thinkingLevel,
     )
-      ? (options?.thinkingLevel as GeminiImageThinkingLevel)
+      ? thinkingLevel
       : DEFAULT_DRAWING_OPTIONS.thinkingLevel,
   };
 }
 
-function buildDrawingRequestOptions(options: DrawingOptions) {
-  return {
-    response_format: {
-      type: "image",
-      mime_type: options.mimeType,
-      aspect_ratio: options.aspectRatio,
-      image_size: options.imageSize,
-    },
-    thinking: {
-      thinking_level: options.thinkingLevel,
-    },
+function buildDrawingRequestOptions(
+  options: DrawingOptions,
+  capabilities: DrawingModelCapabilities,
+) {
+  const responseFormat: {
+    type: "image";
+    mime_type: GeminiImageMimeType;
+    aspect_ratio: GeminiImageAspectRatio;
+    image_size?: GeminiImageSize;
+  } = {
+    type: "image",
+    mime_type: options.mimeType,
+    aspect_ratio: options.aspectRatio,
   };
+
+  if (capabilities.imageSizes.length > 0) {
+    responseFormat.image_size = options.imageSize;
+  }
+
+  const requestOptions: {
+    response_format: typeof responseFormat;
+    thinking?: { thinking_level: GeminiImageThinkingLevel };
+  } = {
+    response_format: responseFormat,
+  };
+
+  if (capabilities.thinkingLevels.length > 0) {
+    requestOptions.thinking = {
+      thinking_level: options.thinkingLevel,
+    };
+  }
+
+  return requestOptions;
 }
 
 function loadDrawingWorkspaces(): DrawingWorkspace[] {
@@ -234,7 +327,7 @@ type DrawingOptionSelectProps<T extends string> = {
   icon: ComponentType<{ className?: string }>;
   label: string;
   value: T;
-  options: T[];
+  options: readonly T[];
   getLabel?: (value: T) => string;
   onChange: (value: T) => void;
 };
@@ -293,9 +386,17 @@ function Drawing() {
     drawingModels.find((model) => model.id === activeWorkspace?.model) ??
     drawingModels[0];
   const selectedDrawingModelId = selectedDrawingModel?.id ?? "";
+  const drawingModelCapabilities = useMemo(
+    () => getDrawingModelCapabilities(selectedDrawingModelId),
+    [selectedDrawingModelId],
+  );
   const mode = activeWorkspace?.mode ?? "generate";
   const prompt = activeWorkspace?.prompt ?? "";
-  const options = activeWorkspace?.options ?? DEFAULT_DRAWING_OPTIONS;
+  const rawOptions = activeWorkspace?.options;
+  const options = useMemo(
+    () => normalizeDrawingOptions(rawOptions, drawingModelCapabilities),
+    [drawingModelCapabilities, rawOptions],
+  );
 
   useEffect(() => {
     const firstWorkspaceId = workspaces[0]?.id;
@@ -358,10 +459,13 @@ function Drawing() {
 
   const updateDrawingOptions = (updates: Partial<DrawingOptions>) => {
     updateActiveWorkspace({
-      options: normalizeDrawingOptions({
-        ...options,
-        ...updates,
-      }),
+      options: normalizeDrawingOptions(
+        {
+          ...options,
+          ...updates,
+        },
+        drawingModelCapabilities,
+      ),
     });
   };
 
@@ -376,7 +480,7 @@ function Drawing() {
       await send(
         text,
         selectedDrawingModelId,
-        buildDrawingRequestOptions(options),
+        buildDrawingRequestOptions(options, drawingModelCapabilities),
       );
     } finally {
       setGenerating(false);
@@ -401,7 +505,15 @@ function Drawing() {
             </div>
             <Select
               value={selectedDrawingModelId || undefined}
-              onValueChange={(model) => updateActiveWorkspace({ model })}
+              onValueChange={(model) =>
+                updateActiveWorkspace({
+                  model,
+                  options: normalizeDrawingOptions(
+                    options,
+                    getDrawingModelCapabilities(model),
+                  ),
+                })
+              }
               disabled={drawingModels.length === 0}
             >
               <SelectTrigger className="w-full h-10 text-sm border-border/60 bg-background/60">
@@ -450,18 +562,22 @@ function Drawing() {
                     icon={Ratio}
                     label={t("drawing.options.aspectRatio")}
                     value={options.aspectRatio}
-                    options={ASPECT_RATIO_OPTIONS}
+                    options={drawingModelCapabilities.aspectRatios}
                     onChange={(aspectRatio) =>
                       updateDrawingOptions({ aspectRatio })
                     }
                   />
-                  <DrawingOptionSelect
-                    icon={ImageIcon}
-                    label={t("drawing.options.imageSize")}
-                    value={options.imageSize}
-                    options={IMAGE_SIZE_OPTIONS}
-                    onChange={(imageSize) => updateDrawingOptions({ imageSize })}
-                  />
+                  {drawingModelCapabilities.imageSizes.length > 0 && (
+                    <DrawingOptionSelect
+                      icon={ImageIcon}
+                      label={t("drawing.options.imageSize")}
+                      value={options.imageSize}
+                      options={drawingModelCapabilities.imageSizes}
+                      onChange={(imageSize) =>
+                        updateDrawingOptions({ imageSize })
+                      }
+                    />
+                  )}
                   <DrawingOptionSelect
                     icon={FileType2}
                     label={t("drawing.options.mimeType")}
@@ -472,18 +588,20 @@ function Drawing() {
                     }
                     onChange={(mimeType) => updateDrawingOptions({ mimeType })}
                   />
-                  <DrawingOptionSelect
-                    icon={Brain}
-                    label={t("drawing.options.thinkingLevel")}
-                    value={options.thinkingLevel}
-                    options={THINKING_LEVEL_OPTIONS}
-                    getLabel={(value) =>
-                      t(`drawing.options.thinking.${value}`)
-                    }
-                    onChange={(thinkingLevel) =>
-                      updateDrawingOptions({ thinkingLevel })
-                    }
-                  />
+                  {drawingModelCapabilities.thinkingLevels.length > 0 && (
+                    <DrawingOptionSelect
+                      icon={Brain}
+                      label={t("drawing.options.thinkingLevel")}
+                      value={options.thinkingLevel}
+                      options={drawingModelCapabilities.thinkingLevels}
+                      getLabel={(value) =>
+                        t(`drawing.options.thinking.${value}`)
+                      }
+                      onChange={(thinkingLevel) =>
+                        updateDrawingOptions({ thinkingLevel })
+                      }
+                    />
+                  )}
                 </div>
               </div>
             )}
