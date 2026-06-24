@@ -43,8 +43,23 @@ type Market struct {
 	Models MarketModelList `json:"models" mapstructure:"models"`
 }
 
+const imageGenerationTag = "image-generation"
+
 var saveMarketConfig = func(models MarketModelList) error {
 	return utils.SaveConfig("market", models)
+}
+
+func ensureDrawingMarketTag(tags ModelTag, drawingModel bool) ModelTag {
+	if !drawingModel {
+		return tags
+	}
+	for _, tag := range tags {
+		if tag == imageGenerationTag {
+			return tags
+		}
+	}
+	next := append(ModelTag{}, tags...)
+	return append(next, imageGenerationTag)
 }
 
 func NewMarket() *Market {
@@ -74,6 +89,8 @@ func (m *Market) GetViewModels() []MarketModelView {
 			}
 		}
 
+		drawingModel := globals.IsDrawingModel(channelType, model.Id)
+
 		items = append(items, MarketModelView{
 			Id:           model.Id,
 			Name:         model.Name,
@@ -81,11 +98,11 @@ func (m *Market) GetViewModels() []MarketModelView {
 			Default:      model.Default,
 			HighContext:  model.HighContext,
 			VisionModel:  model.VisionModel,
-			DrawingModel: globals.IsDrawingModel(channelType, model.Id),
+			DrawingModel: drawingModel,
 			OCRModel:     model.OCRModel,
 			ReverseModel: model.ReverseModel,
 			Avatar:       model.Avatar,
-			Tag:          model.Tag,
+			Tag:          ensureDrawingMarketTag(model.Tag, drawingModel),
 			ChannelType:  channelType,
 		})
 	}

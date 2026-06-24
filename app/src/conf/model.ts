@@ -6,6 +6,7 @@ const GEMINI_DRAWING_MODELS = [
   "gemini-3.1-flash-image",
   "gemini-3-pro-image",
 ];
+export const DRAWING_MODEL_TAG = "image-generation";
 
 export function getGrokModelName(id: string): string | null {
   const match = id.trim().match(/(?:^|\/)grok-(.+)$/i);
@@ -129,6 +130,10 @@ export function getResolvedModelTags(model: Model): string[] {
   }
   if (!isMultimodal && raw.includes("multi-modal")) {
     raw = raw.filter((tag) => tag !== "multi-modal");
+  }
+
+  if (isDrawingModel(model) && !raw.includes(DRAWING_MODEL_TAG)) {
+    raw = [DRAWING_MODEL_TAG, ...raw];
   }
 
   return raw;

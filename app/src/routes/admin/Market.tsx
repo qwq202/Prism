@@ -72,6 +72,7 @@ import {
 import { Label } from "@/components/ui/label.tsx";
 import { uploadResource } from "@/admin/api/system.ts";
 import { withNotify } from "@/api/common.ts";
+import { DRAWING_MODEL_TAG, isDrawingModel } from "@/conf/model.ts";
 
 type Model = RawModel & {
   seed?: string;
@@ -120,12 +121,19 @@ function normalizeMarketModel(model: Model): Model {
   const next = { ...model };
   const tags = Array.from(new Set(next.tag || []));
   const isMultimodal = !!next.vision_model;
+  const isDrawing = isDrawingModel(next);
 
-  next.tag = isMultimodal
+  const resolvedTags = isMultimodal
     ? tags.includes("multi-modal")
       ? tags
       : [...tags, "multi-modal"]
     : tags.filter((tag) => tag !== "multi-modal");
+
+  next.drawing_model = isDrawing;
+  next.tag =
+    isDrawing && !resolvedTags.includes(DRAWING_MODEL_TAG)
+      ? [...resolvedTags, DRAWING_MODEL_TAG]
+      : resolvedTags;
 
   return next;
 }
@@ -225,13 +233,21 @@ function reducer(state: MarketForm, action: MarketAction): MarketForm {
     }
     case "update": {
       const { index, data } = action.payload;
-      return [...state.slice(0, index), data, ...state.slice(index + 1)];
+      return [
+        ...state.slice(0, index),
+        normalizeMarketModel(data),
+        ...state.slice(index + 1),
+      ];
     }
     case "update-id":
       return [
         ...state.map((model, idx) => {
           if (idx === action.payload.idx) {
-            return { ...model, id: action.payload.id };
+            return normalizeMarketModel({
+              ...model,
+              id: action.payload.id,
+              drawing_model: isDrawingModel(action.payload.id),
+            });
           }
           return model;
         }),
@@ -403,47 +419,66 @@ function reducer(state: MarketForm, action: MarketAction): MarketForm {
 
 type MarketTagsProps = {
   tag: string[] | undefined;
+  lockedTags?: string[];
   idx: number;
   dispatch: MarketDispatch;
 };
 
-function MarketTags({ tag, idx, dispatch }: MarketTagsProps) {
+function MarketTags({
+  tag,
+  lockedTags = [],
+  idx,
+  dispatch,
+}: MarketTagsProps) {
   const { t } = useTranslation();
+  const lockedTagSet = useMemo(() => new Set(lockedTags), [lockedTags]);
   const tags = useMemo((): Record<string, boolean> => {
     const selected = tag || [];
 
     return marketEditableTags.reduce(
       (acc, name) => {
-        acc[name] = selected.includes(name);
+        acc[name] = selected.includes(name) || lockedTagSet.has(name);
         return acc;
       },
       {} as Record<string, boolean>,
     );
-  }, [tag]);
+  }, [lockedTagSet, tag]);
 
   return (
     <div className={`market-tags`}>
       {tags &&
-        Object.keys(tags).map((name) => (
-          <Toggle
-            key={name}
-            variant={`outline`}
-            size={`sm`}
-            pressed={tags[name]}
-            className={`market-tag`}
-            onPressedChange={(state) => {
-              dispatch({
-                type: state ? "add-tag" : "remove-tag",
-                payload: {
-                  idx,
-                  tag: name,
-                },
-              });
-            }}
-          >
-            {t(`tag.${name}`)}
-          </Toggle>
-        ))}
+        Object.keys(tags).map((name) => {
+          const locked = lockedTagSet.has(name);
+
+          return (
+            <Toggle
+              key={name}
+              variant={`outline`}
+              size={`sm`}
+              pressed={tags[name]}
+              disabled={locked}
+              className={cn(
+                "market-tag",
+                locked && "cursor-default disabled:opacity-100",
+              )}
+              onPressedChange={(state) => {
+                if (locked) {
+                  return;
+                }
+
+                dispatch({
+                  type: state ? "add-tag" : "remove-tag",
+                  payload: {
+                    idx,
+                    tag: name,
+                  },
+                });
+              }}
+            >
+              {t(`tag.${name}`)}
+            </Toggle>
+          );
+        })}
     </div>
   );
 }
@@ -548,6 +583,10 @@ function MarketItem({
 
   const checked = useMemo(
     (): boolean => model.id.trim().length > 0 && model.name.trim().length > 0,
+    [model],
+  );
+  const lockedTags = useMemo(
+    () => (isDrawingModel(model) ? [DRAWING_MODEL_TAG] : []),
     [model],
   );
 
@@ -762,7 +801,12 @@ function MarketItem({
         </div>
         <div className={`market-row`}>
           <span>{t("admin.market.model-tag")}</span>
-          <MarketTags tag={model.tag} idx={index} dispatch={dispatch} />
+          <MarketTags
+            tag={model.tag}
+            lockedTags={lockedTags}
+            idx={index}
+            dispatch={dispatch}
+          />
         </div>
         <Actions />
       </div>
@@ -1322,9 +1366,11 @@ function Market() {
   };
 
   const submit = async (): Promise<void> => {
-    const preflight = form.filter(
-      (model) => model.id.trim().length > 0 && model.name.trim().length > 0,
-    );
+    const preflight = form
+      .filter(
+        (model) => model.id.trim().length > 0 && model.name.trim().length > 0,
+      )
+      .map(normalizeMarketModel);
     const resp = await updateMarket(preflight);
 
     if (!resp.status) {
