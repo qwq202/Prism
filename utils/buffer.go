@@ -18,6 +18,11 @@ type Charge interface {
 	GetLimit() float32
 }
 
+type ImageBillingEstimator interface {
+	EstimateImageQuota(referenceImages int, responseFormat interface{}, outputImages int) float32
+	GetImageBillingDetail(referenceImages int, responseFormat interface{}, outputImages int) map[string]interface{}
+}
+
 type Buffer struct {
 	Model                string                        `json:"model"`
 	Quota                float32                       `json:"quota"`
@@ -40,6 +45,8 @@ type Buffer struct {
 	ChannelId            int                           `json:"-"`
 	ChannelName          string                        `json:"-"`
 	Charge               Charge                        `json:"-"`
+	ResponseFormat       interface{}                   `json:"-"`
+	ReferenceImages      int                           `json:"-"`
 	VisionRecall         bool                          `json:"-"`
 }
 
@@ -72,6 +79,17 @@ func initInputToken(model string, history []globals.Message) int {
 	return NumTokensFromMessages(history, model, false)
 }
 
+func CountReferenceImagesFromMessages(history []globals.Message) int {
+	for i := len(history) - 1; i >= 0; i-- {
+		if history[i].Role != globals.User {
+			continue
+		}
+		_, urls := ExtractImages(history[i].Content, true)
+		return len(urls)
+	}
+	return 0
+}
+
 func NewBuffer(model string, history []globals.Message, charge Charge) *Buffer {
 	token := initInputToken(model, history)
 
@@ -79,6 +97,7 @@ func NewBuffer(model string, history []globals.Message, charge Charge) *Buffer {
 		Model:           model,
 		Quota:           CountInputQuota(charge, token),
 		InputTokens:     token,
+		ReferenceImages: CountReferenceImagesFromMessages(history),
 		Charge:          charge,
 		FunctionCall:    nil,
 		ToolCalls:       nil,
@@ -96,6 +115,20 @@ func (b *Buffer) GetQuota() float32 {
 }
 
 func (b *Buffer) GetRecordQuota() float32 {
+	if b.Charge == nil {
+		return 0
+	}
+
+	if b.Charge.IsBillingType(globals.ImageBilling) {
+		if estimator, ok := b.Charge.(ImageBillingEstimator); ok {
+			return estimator.EstimateImageQuota(
+				b.ReferenceImages,
+				b.ResponseFormat,
+				b.CountRecordOutputImages(),
+			)
+		}
+	}
+
 	if b.Charge.IsBillingType(globals.TokenBilling) && !b.Usage.IsEmpty() {
 		return CountInputQuota(b.Charge, b.CountRecordInputToken()) +
 			CountOutputToken(b.Charge, b.CountRecordOutputToken())
@@ -301,6 +334,16 @@ func (b *Buffer) GetBillingDetail() string {
 	if !b.Usage.IsEmpty() {
 		detail["official_usage"] = b.Usage
 	}
+	if b.Charge != nil && b.Charge.IsBillingType(globals.ImageBilling) {
+		if estimator, ok := b.Charge.(ImageBillingEstimator); ok {
+			outputImages := b.CountRecordOutputImages()
+			detail["image_billing"] = estimator.GetImageBillingDetail(
+				b.ReferenceImages,
+				b.ResponseFormat,
+				outputImages,
+			)
+		}
+	}
 
 	if len(detail) == 0 {
 		return ""
@@ -396,6 +439,8 @@ func (b *Buffer) ToChargeInfo() string {
 		)
 	case globals.TimesBilling:
 		return fmt.Sprintf("%f quota per request\n", b.Charge.GetLimit())
+	case globals.ImageBilling:
+		return fmt.Sprintf("%f quota per generated image\n", b.Charge.GetLimit())
 	case globals.NonBilling:
 		return "no cost"
 	}
@@ -485,6 +530,18 @@ func (b *Buffer) CountRecordOutputToken() int {
 	return tokens
 }
 
+func (b *Buffer) CountRecordOutputImages() int {
+	if b == nil || strings.TrimSpace(b.Read()) == "" {
+		return 0
+	}
+
+	_, urls := ExtractImages(b.Read(), true)
+	if len(urls) > 0 {
+		return len(urls)
+	}
+	return 1
+}
+
 func (b *Buffer) CountToken() int {
 	return b.CountInputToken() + b.CountOutputToken(true)
 }
@@ -520,6 +577,10 @@ func (b *Buffer) SetTokenName(tokenName string) {
 func (b *Buffer) SetChannel(id int, name string) {
 	b.ChannelId = id
 	b.ChannelName = name
+}
+
+func (b *Buffer) SetResponseFormat(format interface{}) {
+	b.ResponseFormat = format
 }
 
 func (b *Buffer) GetChannelId() int {

@@ -3,6 +3,7 @@ package channel
 import (
 	"chat/globals"
 	"chat/utils"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -261,6 +262,28 @@ func cloneChargeRule(item *Charge) *Charge {
 	}
 	copied := *item
 	copied.Models = append([]string(nil), item.Models...)
+	copied.Image = cloneImageChargeConfig(item.Image)
+	return &copied
+}
+
+func cloneImageChargeConfig(item *ImageChargeConfig) *ImageChargeConfig {
+	if item == nil {
+		return nil
+	}
+
+	copied := *item
+	if item.Size != nil {
+		copied.Size = make(map[string]float32, len(item.Size))
+		for key, value := range item.Size {
+			copied.Size[key] = value
+		}
+	}
+	if item.Quality != nil {
+		copied.Quality = make(map[string]float32, len(item.Quality))
+		for key, value := range item.Quality {
+			copied.Quality[key] = value
+		}
+	}
 	return &copied
 }
 
@@ -341,9 +364,124 @@ func (c *Charge) GetLimit() float32 {
 	case globals.TokenBilling:
 		// 1k input tokens + 1k output tokens
 		return c.GetInput() + c.GetOutput()
+	case globals.ImageBilling:
+		return c.EstimateImageQuota(0, nil, 1)
 	default:
 		return 0
 	}
+}
+
+func (c *Charge) GetImageChargeConfig() ImageChargeConfig {
+	if c.Image == nil {
+		return ImageChargeConfig{}
+	}
+	return *c.Image
+}
+
+func normalizeImageBillingKey(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func getResponseFormatString(data interface{}, keys ...string) string {
+	values, ok := data.(map[string]interface{})
+	if !ok {
+		return ""
+	}
+
+	for _, key := range keys {
+		if value, ok := values[key]; ok {
+			if text, ok := value.(string); ok {
+				return strings.TrimSpace(text)
+			}
+		}
+	}
+
+	return ""
+}
+
+func lookupImagePrice(prices map[string]float32, value string) (float32, bool) {
+	normalized := normalizeImageBillingKey(value)
+	if normalized == "" || len(prices) == 0 {
+		return 0, false
+	}
+
+	for key, price := range prices {
+		if normalizeImageBillingKey(key) == normalized {
+			return price, true
+		}
+	}
+	return 0, false
+}
+
+func (c *Charge) imageUnitPrice(responseFormat interface{}) float32 {
+	config := c.GetImageChargeConfig()
+	price := config.Default
+	if price <= 0 {
+		price = c.GetOutput()
+	}
+
+	size := getResponseFormatString(responseFormat, "image_size", "imageSize", "size")
+	if sizePrice, ok := lookupImagePrice(config.Size, size); ok {
+		price = sizePrice
+	}
+
+	quality := getResponseFormatString(responseFormat, "quality", "image_quality", "imageQuality")
+	if qualityPrice, ok := lookupImagePrice(config.Quality, quality); ok {
+		price += qualityPrice
+	}
+
+	if price < 0 {
+		return 0
+	}
+	return price
+}
+
+func (c *Charge) EstimateImageQuota(referenceImages int, responseFormat interface{}, outputImages int) float32 {
+	if c == nil || c.GetType() != globals.ImageBilling {
+		return 0
+	}
+	if outputImages <= 0 {
+		return 0
+	}
+	if referenceImages < 0 {
+		referenceImages = 0
+	}
+
+	config := c.GetImageChargeConfig()
+	quota := config.Request
+	quota += c.imageUnitPrice(responseFormat) * float32(outputImages)
+	quota += config.Reference * float32(referenceImages)
+	if quota < 0 {
+		return 0
+	}
+	return quota
+}
+
+func (c *Charge) GetImageBillingDetail(referenceImages int, responseFormat interface{}, outputImages int) map[string]interface{} {
+	config := c.GetImageChargeConfig()
+	detail := map[string]interface{}{
+		"billing_unit":     utils.Multi(config.BillingUnit != "", config.BillingUnit, "final_image"),
+		"output_images":    outputImages,
+		"reference_images": referenceImages,
+		"unit_quota":       c.imageUnitPrice(responseFormat),
+		"request_quota":    config.Request,
+		"reference_quota":  config.Reference,
+	}
+
+	if size := getResponseFormatString(responseFormat, "image_size", "imageSize", "size"); size != "" {
+		detail["image_size"] = size
+	}
+	if quality := getResponseFormatString(responseFormat, "quality", "image_quality", "imageQuality"); quality != "" {
+		detail["quality"] = quality
+	}
+	if mimeType := getResponseFormatString(responseFormat, "mime_type", "mimeType"); mimeType != "" {
+		detail["mime_type"] = mimeType
+	}
+	if aspectRatio := getResponseFormatString(responseFormat, "aspect_ratio", "aspectRatio"); aspectRatio != "" {
+		detail["aspect_ratio"] = aspectRatio
+	}
+
+	return detail
 }
 
 func (c *Charge) Contains(model string) bool {
@@ -356,6 +494,7 @@ func (c *Charge) New(model string) *Charge {
 		Models:    []string{model},
 		Input:     c.Input,
 		Output:    c.Output,
+		Image:     cloneImageChargeConfig(c.Image),
 		Anonymous: c.Anonymous,
 	}
 }

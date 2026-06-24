@@ -29,6 +29,7 @@ const (
 	NonBilling   = "non-billing"
 	TimesBilling = "times-billing"
 	TokenBilling = "token-billing"
+	ImageBilling = "image-billing"
 )
 
 const (

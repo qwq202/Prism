@@ -127,6 +127,8 @@ func CountOutputToken(charge Charge, token int) float32 {
 		return float32(token) / 1000 * charge.GetOutput()
 	case globals.TimesBilling:
 		return charge.GetOutput()
+	case globals.ImageBilling:
+		return charge.GetOutput()
 	default:
 		return 0
 	}

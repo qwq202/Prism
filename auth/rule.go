@@ -79,7 +79,35 @@ func summarizeSubscriptionPointWindow(plan channel.Plan, user *User, cache *redi
 }
 
 // CanEnableModel returns whether the model can be enabled (without subscription)
+func estimateImageBillingCost(charge *channel.Charge, messages []globals.Message, responseFormat interface{}) float32 {
+	if charge == nil || !charge.IsBillingType(globals.ImageBilling) {
+		return 0
+	}
+
+	outputImages := 1
+	if config := charge.GetImageChargeConfig(); config.OutputCount > 1 {
+		outputImages = config.OutputCount
+	}
+
+	cost := charge.EstimateImageQuota(
+		utils.CountReferenceImagesFromMessages(messages),
+		responseFormat,
+		outputImages,
+	)
+	if cost <= 0 {
+		return charge.GetLimit()
+	}
+	return cost
+}
+
 func CanEnableModel(db *sql.DB, user *User, model string, messages []globals.Message) error {
+	return CanEnableModelForRequest(db, user, model, messages, nil)
+}
+
+// CanEnableModelForRequest returns whether the model can be enabled for a
+// specific request. responseFormat is used by non-token billing modes such as
+// image generation where size or quality changes the estimated cost.
+func CanEnableModelForRequest(db *sql.DB, user *User, model string, messages []globals.Message, responseFormat interface{}) error {
 	isAuth := user != nil
 	isAdmin := isAuth && user.IsAdmin(db)
 
@@ -114,6 +142,19 @@ func CanEnableModel(db *sql.DB, user *User, model string, messages []globals.Mes
 		)
 	}
 
+	if charge.IsBillingType(globals.ImageBilling) {
+		estimatedCost := estimateImageBillingCost(charge, messages, responseFormat)
+		if estimatedCost > 0 && quota < estimatedCost {
+			return fmt.Errorf(
+				ErrEstimatedCost,
+				model,
+				formatQuotaValue(estimatedCost),
+				formatQuotaValue(quota),
+			)
+		}
+		return nil
+	}
+
 	// Calculate estimated input cost
 	inputTokens := utils.NumTokensFromMessages(messages, model, false)
 	estimatedInputCost := float32(inputTokens) / 1000 * charge.GetInput()
@@ -131,11 +172,18 @@ func CanEnableModel(db *sql.DB, user *User, model string, messages []globals.Mes
 }
 
 func CanEnableModelWithSubscription(db *sql.DB, cache *redis.Client, user *User, model string, messages []globals.Message) (canEnable error, usePlan bool) {
+	return CanEnableModelWithSubscriptionForRequest(db, cache, user, model, messages, nil)
+}
+
+func CanEnableModelWithSubscriptionForRequest(db *sql.DB, cache *redis.Client, user *User, model string, messages []globals.Message, responseFormat interface{}) (canEnable error, usePlan bool) {
 	// use subscription quota first
 	charge := channel.ChargeInstance.GetCharge(model)
 	minimumCost := charge.GetLimit()
 	inputTokens := utils.NumTokensFromMessages(messages, model, false)
 	estimatedInputCost := float32(inputTokens) / 1000 * charge.GetInput()
+	if charge.IsBillingType(globals.ImageBilling) {
+		estimatedInputCost = estimateImageBillingCost(charge, messages, responseFormat)
+	}
 	subscriptionPreflightCost := minimumCost
 	if estimatedInputCost > subscriptionPreflightCost {
 		subscriptionPreflightCost = estimatedInputCost
@@ -157,5 +205,5 @@ func CanEnableModelWithSubscription(db *sql.DB, cache *redis.Client, user *User,
 			), false
 		}
 	}
-	return CanEnableModel(db, user, model, messages), false
+	return CanEnableModelForRequest(db, user, model, messages, responseFormat), false
 }

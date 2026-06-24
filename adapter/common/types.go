@@ -408,6 +408,7 @@ func (c *ChatProps) SetupBuffer(buf *utils.Buffer) {
 	if buf == nil {
 		return
 	}
+	buf.SetResponseFormat(c.ResponseFormat)
 	buf.SetPrompts(c)
 	c.Buffer = buf
 }

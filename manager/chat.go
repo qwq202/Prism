@@ -1624,7 +1624,14 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 	}
 	segment = adapter.ClearMessages(model, segment)
 
-	check, plan := auth.CanEnableModelWithSubscription(db, cache, user, model, segment)
+	check, plan := auth.CanEnableModelWithSubscriptionForRequest(
+		db,
+		cache,
+		user,
+		model,
+		segment,
+		instance.GetResponseFormat(),
+	)
 	conn.Send(globals.ChatSegmentResponse{
 		Conversation: instance.GetId(),
 	})

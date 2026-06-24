@@ -4,6 +4,8 @@ import {
   ChargeProps,
   chargeTypes,
   defaultChargeType,
+  imageBilling,
+  ImageChargeConfig,
   nonBilling,
   timesBilling,
   tokenBilling,
@@ -21,13 +23,18 @@ import {
   DownloadCloud,
   Eraser,
   EyeOff,
+  FileImage,
+  Image as ImageIcon,
   KanbanSquareDashed,
+  Layers3,
   Minus,
   PencilLine,
   Plus,
   RotateCw,
+  Ruler,
   Search,
   Settings2,
+  SlidersHorizontal,
   Trash,
   UploadCloud,
 } from "lucide-react";
@@ -84,6 +91,7 @@ import { getPricing } from "@/admin/datasets/charge.ts";
 import { useAllModels } from "@/admin/hook.tsx";
 import { toast } from "sonner";
 import { formatDecimal } from "@/utils/base.ts";
+import { isDrawingModel } from "@/conf/model.ts";
 
 const initialState: ChargeProps = {
   id: -1,
@@ -93,6 +101,97 @@ const initialState: ChargeProps = {
   input: 0,
   output: 0,
 };
+
+const imageSizePriceKeys = [
+  "512px",
+  "1K",
+  "2K",
+  "4K",
+  "256x256",
+  "512x512",
+  "1024x1024",
+  "1024x1536",
+  "1536x1024",
+  "1024x1792",
+  "1792x1024",
+];
+const imageQualityPriceKeys = ["low", "medium", "high"];
+
+function normalizePriceMap(values?: Record<string, number>) {
+  const next: Record<string, number> = {};
+  Object.entries(values || {}).forEach(([key, value]) => {
+    const name = key.trim();
+    const price = Number(value);
+    if (name && Number.isFinite(price) && price > 0) {
+      next[name] = price;
+    }
+  });
+  return next;
+}
+
+function normalizeImageChargeConfig(
+  image?: ImageChargeConfig,
+  fallback = 0,
+): ImageChargeConfig {
+  const config = image || {};
+  const defaultPrice = Math.max(0, Number(config.default ?? fallback ?? 0));
+  const request = Math.max(0, Number(config.request ?? 0));
+  const reference = Math.max(0, Number(config.reference ?? 0));
+  const outputCount = Math.max(1, Number(config.output_count ?? 1));
+
+  return {
+    default: defaultPrice,
+    request,
+    reference,
+    output_count: outputCount,
+    billing_unit: config.billing_unit || "final_image",
+    size: normalizePriceMap(config.size),
+    quality: normalizePriceMap(config.quality),
+  };
+}
+
+function getImagePriceForKey(
+  prices: Record<string, number> | undefined,
+  key: string,
+): number {
+  if (!prices) return 0;
+  const normalized = key.trim().toLowerCase();
+  const hit = Object.entries(prices).find(
+    ([name]) => name.trim().toLowerCase() === normalized,
+  );
+  return hit ? Number(hit[1]) || 0 : 0;
+}
+
+function countImagePreviewQuota(
+  image: ImageChargeConfig | undefined,
+  size: string,
+  quality: string,
+  referenceImages: number,
+) {
+  const config = normalizeImageChargeConfig(image);
+  const sizePrice = getImagePriceForKey(config.size, size);
+  const qualityPrice = getImagePriceForKey(config.quality, quality);
+  const unitPrice = (sizePrice > 0 ? sizePrice : config.default || 0) +
+    qualityPrice;
+
+  return (
+    (config.request || 0) +
+    unitPrice * Math.max(1, config.output_count || 1) +
+    (config.reference || 0) * Math.max(0, referenceImages)
+  );
+}
+
+function formatImageChargeSummary(charge: ChargeProps) {
+  const image = normalizeImageChargeConfig(charge.image, charge.output);
+  const sizes = Object.entries(image.size || {}).filter(([, value]) => value > 0);
+  if (sizes.length > 0) {
+    return sizes
+      .slice(0, 3)
+      .map(([size, value]) => `${size}: ${formatDecimal(value)}`)
+      .join(" · ");
+  }
+  return `${formatDecimal(image.default || charge.output || 0)} / image`;
+}
 
 type ChargeAction =
   | { type: "set"; payload: ChargeProps }
@@ -104,6 +203,10 @@ type ChargeAction =
   | { type: "set-anonymous"; payload: boolean }
   | { type: "set-input"; payload: number }
   | { type: "set-output"; payload: number }
+  | { type: "set-image"; payload: ImageChargeConfig }
+  | { type: "set-image-number"; key: keyof ImageChargeConfig; payload: number }
+  | { type: "set-image-size-price"; key: string; payload: number }
+  | { type: "set-image-quality-price"; key: string; payload: number }
   | { type: "clear" }
   | { type: "clear-param" };
 
@@ -134,13 +237,57 @@ function reducer(state: ChargeProps, action: ChargeAction): ChargeProps {
         models: state.models.filter((model) => model !== action.payload),
       };
     case "set-type":
-      return { ...state, type: action.payload };
+      return action.payload === imageBilling
+        ? {
+            ...state,
+            type: action.payload,
+            input: 0,
+            image: normalizeImageChargeConfig(state.image, state.output),
+          }
+        : { ...state, type: action.payload };
     case "set-anonymous":
       return { ...state, anonymous: action.payload };
     case "set-input":
       return { ...state, input: action.payload };
     case "set-output":
       return { ...state, output: action.payload };
+    case "set-image": {
+      const image = normalizeImageChargeConfig(action.payload, state.output);
+      return { ...state, image, output: image.default || state.output };
+    }
+    case "set-image-number": {
+      const image = normalizeImageChargeConfig(state.image, state.output);
+      const value = Math.max(
+        action.key === "output_count" ? 1 : 0,
+        action.payload,
+      );
+      const next = { ...image, [action.key]: value };
+      return {
+        ...state,
+        image: next,
+        output: action.key === "default" ? value : state.output,
+      };
+    }
+    case "set-image-size-price": {
+      const image = normalizeImageChargeConfig(state.image, state.output);
+      const nextSize = { ...(image.size || {}) };
+      if (action.payload > 0) {
+        nextSize[action.key] = action.payload;
+      } else {
+        delete nextSize[action.key];
+      }
+      return { ...state, image: { ...image, size: nextSize } };
+    }
+    case "set-image-quality-price": {
+      const image = normalizeImageChargeConfig(state.image, state.output);
+      const nextQuality = { ...(image.quality || {}) };
+      if (action.payload > 0) {
+        nextQuality[action.key] = action.payload;
+      } else {
+        delete nextQuality[action.key];
+      }
+      return { ...state, image: { ...image, quality: nextQuality } };
+    }
     case "clear":
       return initialState;
     case "clear-param":
@@ -165,6 +312,12 @@ function preflight(state: ChargeProps): ChargeProps {
       break;
     case tokenBilling:
       state.anonymous = false;
+      break;
+    case imageBilling:
+      state.input = 0;
+      state.anonymous = false;
+      state.image = normalizeImageChargeConfig(state.image, state.output);
+      state.output = state.image.default || state.output || 0;
       break;
   }
 
@@ -417,6 +570,239 @@ function ChargeAlert({ models, onClick }: ChargeAlertProps) {
   );
 }
 
+type ImageBillingEditorProps = {
+  form: ChargeProps;
+  dispatch: ChargeDispatch;
+};
+
+function ImageBillingEditor({ form, dispatch }: ImageBillingEditorProps) {
+  const { t } = useTranslation();
+  const image = normalizeImageChargeConfig(form.image, form.output);
+  const [previewSize, setPreviewSize] = useState("1K");
+  const [previewQuality, setPreviewQuality] = useState("");
+  const [previewReferences, setPreviewReferences] = useState(0);
+  const previewQuota = countImagePreviewQuota(
+    image,
+    previewSize,
+    previewQuality,
+    previewReferences,
+  );
+
+  return (
+    <div className="mt-5 rounded-lg border border-border/70 bg-muted/20 p-4">
+      <div className="mb-4 flex flex-row items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background border border-border">
+          <ImageIcon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">
+            {t("admin.charge.image-billing-title")}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {t("admin.charge.image-billing-desc")}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="flex flex-row items-center gap-2">
+          <FileImage className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <Label className="grow">{t("admin.charge.image-default")}</Label>
+          <NumberInput
+            value={image.default || 0}
+            onValueChange={(value) =>
+              dispatch({
+                type: "set-image-number",
+                key: "default",
+                payload: value,
+              })
+            }
+            acceptNegative={false}
+            className="w-24"
+            min={0}
+            max={99999}
+          />
+        </div>
+        <div className="flex flex-row items-center gap-2">
+          <Layers3 className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <Label className="grow">{t("admin.charge.image-output-count")}</Label>
+          <NumberInput
+            value={image.output_count || 1}
+            onValueChange={(value) =>
+              dispatch({
+                type: "set-image-number",
+                key: "output_count",
+                payload: value,
+              })
+            }
+            acceptNegative={false}
+            className="w-24"
+            min={1}
+            max={99}
+          />
+        </div>
+        <div className="flex flex-row items-center gap-2">
+          <SlidersHorizontal className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <Label className="grow">{t("admin.charge.image-request")}</Label>
+          <NumberInput
+            value={image.request || 0}
+            onValueChange={(value) =>
+              dispatch({
+                type: "set-image-number",
+                key: "request",
+                payload: value,
+              })
+            }
+            acceptNegative={false}
+            className="w-24"
+            min={0}
+            max={99999}
+          />
+        </div>
+        <div className="flex flex-row items-center gap-2">
+          <UploadCloud className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <Label className="grow">{t("admin.charge.image-reference")}</Label>
+          <NumberInput
+            value={image.reference || 0}
+            onValueChange={(value) =>
+              dispatch({
+                type: "set-image-number",
+                key: "reference",
+                payload: value,
+              })
+            }
+            acceptNegative={false}
+            className="w-24"
+            min={0}
+            max={99999}
+          />
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+        <div className="space-y-4">
+          <div>
+            <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+              <Ruler className="h-4 w-4 text-muted-foreground" />
+              {t("admin.charge.image-size-prices")}
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {imageSizePriceKeys.map((size) => (
+                <div
+                  key={size}
+                  className="flex items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2"
+                >
+                  <span className="w-14 text-sm font-medium">{size}</span>
+                  <NumberInput
+                    value={getImagePriceForKey(image.size, size)}
+                    onValueChange={(value) =>
+                      dispatch({
+                        type: "set-image-size-price",
+                        key: size,
+                        payload: value,
+                      })
+                    }
+                    acceptNegative={false}
+                    className="h-9 flex-1"
+                    min={0}
+                    max={99999}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+              <Settings2 className="h-4 w-4 text-muted-foreground" />
+              {t("admin.charge.image-quality-prices")}
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {imageQualityPriceKeys.map((quality) => (
+                <div
+                  key={quality}
+                  className="flex items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2"
+                >
+                  <span className="w-16 text-sm font-medium">
+                    {t(`admin.charge.image-quality-${quality}`)}
+                  </span>
+                  <NumberInput
+                    value={getImagePriceForKey(image.quality, quality)}
+                    onValueChange={(value) =>
+                      dispatch({
+                        type: "set-image-quality-price",
+                        key: quality,
+                        payload: value,
+                      })
+                    }
+                    acceptNegative={false}
+                    className="h-9 flex-1"
+                    min={0}
+                    max={99999}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-border/70 bg-background p-4">
+          <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+            <Activity className="h-4 w-4 text-muted-foreground" />
+            {t("admin.charge.image-preview")}
+          </div>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="mb-1 block text-xs text-muted-foreground">
+                  {t("admin.charge.image-preview-size")}
+                </Label>
+                <Input
+                  value={previewSize}
+                  onChange={(e) => setPreviewSize(e.target.value)}
+                  className="h-9"
+                />
+              </div>
+              <div>
+                <Label className="mb-1 block text-xs text-muted-foreground">
+                  {t("admin.charge.image-preview-quality")}
+                </Label>
+                <Input
+                  value={previewQuality}
+                  onChange={(e) => setPreviewQuality(e.target.value)}
+                  placeholder={t("admin.charge.image-preview-quality-empty")}
+                  className="h-9"
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="mb-1 block text-xs text-muted-foreground">
+                {t("admin.charge.image-preview-reference")}
+              </Label>
+              <NumberInput
+                value={previewReferences}
+                onValueChange={setPreviewReferences}
+                acceptNegative={false}
+                className="h-9"
+                min={0}
+                max={99}
+              />
+            </div>
+            <div className="rounded-md border border-border bg-muted/30 p-3">
+              <p className="text-xs text-muted-foreground">
+                {t("admin.charge.image-preview-total")}
+              </p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums">
+                {formatDecimal(previewQuota)}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type ChargeEditorProps = {
   form: ChargeProps;
   dispatch: ChargeDispatch;
@@ -447,13 +833,17 @@ function ChargeEditor({
   );
 
   const unusedModels = useMemo(() => {
-    return channelModels.filter(
+    const candidates =
+      form.type === imageBilling
+        ? channelModels.filter((model) => isDrawingModel(model))
+        : channelModels;
+    return candidates.filter(
       (model) =>
         !form.models.includes(model) &&
         !usedModels.includes(model) &&
         model.trim() !== "",
     );
-  }, [channelModels, form.models, usedModels]);
+  }, [channelModels, form.models, form.type, usedModels]);
 
   const disabled = useMemo(() => {
     if (model.trim() !== "") return false;
@@ -658,6 +1048,10 @@ function ChargeEditor({
         </div>
       )}
 
+      {form.type === imageBilling && (
+        <ImageBillingEditor form={form} dispatch={dispatch} />
+      )}
+
       <div
         className={`flex flex-row w-full h-max mt-5 gap-2 items-center flex-wrap`}
       >
@@ -819,14 +1213,27 @@ function ChargeTable({
                   ))}
                 </TableCell>
                 <TableCell>
-                  {formatDecimal(
-                    parseFloat((charge.input * multiplier).toPrecision(10)),
-                  )}
+                  {charge.type === imageBilling
+                    ? t("admin.charge.image-reference-short", {
+                        quota: formatDecimal(
+                          normalizeImageChargeConfig(
+                            charge.image,
+                            charge.output,
+                          ).reference || 0,
+                        ),
+                      })
+                    : formatDecimal(
+                        parseFloat((charge.input * multiplier).toPrecision(10)),
+                      )}
                 </TableCell>
                 <TableCell>
-                  {formatDecimal(
-                    parseFloat((charge.output * multiplier).toPrecision(10)),
-                  )}
+                  {charge.type === imageBilling
+                    ? formatImageChargeSummary(charge)
+                    : formatDecimal(
+                        parseFloat(
+                          (charge.output * multiplier).toPrecision(10),
+                        ),
+                      )}
                 </TableCell>
                 <TableCell>{t(String(charge.anonymous))}</TableCell>
                 <TableCell>

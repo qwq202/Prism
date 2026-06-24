@@ -38,13 +38,24 @@ type Ticker struct {
 }
 
 type Charge struct {
-	Id        int      `json:"id" mapstructure:"id"`
-	Type      string   `json:"type" mapstructure:"type"`
-	Models    []string `json:"models" mapstructure:"models"`
-	Input     float32  `json:"input" mapstructure:"input"`
-	Output    float32  `json:"output" mapstructure:"output"`
-	Anonymous bool     `json:"anonymous" mapstructure:"anonymous"`
-	Unset     bool     `json:"-" mapstructure:"-"`
+	Id        int                `json:"id" mapstructure:"id"`
+	Type      string             `json:"type" mapstructure:"type"`
+	Models    []string           `json:"models" mapstructure:"models"`
+	Input     float32            `json:"input" mapstructure:"input"`
+	Output    float32            `json:"output" mapstructure:"output"`
+	Image     *ImageChargeConfig `json:"image,omitempty" mapstructure:"image"`
+	Anonymous bool               `json:"anonymous" mapstructure:"anonymous"`
+	Unset     bool               `json:"-" mapstructure:"-"`
+}
+
+type ImageChargeConfig struct {
+	Default     float32            `json:"default,omitempty" mapstructure:"default"`
+	Request     float32            `json:"request,omitempty" mapstructure:"request"`
+	Reference   float32            `json:"reference,omitempty" mapstructure:"reference"`
+	Size        map[string]float32 `json:"size,omitempty" mapstructure:"size"`
+	Quality     map[string]float32 `json:"quality,omitempty" mapstructure:"quality"`
+	OutputCount int                `json:"output_count,omitempty" mapstructure:"output_count"`
+	BillingUnit string             `json:"billing_unit,omitempty" mapstructure:"billing_unit"`
 }
 
 type ChargeSequence []*Charge
