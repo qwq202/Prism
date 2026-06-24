@@ -767,6 +767,7 @@
     "advanced": "高级参数",
     "generateImage": "生成图片",
     "addWorkspace": "新增工作区",
+    "deleteWorkspace": "删除工作区 {{index}}",
     "workspaceTitle": "工作区 {{index}}",
     "activeWorkspaceTitle": "当前工作区 {{index}}"
   },

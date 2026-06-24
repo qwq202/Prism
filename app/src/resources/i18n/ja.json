@@ -531,6 +531,7 @@
     "advanced": "詳細設定",
     "generateImage": "画像を生成",
     "addWorkspace": "ワークスペースを追加",
+    "deleteWorkspace": "ワークスペース {{index}} を削除",
     "workspaceTitle": "ワークスペース {{index}}",
     "activeWorkspaceTitle": "現在のワークスペース {{index}}"
   },

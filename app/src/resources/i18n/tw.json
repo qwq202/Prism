@@ -619,6 +619,7 @@
     "advanced": "進階參數",
     "generateImage": "生成圖片",
     "addWorkspace": "新增工作區",
+    "deleteWorkspace": "刪除工作區 {{index}}",
     "workspaceTitle": "工作區 {{index}}",
     "activeWorkspaceTitle": "目前工作區 {{index}}"
   },

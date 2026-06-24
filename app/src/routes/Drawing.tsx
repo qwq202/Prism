@@ -18,6 +18,7 @@ import {
   FileType2,
   Image as ImageIcon,
   Loader2,
+  X,
 } from "lucide-react";
 import {
   Select,
@@ -553,6 +554,39 @@ function Drawing() {
     setActiveWorkspaceId(workspace.id);
   };
 
+  const deleteWorkspace = (workspaceId: string) => {
+    const workspaceIndex = workspaces.findIndex(
+      (workspace) => workspace.id === workspaceId,
+    );
+
+    if (workspaceIndex === -1) {
+      return;
+    }
+
+    if (workspaces.length === 1) {
+      const workspace = createDrawingWorkspace(0, selectedDrawingModelId);
+      setWorkspaces([workspace]);
+      setActiveWorkspaceId(workspace.id);
+      return;
+    }
+
+    const nextWorkspaces = workspaces.filter(
+      (workspace) => workspace.id !== workspaceId,
+    );
+
+    setWorkspaces(nextWorkspaces);
+
+    if (workspaceId === activeWorkspaceIdForStorage) {
+      const nextActiveWorkspace =
+        nextWorkspaces[Math.min(workspaceIndex, nextWorkspaces.length - 1)] ??
+        nextWorkspaces[0];
+
+      if (nextActiveWorkspace) {
+        setActiveWorkspaceId(nextActiveWorkspace.id);
+      }
+    }
+  };
+
   const updateDrawingOptions = (updates: Partial<DrawingOptions>) => {
     updateActiveWorkspace({
       options: normalizeDrawingOptions(
@@ -875,42 +909,65 @@ function Drawing() {
             const label = selected
               ? t("drawing.activeWorkspaceTitle", { index: index + 1 })
               : t("drawing.workspaceTitle", { index: index + 1 });
+            const deleteLabel = t("drawing.deleteWorkspace", {
+              index: index + 1,
+            });
 
             return (
-              <button
+              <div
                 key={workspace.id}
-                type="button"
-                onClick={() => setActiveWorkspaceId(workspace.id)}
-                className={cn(
-                  "relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br transition-all duration-200",
-                  selected
-                    ? "border-2 border-primary/60 shadow-sm ring-2 ring-primary/10"
-                    : "border border-border/50 hover:border-border hover:bg-muted/60",
-                  selected ? accent.active : accent.idle,
-                )}
-                aria-current={selected ? "true" : undefined}
-                aria-label={label}
-                title={label}
+                className="group relative h-12 w-12 shrink-0"
               >
-                <span
+                <button
+                  type="button"
+                  onClick={() => setActiveWorkspaceId(workspace.id)}
                   className={cn(
-                    "relative z-10 text-[11px] font-semibold transition-colors",
+                    "relative flex h-full w-full items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br transition-all duration-200",
                     selected
-                      ? "text-foreground/70"
-                      : "text-muted-foreground/45",
+                      ? "border-2 border-primary/60 shadow-sm ring-2 ring-primary/10"
+                      : "border border-border/50 hover:border-border hover:bg-muted/60",
+                    selected ? accent.active : accent.idle,
                   )}
+                  aria-current={selected ? "true" : undefined}
+                  aria-label={label}
+                  title={label}
                 >
-                  {index + 1}
-                </span>
-                {workspace.prompt.trim() && (
                   <span
                     className={cn(
-                      "absolute bottom-1.5 h-1 w-4 rounded-full",
-                      selected ? "bg-foreground/40" : "bg-muted-foreground/25",
+                      "relative z-10 text-[11px] font-semibold transition-colors",
+                      selected
+                        ? "text-foreground/70"
+                        : "text-muted-foreground/45",
                     )}
-                  />
+                  >
+                    {index + 1}
+                  </span>
+                  {workspace.prompt.trim() && (
+                    <span
+                      className={cn(
+                        "absolute bottom-1.5 h-1 w-4 rounded-full",
+                        selected
+                          ? "bg-foreground/40"
+                          : "bg-muted-foreground/25",
+                      )}
+                    />
+                  )}
+                </button>
+                {workspaces.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      deleteWorkspace(workspace.id);
+                    }}
+                    className="pointer-events-none absolute -right-1 -top-1 z-20 flex h-5 w-5 items-center justify-center rounded-full border border-border/70 bg-background/95 text-muted-foreground opacity-0 shadow-sm transition-all duration-150 hover:border-destructive/50 hover:bg-destructive hover:text-destructive-foreground group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
+                    aria-label={deleteLabel}
+                    title={deleteLabel}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
                 )}
-              </button>
+              </div>
             );
           })}
         </div>

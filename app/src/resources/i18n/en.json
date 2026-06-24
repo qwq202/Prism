@@ -531,6 +531,7 @@
     "advanced": "Advanced settings",
     "generateImage": "Generate image",
     "addWorkspace": "Add workspace",
+    "deleteWorkspace": "Delete workspace {{index}}",
     "workspaceTitle": "Workspace {{index}}",
     "activeWorkspaceTitle": "Active workspace {{index}}"
   },

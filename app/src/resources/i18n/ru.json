@@ -531,6 +531,7 @@
     "advanced": "Дополнительные параметры",
     "generateImage": "Создать изображение",
     "addWorkspace": "Добавить рабочую область",
+    "deleteWorkspace": "Удалить рабочую область {{index}}",
     "workspaceTitle": "Рабочая область {{index}}",
     "activeWorkspaceTitle": "Активная рабочая область {{index}}"
   },
