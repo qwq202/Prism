@@ -7,7 +7,6 @@ import {
 } from "react";
 import {
   Wand2,
-  Settings,
   Plus,
   SlidersHorizontal,
   Palette,
@@ -572,10 +571,6 @@ function Drawing() {
               <label className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
                 {t("drawing.model")}
               </label>
-              <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors group">
-                <Settings className="w-3 h-3 group-hover:rotate-45 transition-transform duration-300" />
-                {t("drawing.manage")}
-              </button>
             </div>
             <Select
               value={selectedDrawingModelId || undefined}
