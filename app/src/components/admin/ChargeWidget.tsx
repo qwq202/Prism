@@ -690,9 +690,11 @@ function ImageBillingEditor({ form, dispatch }: ImageBillingEditorProps) {
               {imageSizePriceKeys.map((size) => (
                 <div
                   key={size}
-                  className="flex items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2"
+                  className="grid grid-cols-[8rem_minmax(0,1fr)] items-center gap-3 rounded-md border border-border/70 bg-background px-3 py-2"
                 >
-                  <span className="w-14 text-sm font-medium">{size}</span>
+                  <span className="shrink-0 whitespace-nowrap text-sm font-medium tabular-nums">
+                    {size}
+                  </span>
                   <NumberInput
                     value={getImagePriceForKey(image.size, size)}
                     onValueChange={(value) =>
@@ -703,7 +705,7 @@ function ImageBillingEditor({ form, dispatch }: ImageBillingEditorProps) {
                       })
                     }
                     acceptNegative={false}
-                    className="h-9 flex-1"
+                    className="h-9 min-w-0"
                     min={0}
                     max={99999}
                   />
