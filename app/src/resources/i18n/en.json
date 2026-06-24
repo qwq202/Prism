@@ -495,6 +495,9 @@
     "uploading-prompt": "Uploading image, please be patient",
     "image-only": "Only image uploads are supported",
     "vision-model-required": "The current model does not support image recognition",
+    "max-count": "Too many reference images",
+    "max-count-prompt": "The current model supports up to {{count}} images. Remove extra images first.",
+    "max-count-reached": "The current model limit of {{count}} images has been reached",
     "files-cleared-on-model-switch": "After the model switch, the image to be sent has been automatically cleared"
   },
   "drawing": {
@@ -512,6 +515,9 @@
     "emptyPrompt": "Describe the image you want below, and AI will create it.",
     "promptLabel": "Image prompt",
     "uploadReference": "Upload reference image",
+    "uploadReferenceWithLimit": "Upload reference images (up to {{limit}})",
+    "referenceLimitExceeded": "Cannot switch model",
+    "referenceLimitExceededPrompt": "{{count}} reference images are uploaded. {{model}} supports up to {{limit}}. Remove extra reference images first.",
     "promptPlaceholder": "Describe the image you want to generate...",
     "tools": {
       "style": "Style",

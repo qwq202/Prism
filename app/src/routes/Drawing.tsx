@@ -1,5 +1,6 @@
 import {
   type ComponentType,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -39,6 +40,7 @@ import FileProvider, {
 } from "@/components/FileProvider.tsx";
 import type { FileArray } from "@/api/file.ts";
 import { formatMessage } from "@/utils/processor.ts";
+import { toast } from "sonner";
 
 type Mode = "generate" | "edit";
 type GeminiImageAspectRatio =
@@ -71,6 +73,7 @@ type DrawingModelCapabilities = {
   aspectRatios: readonly GeminiImageAspectRatio[];
   imageSizes: readonly GeminiImageSize[];
   thinkingLevels: readonly GeminiImageThinkingLevel[];
+  maxReferenceImages: number;
 };
 
 type DrawingWorkspace = {
@@ -153,10 +156,14 @@ const GEMINI_31_FLASH_THINKING_LEVELS: readonly GeminiImageThinkingLevel[] = [
   "minimal",
   "high",
 ];
+const GEMINI_25_FLASH_IMAGE_REFERENCE_LIMIT = 3;
+const GEMINI_31_FLASH_IMAGE_REFERENCE_LIMIT = 10;
+const GEMINI_3_PRO_IMAGE_REFERENCE_LIMIT = 14;
 const DEFAULT_DRAWING_MODEL_CAPABILITIES: DrawingModelCapabilities = {
   aspectRatios: GEMINI_25_FLASH_IMAGE_ASPECT_RATIOS,
   imageSizes: [],
   thinkingLevels: [],
+  maxReferenceImages: GEMINI_25_FLASH_IMAGE_REFERENCE_LIMIT,
 };
 
 function createWorkspaceId() {
@@ -210,6 +217,7 @@ function getDrawingModelCapabilities(modelId: string): DrawingModelCapabilities 
       aspectRatios: GEMINI_31_FLASH_IMAGE_ASPECT_RATIOS,
       imageSizes: GEMINI_31_FLASH_IMAGE_SIZES,
       thinkingLevels: GEMINI_31_FLASH_THINKING_LEVELS,
+      maxReferenceImages: GEMINI_31_FLASH_IMAGE_REFERENCE_LIMIT,
     };
   }
 
@@ -218,6 +226,7 @@ function getDrawingModelCapabilities(modelId: string): DrawingModelCapabilities 
       aspectRatios: GEMINI_3_PRO_IMAGE_ASPECT_RATIOS,
       imageSizes: GEMINI_3_PRO_IMAGE_SIZES,
       thinkingLevels: [],
+      maxReferenceImages: GEMINI_3_PRO_IMAGE_REFERENCE_LIMIT,
     };
   }
 
@@ -455,7 +464,10 @@ function Drawing() {
     () => normalizeDrawingOptions(rawOptions, drawingModelCapabilities),
     [drawingModelCapabilities, rawOptions],
   );
-
+  const referenceImageLimit = drawingModelCapabilities.maxReferenceImages;
+  const uploadReferenceTitle = t("drawing.uploadReferenceWithLimit", {
+    limit: referenceImageLimit,
+  });
   useEffect(() => {
     const firstWorkspaceId = workspaces[0]?.id;
     if (
@@ -484,6 +496,17 @@ function Drawing() {
     }
 
     const capabilities = getDrawingModelCapabilities(requestedModel.id);
+    if (files.length > capabilities.maxReferenceImages) {
+      toast.error(t("drawing.referenceLimitExceeded"), {
+        description: t("drawing.referenceLimitExceededPrompt", {
+          count: files.length,
+          limit: capabilities.maxReferenceImages,
+          model: requestedModel.name || requestedModel.id,
+        }),
+      });
+      return;
+    }
+
     setWorkspaces((current) => {
       const targetWorkspaceId = activeWorkspaceIdForStorage || current[0]?.id;
       if (!targetWorkspaceId) {
@@ -503,7 +526,13 @@ function Drawing() {
     if (activeWorkspaceIdForStorage) {
       setActiveWorkspaceId(activeWorkspaceIdForStorage);
     }
-  }, [activeWorkspaceIdForStorage, drawingModels, requestedDrawingModelId]);
+  }, [
+    activeWorkspaceIdForStorage,
+    drawingModels,
+    files.length,
+    requestedDrawingModelId,
+    t,
+  ]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -527,23 +556,88 @@ function Drawing() {
     );
   }, [activeWorkspaceIdForStorage]);
 
-  const updateActiveWorkspace = (
-    updates: Partial<
-      Pick<DrawingWorkspace, "model" | "mode" | "prompt" | "options">
-    >,
-  ) => {
-    if (!activeWorkspace) {
-      return;
-    }
+  const updateActiveWorkspace = useCallback(
+    (
+      updates: Partial<
+        Pick<DrawingWorkspace, "model" | "mode" | "prompt" | "options">
+      >,
+    ) => {
+      if (!activeWorkspace) {
+        return;
+      }
 
-    setWorkspaces((current) =>
-      current.map((workspace) =>
-        workspace.id === activeWorkspace.id
-          ? { ...workspace, ...updates }
-          : workspace,
-      ),
-    );
-  };
+      setWorkspaces((current) =>
+        current.map((workspace) =>
+          workspace.id === activeWorkspace.id
+            ? { ...workspace, ...updates }
+            : workspace,
+        ),
+      );
+    },
+    [activeWorkspace],
+  );
+
+  const canUseCurrentReferencesWithModel = useCallback(
+    (modelId: string) =>
+      files.length <= getDrawingModelCapabilities(modelId).maxReferenceImages,
+    [files.length],
+  );
+
+  const notifyReferenceImageLimit = useCallback(
+    (modelId: string) => {
+      const capabilities = getDrawingModelCapabilities(modelId);
+      const modelName =
+        drawingModels.find((model) => model.id === modelId)?.name || modelId;
+
+      toast.error(t("drawing.referenceLimitExceeded"), {
+        description: t("drawing.referenceLimitExceededPrompt", {
+          count: files.length,
+          limit: capabilities.maxReferenceImages,
+          model: modelName,
+        }),
+      });
+    },
+    [drawingModels, files.length, t],
+  );
+
+  const selectDrawingModel = useCallback(
+    (modelId: string) => {
+      if (!canUseCurrentReferencesWithModel(modelId)) {
+        notifyReferenceImageLimit(modelId);
+        return;
+      }
+
+      updateActiveWorkspace({
+        model: modelId,
+        options: normalizeDrawingOptions(
+          options,
+          getDrawingModelCapabilities(modelId),
+        ),
+      });
+    },
+    [
+      canUseCurrentReferencesWithModel,
+      notifyReferenceImageLimit,
+      options,
+      updateActiveWorkspace,
+    ],
+  );
+
+  const selectWorkspace = useCallback(
+    (workspace: DrawingWorkspace) => {
+      const targetModelId = workspace.model || drawingModels[0]?.id || "";
+      if (
+        targetModelId &&
+        !canUseCurrentReferencesWithModel(targetModelId)
+      ) {
+        notifyReferenceImageLimit(targetModelId);
+        return;
+      }
+
+      setActiveWorkspaceId(workspace.id);
+    },
+    [canUseCurrentReferencesWithModel, drawingModels, notifyReferenceImageLimit],
+  );
 
   const addWorkspace = () => {
     const workspace = createDrawingWorkspace(
@@ -574,17 +668,31 @@ function Drawing() {
       (workspace) => workspace.id !== workspaceId,
     );
 
-    setWorkspaces(nextWorkspaces);
-
     if (workspaceId === activeWorkspaceIdForStorage) {
       const nextActiveWorkspace =
         nextWorkspaces[Math.min(workspaceIndex, nextWorkspaces.length - 1)] ??
         nextWorkspaces[0];
+      const nextActiveModelId =
+        nextActiveWorkspace?.model || drawingModels[0]?.id || "";
+
+      if (
+        nextActiveModelId &&
+        !canUseCurrentReferencesWithModel(nextActiveModelId)
+      ) {
+        notifyReferenceImageLimit(nextActiveModelId);
+        return;
+      }
+
+      setWorkspaces(nextWorkspaces);
 
       if (nextActiveWorkspace) {
         setActiveWorkspaceId(nextActiveWorkspace.id);
       }
+
+      return;
     }
+
+    setWorkspaces(nextWorkspaces);
   };
 
   const updateDrawingOptions = (updates: Partial<DrawingOptions>) => {
@@ -602,6 +710,10 @@ function Drawing() {
   const generateImage = async () => {
     const text = prompt.trim();
     if (!text || !selectedDrawingModelId || generating) {
+      return;
+    }
+    if (!canUseCurrentReferencesWithModel(selectedDrawingModelId)) {
+      notifyReferenceImageLimit(selectedDrawingModelId);
       return;
     }
 
@@ -635,15 +747,7 @@ function Drawing() {
             </div>
             <Select
               value={selectedDrawingModelId || undefined}
-              onValueChange={(model) =>
-                updateActiveWorkspace({
-                  model,
-                  options: normalizeDrawingOptions(
-                    options,
-                    getDrawingModelCapabilities(model),
-                  ),
-                })
-              }
+              onValueChange={selectDrawingModel}
               disabled={drawingModels.length === 0}
             >
               <SelectTrigger className="w-full h-10 text-sm border-border/60 bg-background/60">
@@ -808,6 +912,7 @@ function Drawing() {
                 dispatch={dispatchFiles}
                 modelId={selectedDrawingModelId}
                 forceImageUpload
+                maxFiles={referenceImageLimit}
                 trigger={({ disabled, filesCount, open }) => (
                   <button
                     type="button"
@@ -817,7 +922,7 @@ function Drawing() {
                       "relative rounded-md p-1.5 text-muted-foreground/50 transition-all duration-150 hover:bg-muted/50 hover:text-muted-foreground",
                       disabled && "cursor-not-allowed opacity-50",
                     )}
-                    title={t("drawing.uploadReference")}
+                    title={uploadReferenceTitle}
                   >
                     <Upload className="h-3.5 w-3.5" />
                     {filesCount > 0 && (
@@ -920,7 +1025,7 @@ function Drawing() {
               >
                 <button
                   type="button"
-                  onClick={() => setActiveWorkspaceId(workspace.id)}
+                  onClick={() => selectWorkspace(workspace)}
                   className={cn(
                     "relative flex h-full w-full items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br transition-all duration-200",
                     selected

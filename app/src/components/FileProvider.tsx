@@ -117,6 +117,7 @@ type FileProviderProps = {
   dispatch: Dispatch<FileProviderAction>;
   modelId?: string;
   forceImageUpload?: boolean;
+  maxFiles?: number;
   trigger?: (props: {
     disabled: boolean;
     filesCount: number;
@@ -129,6 +130,7 @@ function FileProvider({
   dispatch,
   modelId,
   forceImageUpload = false,
+  maxFiles,
   trigger,
 }: FileProviderProps) {
   const { t } = useTranslation();
@@ -164,6 +166,18 @@ function FileProvider({
     model.trim().length > 0 &&
     (forceImageUpload || supportsImageUpload(currentModelInfo));
   const canOpenFilePanel = canUploadImage || files.length > 0;
+  const fileLimit =
+    typeof maxFiles === "number" ? Math.max(0, Math.floor(maxFiles)) : null;
+  const hasFileLimit = fileLimit !== null;
+  const fileLimitReached =
+    hasFileLimit && files.length + tasks.tasks.length >= (fileLimit ?? 0);
+
+  const showFileLimitToast = useCallback(() => {
+    if (!hasFileLimit) return;
+    toast.error(t("file.max-count"), {
+      description: t("file.max-count-prompt", { count: fileLimit ?? 0 }),
+    });
+  }, [fileLimit, hasFileLimit, t]);
 
   const addFile = useCallback(
     (file: FileObject) => {
@@ -187,14 +201,30 @@ function FileProvider({
   );
 
   const triggerFile = useCallback(
-    async (files: (File | null)[]) => {
+    async (incomingFiles: (File | null)[]) => {
       if (!canUploadImage) {
         toast.info(t("file.vision-model-required"));
         return;
       }
 
-      for (const file of files) {
-        if (!file) continue;
+      const availableFiles = incomingFiles.filter(
+        (file): file is File => Boolean(file),
+      );
+
+      if (availableFiles.length === 0) {
+        return;
+      }
+
+      if (
+        hasFileLimit &&
+        files.length + tasks.tasks.length + availableFiles.length >
+          (fileLimit ?? 0)
+      ) {
+        showFileLimitToast();
+        return;
+      }
+
+      for (const file of availableFiles) {
         if (file.size > MaxFileSize) {
           toast.error(t("file.over-size"), {
             description: t("file.over-size-prompt", {
@@ -247,7 +277,17 @@ function FileProvider({
         }
       }
     },
-    [addFile, canUploadImage, t, uploadModelInfo],
+    [
+      addFile,
+      canUploadImage,
+      fileLimit,
+      files.length,
+      hasFileLimit,
+      showFileLimitToast,
+      t,
+      tasks.tasks.length,
+      uploadModelInfo,
+    ],
   );
 
   const handlePasteImages = useCallback(
@@ -377,13 +417,20 @@ function FileProvider({
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.2, duration: 0.3 }}
               >
-                {canUploadImage && (
+                {canUploadImage && !fileLimitReached && (
                   <FileInput
                     loading={tasks.tasks.length > 0}
                     id={"file"}
                     className={"file"}
                     handleEvent={triggerFile}
                   />
+                )}
+                {canUploadImage && fileLimitReached && (
+                  <div className="drop-window cursor-default">
+                    <p>
+                      {t("file.max-count-reached", { count: fileLimit ?? 0 })}
+                    </p>
+                  </div>
                 )}
               </motion.div>
             </motion.div>

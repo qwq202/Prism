@@ -583,6 +583,9 @@
     "uploading-prompt": "正在上傳圖片中，請耐心等待",
     "image-only": "目前僅支援上傳圖片",
     "vision-model-required": "當前模型不支援圖像識別",
+    "max-count": "參考圖數量超出限制",
+    "max-count-prompt": "當前模型最多支援 {{count}} 張圖片，請先刪除多餘圖片",
+    "max-count-reached": "已達到當前模型 {{count}} 張圖片上限",
     "files-cleared-on-model-switch": "模型切換後，待發送圖片已自動清空"
   },
   "drawing": {
@@ -600,6 +603,9 @@
     "emptyPrompt": "在下方描述你想要的圖像，AI 將為你實現",
     "promptLabel": "圖像提示詞",
     "uploadReference": "上傳參考圖",
+    "uploadReferenceWithLimit": "上傳參考圖（最多 {{limit}} 張）",
+    "referenceLimitExceeded": "無法切換模型",
+    "referenceLimitExceededPrompt": "目前已上傳 {{count}} 張參考圖，{{model}} 最多支援 {{limit}} 張。請先刪除多餘參考圖。",
     "promptPlaceholder": "描述你想生成的圖像...",
     "tools": {
       "style": "風格",

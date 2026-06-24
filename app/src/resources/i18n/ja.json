@@ -495,6 +495,9 @@
     "uploading-prompt": "画像をアップロードしています。しばらくお待ちください",
     "image-only": "画像のみアップロードできます",
     "vision-model-required": "現在のモデルは画像認識に対応していません",
+    "max-count": "参照画像が多すぎます",
+    "max-count-prompt": "現在のモデルは最大 {{count}} 枚の画像に対応しています。余分な画像を削除してください。",
+    "max-count-reached": "現在のモデルの {{count}} 枚上限に達しました",
     "files-cleared-on-model-switch": "モデル切り替え後、送信する画像が自動的にクリアされました"
   },
   "drawing": {
@@ -512,6 +515,9 @@
     "emptyPrompt": "下に作りたい画像を説明すると、AI が生成します。",
     "promptLabel": "画像プロンプト",
     "uploadReference": "参照画像をアップロード",
+    "uploadReferenceWithLimit": "参照画像をアップロード（最大 {{limit}} 枚）",
+    "referenceLimitExceeded": "モデルを切り替えられません",
+    "referenceLimitExceededPrompt": "現在 {{count}} 枚の参照画像があります。{{model}} は最大 {{limit}} 枚まで対応しています。余分な参照画像を削除してください。",
     "promptPlaceholder": "生成したい画像を説明してください...",
     "tools": {
       "style": "スタイル",
