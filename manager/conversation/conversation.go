@@ -41,6 +41,8 @@ type Conversation struct {
 	LearningMode             bool              `json:"learning_mode"`
 	MemoryEnabled            bool              `json:"memory_enabled"`
 	MemoryHistoryEnabled     bool              `json:"memory_history_enabled"`
+	ResponseFormat           interface{}       `json:"-"`
+	Thinking                 interface{}       `json:"-"`
 
 	MaxTokens         *int     `json:"max_tokens,omitempty"`
 	Temperature       *float32 `json:"temperature,omitempty"`
@@ -52,25 +54,27 @@ type Conversation struct {
 }
 
 type FormMessage struct {
-	Type                    string `json:"type"`
-	Message                 string `json:"message"`
-	Web                     bool   `json:"web"`
-	WebSearch               bool   `json:"web_search"`
-	URLContext              bool   `json:"url_context"`
-	XSearch                 bool   `json:"x_search"`
-	Fetch                   bool   `json:"fetch"`
-	GeminiThinkingBudget    int    `json:"gemini_thinking_budget"`
-	DeepseekThinkingEnabled *bool  `json:"deepseek_thinking_enabled,omitempty"`
-	DeepseekReasoningEffort string `json:"deepseek_reasoning_effort"`
-	OpenAIReasoningEffort   string `json:"openai_reasoning_effort"`
-	OpenAIReasoningSummary  string `json:"openai_reasoning_summary"`
-	Model                   string `json:"model"`
-	IgnoreContext           bool   `json:"ignore_context"`
-	Context                 int    `json:"context"`
-	CustomInstruction       string `json:"custom_instruction,omitempty"`
-	LearningMode            bool   `json:"learning_mode"`
-	MemoryEnabled           bool   `json:"memory_enabled"`
-	MemoryHistoryEnabled    bool   `json:"memory_history_enabled"`
+	Type                    string      `json:"type"`
+	Message                 string      `json:"message"`
+	Web                     bool        `json:"web"`
+	WebSearch               bool        `json:"web_search"`
+	URLContext              bool        `json:"url_context"`
+	XSearch                 bool        `json:"x_search"`
+	Fetch                   bool        `json:"fetch"`
+	GeminiThinkingBudget    int         `json:"gemini_thinking_budget"`
+	DeepseekThinkingEnabled *bool       `json:"deepseek_thinking_enabled,omitempty"`
+	DeepseekReasoningEffort string      `json:"deepseek_reasoning_effort"`
+	OpenAIReasoningEffort   string      `json:"openai_reasoning_effort"`
+	OpenAIReasoningSummary  string      `json:"openai_reasoning_summary"`
+	Model                   string      `json:"model"`
+	IgnoreContext           bool        `json:"ignore_context"`
+	Context                 int         `json:"context"`
+	CustomInstruction       string      `json:"custom_instruction,omitempty"`
+	LearningMode            bool        `json:"learning_mode"`
+	MemoryEnabled           bool        `json:"memory_enabled"`
+	MemoryHistoryEnabled    bool        `json:"memory_history_enabled"`
+	ResponseFormat          interface{} `json:"response_format,omitempty"`
+	Thinking                interface{} `json:"thinking,omitempty"`
 
 	// request params
 	MaxTokens         *int     `json:"max_tokens,omitempty"`
@@ -176,6 +180,14 @@ func (c *Conversation) GetOpenAIReasoningSummary() string {
 	return strings.TrimSpace(strings.ToLower(c.OpenAIReasoningSummary))
 }
 
+func (c *Conversation) GetResponseFormat() interface{} {
+	return c.ResponseFormat
+}
+
+func (c *Conversation) GetThinking() interface{} {
+	return c.Thinking
+}
+
 func (c *Conversation) GetContextLength() int {
 	if c.Context <= 0 {
 		return defaultConversationContext
@@ -229,6 +241,14 @@ func (c *Conversation) SetOpenAIReasoningEffort(effort string) {
 
 func (c *Conversation) SetOpenAIReasoningSummary(summary string) {
 	c.OpenAIReasoningSummary = globals.NormalizeOpenAIResponsesReasoningSummary(summary)
+}
+
+func (c *Conversation) SetResponseFormat(format interface{}) {
+	c.ResponseFormat = format
+}
+
+func (c *Conversation) SetThinking(thinking interface{}) {
+	c.Thinking = thinking
 }
 
 func (c *Conversation) GetTemperature() *float32 {
@@ -543,6 +563,8 @@ func (c *Conversation) ApplyParam(form *FormMessage) {
 	c.SetLearningMode(form.LearningMode)
 	c.SetMemoryEnabled(form.MemoryEnabled)
 	c.SetMemoryHistoryEnabled(form.MemoryHistoryEnabled)
+	c.SetResponseFormat(form.ResponseFormat)
+	c.SetThinking(form.Thinking)
 
 	c.SetMaxTokens(form.MaxTokens)
 	c.SetTemperature(form.Temperature)

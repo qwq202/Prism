@@ -605,6 +605,17 @@
       "style": "風格",
       "ratio": "比例"
     },
+    "options": {
+      "title": "生成參數",
+      "aspectRatio": "比例",
+      "imageSize": "尺寸",
+      "mimeType": "格式",
+      "thinkingLevel": "思考",
+      "thinking": {
+        "minimal": "快速",
+        "high": "高品質"
+      }
+    },
     "advanced": "進階參數",
     "generateImage": "生成圖片",
     "addWorkspace": "新增工作區",

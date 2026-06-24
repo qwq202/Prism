@@ -517,6 +517,17 @@
       "style": "Style",
       "ratio": "Ratio"
     },
+    "options": {
+      "title": "Generation",
+      "aspectRatio": "Ratio",
+      "imageSize": "Size",
+      "mimeType": "Format",
+      "thinkingLevel": "Thinking",
+      "thinking": {
+        "minimal": "Fast",
+        "high": "High quality"
+      }
+    },
     "advanced": "Advanced settings",
     "generateImage": "Generate image",
     "addWorkspace": "Add workspace",

@@ -517,6 +517,17 @@
       "style": "Стиль",
       "ratio": "Формат"
     },
+    "options": {
+      "title": "Параметры генерации",
+      "aspectRatio": "Формат",
+      "imageSize": "Размер",
+      "mimeType": "Тип",
+      "thinkingLevel": "Рассуждение",
+      "thinking": {
+        "minimal": "Быстро",
+        "high": "Высокое качество"
+      }
+    },
     "advanced": "Дополнительные параметры",
     "generateImage": "Создать изображение",
     "addWorkspace": "Добавить рабочую область",

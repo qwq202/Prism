@@ -517,6 +517,17 @@
       "style": "スタイル",
       "ratio": "比率"
     },
+    "options": {
+      "title": "生成設定",
+      "aspectRatio": "比率",
+      "imageSize": "サイズ",
+      "mimeType": "形式",
+      "thinkingLevel": "思考",
+      "thinking": {
+        "minimal": "高速",
+        "high": "高品質"
+      }
+    },
     "advanced": "詳細設定",
     "generateImage": "画像を生成",
     "addWorkspace": "ワークスペースを追加",

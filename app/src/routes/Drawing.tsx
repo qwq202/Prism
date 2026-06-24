@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type ComponentType, useEffect, useMemo, useState } from "react";
 import {
   Wand2,
   Settings,
@@ -8,6 +8,10 @@ import {
   Ratio,
   Upload,
   ArrowUp,
+  Brain,
+  FileType2,
+  Image as ImageIcon,
+  Loader2,
 } from "lucide-react";
 import {
   Select,
@@ -20,17 +24,43 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/components/ui/lib/utils";
 import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
-import { selectSupportModels } from "@/store/chat.ts";
+import { selectSupportModels, useMessageActions } from "@/store/chat.ts";
 import { isDrawingModel } from "@/conf/model.ts";
 import ModelAvatar from "@/components/ModelAvatar.tsx";
 
 type Mode = "generate" | "edit";
+type GeminiImageAspectRatio =
+  | "1:1"
+  | "1:4"
+  | "1:8"
+  | "2:3"
+  | "3:2"
+  | "3:4"
+  | "4:1"
+  | "4:3"
+  | "4:5"
+  | "5:4"
+  | "8:1"
+  | "9:16"
+  | "16:9"
+  | "21:9";
+type GeminiImageSize = "512px" | "1K" | "2K" | "4K";
+type GeminiImageMimeType = "image/png" | "image/jpeg";
+type GeminiImageThinkingLevel = "minimal" | "high";
+
+type DrawingOptions = {
+  aspectRatio: GeminiImageAspectRatio;
+  imageSize: GeminiImageSize;
+  mimeType: GeminiImageMimeType;
+  thinkingLevel: GeminiImageThinkingLevel;
+};
 
 type DrawingWorkspace = {
   id: string;
   model: string;
   mode: Mode;
   prompt: string;
+  options: DrawingOptions;
   createdAt: number;
   accent: number;
 };
@@ -57,6 +87,33 @@ const WORKSPACE_ACCENTS = [
   },
 ];
 
+const DEFAULT_DRAWING_OPTIONS: DrawingOptions = {
+  aspectRatio: "1:1",
+  imageSize: "1K",
+  mimeType: "image/png",
+  thinkingLevel: "minimal",
+};
+
+const ASPECT_RATIO_OPTIONS: GeminiImageAspectRatio[] = [
+  "1:1",
+  "2:3",
+  "3:2",
+  "3:4",
+  "4:3",
+  "4:5",
+  "5:4",
+  "9:16",
+  "16:9",
+  "21:9",
+  "1:4",
+  "4:1",
+  "1:8",
+  "8:1",
+];
+const IMAGE_SIZE_OPTIONS: GeminiImageSize[] = ["512px", "1K", "2K", "4K"];
+const MIME_TYPE_OPTIONS: GeminiImageMimeType[] = ["image/png", "image/jpeg"];
+const THINKING_LEVEL_OPTIONS: GeminiImageThinkingLevel[] = ["minimal", "high"];
+
 function createWorkspaceId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -71,8 +128,44 @@ function createDrawingWorkspace(index = 0, model = ""): DrawingWorkspace {
     model,
     mode: "generate",
     prompt: "",
+    options: { ...DEFAULT_DRAWING_OPTIONS },
     createdAt: Date.now(),
     accent: index % WORKSPACE_ACCENTS.length,
+  };
+}
+
+function normalizeDrawingOptions(options?: Partial<DrawingOptions>): DrawingOptions {
+  return {
+    aspectRatio: ASPECT_RATIO_OPTIONS.includes(
+      options?.aspectRatio as GeminiImageAspectRatio,
+    )
+      ? (options?.aspectRatio as GeminiImageAspectRatio)
+      : DEFAULT_DRAWING_OPTIONS.aspectRatio,
+    imageSize: IMAGE_SIZE_OPTIONS.includes(options?.imageSize as GeminiImageSize)
+      ? (options?.imageSize as GeminiImageSize)
+      : DEFAULT_DRAWING_OPTIONS.imageSize,
+    mimeType: MIME_TYPE_OPTIONS.includes(options?.mimeType as GeminiImageMimeType)
+      ? (options?.mimeType as GeminiImageMimeType)
+      : DEFAULT_DRAWING_OPTIONS.mimeType,
+    thinkingLevel: THINKING_LEVEL_OPTIONS.includes(
+      options?.thinkingLevel as GeminiImageThinkingLevel,
+    )
+      ? (options?.thinkingLevel as GeminiImageThinkingLevel)
+      : DEFAULT_DRAWING_OPTIONS.thinkingLevel,
+  };
+}
+
+function buildDrawingRequestOptions(options: DrawingOptions) {
+  return {
+    response_format: {
+      type: "image",
+      mime_type: options.mimeType,
+      aspect_ratio: options.aspectRatio,
+      image_size: options.imageSize,
+    },
+    thinking: {
+      thinking_level: options.thinkingLevel,
+    },
   };
 }
 
@@ -108,6 +201,7 @@ function loadDrawingWorkspaces(): DrawingWorkspace[] {
           model: typeof workspace.model === "string" ? workspace.model : "",
           mode: workspace.mode === "edit" ? "edit" : "generate",
           prompt: typeof workspace.prompt === "string" ? workspace.prompt : "",
+          options: normalizeDrawingOptions(workspace.options),
           createdAt:
             typeof workspace.createdAt === "number" &&
             Number.isFinite(workspace.createdAt)
@@ -136,8 +230,48 @@ function loadActiveWorkspaceId() {
   return window.localStorage.getItem(DRAWING_ACTIVE_WORKSPACE_KEY) ?? "";
 }
 
+type DrawingOptionSelectProps<T extends string> = {
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  value: T;
+  options: T[];
+  getLabel?: (value: T) => string;
+  onChange: (value: T) => void;
+};
+
+function DrawingOptionSelect<T extends string>({
+  icon: Icon,
+  label,
+  value,
+  options,
+  getLabel,
+  onChange,
+}: DrawingOptionSelectProps<T>) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+        <Icon className="h-3 w-3" />
+        <span>{label}</span>
+      </div>
+      <Select value={value} onValueChange={(next) => onChange(next as T)}>
+        <SelectTrigger className="h-9 w-full border-border/60 bg-background/60 px-2.5 text-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option} value={option}>
+              {getLabel ? getLabel(option) : option}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 function Drawing() {
   const { t } = useTranslation();
+  const { send } = useMessageActions();
   const supportModels = useSelector(selectSupportModels);
   const [workspaces, setWorkspaces] = useState<DrawingWorkspace[]>(() =>
     loadDrawingWorkspaces(),
@@ -146,6 +280,7 @@ function Drawing() {
     loadActiveWorkspaceId(),
   );
   const [focused, setFocused] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const activeWorkspace =
     workspaces.find((workspace) => workspace.id === activeWorkspaceId) ??
     workspaces[0];
@@ -160,6 +295,7 @@ function Drawing() {
   const selectedDrawingModelId = selectedDrawingModel?.id ?? "";
   const mode = activeWorkspace?.mode ?? "generate";
   const prompt = activeWorkspace?.prompt ?? "";
+  const options = activeWorkspace?.options ?? DEFAULT_DRAWING_OPTIONS;
 
   useEffect(() => {
     const firstWorkspaceId = workspaces[0]?.id;
@@ -194,7 +330,9 @@ function Drawing() {
   }, [activeWorkspaceIdForStorage]);
 
   const updateActiveWorkspace = (
-    updates: Partial<Pick<DrawingWorkspace, "model" | "mode" | "prompt">>,
+    updates: Partial<
+      Pick<DrawingWorkspace, "model" | "mode" | "prompt" | "options">
+    >,
   ) => {
     if (!activeWorkspace) {
       return;
@@ -216,6 +354,33 @@ function Drawing() {
     );
     setWorkspaces((current) => [...current, workspace]);
     setActiveWorkspaceId(workspace.id);
+  };
+
+  const updateDrawingOptions = (updates: Partial<DrawingOptions>) => {
+    updateActiveWorkspace({
+      options: normalizeDrawingOptions({
+        ...options,
+        ...updates,
+      }),
+    });
+  };
+
+  const generateImage = async () => {
+    const text = prompt.trim();
+    if (!text || !selectedDrawingModelId || generating) {
+      return;
+    }
+
+    setGenerating(true);
+    try {
+      await send(
+        text,
+        selectedDrawingModelId,
+        buildDrawingRequestOptions(options),
+      );
+    } finally {
+      setGenerating(false);
+    }
   };
 
   return (
@@ -274,6 +439,53 @@ function Drawing() {
               <p className="text-xs leading-relaxed text-muted-foreground/70">
                 {t("drawing.noModels")}
               </p>
+            )}
+            {drawingModels.length > 0 && (
+              <div className="space-y-3 border-t border-border/60 pt-4">
+                <div className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+                  {t("drawing.options.title")}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <DrawingOptionSelect
+                    icon={Ratio}
+                    label={t("drawing.options.aspectRatio")}
+                    value={options.aspectRatio}
+                    options={ASPECT_RATIO_OPTIONS}
+                    onChange={(aspectRatio) =>
+                      updateDrawingOptions({ aspectRatio })
+                    }
+                  />
+                  <DrawingOptionSelect
+                    icon={ImageIcon}
+                    label={t("drawing.options.imageSize")}
+                    value={options.imageSize}
+                    options={IMAGE_SIZE_OPTIONS}
+                    onChange={(imageSize) => updateDrawingOptions({ imageSize })}
+                  />
+                  <DrawingOptionSelect
+                    icon={FileType2}
+                    label={t("drawing.options.mimeType")}
+                    value={options.mimeType}
+                    options={MIME_TYPE_OPTIONS}
+                    getLabel={(value) =>
+                      value === "image/jpeg" ? "JPEG" : "PNG"
+                    }
+                    onChange={(mimeType) => updateDrawingOptions({ mimeType })}
+                  />
+                  <DrawingOptionSelect
+                    icon={Brain}
+                    label={t("drawing.options.thinkingLevel")}
+                    value={options.thinkingLevel}
+                    options={THINKING_LEVEL_OPTIONS}
+                    getLabel={(value) =>
+                      t(`drawing.options.thinking.${value}`)
+                    }
+                    onChange={(thinkingLevel) =>
+                      updateDrawingOptions({ thinkingLevel })
+                    }
+                  />
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -388,17 +600,22 @@ function Drawing() {
               </div>
 
               <button
-                disabled={!prompt.trim()}
+                onClick={generateImage}
+                disabled={!prompt.trim() || !selectedDrawingModelId || generating}
                 className={cn(
                   "flex h-9 w-9 items-center justify-center rounded-full transition-all duration-150 shrink-0 select-none",
-                  prompt.trim()
+                  prompt.trim() && selectedDrawingModelId && !generating
                     ? "bg-foreground text-background hover:opacity-85 active:scale-[0.96] shadow-sm"
                     : "bg-muted/60 text-muted-foreground/40 cursor-not-allowed",
                 )}
                 aria-label={t("drawing.generateImage")}
                 title={t("drawing.generateImage")}
               >
-                <ArrowUp className="h-4 w-4" />
+                {generating ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ArrowUp className="h-4 w-4" />
+                )}
               </button>
             </div>
           </div>

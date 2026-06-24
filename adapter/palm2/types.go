@@ -33,6 +33,24 @@ type GeminiChatBody struct {
 	GenerationConfig  GeminiConfig      `json:"generationConfig"`
 }
 
+type GeminiInteractionBody struct {
+	Model            string                             `json:"model"`
+	Input            interface{}                        `json:"input"`
+	ResponseFormat   *GeminiInteractionResponseFormat   `json:"response_format,omitempty"`
+	GenerationConfig *GeminiInteractionGenerationConfig `json:"generation_config,omitempty"`
+}
+
+type GeminiInteractionResponseFormat struct {
+	Type        string `json:"type,omitempty"`
+	MimeType    string `json:"mime_type,omitempty"`
+	AspectRatio string `json:"aspect_ratio,omitempty"`
+	ImageSize   string `json:"image_size,omitempty"`
+}
+
+type GeminiInteractionGenerationConfig struct {
+	ThinkingLevel string `json:"thinking_level,omitempty"`
+}
+
 type GeminiConfig struct {
 	Temperature        *float32              `json:"temperature,omitempty"`
 	MaxOutputTokens    *int                  `json:"maxOutputTokens,omitempty"`
@@ -108,6 +126,36 @@ type GeminiCandidate struct {
 
 type GeminiChatResponse struct {
 	Candidates []GeminiCandidate `json:"candidates"`
+}
+
+type GeminiInteractionImage struct {
+	Data          string `json:"data,omitempty"`
+	MimeType      string `json:"mime_type,omitempty"`
+	MimeTypeCamel string `json:"mimeType,omitempty"`
+	URL           string `json:"url,omitempty"`
+}
+
+type GeminiInteractionContent struct {
+	Type          string `json:"type,omitempty"`
+	Text          string `json:"text,omitempty"`
+	Data          string `json:"data,omitempty"`
+	MimeType      string `json:"mime_type,omitempty"`
+	MimeTypeCamel string `json:"mimeType,omitempty"`
+	URL           string `json:"url,omitempty"`
+}
+
+type GeminiInteractionStep struct {
+	Type    string                     `json:"type,omitempty"`
+	Content []GeminiInteractionContent `json:"content,omitempty"`
+}
+
+type GeminiInteractionResponse struct {
+	OutputText      string                     `json:"output_text,omitempty"`
+	Text            string                     `json:"text,omitempty"`
+	OutputImage     *GeminiInteractionImage    `json:"output_image,omitempty"`
+	GeneratedImages []GeminiInteractionImage   `json:"generated_images,omitempty"`
+	Output          []GeminiInteractionContent `json:"output,omitempty"`
+	Steps           []GeminiInteractionStep    `json:"steps,omitempty"`
 }
 
 type GeminiChatErrorResponse struct {

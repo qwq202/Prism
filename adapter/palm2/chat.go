@@ -7,12 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 )
 
 var geminiMaxImages = 16
 
 const defaultVertexAIExpressEndpoint = "https://aiplatform.googleapis.com"
+const defaultGeminiInteractionAPIVersion = "v1beta"
 
 func getGeminiAPIVersion(model string) string {
 	if strings.Contains(model, "preview") || strings.Contains(model, "exp") || strings.Contains(model, "latest") {
@@ -67,9 +69,25 @@ func (c *ChatInstance) GetVertexAIExpressChatEndpoint(model string, stream bool)
 	)
 }
 
+func (c *ChatInstance) useGeminiInteractions(model string) bool {
+	return !c.VertexAIExpress && globals.IsGeminiImageGenerationModel(model)
+}
+
+func (c *ChatInstance) GetGeminiInteractionsEndpoint() string {
+	return fmt.Sprintf(
+		"%s/%s/interactions",
+		strings.TrimRight(strings.TrimSpace(c.Endpoint), "/"),
+		defaultGeminiInteractionAPIVersion,
+	)
+}
+
 func (c *ChatInstance) GetChatEndpoint(model string, stream bool) string {
 	if c.VertexAIExpress {
 		return c.GetVertexAIExpressChatEndpoint(model, stream)
+	}
+
+	if c.useGeminiInteractions(model) {
+		return c.GetGeminiInteractionsEndpoint()
 	}
 
 	if model == globals.ChatBison001 {
@@ -140,6 +158,134 @@ func (c *ChatInstance) GetGeminiChatBody(props *adaptercommon.ChatProps) *Gemini
 	}
 }
 
+func getStringFromMap(data interface{}, keys ...string) string {
+	values, ok := data.(map[string]interface{})
+	if !ok {
+		return ""
+	}
+
+	for _, key := range keys {
+		if value, ok := values[key]; ok {
+			if text, ok := value.(string); ok {
+				return strings.TrimSpace(text)
+			}
+		}
+	}
+
+	return ""
+}
+
+func normalizeGeminiInteractionMimeType(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "image/jpeg", "image/jpg", "jpeg", "jpg":
+		return "image/jpeg"
+	default:
+		return "image/png"
+	}
+}
+
+func normalizeGeminiInteractionAspectRatio(value string) string {
+	normalized := strings.TrimSpace(value)
+	if normalized == "" {
+		return "1:1"
+	}
+
+	allowed := map[string]bool{
+		"1:1": true, "1:4": true, "1:8": true, "2:3": true,
+		"3:2": true, "3:4": true, "4:1": true, "4:3": true,
+		"4:5": true, "5:4": true, "8:1": true, "9:16": true,
+		"16:9": true, "21:9": true,
+	}
+	if allowed[normalized] {
+		return normalized
+	}
+
+	return "1:1"
+}
+
+func normalizeGeminiInteractionImageSize(value string) string {
+	normalized := strings.ToUpper(strings.TrimSpace(value))
+	switch normalized {
+	case "512", "512PX", "0.5K":
+		return "512px"
+	case "1K", "2K", "4K":
+		return normalized
+	default:
+		return "1K"
+	}
+}
+
+func normalizeGeminiInteractionThinkingLevel(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "high":
+		return "high"
+	case "minimal":
+		return "minimal"
+	default:
+		return ""
+	}
+}
+
+func getGeminiInteractionResponseFormat(props *adaptercommon.ChatProps) *GeminiInteractionResponseFormat {
+	responseFormat := &GeminiInteractionResponseFormat{
+		Type:        "image",
+		MimeType:    "image/png",
+		AspectRatio: "1:1",
+		ImageSize:   "1K",
+	}
+	if props == nil || props.ResponseFormat == nil {
+		return responseFormat
+	}
+
+	responseFormat.Type = strings.ToLower(strings.TrimSpace(getStringFromMap(props.ResponseFormat, "type")))
+	if responseFormat.Type != "image" {
+		responseFormat.Type = "image"
+	}
+	responseFormat.MimeType = normalizeGeminiInteractionMimeType(getStringFromMap(props.ResponseFormat, "mime_type", "mimeType"))
+	responseFormat.AspectRatio = normalizeGeminiInteractionAspectRatio(getStringFromMap(props.ResponseFormat, "aspect_ratio", "aspectRatio"))
+	responseFormat.ImageSize = normalizeGeminiInteractionImageSize(getStringFromMap(props.ResponseFormat, "image_size", "imageSize"))
+
+	return responseFormat
+}
+
+func getGeminiInteractionGenerationConfig(props *adaptercommon.ChatProps) *GeminiInteractionGenerationConfig {
+	if props == nil || props.Thinking == nil {
+		return nil
+	}
+
+	level := normalizeGeminiInteractionThinkingLevel(getStringFromMap(props.Thinking, "thinking_level", "thinkingLevel"))
+	if level == "" {
+		return nil
+	}
+
+	return &GeminiInteractionGenerationConfig{ThinkingLevel: level}
+}
+
+var markdownImagePattern = regexp.MustCompile(`!\[[^\]]*\]\([^)]+\)`)
+
+func getGeminiInteractionInput(props *adaptercommon.ChatProps) string {
+	if props == nil || len(props.Message) == 0 {
+		return ""
+	}
+
+	prompt := strings.TrimSpace(props.Message[len(props.Message)-1].Content)
+	textOnly := strings.TrimSpace(markdownImagePattern.ReplaceAllString(prompt, ""))
+	if textOnly != "" {
+		return textOnly
+	}
+
+	return prompt
+}
+
+func (c *ChatInstance) GetGeminiInteractionBody(props *adaptercommon.ChatProps) *GeminiInteractionBody {
+	return &GeminiInteractionBody{
+		Model:            props.Model,
+		Input:            getGeminiInteractionInput(props),
+		ResponseFormat:   getGeminiInteractionResponseFormat(props),
+		GenerationConfig: getGeminiInteractionGenerationConfig(props),
+	}
+}
+
 func (c *ChatInstance) GetPalm2ChatResponse(data interface{}) (string, error) {
 	if form := utils.MapToStruct[PalmChatResponse](data); form != nil {
 		if len(form.Candidates) == 0 {
@@ -148,6 +294,106 @@ func (c *ChatInstance) GetPalm2ChatResponse(data interface{}) (string, error) {
 		return form.Candidates[0].Content, nil
 	}
 	return "", fmt.Errorf("palm2 error: cannot parse response")
+}
+
+func appendGeminiInteractionImage(builder *strings.Builder, image GeminiInteractionImage) {
+	data := strings.TrimSpace(image.Data)
+	url := strings.TrimSpace(image.URL)
+	if data == "" && url == "" {
+		return
+	}
+
+	if builder.Len() > 0 {
+		builder.WriteString("\n\n")
+	}
+
+	if url != "" {
+		builder.WriteString("![image](")
+		builder.WriteString(url)
+		builder.WriteString(")")
+		return
+	}
+
+	mimeType := strings.TrimSpace(image.MimeType)
+	if mimeType == "" {
+		mimeType = strings.TrimSpace(image.MimeTypeCamel)
+	}
+	if mimeType == "" {
+		mimeType = "image/png"
+	}
+
+	builder.WriteString("![image](data:")
+	builder.WriteString(mimeType)
+	builder.WriteString(";base64,")
+	builder.WriteString(data)
+	builder.WriteString(")")
+}
+
+func appendGeminiInteractionContent(builder *strings.Builder, content GeminiInteractionContent) {
+	contentType := strings.ToLower(strings.TrimSpace(content.Type))
+	text := strings.TrimSpace(content.Text)
+	if text != "" && (contentType == "" || strings.Contains(contentType, "text")) {
+		if builder.Len() > 0 {
+			builder.WriteString("\n\n")
+		}
+		builder.WriteString(text)
+		return
+	}
+
+	if content.Data != "" || content.URL != "" || strings.Contains(contentType, "image") {
+		appendGeminiInteractionImage(builder, GeminiInteractionImage{
+			Data:          content.Data,
+			MimeType:      content.MimeType,
+			MimeTypeCamel: content.MimeTypeCamel,
+			URL:           content.URL,
+		})
+	}
+}
+
+func (c *ChatInstance) GetGeminiInteractionChunk(data interface{}) (*globals.Chunk, error) {
+	if form := utils.MapToStruct[GeminiInteractionResponse](data); form != nil {
+		var builder strings.Builder
+		for _, output := range form.Output {
+			appendGeminiInteractionContent(&builder, output)
+		}
+		for _, step := range form.Steps {
+			if step.Type != "" && !strings.Contains(strings.ToLower(step.Type), "output") {
+				continue
+			}
+			for _, content := range step.Content {
+				appendGeminiInteractionContent(&builder, content)
+			}
+		}
+		if strings.TrimSpace(form.OutputText) != "" {
+			if builder.Len() > 0 {
+				builder.WriteString("\n\n")
+			}
+			builder.WriteString(strings.TrimSpace(form.OutputText))
+		}
+		if strings.TrimSpace(form.Text) != "" {
+			if builder.Len() > 0 {
+				builder.WriteString("\n\n")
+			}
+			builder.WriteString(strings.TrimSpace(form.Text))
+		}
+		if form.OutputImage != nil {
+			appendGeminiInteractionImage(&builder, *form.OutputImage)
+		}
+		for _, image := range form.GeneratedImages {
+			appendGeminiInteractionImage(&builder, image)
+		}
+
+		content := strings.TrimSpace(builder.String())
+		if content != "" {
+			return &globals.Chunk{Content: content}, nil
+		}
+	}
+
+	if form := utils.MapToStruct[GeminiChatErrorResponse](data); form != nil {
+		return nil, fmt.Errorf("gemini error: %s (code: %d, status: %s)", form.Error.Message, form.Error.Code, form.Error.Status)
+	}
+
+	return nil, fmt.Errorf("gemini interactions: cannot parse response")
 }
 
 func (c *ChatInstance) buildGeminiChunk(model string, parts []GeminiChatPart, stream bool) *globals.Chunk {
@@ -296,6 +542,19 @@ func (c *ChatInstance) CreateStreamChatRequest(props *adaptercommon.ChatProps, c
 }
 
 func (c *ChatInstance) CreateGeminiChatRequest(props *adaptercommon.ChatProps) (*globals.Chunk, error) {
+	if c.useGeminiInteractions(props.Model) {
+		data, err := utils.Post(c.GetGeminiInteractionsEndpoint(), map[string]string{
+			"Content-Type":   "application/json",
+			"x-goog-api-key": c.ApiKey,
+		}, c.GetGeminiInteractionBody(props), props.Proxy)
+
+		if err != nil {
+			return nil, fmt.Errorf("gemini interactions error: %s", err.Error())
+		}
+
+		return c.GetGeminiInteractionChunk(data)
+	}
+
 	data, err := utils.Post(c.GetChatEndpoint(props.Model, false), map[string]string{
 		"Content-Type": "application/json",
 	}, c.GetGeminiChatBody(props), props.Proxy)

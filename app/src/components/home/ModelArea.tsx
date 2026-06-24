@@ -4,9 +4,9 @@ import SelectGroup, {
 } from "@/components/SelectGroup.tsx";
 import {
   selectCurrent,
+  selectChatSupportModels,
   selectModel,
   selectModelList,
-  selectSupportModels,
   setModel,
 } from "@/store/chat.ts";
 import { useTranslation } from "react-i18next";
@@ -128,7 +128,7 @@ export default function ModelFinder(props: ModelSelectorProps) {
   const list = useSelector(selectModelList);
   const currentConversationId = useSelector(selectCurrent);
 
-  const supportModels = useSelector(selectSupportModels);
+  const supportModels = useSelector(selectChatSupportModels);
   const subscriptionData = useSelector(subscriptionDataSelector);
 
   const syncConversationModel = useCallback(async (value: string) => {
@@ -222,7 +222,7 @@ export function ModelArea() {
   const level = useSelector(levelSelector);
   const currentConversationId = useSelector(selectCurrent);
 
-  const supportModels = useSelector(selectSupportModels);
+  const supportModels = useSelector(selectChatSupportModels);
   const modelList = useSelector(selectModelList);
   const subscriptionData = useSelector(subscriptionDataSelector);
 

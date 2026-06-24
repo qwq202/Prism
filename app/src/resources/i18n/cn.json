@@ -753,6 +753,17 @@
       "style": "风格",
       "ratio": "比例"
     },
+    "options": {
+      "title": "生成参数",
+      "aspectRatio": "比例",
+      "imageSize": "尺寸",
+      "mimeType": "格式",
+      "thinkingLevel": "思考",
+      "thinking": {
+        "minimal": "快速",
+        "high": "高质量"
+      }
+    },
     "advanced": "高级参数",
     "generateImage": "生成图片",
     "addWorkspace": "新增工作区",

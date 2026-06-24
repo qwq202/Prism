@@ -636,6 +636,9 @@ func buildChatProps(
 	if thinking == nil {
 		thinking, reasoningEffort = buildDeepseekThinkingConfig(instance, model)
 	}
+	if instance.GetThinking() != nil {
+		thinking = instance.GetThinking()
+	}
 
 	return adaptercommon.CreateChatProps(&adaptercommon.ChatProps{
 		Model:                model,
@@ -649,6 +652,7 @@ func buildChatProps(
 		MemoryHistoryEnabled: instance.IsMemoryHistoryEnabled(),
 		Tools:                tools,
 		ToolChoice:           toolChoice,
+		ResponseFormat:       instance.GetResponseFormat(),
 		EnableWeb:            instance.IsEnableWeb(),
 		EnableWebSearch:      instance.IsEnableWebSearch(),
 		EnableURLContext:     instance.IsEnableURLContext(),
@@ -1425,6 +1429,8 @@ func createChatTask(
 			Model:                model,
 			Message:              segment,
 			CustomInstruction:    instance.GetCustomInstruction(),
+			ResponseFormat:       instance.GetResponseFormat(),
+			Thinking:             instance.GetThinking(),
 			EnableWeb:            instance.IsEnableWeb(),
 			EnableWebSearch:      instance.IsEnableWebSearch(),
 			EnableURLContext:     instance.IsEnableURLContext(),

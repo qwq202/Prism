@@ -65,6 +65,8 @@ export type ChatProps = {
   deepseek_reasoning_effort?: string;
   openai_reasoning_effort?: string;
   openai_reasoning_summary?: string;
+  response_format?: unknown;
+  thinking?: unknown;
   web_search_mode?: "quick" | "detailed";
   web_page_summary?: boolean;
   think?: boolean;
@@ -117,6 +119,8 @@ function summarizeChatProps(data: ChatProps): Record<string, unknown> {
     deepseek_reasoning_effort: data.deepseek_reasoning_effort,
     openai_reasoning_effort: data.openai_reasoning_effort,
     openai_reasoning_summary: data.openai_reasoning_summary,
+    has_response_format: Boolean(data.response_format),
+    has_thinking: Boolean(data.thinking),
     enable_mcp: data.enable_mcp,
     mcp_plugin_id: data.mcp_plugin_id,
   };
@@ -256,9 +260,7 @@ export class Connection {
     this.init();
   }
 
-  public send(
-    data: Record<string, string | boolean | number | undefined>,
-  ): boolean {
+  public send(data: Record<string, unknown>): boolean {
     if (!this.connection || this.connection.readyState !== WebSocket.OPEN) {
       this.state = false;
       if (
@@ -271,15 +273,15 @@ export class Connection {
       logClientEvent("chat.websocket", "send-not-ready", {
         id: this.id,
         ready_state: this.connection?.readyState,
-        type: data.type,
+        type: typeof data.type === "string" ? data.type : undefined,
       });
       return false;
     }
     this.connection.send(JSON.stringify(data));
     logClientEvent("chat.websocket", "send", {
       id: this.id,
-      type: data.type ?? "auth",
-      model: data.model,
+      type: typeof data.type === "string" ? data.type : "auth",
+      model: typeof data.model === "string" ? data.model : undefined,
       message_length:
         typeof data.message === "string" ? data.message.length : undefined,
     });

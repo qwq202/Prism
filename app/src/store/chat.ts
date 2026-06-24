@@ -22,6 +22,7 @@ import {
   loadPreferenceModels,
   setOfflineModels,
 } from "@/conf/storage.ts";
+import { isDrawingModel } from "@/conf/model.ts";
 import {
   deleteConversation as doDeleteConversation,
   deleteAllConversations as doDeleteAllConversations,
@@ -47,7 +48,7 @@ import { CustomMask, Mask } from "@/masks/types.ts";
 import { listMasks } from "@/api/mask.ts";
 import { useDispatch, useSelector } from "react-redux";
 import { useMemo } from "react";
-import { ConnectionStack, StreamMessage } from "@/api/connection.ts";
+import { ChatProps, ConnectionStack, StreamMessage } from "@/api/connection.ts";
 import { useTranslation } from "react-i18next";
 import {
   buildPersonalizationInstruction,
@@ -503,19 +504,29 @@ export function inModel(supportModels: Model[], model: string): boolean {
   );
 }
 
+export function getChatSupportModels(supportModels: Model[]): Model[] {
+  return supportModels.filter((item) => !isDrawingModel(item));
+}
+
+export function inChatModel(supportModels: Model[], model: string): boolean {
+  return inModel(getChatSupportModels(supportModels), model);
+}
+
 export function getModel(
   supportModels: Model[],
   model: string | undefined | null,
 ): string {
-  if (supportModels.length === 0) return "";
-  return model && inModel(supportModels, model) ? model : supportModels[0].id;
+  const chatModels = getChatSupportModels(supportModels);
+  if (chatModels.length === 0) return "";
+  return model && inModel(chatModels, model) ? model : chatModels[0].id;
 }
 
 export function getModelList(
   supportModels: Model[],
   models: string[],
 ): string[] {
-  return models.filter((item) => inModel(supportModels, item));
+  const chatModels = getChatSupportModels(supportModels);
+  return models.filter((item) => inModel(chatModels, item));
 }
 
 export function isGeminiModelId(model: string | undefined | null): boolean {
@@ -1352,7 +1363,7 @@ const chatSlice = createSlice({
     setModel: (state, action) => {
       const model = action.payload as string;
       if (!model || model === "") return;
-      if (!inModel(state.support_models, model)) return;
+      if (!inChatModel(state.support_models, model)) return;
 
       // if model is not in model list, add it
       // if (!state.model_list.includes(model)) {
@@ -1460,7 +1471,7 @@ const chatSlice = createSlice({
       if (!conversation) return;
       if (
         conversation.model &&
-        inModel(state.support_models, conversation.model)
+        inChatModel(state.support_models, conversation.model)
       ) {
         state.model = conversation.model;
       }
@@ -1474,7 +1485,7 @@ const chatSlice = createSlice({
       const conversation = state.conversations[current];
       if (
         conversation?.model &&
-        inModel(state.support_models, conversation.model)
+        inChatModel(state.support_models, conversation.model)
       ) {
         state.model = conversation.model;
       }
@@ -1488,14 +1499,14 @@ const chatSlice = createSlice({
     setModelList: (state, action) => {
       const models = action.payload as string[];
       state.model_list = models.filter((item) =>
-        inModel(state.support_models, item),
+        inChatModel(state.support_models, item),
       );
       setArrayMemory("model_mark_list", state.model_list);
     },
     addModelList: (state, action) => {
       const model = action.payload as string;
       if (
-        inModel(state.support_models, model) &&
+        inChatModel(state.support_models, model) &&
         !state.model_list.includes(model)
       ) {
         state.model_list.push(model);
@@ -1505,7 +1516,7 @@ const chatSlice = createSlice({
     removeModelList: (state, action) => {
       const model = action.payload as string;
       if (
-        inModel(state.support_models, model) &&
+        inChatModel(state.support_models, model) &&
         state.model_list.includes(model)
       ) {
         state.model_list = state.model_list.filter((item) => item !== model);
@@ -1525,7 +1536,7 @@ const chatSlice = createSlice({
       };
       if (mask.model) {
         nextConversation.model = mask.model;
-        if (inModel(state.support_models, mask.model)) {
+        if (inChatModel(state.support_models, mask.model)) {
           state.model = mask.model;
           setMemory("model", mask.model);
         }
@@ -1550,7 +1561,7 @@ const chatSlice = createSlice({
       const maskedModel =
         state.current === -1 ? state.conversations[-1]?.model : undefined;
       const preferredModel =
-        maskedModel && inModel(models, maskedModel)
+        maskedModel && inChatModel(models, maskedModel)
           ? maskedModel
           : getMemory("model");
 
@@ -1670,6 +1681,8 @@ export const selectCustomMasks = (state: RootState): CustomMask[] =>
   state.chat.custom_masks;
 export const selectSupportModels = (state: RootState): Model[] =>
   state.chat.support_models;
+export const selectChatSupportModels = (state: RootState): Model[] =>
+  getChatSupportModels(state.chat.support_models);
 export const selectMaskItem = (state: RootState): Mask | null =>
   state.chat.mask_item;
 
@@ -1974,6 +1987,7 @@ export function useMessageActions() {
   const openai_reasoning_effort = useSelector(selectOpenAIReasoningEffort);
   const openai_reasoning_summary = useSelector(selectOpenAIReasoningSummary);
   const support_models = useSelector(selectSupportModels);
+  const chat_support_models = useSelector(selectChatSupportModels);
   const history = useSelector(historySelector);
   const context = useSelector(contextSelector);
   const max_tokens = useSelector(maxTokensSelector);
@@ -2010,7 +2024,11 @@ export function useMessageActions() {
   });
 
   return {
-    send: async (message: string, using_model?: string) => {
+    send: async (
+      message: string,
+      using_model?: string,
+      requestOptions?: Pick<ChatProps, "response_format" | "thinking">,
+    ) => {
       if (conversationLoading) {
         logClientEvent(
           "chat.action",
@@ -2028,7 +2046,7 @@ export function useMessageActions() {
         current === -1 ? conversations[-1]?.model : undefined;
       const targetModel =
         using_model ||
-        (conversationModel && inModel(support_models, conversationModel)
+        (conversationModel && inModel(chat_support_models, conversationModel)
           ? conversationModel
           : model);
       const enableGeminiNativeWeb = isGeminiModelId(targetModel);
@@ -2111,6 +2129,8 @@ export function useMessageActions() {
         openai_reasoning_summary: openAIReasoningCapabilities.reasoningSummary
           ? openai_reasoning_summary
           : undefined,
+        has_response_format: Boolean(requestOptions?.response_format),
+        has_thinking: Boolean(requestOptions?.thinking),
       };
 
       logClientEvent("chat.action", "send-start", requestSummary);
@@ -2161,6 +2181,8 @@ export function useMessageActions() {
         openai_reasoning_summary: openAIReasoningCapabilities.reasoningSummary
           ? openai_reasoning_summary
           : undefined,
+        response_format: requestOptions?.response_format,
+        thinking: requestOptions?.thinking,
         model: targetModel,
         context: history,
         ignore_context: !context,
