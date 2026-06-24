@@ -27,6 +27,7 @@ import { useSelector } from "react-redux";
 import { selectSupportModels, useMessageActions } from "@/store/chat.ts";
 import { isDrawingModel } from "@/conf/model.ts";
 import ModelAvatar from "@/components/ModelAvatar.tsx";
+import { useSearchParams } from "react-router-dom";
 
 type Mode = "generate" | "edit";
 type GeminiImageAspectRatio =
@@ -366,6 +367,8 @@ function Drawing() {
   const { t } = useTranslation();
   const { send } = useMessageActions();
   const supportModels = useSelector(selectSupportModels);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedDrawingModelId = searchParams.get("model")?.trim() ?? "";
   const [workspaces, setWorkspaces] = useState<DrawingWorkspace[]>(() =>
     loadDrawingWorkspaces(),
   );
@@ -407,6 +410,47 @@ function Drawing() {
       setActiveWorkspaceId(firstWorkspaceId);
     }
   }, [activeWorkspaceId, workspaces]);
+
+  useEffect(() => {
+    if (!requestedDrawingModelId || !activeWorkspace) {
+      return;
+    }
+    if (drawingModels.length === 0) {
+      return;
+    }
+
+    const requestedModel = drawingModels.find(
+      (model) => model.id === requestedDrawingModelId,
+    );
+    if (requestedModel) {
+      const capabilities = getDrawingModelCapabilities(requestedModel.id);
+      setWorkspaces((current) =>
+        current.map((workspace) =>
+          workspace.id === activeWorkspace.id
+            ? {
+                ...workspace,
+                model: requestedModel.id,
+                options: normalizeDrawingOptions(
+                  workspace.options,
+                  capabilities,
+                ),
+              }
+            : workspace,
+        ),
+      );
+      setActiveWorkspaceId(activeWorkspace.id);
+    }
+
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.delete("model");
+    setSearchParams(nextSearchParams, { replace: true });
+  }, [
+    activeWorkspace,
+    drawingModels,
+    requestedDrawingModelId,
+    searchParams,
+    setSearchParams,
+  ]);
 
   useEffect(() => {
     if (typeof window === "undefined") {

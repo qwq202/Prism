@@ -47,7 +47,7 @@ import { goAuth } from "@/utils/app.ts";
 import { cn } from "@/components/ui/lib/utils.ts";
 import { includingModelFromPlan } from "@/conf/subscription.tsx";
 import { subscriptionDataSelector } from "@/store/globals.ts";
-import { getResolvedModelTags } from "@/conf/model.ts";
+import { getResolvedModelTags, isDrawingModel } from "@/conf/model.ts";
 import {
   ChargeBaseProps,
   nonBilling,
@@ -1008,6 +1008,13 @@ function ModelDetailPanel({
       });
       return;
     }
+
+    if (isDrawingModel(model)) {
+      router.navigate(`/drawing?model=${encodeURIComponent(model.id)}`);
+      onClose();
+      return;
+    }
+
     dispatch(setModel(model.id));
     router.navigate("/");
     onClose();
