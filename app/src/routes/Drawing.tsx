@@ -41,6 +41,7 @@ import FileProvider, {
 import type { FileArray } from "@/api/file.ts";
 import { formatMessage } from "@/utils/processor.ts";
 import { toast } from "sonner";
+import { blobEvent, filePanelEvent } from "@/events/blob.ts";
 
 type Mode = "generate" | "edit";
 type GeminiImageAspectRatio =
@@ -200,6 +201,25 @@ function drawingFileReducer(
     default:
       return state;
   }
+}
+
+function hasDraggedFiles(dataTransfer: DataTransfer | null): boolean {
+  return Boolean(
+    dataTransfer && Array.from(dataTransfer.types).includes("Files"),
+  );
+}
+
+function getDroppedFiles(dataTransfer: DataTransfer | null): File[] {
+  if (!dataTransfer) return [];
+
+  const filesFromItems = Array.from(dataTransfer.items ?? [])
+    .filter((item) => item.kind === "file")
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => Boolean(file));
+
+  return filesFromItems.length
+    ? filesFromItems
+    : Array.from(dataTransfer.files ?? []);
 }
 
 function hasStringOption<T extends string>(
@@ -468,6 +488,47 @@ function Drawing() {
   const uploadReferenceTitle = t("drawing.uploadReferenceWithLimit", {
     limit: referenceImageLimit,
   });
+
+  useEffect(() => {
+    const openReferencePanel = (event: DragEvent) => {
+      if (!hasDraggedFiles(event.dataTransfer)) return false;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+      filePanelEvent.emit(undefined);
+      return true;
+    };
+
+    const handleDragEnter = (event: DragEvent) => {
+      openReferencePanel(event);
+    };
+
+    const handleDragOver = (event: DragEvent) => {
+      openReferencePanel(event);
+    };
+
+    const handleDrop = (event: DragEvent) => {
+      if (event.defaultPrevented || !hasDraggedFiles(event.dataTransfer)) {
+        return;
+      }
+      event.preventDefault();
+
+      const droppedFiles = getDroppedFiles(event.dataTransfer);
+      if (droppedFiles.length > 0) {
+        blobEvent.emit(droppedFiles);
+      }
+    };
+
+    window.addEventListener("dragenter", handleDragEnter);
+    window.addEventListener("dragover", handleDragOver);
+    window.addEventListener("drop", handleDrop);
+
+    return () => {
+      window.removeEventListener("dragenter", handleDragEnter);
+      window.removeEventListener("dragover", handleDragOver);
+      window.removeEventListener("drop", handleDrop);
+    };
+  }, []);
+
   useEffect(() => {
     const firstWorkspaceId = workspaces[0]?.id;
     if (
