@@ -2,10 +2,15 @@ import { useEffect, useState } from "react";
 import { addEventListeners } from "@/utils/dom.ts";
 
 export let mobile = isMobile();
+export let phone = isPhone();
 
-window.addEventListener("resize", () => {
+function updateDeviceFlags() {
   mobile = isMobile();
-});
+  phone = isPhone();
+}
+
+window.addEventListener("resize", updateDeviceFlags);
+window.addEventListener("orientationchange", updateDeviceFlags);
 
 export function isMobile(): boolean {
   return (
@@ -17,6 +22,31 @@ export function isMobile(): boolean {
     navigator.userAgent.includes("iPad") ||
     navigator.userAgent.includes("iPod") ||
     navigator.userAgent.includes("Watch")
+  );
+}
+
+function isIPadLike(): boolean {
+  return (
+    navigator.userAgent.includes("iPad") ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
+
+export function isPhone(): boolean {
+  const width = document.documentElement.clientWidth || window.innerWidth;
+  const height = document.documentElement.clientHeight || window.innerHeight;
+  const userAgent = navigator.userAgent;
+
+  if (isIPadLike()) return false;
+
+  return (
+    width <= 668 ||
+    height <= 468 ||
+    userAgent.includes("iPhone") ||
+    userAgent.includes("iPod") ||
+    userAgent.includes("Watch") ||
+    (userAgent.includes("Android") && userAgent.includes("Mobile")) ||
+    (userAgent.includes("Mobile") && !userAgent.includes("iPad"))
   );
 }
 

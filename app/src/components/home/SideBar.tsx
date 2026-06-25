@@ -15,7 +15,7 @@ import {
   useEffectAsync,
   useAnimation as animateElement,
 } from "@/utils/hook.ts";
-import { mobile, openWindow } from "@/utils/device.ts";
+import { openWindow, phone } from "@/utils/device.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { selectMenu, setMenu } from "@/store/menu.ts";
 import {
@@ -128,7 +128,7 @@ function SidebarAction({
             size={`icon`}
             onClick={async () => {
               await toggle(-1);
-              if (mobile) dispatch(setMenu(false));
+              if (phone) dispatch(setMenu(false));
             }}
           >
             {current === -1 && mask ? (

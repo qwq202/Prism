@@ -1,11 +1,11 @@
 import { createSlice } from "@reduxjs/toolkit";
-import { mobile } from "@/utils/device.ts";
+import { phone } from "@/utils/device.ts";
 import { RootState } from "@/store/index.ts";
 
 export const menuSlice = createSlice({
   name: "menu",
   initialState: {
-    open: !mobile, // mobile: false, desktop: true
+    open: !phone, // phone: false, tablet/desktop: true
   },
   reducers: {
     toggleMenu: (state) => {
