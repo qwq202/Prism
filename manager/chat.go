@@ -556,6 +556,7 @@ func syncBufferChannel(target *utils.Buffer, source *utils.Buffer) {
 	}
 
 	target.SetChannel(source.GetChannelId(), source.GetChannelName())
+	target.SetPromptCache(source.GetPromptCache())
 }
 
 func signalInterrupt(interruptSignal chan error, err error) {

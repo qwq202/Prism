@@ -388,6 +388,18 @@ function CacheUsageBadges({ record }: { record: BillingRecord }) {
           {t("record.cache-write-short", { tokens: usage.writeTokens })}
         </Badge>
       )}
+      {usage.promptCache && !usage.hasCacheUsage && (
+        <Badge variant="outline" className="text-[10px] font-medium">
+          {usage.promptCache.status === "below_threshold"
+            ? t("record.cache-below-threshold-short", {
+                tokens: usage.promptCache.promptTokens,
+                threshold: usage.promptCache.thresholdTokens,
+              })
+            : usage.promptCache.status === "manual"
+              ? t("record.cache-manual-short")
+              : t("record.cache-attempted-short")}
+        </Badge>
+      )}
     </div>
   );
 }

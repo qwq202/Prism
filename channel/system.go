@@ -21,20 +21,20 @@ var saveSystemConfig = func(config *SystemConfig) error {
 var serverRuntimeID = fmt.Sprintf("%d", time.Now().UnixNano())
 
 type ApiInfo struct {
-	Title        string   `json:"title"`
-	Logo         string   `json:"logo"`
-	File         string   `json:"file"`
-	Docs         string   `json:"docs"`
-	TimeZone     string   `json:"timezone"`
-	Announcement string   `json:"announcement"`
-	BuyLink      string   `json:"buy_link"`
-	Contact      string   `json:"contact"`
-	Footer       string   `json:"footer"`
-	AuthFooter   bool     `json:"auth_footer"`
-	Mail         bool     `json:"mail"`
-	WebSearch    bool     `json:"web_search"`
-	HasTaskModel bool     `json:"has_task_model"`
-	RuntimeID    string   `json:"runtime_id"`
+	Title        string `json:"title"`
+	Logo         string `json:"logo"`
+	File         string `json:"file"`
+	Docs         string `json:"docs"`
+	TimeZone     string `json:"timezone"`
+	Announcement string `json:"announcement"`
+	BuyLink      string `json:"buy_link"`
+	Contact      string `json:"contact"`
+	Footer       string `json:"footer"`
+	AuthFooter   bool   `json:"auth_footer"`
+	Mail         bool   `json:"mail"`
+	WebSearch    bool   `json:"web_search"`
+	HasTaskModel bool   `json:"has_task_model"`
+	RuntimeID    string `json:"runtime_id"`
 }
 
 type generalState struct {
@@ -120,17 +120,23 @@ type r2StorageState struct {
 	PublicBaseURL string `json:"public_base_url" mapstructure:"publicbaseurl"`
 }
 
+type promptCacheState struct {
+	Enabled   *bool `json:"enabled,omitempty" mapstructure:"enabled"`
+	MinTokens int   `json:"min_tokens" mapstructure:"mintokens"`
+}
+
 type commonState struct {
-	Cache                 []string       `json:"cache" mapstructure:"cache"`
-	Expire                int64          `json:"expire" mapstructure:"expire"`
-	Size                  int64          `json:"size" mapstructure:"size"`
-	ImageStore            bool           `json:"image_store" mapstructure:"imagestore"`
-	PromptStore           bool           `json:"prompt_store" mapstructure:"promptstore"`
-	OrphanCleanupEnabled  bool           `json:"orphan_cleanup_enabled" mapstructure:"orphancleanupenabled"`
-	OrphanCleanupInterval int64          `json:"orphan_cleanup_interval" mapstructure:"orphancleanupinterval"`
-	StorageMode           string         `json:"storage_mode" mapstructure:"storagemode"`
-	S3                    s3StorageState `json:"s3" mapstructure:"s3"`
-	R2                    r2StorageState `json:"r2" mapstructure:"r2"`
+	Cache                 []string         `json:"cache" mapstructure:"cache"`
+	Expire                int64            `json:"expire" mapstructure:"expire"`
+	Size                  int64            `json:"size" mapstructure:"size"`
+	PromptCache           promptCacheState `json:"prompt_cache" mapstructure:"promptcache"`
+	ImageStore            bool             `json:"image_store" mapstructure:"imagestore"`
+	PromptStore           bool             `json:"prompt_store" mapstructure:"promptstore"`
+	OrphanCleanupEnabled  bool             `json:"orphan_cleanup_enabled" mapstructure:"orphancleanupenabled"`
+	OrphanCleanupInterval int64            `json:"orphan_cleanup_interval" mapstructure:"orphancleanupinterval"`
+	StorageMode           string           `json:"storage_mode" mapstructure:"storagemode"`
+	S3                    s3StorageState   `json:"s3" mapstructure:"s3"`
+	R2                    r2StorageState   `json:"r2" mapstructure:"r2"`
 }
 
 type SystemConfig struct {
@@ -182,6 +188,8 @@ func (c *SystemConfig) Load() {
 
 	globals.CacheAcceptedExpire = c.GetCacheAcceptedExpire()
 	globals.CacheAcceptedSize = c.GetCacheAcceptedSize()
+	globals.PromptCacheEnabled = c.GetPromptCacheEnabled()
+	globals.PromptCacheMinTokens = c.GetPromptCacheMinTokens()
 	globals.StorageMode = c.GetStorageMode()
 	globals.StorageS3Endpoint = c.GetStorageS3Endpoint()
 	globals.StorageS3Region = c.GetStorageS3Region()
@@ -232,6 +240,9 @@ func (c *SystemConfig) Normalize() {
 
 	c.Common.Expire = c.GetCacheAcceptedExpire()
 	c.Common.Size = c.GetCacheAcceptedSize()
+	enabled := c.GetPromptCacheEnabled()
+	c.Common.PromptCache.Enabled = &enabled
+	c.Common.PromptCache.MinTokens = c.GetPromptCacheMinTokens()
 	c.Common.OrphanCleanupInterval = c.GetOrphanCleanupInterval()
 	c.Common.StorageMode = c.GetRawStorageMode()
 	c.Common.S3.Endpoint = c.GetStorageS3Endpoint()
@@ -533,6 +544,17 @@ func (c *SystemConfig) GetCacheAcceptedSize() int64 {
 	}
 
 	return c.Common.Size
+}
+
+func (c *SystemConfig) GetPromptCacheEnabled() bool {
+	return c.Common.PromptCache.Enabled == nil || *c.Common.PromptCache.Enabled
+}
+
+func (c *SystemConfig) GetPromptCacheMinTokens() int {
+	if c.Common.PromptCache.MinTokens < 0 {
+		return 0
+	}
+	return c.Common.PromptCache.MinTokens
 }
 
 func (c *SystemConfig) GetStorageMode() string {

@@ -98,6 +98,22 @@ type TokenUsage struct {
 	CompletionTokensDetails CompletionTokensDetails `json:"completion_tokens_details,omitempty"`
 }
 
+type PromptCacheDetail struct {
+	Provider             string `json:"provider,omitempty"`
+	Mode                 string `json:"mode,omitempty"`
+	ChannelType          string `json:"channel_type,omitempty"`
+	Status               string `json:"status,omitempty"`
+	Reason               string `json:"reason,omitempty"`
+	PromptTokens         int    `json:"prompt_tokens,omitempty"`
+	ThresholdTokens      int    `json:"threshold_tokens,omitempty"`
+	Eligible             bool   `json:"eligible"`
+	Attempted            bool   `json:"attempted"`
+	PromptCacheKey       bool   `json:"prompt_cache_key,omitempty"`
+	PromptCacheRetention string `json:"prompt_cache_retention,omitempty"`
+	CacheControl         bool   `json:"cache_control,omitempty"`
+	Manual               bool   `json:"manual,omitempty"`
+}
+
 func (u *TokenUsage) IsEmpty() bool {
 	return u == nil ||
 		(u.PromptTokens == 0 &&

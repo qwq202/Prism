@@ -38,6 +38,7 @@ func createChatRequest(conf globals.ChannelConfig, props *adaptercommon.ChatProp
 
 	factoryType := conf.GetType()
 	props.ChannelType = factoryType
+	adaptercommon.ApplyPromptCacheDefaults(props)
 	if factory, ok := channelFactories[factoryType]; ok {
 		return factory(conf).CreateStreamChatRequest(props, hook)
 	}

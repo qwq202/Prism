@@ -22,6 +22,8 @@ var NotifyUrl = ""
 var CacheAcceptedModels []string
 var CacheAcceptedExpire int64
 var CacheAcceptedSize int64
+var PromptCacheEnabled = true
+var PromptCacheMinTokens int
 var AcceptImageStore bool
 var AcceptPromptStore bool
 var StorageMode = "local"

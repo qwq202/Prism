@@ -205,10 +205,16 @@ export type GroupPricingState = {
   description: string;
 };
 
+export type PromptCacheState = {
+  enabled: boolean;
+  min_tokens: number;
+};
+
 export type CommonState = {
   cache: string[];
   expire: number;
   size: number;
+  prompt_cache: PromptCacheState;
 
   prompt_store: boolean;
   image_store: boolean;
@@ -309,6 +315,10 @@ export const initialSystemState: SystemProps = {
     cache: [],
     expire: 3600,
     size: 1,
+    prompt_cache: {
+      enabled: true,
+      min_tokens: 0,
+    },
     prompt_store: false,
     image_store: false,
     orphan_cleanup_enabled: false,
@@ -442,6 +452,18 @@ export async function getConfig(): Promise<SystemResponse> {
         )
           ? data.data.search.depth
           : "basic";
+
+      data.data.common.prompt_cache = data.data.common.prompt_cache || {
+        enabled: true,
+        min_tokens: 0,
+      };
+      data.data.common.prompt_cache.enabled =
+        data.data.common.prompt_cache.enabled !== false;
+      data.data.common.prompt_cache.min_tokens =
+        data.data.common.prompt_cache.min_tokens &&
+        data.data.common.prompt_cache.min_tokens > 0
+          ? data.data.common.prompt_cache.min_tokens
+          : 0;
 
       data.data.site.currency = data.data.site.currency || "cny";
       const auth = (data.data.auth = data.data.auth || {

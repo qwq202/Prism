@@ -47,6 +47,7 @@ type Buffer struct {
 	FunctionCall         *globals.FunctionCall         `json:"function_call"`
 	ReasoningContent     string                        `json:"reasoning_content,omitempty"`
 	Usage                *globals.TokenUsage           `json:"usage,omitempty"`
+	PromptCache          *globals.PromptCacheDetail    `json:"prompt_cache,omitempty"`
 	GeminiHiddenMetadata *globals.GeminiHiddenMetadata `json:"gemini_hidden_metadata,omitempty"`
 	ClaudeHiddenMetadata *globals.ClaudeHiddenMetadata `json:"claude_hidden_metadata,omitempty"`
 	StartTime            *time.Time                    `json:"-"`
@@ -354,10 +355,29 @@ func (b *Buffer) GetUsage() *globals.TokenUsage {
 	return cloneTokenUsage(b.Usage)
 }
 
+func clonePromptCacheDetail(detail *globals.PromptCacheDetail) *globals.PromptCacheDetail {
+	if detail == nil {
+		return nil
+	}
+	copied := *detail
+	return &copied
+}
+
+func (b *Buffer) SetPromptCache(detail *globals.PromptCacheDetail) {
+	b.PromptCache = clonePromptCacheDetail(detail)
+}
+
+func (b *Buffer) GetPromptCache() *globals.PromptCacheDetail {
+	return clonePromptCacheDetail(b.PromptCache)
+}
+
 func (b *Buffer) GetBillingDetail() string {
 	detail := make(map[string]interface{})
 	if !b.Usage.IsEmpty() {
 		detail["official_usage"] = b.Usage
+	}
+	if b.PromptCache != nil {
+		detail["prompt_cache"] = b.PromptCache
 	}
 	if b.Charge != nil && b.Charge.IsBillingType(globals.ImageBilling) {
 		if estimator, ok := b.Charge.(ImageBillingEstimator); ok {

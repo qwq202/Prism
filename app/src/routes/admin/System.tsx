@@ -951,6 +951,42 @@ function Common({ data, dispatch, onChange }: CompProps<CommonState>) {
         />
       </ParagraphItem>
       <ParagraphItem>
+        <Label>
+          {t("admin.system.promptCache")}
+          <Tips
+            className={`inline-block`}
+            content={t("admin.system.promptCacheTip")}
+          />
+        </Label>
+        <div className="flex h-10 items-center">
+          <Switch
+            checked={data.prompt_cache.enabled}
+            onCheckedChange={(value) =>
+              dispatch({ type: "update:common.prompt_cache.enabled", value })
+            }
+          />
+        </div>
+      </ParagraphItem>
+      <ParagraphItem>
+        <Label>
+          {t("admin.system.promptCacheMinTokens")}
+          <Tips
+            className={`inline-block`}
+            content={t("admin.system.promptCacheMinTokensTip")}
+          />
+        </Label>
+        <NumberInput
+          value={data.prompt_cache.min_tokens}
+          onValueChange={(value) =>
+            dispatch({
+              type: "update:common.prompt_cache.min_tokens",
+              value,
+            })
+          }
+          min={0}
+        />
+      </ParagraphItem>
+      <ParagraphItem>
         <div className={`flex flex-row flex-wrap gap-2 ml-auto`}>
           <Button
             variant={`outline`}
