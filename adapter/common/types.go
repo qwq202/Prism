@@ -58,6 +58,8 @@ type ChatProps struct {
 	ParallelToolCalls    *bool                  `json:"parallel_tool_calls,omitempty"`
 	StreamOptions        interface{}            `json:"stream_options,omitempty"`
 	Thinking             interface{}            `json:"thinking,omitempty"`
+	CachedContent        *string                `json:"cachedContent,omitempty"`
+	CachedContentSnake   *string                `json:"cached_content,omitempty"`
 	Logprobs             *bool                  `json:"logprobs,omitempty"`
 	TopLogprobs          *int                   `json:"top_logprobs,omitempty"`
 	Tools                *globals.FunctionTools `json:"tools,omitempty"`

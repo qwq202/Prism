@@ -152,10 +152,27 @@ func (c *ChatInstance) GetGeminiChatBody(props *adaptercommon.ChatProps) *Gemini
 	return &GeminiChatBody{
 		SystemInstruction: c.GetGeminiSystemInstruction(props.Model, props.Message),
 		Contents:          c.GetGeminiContents(props.Model, props.Message),
+		CachedContent:     getGeminiCachedContent(props),
 		Tools:             mergeGeminiTools(getGeminiBuiltinTools(props.EnableWebSearch, props.EnableURLContext), getGeminiTools(props.Tools)),
 		ToolConfig:        getGeminiToolConfig(props.ToolChoice),
 		GenerationConfig:  config,
 	}
+}
+
+func getGeminiCachedContent(props *adaptercommon.ChatProps) string {
+	if props == nil {
+		return ""
+	}
+
+	for _, value := range []*string{props.CachedContent, props.CachedContentSnake} {
+		if value == nil {
+			continue
+		}
+		if normalized := strings.TrimSpace(*value); normalized != "" {
+			return normalized
+		}
+	}
+	return ""
 }
 
 func getStringFromMap(data interface{}, keys ...string) string {

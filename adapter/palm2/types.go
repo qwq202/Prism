@@ -30,6 +30,7 @@ type PalmChatResponse struct {
 type GeminiChatBody struct {
 	SystemInstruction *GeminiContent    `json:"systemInstruction,omitempty"`
 	Contents          []GeminiContent   `json:"contents"`
+	CachedContent     string            `json:"cachedContent,omitempty"`
 	Tools             []GeminiTool      `json:"tools,omitempty"`
 	ToolConfig        *GeminiToolConfig `json:"toolConfig,omitempty"`
 	GenerationConfig  GeminiConfig      `json:"generationConfig"`
