@@ -274,6 +274,16 @@ func IsSkipError(err error) bool {
 	return err == nil || isClientInterruptError(err)
 }
 
+func isRetryableRequestError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	content := strings.ToLower(err.Error())
+	return !strings.Contains(content, "system_disk_overloaded") &&
+		!strings.Contains(content, "system disk overloaded")
+}
+
 func isQPSOverLimit(model string, err error) bool {
 	if strings.Contains(model, "spark-desk") {
 		return strings.Contains(err.Error(), "AppIdQpsOverFlowError")
@@ -299,6 +309,12 @@ func NewChatRequest(conf globals.ChannelConfig, props *adaptercommon.ChatProps, 
 			return NewChatRequest(conf, props, hook)
 		}
 
+		if !isRetryableRequestError(err) {
+			content := strings.Replace(err.Error(), "\n", "", -1)
+			globals.Warn(fmt.Sprintf("not retrying chat request for %s (non-retryable error: %s)", props.OriginalModel, content))
+			return conf.ProcessError(err)
+		}
+
 		if props.Current < retries {
 			content := strings.Replace(err.Error(), "\n", "", -1)
 			globals.Warn(fmt.Sprintf("retrying chat request for %s (attempt %d/%d, error: %s)", props.OriginalModel, props.Current+1, retries, content))
@@ -322,6 +338,12 @@ func NewVideoRequest(conf globals.ChannelConfig, props *adaptercommon.VideoProps
 			globals.Info(fmt.Sprintf("qps limit for %s, sleep and retry (times: %d)", props.OriginalModel, props.Current))
 			time.Sleep(500 * time.Millisecond)
 			return NewVideoRequest(conf, props, hook)
+		}
+
+		if !isRetryableRequestError(err) {
+			content := strings.Replace(err.Error(), "\n", "", -1)
+			globals.Warn(fmt.Sprintf("not retrying video request for %s (non-retryable error: %s)", props.OriginalModel, content))
+			return conf.ProcessError(err)
 		}
 
 		if props.Current < retries {

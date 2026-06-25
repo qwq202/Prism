@@ -78,6 +78,19 @@ func TestNonInterruptErrorsRemainAvailable(t *testing.T) {
 	}
 }
 
+func TestSystemDiskOverloadedSkipsSameChannelRetry(t *testing.T) {
+	err := errors.New(`gemini error: {"error":{"message":"system disk overloaded (current: 96.2%, threshold: 95%)","type":"new_api_error","code":"system_disk_overloaded"}}`)
+	if !IsAvailableError(err) {
+		t.Fatalf("expected disk overload to count against the channel")
+	}
+	if IsSkipError(err) {
+		t.Fatalf("expected disk overload to remain visible to channel fallback")
+	}
+	if isRetryableRequestError(err) {
+		t.Fatalf("expected disk overload to skip retrying the same channel")
+	}
+}
+
 func TestSanitizeChatMessagesForRequestStripsContextClearMarker(t *testing.T) {
 	props := &adaptercommon.ChatProps{
 		OriginalModel: "deepseek-v3",
