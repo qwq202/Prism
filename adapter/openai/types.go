@@ -38,6 +38,7 @@ type ChatRequest struct {
 	MaxToken            *int                   `json:"max_tokens,omitempty"`
 	MaxCompletionTokens *int                   `json:"max_completion_tokens,omitempty"`
 	Stream              bool                   `json:"stream"`
+	StreamOptions       interface{}            `json:"stream_options,omitempty"`
 	PresencePenalty     *float32               `json:"presence_penalty,omitempty"`
 	FrequencyPenalty    *float32               `json:"frequency_penalty,omitempty"`
 	Temperature         *float32               `json:"temperature,omitempty"`
@@ -76,7 +77,8 @@ type ChatResponse struct {
 		Message      ResponseMessage `json:"message"`
 		FinishReason string          `json:"finish_reason"`
 	} `json:"choices"`
-	Error ResponseError `json:"error"`
+	Error ResponseError       `json:"error"`
+	Usage *globals.TokenUsage `json:"usage,omitempty"`
 }
 
 // ChatStreamResponse is the stream response body for openai
@@ -90,7 +92,8 @@ type ChatStreamResponse struct {
 		Index        int             `json:"index"`
 		FinishReason string          `json:"finish_reason"`
 	} `json:"choices"`
-	Error ResponseError `json:"error"`
+	Error ResponseError       `json:"error"`
+	Usage *globals.TokenUsage `json:"usage,omitempty"`
 }
 
 // CompletionResponse is the native http request body / stream response body for openai completion
@@ -103,6 +106,7 @@ type CompletionResponse struct {
 		Text  string `json:"text"`
 		Index int    `json:"index"`
 	} `json:"choices"`
+	Usage *globals.TokenUsage `json:"usage,omitempty"`
 }
 
 type ChatStreamErrorResponse struct {

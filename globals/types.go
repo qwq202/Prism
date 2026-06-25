@@ -79,10 +79,15 @@ type CompletionTokensDetails struct {
 	ReasoningTokens int `json:"reasoning_tokens,omitempty"`
 }
 
+type PromptTokensDetails struct {
+	CachedTokens int `json:"cached_tokens,omitempty"`
+}
+
 type TokenUsage struct {
 	PromptTokens            int                     `json:"prompt_tokens,omitempty"`
 	CompletionTokens        int                     `json:"completion_tokens,omitempty"`
 	TotalTokens             int                     `json:"total_tokens,omitempty"`
+	PromptTokensDetails     *PromptTokensDetails    `json:"prompt_tokens_details,omitempty"`
 	PromptCacheHitTokens    int                     `json:"prompt_cache_hit_tokens,omitempty"`
 	PromptCacheMissTokens   int                     `json:"prompt_cache_miss_tokens,omitempty"`
 	CompletionTokensDetails CompletionTokensDetails `json:"completion_tokens_details,omitempty"`
@@ -93,9 +98,29 @@ func (u *TokenUsage) IsEmpty() bool {
 		(u.PromptTokens == 0 &&
 			u.CompletionTokens == 0 &&
 			u.TotalTokens == 0 &&
+			(u.PromptTokensDetails == nil || u.PromptTokensDetails.CachedTokens == 0) &&
 			u.PromptCacheHitTokens == 0 &&
 			u.PromptCacheMissTokens == 0 &&
 			u.CompletionTokensDetails.ReasoningTokens == 0)
+}
+
+func NormalizeTokenUsage(usage *TokenUsage) *TokenUsage {
+	if usage == nil {
+		return nil
+	}
+
+	normalized := *usage
+	if normalized.PromptTokensDetails != nil {
+		if normalized.PromptCacheHitTokens == 0 && normalized.PromptTokensDetails.CachedTokens > 0 {
+			normalized.PromptCacheHitTokens = normalized.PromptTokensDetails.CachedTokens
+		}
+		normalized.PromptTokensDetails = nil
+	}
+	if normalized.TotalTokens == 0 && (normalized.PromptTokens > 0 || normalized.CompletionTokens > 0) {
+		normalized.TotalTokens = normalized.PromptTokens + normalized.CompletionTokens
+	}
+
+	return &normalized
 }
 
 type ChatSegmentToolCall struct {

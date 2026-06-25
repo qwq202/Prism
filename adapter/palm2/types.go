@@ -1,5 +1,7 @@
 package palm2
 
+import "chat/globals"
+
 const (
 	GeminiUserType  = "user"
 	GeminiModelType = "model"
@@ -125,7 +127,8 @@ type GeminiCandidate struct {
 }
 
 type GeminiChatResponse struct {
-	Candidates []GeminiCandidate `json:"candidates"`
+	Candidates    []GeminiCandidate    `json:"candidates"`
+	UsageMetadata *GeminiUsageMetadata `json:"usageMetadata,omitempty"`
 }
 
 type GeminiInteractionImage struct {
@@ -150,12 +153,14 @@ type GeminiInteractionStep struct {
 }
 
 type GeminiInteractionResponse struct {
-	OutputText      string                     `json:"output_text,omitempty"`
-	Text            string                     `json:"text,omitempty"`
-	OutputImage     *GeminiInteractionImage    `json:"output_image,omitempty"`
-	GeneratedImages []GeminiInteractionImage   `json:"generated_images,omitempty"`
-	Output          []GeminiInteractionContent `json:"output,omitempty"`
-	Steps           []GeminiInteractionStep    `json:"steps,omitempty"`
+	OutputText         string                     `json:"output_text,omitempty"`
+	Text               string                     `json:"text,omitempty"`
+	OutputImage        *GeminiInteractionImage    `json:"output_image,omitempty"`
+	GeneratedImages    []GeminiInteractionImage   `json:"generated_images,omitempty"`
+	Output             []GeminiInteractionContent `json:"output,omitempty"`
+	Steps              []GeminiInteractionStep    `json:"steps,omitempty"`
+	UsageMetadata      *GeminiUsageMetadata       `json:"usageMetadata,omitempty"`
+	UsageMetadataSnake *GeminiUsageMetadata       `json:"usage_metadata,omitempty"`
 }
 
 type GeminiChatErrorResponse struct {
@@ -167,5 +172,35 @@ type GeminiChatErrorResponse struct {
 }
 
 type GeminiStreamResponse struct {
-	Candidates []GeminiCandidate `json:"candidates"`
+	Candidates    []GeminiCandidate    `json:"candidates"`
+	UsageMetadata *GeminiUsageMetadata `json:"usageMetadata,omitempty"`
+}
+
+type GeminiUsageMetadata struct {
+	PromptTokenCount        int `json:"promptTokenCount,omitempty"`
+	CandidatesTokenCount    int `json:"candidatesTokenCount,omitempty"`
+	TotalTokenCount         int `json:"totalTokenCount,omitempty"`
+	CachedContentTokenCount int `json:"cachedContentTokenCount,omitempty"`
+	ThoughtsTokenCount      int `json:"thoughtsTokenCount,omitempty"`
+}
+
+func (m *GeminiUsageMetadata) TokenUsage() *globals.TokenUsage {
+	if m == nil {
+		return nil
+	}
+
+	promptTokens := m.PromptTokenCount
+	if promptTokens == 0 && m.CachedContentTokenCount > 0 {
+		promptTokens = m.CachedContentTokenCount
+	}
+
+	return globals.NormalizeTokenUsage(&globals.TokenUsage{
+		PromptTokens:         promptTokens,
+		CompletionTokens:     m.CandidatesTokenCount,
+		TotalTokens:          m.TotalTokenCount,
+		PromptCacheHitTokens: m.CachedContentTokenCount,
+		CompletionTokensDetails: globals.CompletionTokensDetails{
+			ReasoningTokens: m.ThoughtsTokenCount,
+		},
+	})
 }

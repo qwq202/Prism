@@ -31,6 +31,7 @@ import DatePicker from "@/components/ui/date-picker.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { PaginationAction } from "@/components/ui/pagination.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
+import { Switch } from "@/components/ui/switch.tsx";
 import {
   Select,
   SelectContent,
@@ -56,6 +57,7 @@ import { useSelector } from "react-redux";
 import { infoTimeZoneSelector } from "@/store/info.ts";
 import { withNotify } from "@/api/common.ts";
 import { getReadableTokenCount } from "@/utils/processor.ts";
+import { getRecordCacheUsage } from "@/utils/record-cache.ts";
 
 type LogFilters = {
   type: RecordType;
@@ -63,6 +65,7 @@ type LogFilters = {
   token_name: string;
   start_time: string;
   end_time: string;
+  cache_hit: boolean;
 };
 
 type MetricCardProps = {
@@ -133,6 +136,7 @@ function getInitialFilters(timeZone: string): LogFilters {
     token_name: "",
     start_time: toTimeZoneDateInputValue(start, timeZone),
     end_time: toTimeZoneDateInputValue(end, timeZone),
+    cache_hit: false,
   };
 }
 
@@ -357,6 +361,27 @@ function RecordTypeLabel({ type }: { type: string }) {
     <Badge variant={variants[type] ?? "outline"}>
       {t(`record.types.${type}`) || type}
     </Badge>
+  );
+}
+
+function CacheUsageBadges({ record }: { record: BillingRecord }) {
+  const { t } = useTranslation();
+  const usage = getRecordCacheUsage(record);
+  if (!usage) return null;
+
+  return (
+    <div className="mt-1 flex flex-wrap gap-1">
+      {usage.hitTokens > 0 && (
+        <Badge variant="secondary" className="text-[10px] font-medium">
+          {t("record.cache-hit-short", { tokens: usage.hitTokens })}
+        </Badge>
+      )}
+      {usage.missTokens > 0 && (
+        <Badge variant="outline" className="text-[10px] font-medium">
+          {t("record.cache-miss-short", { tokens: usage.missTokens })}
+        </Badge>
+      )}
+    </div>
   );
 }
 
@@ -615,8 +640,17 @@ function Log() {
               }
               onKeyDown={handleEnterSearch}
             />
-            <div className="hidden lg:block" />
-            <div className="hidden lg:block" />
+            <FieldLabel icon={<Cloud />}>
+              {t("record.cache-hit-only")}
+            </FieldLabel>
+            <div className="flex h-10 items-center">
+              <Switch
+                checked={filters.cache_hit}
+                onCheckedChange={(cache_hit) =>
+                  setFilters({ ...filters, cache_hit })
+                }
+              />
+            </div>
 
             <div className="lg:col-span-4">
               <Button
@@ -755,7 +789,10 @@ function Log() {
                     <TableCell className="max-w-[180px] truncate font-medium">
                       {record.model || "—"}
                     </TableCell>
-                    <TableCell>{record.input_tokens}</TableCell>
+                    <TableCell>
+                      <div>{record.input_tokens}</div>
+                      <CacheUsageBadges record={record} />
+                    </TableCell>
                     <TableCell>{record.output_tokens}</TableCell>
                     <TableCell>{record.duration.toFixed(1)}s</TableCell>
                     <TableCell>{formatQuota(record.quota)}</TableCell>

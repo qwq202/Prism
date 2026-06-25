@@ -62,6 +62,7 @@ export type RecordQuery = {
   type?: RecordType;
   show_channel?: boolean;
   self?: boolean;
+  cache_hit?: boolean;
 };
 
 type ListRecordsResponse = CommonResponse & {

@@ -47,6 +47,7 @@ func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps, stream bool) 
 		Messages:         formatMessages(props),
 		MaxToken:         props.MaxTokens,
 		Stream:           stream,
+		StreamOptions:    getStreamOptions(props, stream),
 		PresencePenalty:  props.PresencePenalty,
 		FrequencyPenalty: props.FrequencyPenalty,
 		Temperature:      props.Temperature,
@@ -54,6 +55,16 @@ func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps, stream bool) 
 		Tools:            props.Tools,
 		ToolChoice:       props.ToolChoice,
 	}
+}
+
+func getStreamOptions(props *adaptercommon.ChatProps, stream bool) interface{} {
+	if !stream {
+		return nil
+	}
+	if props.StreamOptions != nil {
+		return props.StreamOptions
+	}
+	return map[string]bool{"include_usage": true}
 }
 
 func getChatResponseContent(data *ChatResponse) (string, error) {

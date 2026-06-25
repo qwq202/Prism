@@ -71,6 +71,41 @@ func TestBufferRecordsOfficialUsage(t *testing.T) {
 	}
 }
 
+func TestBufferNormalizesOfficialPromptTokenDetails(t *testing.T) {
+	buffer := &Buffer{}
+	buffer.WriteChunk(&globals.Chunk{
+		Usage: &globals.TokenUsage{
+			PromptTokens:     30,
+			CompletionTokens: 7,
+			PromptTokensDetails: &globals.PromptTokensDetails{
+				CachedTokens: 12,
+			},
+		},
+	})
+
+	usage := buffer.GetUsage()
+	if usage == nil {
+		t.Fatalf("expected usage to be recorded")
+	}
+	if usage.PromptCacheHitTokens != 12 {
+		t.Fatalf("expected cached prompt tokens to normalize as cache-hit tokens, got %#v", usage)
+	}
+	if usage.PromptTokensDetails != nil {
+		t.Fatalf("expected provider-specific prompt token details to be cleared, got %#v", usage.PromptTokensDetails)
+	}
+	if usage.TotalTokens != 37 {
+		t.Fatalf("expected total tokens to be derived, got %#v", usage)
+	}
+
+	detail := buffer.GetBillingDetail()
+	if !strings.Contains(detail, `"prompt_cache_hit_tokens":12`) {
+		t.Fatalf("expected billing detail to include normalized cache-hit tokens, got %q", detail)
+	}
+	if strings.Contains(detail, "prompt_tokens_details") {
+		t.Fatalf("expected billing detail to omit provider-specific token details, got %q", detail)
+	}
+}
+
 func TestBufferMergesOfficialUsage(t *testing.T) {
 	target := &Buffer{}
 	source := &Buffer{}

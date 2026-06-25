@@ -44,6 +44,7 @@ import {
   Zap,
   Clock,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch.tsx";
 import { mobile } from "@/utils/device.ts";
 import { cn } from "@/components/ui/lib/utils.ts";
 import { formatRecordTime } from "@/utils/record-time.ts";
@@ -51,10 +52,12 @@ import { useSelector } from "react-redux";
 import { infoTimeZoneSelector } from "@/store/info.ts";
 import { withNotify } from "@/api/common.ts";
 import { getReadableTokenCount } from "@/utils/processor.ts";
+import { getRecordCacheUsage } from "@/utils/record-cache.ts";
 
 const defaultRecordQuery: RecordQuery = {
   type: RecordType.All,
   show_channel: true,
+  cache_hit: false,
 };
 
 const defaultRecordInput = {
@@ -64,6 +67,7 @@ const defaultRecordInput = {
   start_time: "",
   end_time: "",
   type: RecordType.All as RecordType,
+  cache_hit: false,
 };
 
 function StatCard({
@@ -154,6 +158,27 @@ function RecordTypeLabel({ type }: { type: string }) {
   );
 }
 
+function CacheUsageBadges({ record }: { record: BillingRecord }) {
+  const { t } = useTranslation();
+  const usage = getRecordCacheUsage(record);
+  if (!usage) return null;
+
+  return (
+    <div className="mt-1 flex flex-wrap gap-1">
+      {usage.hitTokens > 0 && (
+        <Badge variant="secondary" className="text-[10px] font-medium">
+          {t("record.cache-hit-short", { tokens: usage.hitTokens })}
+        </Badge>
+      )}
+      {usage.missTokens > 0 && (
+        <Badge variant="outline" className="text-[10px] font-medium">
+          {t("record.cache-miss-short", { tokens: usage.missTokens })}
+        </Badge>
+      )}
+    </div>
+  );
+}
+
 function RecordTableSkeleton() {
   return (
     <>
@@ -238,6 +263,7 @@ function RecordTable() {
       token_name: input.token_name || undefined,
       start_time: input.start_time || undefined,
       end_time: input.end_time || undefined,
+      cache_hit: input.cache_hit || undefined,
       show_channel: true,
     };
     setQuery(q);
@@ -325,6 +351,17 @@ function RecordTable() {
             ))}
           </SelectContent>
         </Select>
+        <div className="flex h-10 items-center gap-2 rounded-md border px-3">
+          <Switch
+            checked={input.cache_hit}
+            onCheckedChange={(cache_hit) =>
+              setInput({ ...input, cache_hit })
+            }
+          />
+          <span className="whitespace-nowrap text-sm">
+            {t("record.cache-hit-only")}
+          </span>
+        </div>
         <Button onClick={handleSearch} variant="outline" size="icon">
           <Search className="w-4 h-4" />
         </Button>
@@ -378,7 +415,10 @@ function RecordTable() {
                 <TableCell className="max-w-[80px] truncate">
                   {r.token_name}
                 </TableCell>
-                <TableCell>{r.input_tokens}</TableCell>
+                <TableCell>
+                  <div>{r.input_tokens}</div>
+                  <CacheUsageBadges record={r} />
+                </TableCell>
                 <TableCell>{r.output_tokens}</TableCell>
                 <TableCell>{r.quota.toFixed(4)}</TableCell>
                 <TableCell>{r.duration.toFixed(1)}s</TableCell>

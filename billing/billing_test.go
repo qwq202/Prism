@@ -70,6 +70,25 @@ func seedBillingRecordWithQuota(
 	}
 }
 
+func seedBillingRecordWithDetail(
+	t *testing.T,
+	db *sql.DB,
+	tokenName string,
+	detail string,
+) {
+	t.Helper()
+
+	if _, err := globals.ExecDb(db, `
+		INSERT INTO billing (
+			user_id, username, type, token_name, model,
+			input_tokens, output_tokens, quota, duration,
+			detail, prompts, response_prompts, channel, channel_name, created_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, 1, "root", "consume", tokenName, "gpt-5.1", 10, 20, 1.25, 0.8, detail, "", "", 0, "", "2026-04-22 15:30:00"); err != nil {
+		t.Fatalf("insert billing record with detail: %v", err)
+	}
+}
+
 func seedBillingRecordWithTokenUsage(
 	t *testing.T,
 	db *sql.DB,
@@ -90,6 +109,25 @@ func seedBillingRecordWithTokenUsage(
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, userId, username, recordType, "stats-token", "deepseek-v4-flash", inputTokens, outputTokens, 1.25, 0.8, "", "", "", 0, "", createdAt); err != nil {
 		t.Fatalf("insert billing record with token usage: %v", err)
+	}
+}
+
+func TestListRecordsFiltersCacheHitUsage(t *testing.T) {
+	db := openBillingTestDB(t)
+
+	seedBillingRecordWithDetail(t, db, "cache-hit-token", `{"official_usage":{"prompt_tokens":100,"prompt_cache_hit_tokens":60}}`)
+	seedBillingRecordWithDetail(t, db, "plain-token", `{"official_usage":{"prompt_tokens":100}}`)
+
+	data, err := ListRecords(db, true, 1, 0, RecordQuery{CacheHit: true})
+	if err != nil {
+		t.Fatalf("list records: %v", err)
+	}
+
+	if len(data.Records) != 1 {
+		t.Fatalf("expected 1 cache-hit record, got %d (%#v)", len(data.Records), data.Records)
+	}
+	if data.Records[0].TokenName != "cache-hit-token" {
+		t.Fatalf("expected cache-hit-token, got %#v", data.Records[0])
 	}
 }
 

@@ -43,10 +43,11 @@ type OutputContent = compat.OutputContent
 type OutputItem = compat.OutputItem
 
 type ResponseResponse struct {
-	ID     string       `json:"id"`
-	Object string       `json:"object"`
-	Model  string       `json:"model"`
-	Output []OutputItem `json:"output"`
+	ID     string                `json:"id"`
+	Object string                `json:"object"`
+	Model  string                `json:"model"`
+	Output []OutputItem          `json:"output"`
+	Usage  *compat.ResponseUsage `json:"usage,omitempty"`
 	Error  struct {
 		Message string `json:"message"`
 		Type    string `json:"type"`
@@ -54,10 +55,11 @@ type ResponseResponse struct {
 }
 
 type ResponseStreamEvent struct {
-	Type  string      `json:"type"`
-	Delta string      `json:"delta,omitempty"`
-	Item  *OutputItem `json:"item,omitempty"`
-	Error struct {
+	Type     string            `json:"type"`
+	Delta    string            `json:"delta,omitempty"`
+	Item     *OutputItem       `json:"item,omitempty"`
+	Response *ResponseResponse `json:"response,omitempty"`
+	Error    struct {
 		Message string `json:"message"`
 		Type    string `json:"type"`
 	} `json:"error,omitempty"`

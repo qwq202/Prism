@@ -282,11 +282,18 @@ func cloneTokenUsage(usage *globals.TokenUsage) *globals.TokenUsage {
 		return nil
 	}
 
-	cloned := *usage
+	normalized := globals.NormalizeTokenUsage(usage)
+	cloned := *normalized
+	if normalized.PromptTokensDetails != nil {
+		details := *normalized.PromptTokensDetails
+		cloned.PromptTokensDetails = &details
+	}
 	return &cloned
 }
 
 func mergeTokenUsage(left *globals.TokenUsage, right *globals.TokenUsage) *globals.TokenUsage {
+	left = globals.NormalizeTokenUsage(left)
+	right = globals.NormalizeTokenUsage(right)
 	if left.IsEmpty() {
 		return cloneTokenUsage(right)
 	}

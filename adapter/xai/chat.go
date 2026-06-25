@@ -177,7 +177,17 @@ func buildResponseChunk(form *ResponseResponse) *globals.Chunk {
 		return &globals.Chunk{}
 	}
 
-	return compat.BuildResponseChunk(form.Output)
+	chunk := compat.BuildResponseChunk(form.Output)
+	chunk.Usage = form.Usage.TokenUsage()
+	return chunk
+}
+
+func buildResponseUsageChunk(form *ResponseResponse) *globals.Chunk {
+	if form == nil {
+		return &globals.Chunk{}
+	}
+
+	return &globals.Chunk{Usage: form.Usage.TokenUsage()}
 }
 
 func parseResponse(data string) (*ResponseResponse, error) {
@@ -273,6 +283,8 @@ func (c *ChatInstance) CreateStreamChatRequest(props *adaptercommon.ChatProps, c
 				chunk = emitOutputText(event.Delta, &reasoningStarted, &reasoningClosed)
 			case "response.output_item.done":
 				chunk = emitFunctionCallEvent(event.Item)
+			case "response.completed":
+				chunk = buildResponseUsageChunk(event.Response)
 			default:
 				return nil
 			}

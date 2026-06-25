@@ -409,7 +409,12 @@ func appendJSONString(builder *strings.Builder, data string) {
 	builder.WriteString(data)
 }
 
-func collectResponse(content []ContentBlock) *globals.Chunk {
+func collectResponse(form *ChatResponse) *globals.Chunk {
+	if form == nil {
+		return &globals.Chunk{}
+	}
+
+	content := form.Content
 	texts := make([]string, 0)
 	reasoningBlocks := make([]globals.ClaudeThinkingBlock, 0)
 	reasoningTexts := make([]string, 0)
@@ -473,6 +478,7 @@ func collectResponse(content []ContentBlock) *globals.Chunk {
 		ToolCall:             toolCallPtr,
 		ReasoningContent:     reasoningPtr,
 		ClaudeHiddenMetadata: hidden,
+		Usage:                form.Usage.TokenUsage(),
 	}
 }
 
@@ -548,7 +554,7 @@ func (c *ChatInstance) ProcessLine(data string) (*globals.Chunk, error) {
 
 	if eventType == "" {
 		if form := processChatResponse(payload); form != nil && len(form.Content) > 0 {
-			return collectResponse(form.Content), nil
+			return collectResponse(form), nil
 		}
 		return &globals.Chunk{Content: ""}, nil
 	}
@@ -562,6 +568,14 @@ func (c *ChatInstance) ProcessLine(data string) (*globals.Chunk, error) {
 	}
 
 	switch eventType {
+	case "message_start":
+		if form.Message != nil && form.Message.Usage != nil {
+			return &globals.Chunk{Usage: form.Message.Usage.TokenUsage()}, nil
+		}
+	case "message_delta":
+		if form.Usage != nil {
+			return &globals.Chunk{Usage: form.Usage.TokenUsage()}, nil
+		}
 	case "content_block_start":
 		if form.ContentBlock == nil {
 			return &globals.Chunk{Content: ""}, nil

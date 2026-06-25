@@ -21,6 +21,7 @@ type RecordQueryForm struct {
 	Type        string `json:"type"`
 	ShowChannel bool   `json:"show_channel"`
 	Self        bool   `json:"self"`
+	CacheHit    bool   `json:"cache_hit"`
 }
 
 type RecordStatsForm struct {
@@ -62,6 +63,7 @@ func RecordViewAPI(c *gin.Context) {
 		Type:        form.Type,
 		ShowChannel: form.ShowChannel,
 		Self:        form.Self,
+		CacheHit:    form.CacheHit,
 	})
 
 	if err != nil {

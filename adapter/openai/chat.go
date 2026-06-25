@@ -61,6 +61,7 @@ func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps, stream bool) 
 		Model:            props.Model,
 		Messages:         messages,
 		Stream:           stream,
+		StreamOptions:    getStreamOptions(props, stream),
 		PresencePenalty:  props.PresencePenalty,
 		FrequencyPenalty: props.FrequencyPenalty,
 		Temperature:      temperature,
@@ -75,6 +76,16 @@ func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps, stream bool) 
 		request.MaxToken = props.MaxTokens
 	}
 	return request
+}
+
+func getStreamOptions(props *adaptercommon.ChatProps, stream bool) interface{} {
+	if !stream {
+		return nil
+	}
+	if props.StreamOptions != nil {
+		return props.StreamOptions
+	}
+	return map[string]bool{"include_usage": true}
 }
 
 // CreateChatRequest is the native http request body for openai

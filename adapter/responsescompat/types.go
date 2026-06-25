@@ -1,5 +1,7 @@
 package responsescompat
 
+import "chat/globals"
+
 type InputMessageContent struct {
 	Type     string  `json:"type"`
 	Text     *string `json:"text,omitempty"`
@@ -38,4 +40,43 @@ type OutputItem struct {
 	Name             string                    `json:"name,omitempty"`
 	Arguments        string                    `json:"arguments,omitempty"`
 	CallID           string                    `json:"call_id,omitempty"`
+}
+
+type InputTokensDetails struct {
+	CachedTokens int `json:"cached_tokens,omitempty"`
+}
+
+type OutputTokensDetails struct {
+	ReasoningTokens int `json:"reasoning_tokens,omitempty"`
+}
+
+type ResponseUsage struct {
+	InputTokens         int                 `json:"input_tokens,omitempty"`
+	InputTokensDetails  *InputTokensDetails `json:"input_tokens_details,omitempty"`
+	OutputTokens        int                 `json:"output_tokens,omitempty"`
+	OutputTokensDetails OutputTokensDetails `json:"output_tokens_details,omitempty"`
+	TotalTokens         int                 `json:"total_tokens,omitempty"`
+}
+
+func (u *ResponseUsage) TokenUsage() *globals.TokenUsage {
+	if u == nil {
+		return nil
+	}
+
+	var promptDetails *globals.PromptTokensDetails
+	if u.InputTokensDetails != nil && u.InputTokensDetails.CachedTokens > 0 {
+		promptDetails = &globals.PromptTokensDetails{
+			CachedTokens: u.InputTokensDetails.CachedTokens,
+		}
+	}
+
+	return globals.NormalizeTokenUsage(&globals.TokenUsage{
+		PromptTokens:        u.InputTokens,
+		CompletionTokens:    u.OutputTokens,
+		TotalTokens:         u.TotalTokens,
+		PromptTokensDetails: promptDetails,
+		CompletionTokensDetails: globals.CompletionTokensDetails{
+			ReasoningTokens: u.OutputTokensDetails.ReasoningTokens,
+		},
+	})
 }

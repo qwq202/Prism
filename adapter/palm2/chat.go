@@ -476,7 +476,7 @@ func (c *ChatInstance) GetGeminiInteractionChunk(data interface{}) (*globals.Chu
 
 		content := strings.TrimSpace(builder.String())
 		if content != "" {
-			return &globals.Chunk{Content: content}, nil
+			return &globals.Chunk{Content: content, Usage: getGeminiInteractionUsage(form)}, nil
 		}
 	}
 
@@ -487,16 +487,31 @@ func (c *ChatInstance) GetGeminiInteractionChunk(data interface{}) (*globals.Chu
 	return nil, fmt.Errorf("gemini interactions: cannot parse response")
 }
 
-func (c *ChatInstance) buildGeminiChunk(model string, parts []GeminiChatPart, stream bool) *globals.Chunk {
+func getGeminiInteractionUsage(form *GeminiInteractionResponse) *globals.TokenUsage {
+	if form == nil {
+		return nil
+	}
+	if form.UsageMetadata != nil {
+		return form.UsageMetadata.TokenUsage()
+	}
+	return form.UsageMetadataSnake.TokenUsage()
+}
+
+func (c *ChatInstance) buildGeminiChunk(model string, parts []GeminiChatPart, stream bool, usage ...*GeminiUsageMetadata) *globals.Chunk {
 	content := c.GetGeminiChatText(model, parts)
 	if stream {
 		content = c.GetGeminiStreamText(model, parts)
+	}
+	var tokenUsage *globals.TokenUsage
+	if len(usage) > 0 {
+		tokenUsage = usage[0].TokenUsage()
 	}
 
 	return &globals.Chunk{
 		Content:              content,
 		ToolCall:             getGeminiToolCalls(parts),
 		GeminiHiddenMetadata: getGeminiHiddenMetadataFromParts(parts),
+		Usage:                tokenUsage,
 	}
 }
 
@@ -504,7 +519,10 @@ func (c *ChatInstance) GetGeminiChunk(model string, data interface{}) (*globals.
 	if form := utils.MapToStruct[GeminiChatResponse](data); form != nil {
 		if len(form.Candidates) != 0 {
 			parts := form.Candidates[0].Content.Parts
-			return c.buildGeminiChunk(model, parts, false), nil
+			return c.buildGeminiChunk(model, parts, false, form.UsageMetadata), nil
+		}
+		if form.UsageMetadata != nil {
+			return &globals.Chunk{Usage: form.UsageMetadata.TokenUsage()}, nil
 		}
 	}
 
@@ -587,7 +605,10 @@ func (c *ChatInstance) CreateStreamChatRequest(props *adaptercommon.ChatProps, c
 			if form := utils.UnmarshalForm[GeminiStreamResponse](data); form != nil {
 				if len(form.Candidates) != 0 && len(form.Candidates[0].Content.Parts) != 0 {
 					parts := form.Candidates[0].Content.Parts
-					return callback(c.buildGeminiChunk(props.Model, parts, true))
+					return callback(c.buildGeminiChunk(props.Model, parts, true, form.UsageMetadata))
+				}
+				if form.UsageMetadata != nil {
+					return callback(&globals.Chunk{Usage: form.UsageMetadata.TokenUsage()})
 				}
 				return nil
 			}

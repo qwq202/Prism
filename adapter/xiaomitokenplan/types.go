@@ -30,6 +30,7 @@ type ChatRequest struct {
 	Messages            interface{}            `json:"messages"`
 	MaxCompletionTokens *int                   `json:"max_completion_tokens,omitempty"`
 	Stream              bool                   `json:"stream"`
+	StreamOptions       interface{}            `json:"stream_options,omitempty"`
 	PresencePenalty     *float32               `json:"presence_penalty,omitempty"`
 	FrequencyPenalty    *float32               `json:"frequency_penalty,omitempty"`
 	Temperature         *float32               `json:"temperature,omitempty"`
@@ -61,6 +62,7 @@ type ChatStreamResponse struct {
 		Index        int             `json:"index"`
 		FinishReason string          `json:"finish_reason"`
 	} `json:"choices"`
+	Usage *globals.TokenUsage `json:"usage,omitempty"`
 }
 
 type ChatStreamErrorResponse struct {

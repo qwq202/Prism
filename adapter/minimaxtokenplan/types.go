@@ -61,6 +61,7 @@ type StreamEvent struct {
 	Delta        *ContentBlockDelta `json:"delta,omitempty"`
 	Error        *ChatError         `json:"error,omitempty"`
 	Message      *ResponseMessage   `json:"message,omitempty"`
+	Usage        *AnthropicUsage    `json:"usage,omitempty"`
 }
 
 type ContentBlockDelta struct {
@@ -74,20 +75,44 @@ type ContentBlockDelta struct {
 }
 
 type ResponseMessage struct {
-	ID         string         `json:"id"`
-	Type       string         `json:"type"`
-	Role       string         `json:"role"`
-	Content    []ContentBlock `json:"content"`
-	StopReason *string        `json:"stop_reason,omitempty"`
+	ID         string          `json:"id"`
+	Type       string          `json:"type"`
+	Role       string          `json:"role"`
+	Content    []ContentBlock  `json:"content"`
+	StopReason *string         `json:"stop_reason,omitempty"`
+	Usage      *AnthropicUsage `json:"usage,omitempty"`
 }
 
 type ChatResponse struct {
-	ID         string         `json:"id"`
-	Type       string         `json:"type"`
-	Role       string         `json:"role"`
-	Content    []ContentBlock `json:"content"`
-	StopReason *string        `json:"stop_reason,omitempty"`
-	Error      *ChatError     `json:"error,omitempty"`
+	ID         string          `json:"id"`
+	Type       string          `json:"type"`
+	Role       string          `json:"role"`
+	Content    []ContentBlock  `json:"content"`
+	StopReason *string         `json:"stop_reason,omitempty"`
+	Usage      *AnthropicUsage `json:"usage,omitempty"`
+	Error      *ChatError      `json:"error,omitempty"`
+}
+
+type AnthropicUsage struct {
+	InputTokens              int `json:"input_tokens,omitempty"`
+	OutputTokens             int `json:"output_tokens,omitempty"`
+	CacheCreationInputTokens int `json:"cache_creation_input_tokens,omitempty"`
+	CacheReadInputTokens     int `json:"cache_read_input_tokens,omitempty"`
+}
+
+func (u *AnthropicUsage) TokenUsage() *globals.TokenUsage {
+	if u == nil {
+		return nil
+	}
+
+	promptTokens := u.InputTokens + u.CacheCreationInputTokens + u.CacheReadInputTokens
+	return globals.NormalizeTokenUsage(&globals.TokenUsage{
+		PromptTokens:          promptTokens,
+		CompletionTokens:      u.OutputTokens,
+		TotalTokens:           promptTokens + u.OutputTokens,
+		PromptCacheHitTokens:  u.CacheReadInputTokens,
+		PromptCacheMissTokens: u.CacheCreationInputTokens,
+	})
 }
 
 type ChatError struct {
