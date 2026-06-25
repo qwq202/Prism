@@ -43,6 +43,8 @@ type Charge struct {
 	Models    []string           `json:"models" mapstructure:"models"`
 	Input     float32            `json:"input" mapstructure:"input"`
 	Output    float32            `json:"output" mapstructure:"output"`
+	CacheHit  *float32           `json:"cache_hit,omitempty" mapstructure:"cache_hit"`
+	CacheMiss *float32           `json:"cache_miss,omitempty" mapstructure:"cache_miss"`
 	Image     *ImageChargeConfig `json:"image,omitempty" mapstructure:"image"`
 	Anonymous bool               `json:"anonymous" mapstructure:"anonymous"`
 	Unset     bool               `json:"-" mapstructure:"-"`

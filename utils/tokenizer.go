@@ -121,6 +121,57 @@ func CountInputQuota(charge Charge, token int) float32 {
 	return 0
 }
 
+func CountRecordInputQuota(charge Charge, fallbackTokens int, usage *globals.TokenUsage) float32 {
+	if charge == nil || charge.GetType() != globals.TokenBilling {
+		return 0
+	}
+	if usage.IsEmpty() {
+		return CountInputQuota(charge, fallbackTokens)
+	}
+
+	promptTokens := usage.PromptTokens
+	cacheHitTokens := usage.PromptCacheHitTokens
+	cacheMissTokens := usage.PromptCacheMissTokens
+	if promptTokens == 0 {
+		promptTokens = cacheHitTokens + cacheMissTokens
+	}
+
+	cacheCharge, hasCachePrices := charge.(TokenCacheCharge)
+	if !hasCachePrices {
+		if promptTokens > fallbackTokens {
+			return CountInputQuota(charge, promptTokens)
+		}
+		return CountInputQuota(charge, fallbackTokens)
+	}
+
+	cacheHitPrice, hasCacheHitPrice := cacheCharge.GetCacheHit()
+	cacheMissPrice, hasCacheMissPrice := cacheCharge.GetCacheMiss()
+	if !hasCacheHitPrice && !hasCacheMissPrice {
+		if promptTokens > fallbackTokens {
+			return CountInputQuota(charge, promptTokens)
+		}
+		return CountInputQuota(charge, fallbackTokens)
+	}
+	if !hasCacheHitPrice {
+		cacheHitPrice = charge.GetInput()
+	}
+	if !hasCacheMissPrice {
+		cacheMissPrice = charge.GetInput()
+	}
+
+	regularTokens := promptTokens - cacheHitTokens - cacheMissTokens
+	if regularTokens < 0 {
+		regularTokens = 0
+	}
+	if promptTokens < fallbackTokens {
+		regularTokens += fallbackTokens - promptTokens
+	}
+
+	return float32(regularTokens)/1000*charge.GetInput() +
+		float32(cacheHitTokens)/1000*cacheHitPrice +
+		float32(cacheMissTokens)/1000*cacheMissPrice
+}
+
 func CountOutputToken(charge Charge, token int) float32 {
 	switch charge.GetType() {
 	case globals.TokenBilling:

@@ -23,6 +23,11 @@ type ImageBillingEstimator interface {
 	GetImageBillingDetail(referenceImages int, responseFormat interface{}, outputImages int) map[string]interface{}
 }
 
+type TokenCacheCharge interface {
+	GetCacheHit() (float32, bool)
+	GetCacheMiss() (float32, bool)
+}
+
 type Buffer struct {
 	Model                string                        `json:"model"`
 	Quota                float32                       `json:"quota"`
@@ -130,7 +135,7 @@ func (b *Buffer) GetRecordQuota() float32 {
 	}
 
 	if b.Charge.IsBillingType(globals.TokenBilling) && !b.Usage.IsEmpty() {
-		return CountInputQuota(b.Charge, b.CountRecordInputToken()) +
+		return CountRecordInputQuota(b.Charge, b.CountInputToken(), b.Usage) +
 			CountOutputToken(b.Charge, b.CountRecordOutputToken())
 	}
 

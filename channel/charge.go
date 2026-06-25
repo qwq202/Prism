@@ -262,7 +262,17 @@ func cloneChargeRule(item *Charge) *Charge {
 	}
 	copied := *item
 	copied.Models = append([]string(nil), item.Models...)
+	copied.CacheHit = cloneFloat32Ptr(item.CacheHit)
+	copied.CacheMiss = cloneFloat32Ptr(item.CacheMiss)
 	copied.Image = cloneImageChargeConfig(item.Image)
+	return &copied
+}
+
+func cloneFloat32Ptr(value *float32) *float32 {
+	if value == nil {
+		return nil
+	}
+	copied := *value
 	return &copied
 }
 
@@ -341,6 +351,20 @@ func (c *Charge) GetOutput() float32 {
 		return 0
 	}
 	return c.Output
+}
+
+func (c *Charge) GetCacheHit() (float32, bool) {
+	if c.CacheHit == nil || *c.CacheHit < 0 {
+		return 0, false
+	}
+	return *c.CacheHit, true
+}
+
+func (c *Charge) GetCacheMiss() (float32, bool) {
+	if c.CacheMiss == nil || *c.CacheMiss < 0 {
+		return 0, false
+	}
+	return *c.CacheMiss, true
 }
 
 func (c *Charge) SupportAnonymous() bool {
@@ -494,6 +518,8 @@ func (c *Charge) New(model string) *Charge {
 		Models:    []string{model},
 		Input:     c.Input,
 		Output:    c.Output,
+		CacheHit:  cloneFloat32Ptr(c.CacheHit),
+		CacheMiss: cloneFloat32Ptr(c.CacheMiss),
 		Image:     cloneImageChargeConfig(c.Image),
 		Anonymous: c.Anonymous,
 	}

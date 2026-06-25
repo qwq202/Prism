@@ -27,6 +27,8 @@ export type ChargeBaseProps = {
   anonymous: boolean;
   input: number;
   output: number;
+  cache_hit?: number;
+  cache_miss?: number;
   image?: ImageChargeConfig;
 };
 

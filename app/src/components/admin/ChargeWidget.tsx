@@ -18,6 +18,7 @@ import {
   Activity,
   AlertCircle,
   BoxIcon,
+  Check,
   Cloud,
   Copy,
   DownloadCloud,
@@ -193,6 +194,10 @@ function formatImageChargeSummary(charge: ChargeProps) {
   return `${formatDecimal(image.default || charge.output || 0)} / image`;
 }
 
+function hasTokenCachePrices(charge: ChargeProps) {
+  return (charge.cache_hit ?? 0) > 0 || (charge.cache_miss ?? 0) > 0;
+}
+
 type ChargeAction =
   | { type: "set"; payload: ChargeProps }
   | { type: "set-models"; payload: string[] }
@@ -203,9 +208,12 @@ type ChargeAction =
   | { type: "set-anonymous"; payload: boolean }
   | { type: "set-input"; payload: number }
   | { type: "set-output"; payload: number }
+  | { type: "set-cache-hit"; payload: number }
+  | { type: "set-cache-miss"; payload: number }
   | { type: "set-image"; payload: ImageChargeConfig }
   | { type: "set-image-number"; key: keyof ImageChargeConfig; payload: number }
   | { type: "set-image-size-price"; key: string; payload: number }
+  | { type: "set-image-all-size-prices"; payload: number }
   | { type: "set-image-quality-price"; key: string; payload: number }
   | { type: "clear" }
   | { type: "clear-param" };
@@ -251,6 +259,16 @@ function reducer(state: ChargeProps, action: ChargeAction): ChargeProps {
       return { ...state, input: action.payload };
     case "set-output":
       return { ...state, output: action.payload };
+    case "set-cache-hit":
+      return {
+        ...state,
+        cache_hit: action.payload > 0 ? action.payload : undefined,
+      };
+    case "set-cache-miss":
+      return {
+        ...state,
+        cache_miss: action.payload > 0 ? action.payload : undefined,
+      };
     case "set-image": {
       const image = normalizeImageChargeConfig(action.payload, state.output);
       return { ...state, image, output: image.default || state.output };
@@ -275,6 +293,16 @@ function reducer(state: ChargeProps, action: ChargeAction): ChargeProps {
         nextSize[action.key] = action.payload;
       } else {
         delete nextSize[action.key];
+      }
+      return { ...state, image: { ...image, size: nextSize } };
+    }
+    case "set-image-all-size-prices": {
+      const image = normalizeImageChargeConfig(state.image, state.output);
+      const nextSize: Record<string, number> = {};
+      if (action.payload > 0) {
+        imageSizePriceKeys.forEach((key) => {
+          nextSize[key] = action.payload;
+        });
       }
       return { ...state, image: { ...image, size: nextSize } };
     }
@@ -305,17 +333,25 @@ function preflight(state: ChargeProps): ChargeProps {
     case nonBilling:
       state.input = 0;
       state.output = 0;
+      state.cache_hit = undefined;
+      state.cache_miss = undefined;
       break;
     case timesBilling:
       state.input = 0;
       state.anonymous = false;
+      state.cache_hit = undefined;
+      state.cache_miss = undefined;
       break;
     case tokenBilling:
       state.anonymous = false;
+      if ((state.cache_hit ?? 0) <= 0) state.cache_hit = undefined;
+      if ((state.cache_miss ?? 0) <= 0) state.cache_miss = undefined;
       break;
     case imageBilling:
       state.input = 0;
       state.anonymous = false;
+      state.cache_hit = undefined;
+      state.cache_miss = undefined;
       state.image = normalizeImageChargeConfig(state.image, state.output);
       state.output = state.image.default || state.output || 0;
       break;
@@ -581,6 +617,7 @@ function ImageBillingEditor({ form, dispatch }: ImageBillingEditorProps) {
   const [previewSize, setPreviewSize] = useState("1K");
   const [previewQuality, setPreviewQuality] = useState("");
   const [previewReferences, setPreviewReferences] = useState(0);
+  const [bulkSizePrice, setBulkSizePrice] = useState(0);
   const previewQuota = countImagePreviewQuota(
     image,
     previewSize,
@@ -682,17 +719,37 @@ function ImageBillingEditor({ form, dispatch }: ImageBillingEditorProps) {
       <div className="mt-5 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-4">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+            <div className="mb-2 flex flex-wrap items-center gap-2 text-sm font-medium">
               <Ruler className="h-4 w-4 text-muted-foreground" />
-              {t("admin.charge.image-size-prices")}
+              <span className="grow">{t("admin.charge.image-size-prices")}</span>
+              <NumberInput
+                value={bulkSizePrice}
+                onValueChange={setBulkSizePrice}
+                acceptNegative={false}
+                className="h-8 w-20"
+                min={0}
+                max={99999}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-8 gap-1 px-2"
+                onClick={() =>
+                  dispatch({
+                    type: "set-image-all-size-prices",
+                    payload: bulkSizePrice,
+                  })
+                }
+              >
+                <Check className="h-3.5 w-3.5" />
+                {t("admin.charge.image-apply-all")}
+              </Button>
             </div>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-x-3 gap-y-2 rounded-md border border-border/50 bg-muted/30 p-3 sm:grid-cols-2 lg:grid-cols-3">
               {imageSizePriceKeys.map((size) => (
-                <div
-                  key={size}
-                  className="grid grid-cols-[8rem_minmax(0,1fr)] items-center gap-3 rounded-md border border-border/70 bg-background px-3 py-2"
-                >
-                  <span className="shrink-0 whitespace-nowrap text-sm font-medium tabular-nums">
+                <div key={size} className="flex items-center gap-2">
+                  <span className="w-20 shrink-0 whitespace-nowrap text-xs font-medium tabular-nums text-muted-foreground">
                     {size}
                   </span>
                   <NumberInput
@@ -705,7 +762,7 @@ function ImageBillingEditor({ form, dispatch }: ImageBillingEditorProps) {
                       })
                     }
                     acceptNegative={false}
-                    className="h-9 min-w-0"
+                    className="h-8 min-w-0 flex-1"
                     min={0}
                     max={99999}
                   />
@@ -1047,6 +1104,63 @@ function ChargeEditor({
               max={99999999}
             />
           </div>
+          <div className={`flex flex-row w-full h-max items-center`}>
+            <Cloud className={`w-4 h-4 mr-2`} />
+            <Label className={`grow`}>
+              {t("admin.charge.cache-hit-count")}
+              <span
+                className={`token cursor-pointer select-none hover:text-foreground transition-colors ml-0.5`}
+                onClick={() => setUnitM((v) => !v)}
+                title={unitM ? "切换到 1k tokens" : "切换到 1M tokens"}
+              >
+                {" / "}
+                {unitM ? "1M" : "1k"}
+                {" tokens ↕"}
+              </span>
+            </Label>
+            <NumberInput
+              value={parseFloat(
+                (((form.cache_hit ?? 0) * multiplier) || 0).toPrecision(10),
+              )}
+              onValueChange={(value) =>
+                dispatch({ type: "set-cache-hit", payload: value / multiplier })
+              }
+              acceptNegative={false}
+              className={`w-20`}
+              min={0}
+              max={99999999}
+            />
+          </div>
+          <div className={`flex flex-row w-full h-max items-center`}>
+            <UploadCloud className={`w-4 h-4 mr-2`} />
+            <Label className={`grow`}>
+              {t("admin.charge.cache-miss-count")}
+              <span
+                className={`token cursor-pointer select-none hover:text-foreground transition-colors ml-0.5`}
+                onClick={() => setUnitM((v) => !v)}
+                title={unitM ? "切换到 1k tokens" : "切换到 1M tokens"}
+              >
+                {" / "}
+                {unitM ? "1M" : "1k"}
+                {" tokens ↕"}
+              </span>
+            </Label>
+            <NumberInput
+              value={parseFloat(
+                (((form.cache_miss ?? 0) * multiplier) || 0).toPrecision(10),
+              )}
+              onValueChange={(value) =>
+                dispatch({
+                  type: "set-cache-miss",
+                  payload: value / multiplier,
+                })
+              }
+              acceptNegative={false}
+              className={`w-20`}
+              min={0}
+              max={99999999}
+            />
+          </div>
         </div>
       )}
 
@@ -1215,18 +1329,45 @@ function ChargeTable({
                   ))}
                 </TableCell>
                 <TableCell>
-                  {charge.type === imageBilling
-                    ? t("admin.charge.image-reference-short", {
-                        quota: formatDecimal(
-                          normalizeImageChargeConfig(
-                            charge.image,
-                            charge.output,
-                          ).reference || 0,
-                        ),
-                      })
-                    : formatDecimal(
+                  {charge.type === imageBilling ? (
+                    t("admin.charge.image-reference-short", {
+                      quota: formatDecimal(
+                        normalizeImageChargeConfig(
+                          charge.image,
+                          charge.output,
+                        ).reference || 0,
+                      ),
+                    })
+                  ) : (
+                    <>
+                      {formatDecimal(
                         parseFloat((charge.input * multiplier).toPrecision(10)),
                       )}
+                      {charge.type === tokenBilling &&
+                        hasTokenCachePrices(charge) && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {t("admin.charge.cache-short", {
+                              hit: formatDecimal(
+                                parseFloat(
+                                  (
+                                    ((charge.cache_hit ?? 0) * multiplier) ||
+                                    0
+                                  ).toPrecision(10),
+                                ),
+                              ),
+                              miss: formatDecimal(
+                                parseFloat(
+                                  (
+                                    ((charge.cache_miss ?? 0) * multiplier) ||
+                                    0
+                                  ).toPrecision(10),
+                                ),
+                              ),
+                            })}
+                          </p>
+                        )}
+                    </>
+                  )}
                 </TableCell>
                 <TableCell>
                   {charge.type === imageBilling

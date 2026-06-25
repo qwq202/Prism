@@ -18,6 +18,26 @@ func (usageTestCharge) IsBilling() bool             { return true }
 func (usageTestCharge) IsBillingType(t string) bool { return t == globals.TokenBilling }
 func (usageTestCharge) GetLimit() float32           { return 0 }
 
+type usageCacheTestCharge struct {
+	hit  float32
+	miss float32
+}
+
+func (usageCacheTestCharge) GetType() string             { return globals.TokenBilling }
+func (usageCacheTestCharge) GetModels() []string         { return nil }
+func (usageCacheTestCharge) GetInput() float32           { return 1 }
+func (usageCacheTestCharge) GetOutput() float32          { return 2 }
+func (usageCacheTestCharge) SupportAnonymous() bool      { return true }
+func (usageCacheTestCharge) IsBilling() bool             { return true }
+func (usageCacheTestCharge) IsBillingType(t string) bool { return t == globals.TokenBilling }
+func (usageCacheTestCharge) GetLimit() float32           { return 0 }
+func (c usageCacheTestCharge) GetCacheHit() (float32, bool) {
+	return c.hit, true
+}
+func (c usageCacheTestCharge) GetCacheMiss() (float32, bool) {
+	return c.miss, true
+}
+
 func TestBufferRecordsOfficialUsage(t *testing.T) {
 	buffer := &Buffer{}
 	buffer.WriteChunk(&globals.Chunk{
@@ -104,6 +124,27 @@ func TestBufferRecordQuotaUsesOfficialUsageWhenPresent(t *testing.T) {
 	}
 	if got := buffer.GetRecordQuota(); math.Abs(float64(got-5)) > 0.001 {
 		t.Fatalf("expected official usage quota 5, got %f", got)
+	}
+}
+
+func TestBufferRecordQuotaUsesCacheTokenPrices(t *testing.T) {
+	buffer := NewBuffer(globals.GPT3Turbo, nil, usageCacheTestCharge{
+		hit:  0.2,
+		miss: 0.6,
+	})
+	buffer.Write("visible")
+	buffer.SetUsage(&globals.TokenUsage{
+		PromptTokens:          1000,
+		CompletionTokens:      1000,
+		TotalTokens:           2000,
+		PromptCacheHitTokens:  300,
+		PromptCacheMissTokens: 200,
+	})
+
+	// input: 500 regular * 1 + 300 cache-hit * 0.2 + 200 cache-miss * 0.6 = 0.68
+	// output: 1000 * 2 = 2
+	if got := buffer.GetRecordQuota(); math.Abs(float64(got-2.68)) > 0.001 {
+		t.Fatalf("expected cache-aware quota 2.68, got %f", got)
 	}
 }
 
