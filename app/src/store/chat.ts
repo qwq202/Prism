@@ -1,4 +1,4 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { createSelector, createSlice } from "@reduxjs/toolkit";
 import {
   AssistantRole,
   ConversationInstance,
@@ -1681,8 +1681,10 @@ export const selectCustomMasks = (state: RootState): CustomMask[] =>
   state.chat.custom_masks;
 export const selectSupportModels = (state: RootState): Model[] =>
   state.chat.support_models;
-export const selectChatSupportModels = (state: RootState): Model[] =>
-  getChatSupportModels(state.chat.support_models);
+export const selectChatSupportModels = createSelector(
+  [selectSupportModels],
+  getChatSupportModels,
+);
 export const selectMaskItem = (state: RootState): Mask | null =>
   state.chat.mask_item;
 
