@@ -1464,6 +1464,8 @@
       "cache-short": "缓存 H {{hit}} / M {{miss}}",
       "image-billing-title": "绘图计费",
       "image-billing-desc": "按最终生成图片计费，可叠加尺寸、质量、参考图和固定请求费用，适用于 Gemini、OpenAI、Azure 等绘图渠道。",
+      "image-advanced": "高级计费",
+      "image-basic-total": "基础预估",
       "image-billing-mode": "计费模式",
       "image-billing-mode-per_image": "按张 / 默认价",
       "image-billing-mode-matrix": "参数矩阵",

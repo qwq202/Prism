@@ -948,6 +948,8 @@
       "cache-short": "Cache H {{hit}} / M {{miss}}",
       "image-billing-title": "Image Billing",
       "image-billing-desc": "Charge by final generated image with optional size, quality, reference image, and fixed request costs for Gemini, OpenAI, Azure, and custom image channels.",
+      "image-advanced": "Advanced billing",
+      "image-basic-total": "Basic estimate",
       "image-billing-mode": "Billing mode",
       "image-billing-mode-per_image": "Per image / default",
       "image-billing-mode-matrix": "Parameter matrix",

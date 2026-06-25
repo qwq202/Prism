@@ -25,6 +25,7 @@ import {
   AlertCircle,
   BoxIcon,
   Check,
+  ChevronDown,
   Cloud,
   Copy,
   DownloadCloud,
@@ -178,14 +179,13 @@ function normalizeImageChargeConfig(
     billing_unit: config.billing_unit || "final_image",
     size: normalizePriceMap(config.size),
     quality: normalizePriceMap(config.quality),
-    rules: (config.rules || [])
-      .map((rule) => ({
-        size: rule.size?.trim() || undefined,
-        quality: rule.quality?.trim() || undefined,
-        mime_type: rule.mime_type?.trim() || undefined,
-        aspect_ratio: rule.aspect_ratio?.trim() || undefined,
-        quota: Math.max(0, Number(rule.quota || 0)),
-      })),
+    rules: (config.rules || []).map((rule) => ({
+      size: rule.size?.trim() || undefined,
+      quality: rule.quality?.trim() || undefined,
+      mime_type: rule.mime_type?.trim() || undefined,
+      aspect_ratio: rule.aspect_ratio?.trim() || undefined,
+      quota: Math.max(0, Number(rule.quota || 0)),
+    })),
     usage: {
       input: Math.max(0, Number(config.usage?.input ?? 0)),
       output: Math.max(0, Number(config.usage?.output ?? 0)),
@@ -218,11 +218,11 @@ function countImagePreviewQuota(
     return (
       (config.request || 0) +
       (config.reference || 0) * Math.max(0, referenceImages) +
-      Math.max(0, usageTokens?.input || 0) / 1000 *
+      (Math.max(0, usageTokens?.input || 0) / 1000) *
         Math.max(0, config.usage?.input || 0) +
-      Math.max(0, usageTokens?.output || 0) / 1000 *
+      (Math.max(0, usageTokens?.output || 0) / 1000) *
         Math.max(0, config.usage?.output || 0) +
-      Math.max(0, usageTokens?.image || 0) / 1000 *
+      (Math.max(0, usageTokens?.image || 0) / 1000) *
         Math.max(0, config.usage?.image || 0)
     );
   }
@@ -243,8 +243,8 @@ function countImagePreviewQuota(
   }
   const sizePrice = getImagePriceForKey(config.size, size);
   const qualityPrice = getImagePriceForKey(config.quality, quality);
-  const unitPrice = (sizePrice > 0 ? sizePrice : config.default || 0) +
-    qualityPrice;
+  const unitPrice =
+    (sizePrice > 0 ? sizePrice : config.default || 0) + qualityPrice;
 
   return (
     (config.request || 0) +
@@ -261,7 +261,9 @@ function formatImageChargeSummary(charge: ChargeProps) {
   if (image.mode === imageBillingModeMatrix && (image.rules || []).length > 0) {
     return `${image.rules?.length || 0} rules`;
   }
-  const sizes = Object.entries(image.size || {}).filter(([, value]) => value > 0);
+  const sizes = Object.entries(image.size || {}).filter(
+    ([, value]) => value > 0,
+  );
   if (sizes.length > 0) {
     return sizes
       .slice(0, 3)
@@ -294,7 +296,11 @@ type ChargeAction =
   | { type: "set-image-size-price"; key: string; payload: number }
   | { type: "set-image-all-size-prices"; payload: number }
   | { type: "set-image-quality-price"; key: string; payload: number }
-  | { type: "set-image-usage-price"; key: "input" | "output" | "image"; payload: number }
+  | {
+      type: "set-image-usage-price";
+      key: "input" | "output" | "image";
+      payload: number;
+    }
   | { type: "add-image-rule" }
   | { type: "remove-image-rule"; index: number }
   | {
@@ -453,7 +459,9 @@ function reducer(state: ChargeProps, action: ChargeAction): ChargeProps {
         ...state,
         image: {
           ...image,
-          rules: (image.rules || []).filter((_, index) => index !== action.index),
+          rules: (image.rules || []).filter(
+            (_, index) => index !== action.index,
+          ),
         },
       };
     }
@@ -586,9 +594,10 @@ function SyncDialog({
         defaultValue={"https://api.chatnio.net"}
         alert={system === "" ? t("admin.format-only") : undefined}
         onSubmit={async (endpoint): Promise<boolean> => {
-          const path = system === "newapi"
-            ? `${endpoint.replace(/\/$/, "")}/api/ratio_config`
-            : getV1Path("/v1/charge", { endpoint });
+          const path =
+            system === "newapi"
+              ? `${endpoint.replace(/\/$/, "")}/api/ratio_config`
+              : getV1Path("/v1/charge", { endpoint });
           const resp = await fetchUpstreamCharge({ endpoint, system });
 
           if (!resp.status || resp.data.length === 0) {
@@ -780,6 +789,7 @@ function ImageBillingEditor({ form, dispatch }: ImageBillingEditorProps) {
   const [previewOutputTokens, setPreviewOutputTokens] = useState(0);
   const [previewImageTokens, setPreviewImageTokens] = useState(0);
   const [bulkSizePrice, setBulkSizePrice] = useState(0);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const previewQuota = countImagePreviewQuota(
     image,
     previewSize,
@@ -793,6 +803,7 @@ function ImageBillingEditor({ form, dispatch }: ImageBillingEditorProps) {
   );
   const isMatrixBilling = image.mode === imageBillingModeMatrix;
   const isOfficialUsageBilling = image.mode === imageBillingModeOfficialUsage;
+  const basicQuota = countImagePreviewQuota(image, "", "", 0);
 
   return (
     <div className="mt-5 rounded-lg border border-border/70 bg-muted/20 p-4">
@@ -810,55 +821,8 @@ function ImageBillingEditor({ form, dispatch }: ImageBillingEditorProps) {
         </div>
       </div>
 
-      <div className="mb-4 grid gap-3 md:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">
-            {t("admin.charge.image-billing-mode")}
-          </Label>
-          <Select
-            value={image.mode || imageBillingModePerImage}
-            onValueChange={(value) =>
-              dispatch({ type: "set-image-mode", payload: value })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {imageBillingModes.map((mode) => (
-                <SelectItem key={mode} value={mode}>
-                  {t(`admin.charge.image-billing-mode-${mode}`)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">
-            {t("admin.charge.image-missing-policy")}
-          </Label>
-          <Select
-            value={image.missing_price_policy || imageMissingPricePolicyDefault}
-            onValueChange={(value) =>
-              dispatch({ type: "set-image-missing-policy", payload: value })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {imageMissingPricePolicies.map((policy) => (
-                <SelectItem key={policy} value={policy}>
-                  {t(`admin.charge.image-missing-policy-${policy}`)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-2">
-        <div className="flex flex-row items-center gap-2">
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+        <div className="flex flex-row items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2">
           <FileImage className="h-4 w-4 shrink-0 text-muted-foreground" />
           <Label className="grow">{t("admin.charge.image-default")}</Label>
           <NumberInput
@@ -876,7 +840,7 @@ function ImageBillingEditor({ form, dispatch }: ImageBillingEditorProps) {
             max={99999}
           />
         </div>
-        <div className="flex flex-row items-center gap-2">
+        <div className="flex flex-row items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2">
           <Layers3 className="h-4 w-4 shrink-0 text-muted-foreground" />
           <Label className="grow">{t("admin.charge.image-output-count")}</Label>
           <NumberInput
@@ -894,7 +858,7 @@ function ImageBillingEditor({ form, dispatch }: ImageBillingEditorProps) {
             max={99}
           />
         </div>
-        <div className="flex flex-row items-center gap-2">
+        <div className="flex flex-row items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2">
           <SlidersHorizontal className="h-4 w-4 shrink-0 text-muted-foreground" />
           <Label className="grow">{t("admin.charge.image-request")}</Label>
           <NumberInput
@@ -912,7 +876,7 @@ function ImageBillingEditor({ form, dispatch }: ImageBillingEditorProps) {
             max={99999}
           />
         </div>
-        <div className="flex flex-row items-center gap-2">
+        <div className="flex flex-row items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2">
           <UploadCloud className="h-4 w-4 shrink-0 text-muted-foreground" />
           <Label className="grow">{t("admin.charge.image-reference")}</Label>
           <NumberInput
@@ -932,339 +896,432 @@ function ImageBillingEditor({ form, dispatch }: ImageBillingEditorProps) {
         </div>
       </div>
 
-      <div className="mt-5 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="space-y-4">
-          <div>
-            <div className="mb-2 flex flex-wrap items-center gap-2 text-sm font-medium">
-              <Ruler className="h-4 w-4 text-muted-foreground" />
-              <span className="grow">{t("admin.charge.image-size-prices")}</span>
-              <NumberInput
-                value={bulkSizePrice}
-                onValueChange={setBulkSizePrice}
-                acceptNegative={false}
-                className="h-8 w-20"
-                min={0}
-                max={99999}
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                className="h-8 gap-1 px-2"
-                onClick={() =>
-                  dispatch({
-                    type: "set-image-all-size-prices",
-                    payload: bulkSizePrice,
-                  })
-                }
-              >
-                <Check className="h-3.5 w-3.5" />
-                {t("admin.charge.image-apply-all")}
-              </Button>
-            </div>
-            <div className="grid gap-x-3 gap-y-2 rounded-md border border-border/50 bg-muted/30 p-3 sm:grid-cols-2 lg:grid-cols-3">
-              {imageSizePriceKeys.map((size) => (
-                <div key={size} className="flex items-center gap-2">
-                  <span className="w-20 shrink-0 whitespace-nowrap text-xs font-medium tabular-nums text-muted-foreground">
-                    {size}
-                  </span>
-                  <NumberInput
-                    value={getImagePriceForKey(image.size, size)}
-                    onValueChange={(value) =>
-                      dispatch({
-                        type: "set-image-size-price",
-                        key: size,
-                        payload: value,
-                      })
-                    }
-                    acceptNegative={false}
-                    className="h-8 min-w-0 flex-1"
-                    min={0}
-                    max={99999}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {isMatrixBilling && (
-            <div>
-              <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-                <KanbanSquareDashed className="h-4 w-4 text-muted-foreground" />
-                <span className="grow">
-                  {t("admin.charge.image-matrix-rules")}
-                </span>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className="h-8 gap-1 px-2"
-                  onClick={() => dispatch({ type: "add-image-rule" })}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  {t("admin.charge.image-add-matrix-rule")}
-                </Button>
-              </div>
-              <div className="space-y-2 rounded-md border border-border/50 bg-muted/30 p-3">
-                {(image.rules || []).length === 0 && (
-                  <p className="py-2 text-center text-xs text-muted-foreground">
-                    {t("admin.charge.image-empty-matrix-rules")}
-                  </p>
-                )}
-                {(image.rules || []).map((rule, index) => (
-                  <div
-                    key={index}
-                    className="grid gap-2 rounded-md border border-border/70 bg-background p-2 sm:grid-cols-[repeat(5,minmax(0,1fr))_auto]"
-                  >
-                    <Input
-                      value={rule.size || ""}
-                      onChange={(event) =>
-                        dispatch({
-                          type: "set-image-rule",
-                          index,
-                          key: "size",
-                          payload: event.target.value,
-                        })
-                      }
-                      placeholder={t("admin.charge.image-preview-size")}
-                      className="h-8"
-                    />
-                    <Input
-                      value={rule.quality || ""}
-                      onChange={(event) =>
-                        dispatch({
-                          type: "set-image-rule",
-                          index,
-                          key: "quality",
-                          payload: event.target.value,
-                        })
-                      }
-                      placeholder={t("admin.charge.image-preview-quality")}
-                      className="h-8"
-                    />
-                    <Input
-                      value={rule.mime_type || ""}
-                      onChange={(event) =>
-                        dispatch({
-                          type: "set-image-rule",
-                          index,
-                          key: "mime_type",
-                          payload: event.target.value,
-                        })
-                      }
-                      placeholder={t("admin.charge.image-rule-format")}
-                      className="h-8"
-                    />
-                    <Input
-                      value={rule.aspect_ratio || ""}
-                      onChange={(event) =>
-                        dispatch({
-                          type: "set-image-rule",
-                          index,
-                          key: "aspect_ratio",
-                          payload: event.target.value,
-                        })
-                      }
-                      placeholder={t("admin.charge.image-rule-ratio")}
-                      className="h-8"
-                    />
-                    <NumberInput
-                      value={rule.quota || 0}
-                      onValueChange={(value) =>
-                        dispatch({
-                          type: "set-image-rule",
-                          index,
-                          key: "quota",
-                          payload: value,
-                        })
-                      }
-                      acceptNegative={false}
-                      className="h-8"
-                      min={0}
-                      max={99999}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() =>
-                        dispatch({ type: "remove-image-rule", index })
-                      }
-                    >
-                      <Trash className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {isOfficialUsageBilling && (
-            <div>
-              <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-                <Activity className="h-4 w-4 text-muted-foreground" />
-                {t("admin.charge.image-usage-prices")}
-              </div>
-              <div className="grid gap-2 rounded-md border border-border/50 bg-muted/30 p-3 sm:grid-cols-3">
-                {(["input", "output", "image"] as const).map((key) => (
-                  <div
-                    key={key}
-                    className="flex items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2"
-                  >
-                    <span className="w-16 text-sm font-medium">
-                      {t(`admin.charge.image-usage-${key}`)}
-                    </span>
-                    <NumberInput
-                      value={image.usage?.[key] || 0}
-                      onValueChange={(value) =>
-                        dispatch({
-                          type: "set-image-usage-price",
-                          key,
-                          payload: value,
-                        })
-                      }
-                      acceptNegative={false}
-                      className="h-9 flex-1"
-                      min={0}
-                      max={99999}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div>
-            <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-              <Settings2 className="h-4 w-4 text-muted-foreground" />
-              {t("admin.charge.image-quality-prices")}
-            </div>
-            <div className="grid gap-2 sm:grid-cols-3">
-              {imageQualityPriceKeys.map((quality) => (
-                <div
-                  key={quality}
-                  className="flex items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2"
-                >
-                  <span className="w-16 text-sm font-medium">
-                    {t(`admin.charge.image-quality-${quality}`)}
-                  </span>
-                  <NumberInput
-                    value={getImagePriceForKey(image.quality, quality)}
-                    onValueChange={(value) =>
-                      dispatch({
-                        type: "set-image-quality-price",
-                        key: quality,
-                        payload: value,
-                      })
-                    }
-                    acceptNegative={false}
-                    className="h-9 flex-1"
-                    min={0}
-                    max={99999}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-border/70 bg-background p-4">
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-            <Activity className="h-4 w-4 text-muted-foreground" />
-            {t("admin.charge.image-preview")}
-          </div>
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="mb-1 block text-xs text-muted-foreground">
-                  {t("admin.charge.image-preview-size")}
-                </Label>
-                <Input
-                  value={previewSize}
-                  onChange={(e) => setPreviewSize(e.target.value)}
-                  className="h-9"
-                />
-              </div>
-              <div>
-                <Label className="mb-1 block text-xs text-muted-foreground">
-                  {t("admin.charge.image-preview-quality")}
-                </Label>
-                <Input
-                  value={previewQuality}
-                  onChange={(e) => setPreviewQuality(e.target.value)}
-                  placeholder={t("admin.charge.image-preview-quality-empty")}
-                  className="h-9"
-                />
-              </div>
-            </div>
-            <div>
-              <Label className="mb-1 block text-xs text-muted-foreground">
-                {t("admin.charge.image-preview-reference")}
-              </Label>
-              <NumberInput
-                value={previewReferences}
-                onValueChange={setPreviewReferences}
-                acceptNegative={false}
-                className="h-9"
-                min={0}
-                max={99}
-              />
-            </div>
-            {isOfficialUsageBilling && (
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <Label className="mb-1 block text-xs text-muted-foreground">
-                    {t("admin.charge.image-usage-input")}
-                  </Label>
-                  <NumberInput
-                    value={previewInputTokens}
-                    onValueChange={setPreviewInputTokens}
-                    acceptNegative={false}
-                    className="h-9"
-                    min={0}
-                    max={99999999}
-                  />
-                </div>
-                <div>
-                  <Label className="mb-1 block text-xs text-muted-foreground">
-                    {t("admin.charge.image-usage-output")}
-                  </Label>
-                  <NumberInput
-                    value={previewOutputTokens}
-                    onValueChange={setPreviewOutputTokens}
-                    acceptNegative={false}
-                    className="h-9"
-                    min={0}
-                    max={99999999}
-                  />
-                </div>
-                <div>
-                  <Label className="mb-1 block text-xs text-muted-foreground">
-                    {t("admin.charge.image-usage-image")}
-                  </Label>
-                  <NumberInput
-                    value={previewImageTokens}
-                    onValueChange={setPreviewImageTokens}
-                    acceptNegative={false}
-                    className="h-9"
-                    min={0}
-                    max={99999999}
-                  />
-                </div>
-              </div>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={() => setAdvancedOpen((open) => !open)}
+        >
+          <Settings2 className="h-4 w-4" />
+          {t("admin.charge.image-advanced")}
+          <ChevronDown
+            className={cn(
+              "h-4 w-4 transition-transform",
+              advancedOpen && "rotate-180",
             )}
-            <div className="rounded-md border border-border bg-muted/30 p-3">
-              <p className="text-xs text-muted-foreground">
-                {t("admin.charge.image-preview-total")}
-              </p>
-              <p className="mt-1 text-2xl font-semibold tabular-nums">
-                {formatDecimal(previewQuota)}
-              </p>
-            </div>
-          </div>
+          />
+        </Button>
+        <Badge variant="secondary">
+          {t(`admin.charge.image-billing-mode-${image.mode}`)}
+        </Badge>
+        {image.missing_price_policy === imageMissingPricePolicyReject && (
+          <Badge variant="outline">
+            {t("admin.charge.image-missing-policy-reject")}
+          </Badge>
+        )}
+        <div className="grow" />
+        <div className="rounded-md border border-border/70 bg-background px-3 py-1.5 text-sm">
+          <span className="mr-2 text-muted-foreground">
+            {t("admin.charge.image-basic-total")}
+          </span>
+          <span className="font-semibold tabular-nums">
+            {formatDecimal(basicQuota)}
+          </span>
         </div>
       </div>
+
+      {advancedOpen && (
+        <div className="mt-4 space-y-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">
+                {t("admin.charge.image-billing-mode")}
+              </Label>
+              <Select
+                value={image.mode || imageBillingModePerImage}
+                onValueChange={(value) =>
+                  dispatch({ type: "set-image-mode", payload: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {imageBillingModes.map((mode) => (
+                    <SelectItem key={mode} value={mode}>
+                      {t(`admin.charge.image-billing-mode-${mode}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">
+                {t("admin.charge.image-missing-policy")}
+              </Label>
+              <Select
+                value={
+                  image.missing_price_policy || imageMissingPricePolicyDefault
+                }
+                onValueChange={(value) =>
+                  dispatch({ type: "set-image-missing-policy", payload: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {imageMissingPricePolicies.map((policy) => (
+                    <SelectItem key={policy} value={policy}>
+                      {t(`admin.charge.image-missing-policy-${policy}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+            <div className="space-y-4">
+              <div>
+                <div className="mb-2 flex flex-wrap items-center gap-2 text-sm font-medium">
+                  <Ruler className="h-4 w-4 text-muted-foreground" />
+                  <span className="grow">
+                    {t("admin.charge.image-size-prices")}
+                  </span>
+                  <NumberInput
+                    value={bulkSizePrice}
+                    onValueChange={setBulkSizePrice}
+                    acceptNegative={false}
+                    className="h-8 w-20"
+                    min={0}
+                    max={99999}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 gap-1 px-2"
+                    onClick={() =>
+                      dispatch({
+                        type: "set-image-all-size-prices",
+                        payload: bulkSizePrice,
+                      })
+                    }
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                    {t("admin.charge.image-apply-all")}
+                  </Button>
+                </div>
+                <div className="grid gap-x-3 gap-y-2 rounded-md border border-border/50 bg-muted/30 p-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {imageSizePriceKeys.map((size) => (
+                    <div key={size} className="flex items-center gap-2">
+                      <span className="w-20 shrink-0 whitespace-nowrap text-xs font-medium tabular-nums text-muted-foreground">
+                        {size}
+                      </span>
+                      <NumberInput
+                        value={getImagePriceForKey(image.size, size)}
+                        onValueChange={(value) =>
+                          dispatch({
+                            type: "set-image-size-price",
+                            key: size,
+                            payload: value,
+                          })
+                        }
+                        acceptNegative={false}
+                        className="h-8 min-w-0 flex-1"
+                        min={0}
+                        max={99999}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {isMatrixBilling && (
+                <div>
+                  <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                    <KanbanSquareDashed className="h-4 w-4 text-muted-foreground" />
+                    <span className="grow">
+                      {t("admin.charge.image-matrix-rules")}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="h-8 gap-1 px-2"
+                      onClick={() => dispatch({ type: "add-image-rule" })}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      {t("admin.charge.image-add-matrix-rule")}
+                    </Button>
+                  </div>
+                  <div className="space-y-2 rounded-md border border-border/50 bg-muted/30 p-3">
+                    {(image.rules || []).length === 0 && (
+                      <p className="py-2 text-center text-xs text-muted-foreground">
+                        {t("admin.charge.image-empty-matrix-rules")}
+                      </p>
+                    )}
+                    {(image.rules || []).map((rule, index) => (
+                      <div
+                        key={index}
+                        className="grid gap-2 rounded-md border border-border/70 bg-background p-2 sm:grid-cols-[repeat(5,minmax(0,1fr))_auto]"
+                      >
+                        <Input
+                          value={rule.size || ""}
+                          onChange={(event) =>
+                            dispatch({
+                              type: "set-image-rule",
+                              index,
+                              key: "size",
+                              payload: event.target.value,
+                            })
+                          }
+                          placeholder={t("admin.charge.image-preview-size")}
+                          className="h-8"
+                        />
+                        <Input
+                          value={rule.quality || ""}
+                          onChange={(event) =>
+                            dispatch({
+                              type: "set-image-rule",
+                              index,
+                              key: "quality",
+                              payload: event.target.value,
+                            })
+                          }
+                          placeholder={t("admin.charge.image-preview-quality")}
+                          className="h-8"
+                        />
+                        <Input
+                          value={rule.mime_type || ""}
+                          onChange={(event) =>
+                            dispatch({
+                              type: "set-image-rule",
+                              index,
+                              key: "mime_type",
+                              payload: event.target.value,
+                            })
+                          }
+                          placeholder={t("admin.charge.image-rule-format")}
+                          className="h-8"
+                        />
+                        <Input
+                          value={rule.aspect_ratio || ""}
+                          onChange={(event) =>
+                            dispatch({
+                              type: "set-image-rule",
+                              index,
+                              key: "aspect_ratio",
+                              payload: event.target.value,
+                            })
+                          }
+                          placeholder={t("admin.charge.image-rule-ratio")}
+                          className="h-8"
+                        />
+                        <NumberInput
+                          value={rule.quota || 0}
+                          onValueChange={(value) =>
+                            dispatch({
+                              type: "set-image-rule",
+                              index,
+                              key: "quota",
+                              payload: value,
+                            })
+                          }
+                          acceptNegative={false}
+                          className="h-8"
+                          min={0}
+                          max={99999}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() =>
+                            dispatch({ type: "remove-image-rule", index })
+                          }
+                        >
+                          <Trash className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {isOfficialUsageBilling && (
+                <div>
+                  <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                    <Activity className="h-4 w-4 text-muted-foreground" />
+                    {t("admin.charge.image-usage-prices")}
+                  </div>
+                  <div className="grid gap-2 rounded-md border border-border/50 bg-muted/30 p-3 sm:grid-cols-3">
+                    {(["input", "output", "image"] as const).map((key) => (
+                      <div
+                        key={key}
+                        className="flex items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2"
+                      >
+                        <span className="w-16 text-sm font-medium">
+                          {t(`admin.charge.image-usage-${key}`)}
+                        </span>
+                        <NumberInput
+                          value={image.usage?.[key] || 0}
+                          onValueChange={(value) =>
+                            dispatch({
+                              type: "set-image-usage-price",
+                              key,
+                              payload: value,
+                            })
+                          }
+                          acceptNegative={false}
+                          className="h-9 flex-1"
+                          min={0}
+                          max={99999}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                  <Settings2 className="h-4 w-4 text-muted-foreground" />
+                  {t("admin.charge.image-quality-prices")}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {imageQualityPriceKeys.map((quality) => (
+                    <div
+                      key={quality}
+                      className="flex items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2"
+                    >
+                      <span className="w-16 text-sm font-medium">
+                        {t(`admin.charge.image-quality-${quality}`)}
+                      </span>
+                      <NumberInput
+                        value={getImagePriceForKey(image.quality, quality)}
+                        onValueChange={(value) =>
+                          dispatch({
+                            type: "set-image-quality-price",
+                            key: quality,
+                            payload: value,
+                          })
+                        }
+                        acceptNegative={false}
+                        className="h-9 flex-1"
+                        min={0}
+                        max={99999}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-border/70 bg-background p-4">
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+                <Activity className="h-4 w-4 text-muted-foreground" />
+                {t("admin.charge.image-preview")}
+              </div>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground">
+                      {t("admin.charge.image-preview-size")}
+                    </Label>
+                    <Input
+                      value={previewSize}
+                      onChange={(e) => setPreviewSize(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground">
+                      {t("admin.charge.image-preview-quality")}
+                    </Label>
+                    <Input
+                      value={previewQuality}
+                      onChange={(e) => setPreviewQuality(e.target.value)}
+                      placeholder={t(
+                        "admin.charge.image-preview-quality-empty",
+                      )}
+                      className="h-9"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label className="mb-1 block text-xs text-muted-foreground">
+                    {t("admin.charge.image-preview-reference")}
+                  </Label>
+                  <NumberInput
+                    value={previewReferences}
+                    onValueChange={setPreviewReferences}
+                    acceptNegative={false}
+                    className="h-9"
+                    min={0}
+                    max={99}
+                  />
+                </div>
+                {isOfficialUsageBilling && (
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <Label className="mb-1 block text-xs text-muted-foreground">
+                        {t("admin.charge.image-usage-input")}
+                      </Label>
+                      <NumberInput
+                        value={previewInputTokens}
+                        onValueChange={setPreviewInputTokens}
+                        acceptNegative={false}
+                        className="h-9"
+                        min={0}
+                        max={99999999}
+                      />
+                    </div>
+                    <div>
+                      <Label className="mb-1 block text-xs text-muted-foreground">
+                        {t("admin.charge.image-usage-output")}
+                      </Label>
+                      <NumberInput
+                        value={previewOutputTokens}
+                        onValueChange={setPreviewOutputTokens}
+                        acceptNegative={false}
+                        className="h-9"
+                        min={0}
+                        max={99999999}
+                      />
+                    </div>
+                    <div>
+                      <Label className="mb-1 block text-xs text-muted-foreground">
+                        {t("admin.charge.image-usage-image")}
+                      </Label>
+                      <NumberInput
+                        value={previewImageTokens}
+                        onValueChange={setPreviewImageTokens}
+                        acceptNegative={false}
+                        className="h-9"
+                        min={0}
+                        max={99999999}
+                      />
+                    </div>
+                  </div>
+                )}
+                <div className="rounded-md border border-border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground">
+                    {t("admin.charge.image-preview-total")}
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold tabular-nums">
+                    {formatDecimal(previewQuota)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1474,7 +1531,9 @@ function ChargeEditor({
                 onClick={() => setUnitM((v) => !v)}
                 title={unitM ? "切换到 1k tokens" : "切换到 1M tokens"}
               >
-                {" / "}{unitM ? "1M" : "1k"}{" tokens ↕"}
+                {" / "}
+                {unitM ? "1M" : "1k"}
+                {" tokens ↕"}
               </span>
             </Label>
             <NumberInput
@@ -1497,7 +1556,9 @@ function ChargeEditor({
                 onClick={() => setUnitM((v) => !v)}
                 title={unitM ? "切换到 1k tokens" : "切换到 1M tokens"}
               >
-                {" / "}{unitM ? "1M" : "1k"}{" tokens ↕"}
+                {" / "}
+                {unitM ? "1M" : "1k"}
+                {" tokens ↕"}
               </span>
             </Label>
             <NumberInput
@@ -1527,7 +1588,7 @@ function ChargeEditor({
             </Label>
             <NumberInput
               value={parseFloat(
-                (((form.cache_hit ?? 0) * multiplier) || 0).toPrecision(10),
+                ((form.cache_hit ?? 0) * multiplier || 0).toPrecision(10),
               )}
               onValueChange={(value) =>
                 dispatch({ type: "set-cache-hit", payload: value / multiplier })
@@ -1554,7 +1615,7 @@ function ChargeEditor({
             </Label>
             <NumberInput
               value={parseFloat(
-                (((form.cache_miss ?? 0) * multiplier) || 0).toPrecision(10),
+                ((form.cache_miss ?? 0) * multiplier || 0).toPrecision(10),
               )}
               onValueChange={(value) =>
                 dispatch({
@@ -1739,10 +1800,8 @@ function ChargeTable({
                   {charge.type === imageBilling ? (
                     t("admin.charge.image-reference-short", {
                       quota: formatDecimal(
-                        normalizeImageChargeConfig(
-                          charge.image,
-                          charge.output,
-                        ).reference || 0,
+                        normalizeImageChargeConfig(charge.image, charge.output)
+                          .reference || 0,
                       ),
                     })
                   ) : (
@@ -1757,16 +1816,14 @@ function ChargeTable({
                               hit: formatDecimal(
                                 parseFloat(
                                   (
-                                    ((charge.cache_hit ?? 0) * multiplier) ||
-                                    0
+                                    (charge.cache_hit ?? 0) * multiplier || 0
                                   ).toPrecision(10),
                                 ),
                               ),
                               miss: formatDecimal(
                                 parseFloat(
                                   (
-                                    ((charge.cache_miss ?? 0) * multiplier) ||
-                                    0
+                                    (charge.cache_miss ?? 0) * multiplier || 0
                                   ).toPrecision(10),
                                 ),
                               ),
