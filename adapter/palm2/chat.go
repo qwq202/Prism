@@ -491,20 +491,27 @@ func getGeminiInteractionUsage(form *GeminiInteractionResponse) *globals.TokenUs
 	if form == nil {
 		return nil
 	}
-	if form.UsageMetadata != nil {
-		return form.UsageMetadata.TokenUsage()
-	}
-	return form.UsageMetadataSnake.TokenUsage()
+	return getGeminiUsage(form.UsageMetadata, form.UsageMetadataSnake)
 }
 
-func (c *ChatInstance) buildGeminiChunk(model string, parts []GeminiChatPart, stream bool, usage ...*GeminiUsageMetadata) *globals.Chunk {
+func getGeminiUsage(metadata ...*GeminiUsageMetadata) *globals.TokenUsage {
+	for _, item := range metadata {
+		usage := item.TokenUsage()
+		if !usage.IsEmpty() {
+			return usage
+		}
+	}
+	return nil
+}
+
+func (c *ChatInstance) buildGeminiChunk(model string, parts []GeminiChatPart, stream bool, usage ...*globals.TokenUsage) *globals.Chunk {
 	content := c.GetGeminiChatText(model, parts)
 	if stream {
 		content = c.GetGeminiStreamText(model, parts)
 	}
 	var tokenUsage *globals.TokenUsage
 	if len(usage) > 0 {
-		tokenUsage = usage[0].TokenUsage()
+		tokenUsage = usage[0]
 	}
 
 	return &globals.Chunk{
@@ -517,12 +524,13 @@ func (c *ChatInstance) buildGeminiChunk(model string, parts []GeminiChatPart, st
 
 func (c *ChatInstance) GetGeminiChunk(model string, data interface{}) (*globals.Chunk, error) {
 	if form := utils.MapToStruct[GeminiChatResponse](data); form != nil {
+		usage := getGeminiUsage(form.UsageMetadata, form.UsageMetadataSnake)
 		if len(form.Candidates) != 0 {
 			parts := form.Candidates[0].Content.Parts
-			return c.buildGeminiChunk(model, parts, false, form.UsageMetadata), nil
+			return c.buildGeminiChunk(model, parts, false, usage), nil
 		}
-		if form.UsageMetadata != nil {
-			return &globals.Chunk{Usage: form.UsageMetadata.TokenUsage()}, nil
+		if !usage.IsEmpty() {
+			return &globals.Chunk{Usage: usage}, nil
 		}
 	}
 
@@ -603,12 +611,13 @@ func (c *ChatInstance) CreateStreamChatRequest(props *adaptercommon.ChatProps, c
 			ticks += 1
 
 			if form := utils.UnmarshalForm[GeminiStreamResponse](data); form != nil {
+				usage := getGeminiUsage(form.UsageMetadata, form.UsageMetadataSnake)
 				if len(form.Candidates) != 0 && len(form.Candidates[0].Content.Parts) != 0 {
 					parts := form.Candidates[0].Content.Parts
-					return callback(c.buildGeminiChunk(props.Model, parts, true, form.UsageMetadata))
+					return callback(c.buildGeminiChunk(props.Model, parts, true, usage))
 				}
-				if form.UsageMetadata != nil {
-					return callback(&globals.Chunk{Usage: form.UsageMetadata.TokenUsage()})
+				if !usage.IsEmpty() {
+					return callback(&globals.Chunk{Usage: usage})
 				}
 				return nil
 			}

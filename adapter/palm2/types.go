@@ -127,8 +127,9 @@ type GeminiCandidate struct {
 }
 
 type GeminiChatResponse struct {
-	Candidates    []GeminiCandidate    `json:"candidates"`
-	UsageMetadata *GeminiUsageMetadata `json:"usageMetadata,omitempty"`
+	Candidates         []GeminiCandidate    `json:"candidates"`
+	UsageMetadata      *GeminiUsageMetadata `json:"usageMetadata,omitempty"`
+	UsageMetadataSnake *GeminiUsageMetadata `json:"usage_metadata,omitempty"`
 }
 
 type GeminiInteractionImage struct {
@@ -172,16 +173,22 @@ type GeminiChatErrorResponse struct {
 }
 
 type GeminiStreamResponse struct {
-	Candidates    []GeminiCandidate    `json:"candidates"`
-	UsageMetadata *GeminiUsageMetadata `json:"usageMetadata,omitempty"`
+	Candidates         []GeminiCandidate    `json:"candidates"`
+	UsageMetadata      *GeminiUsageMetadata `json:"usageMetadata,omitempty"`
+	UsageMetadataSnake *GeminiUsageMetadata `json:"usage_metadata,omitempty"`
 }
 
 type GeminiUsageMetadata struct {
-	PromptTokenCount        int `json:"promptTokenCount,omitempty"`
-	CandidatesTokenCount    int `json:"candidatesTokenCount,omitempty"`
-	TotalTokenCount         int `json:"totalTokenCount,omitempty"`
-	CachedContentTokenCount int `json:"cachedContentTokenCount,omitempty"`
-	ThoughtsTokenCount      int `json:"thoughtsTokenCount,omitempty"`
+	PromptTokenCount             int `json:"promptTokenCount,omitempty"`
+	PromptTokenCountSnake        int `json:"prompt_token_count,omitempty"`
+	CandidatesTokenCount         int `json:"candidatesTokenCount,omitempty"`
+	CandidatesTokenCountSnake    int `json:"candidates_token_count,omitempty"`
+	TotalTokenCount              int `json:"totalTokenCount,omitempty"`
+	TotalTokenCountSnake         int `json:"total_token_count,omitempty"`
+	CachedContentTokenCount      int `json:"cachedContentTokenCount,omitempty"`
+	CachedContentTokenCountSnake int `json:"cached_content_token_count,omitempty"`
+	ThoughtsTokenCount           int `json:"thoughtsTokenCount,omitempty"`
+	ThoughtsTokenCountSnake      int `json:"thoughts_token_count,omitempty"`
 }
 
 func (m *GeminiUsageMetadata) TokenUsage() *globals.TokenUsage {
@@ -189,18 +196,28 @@ func (m *GeminiUsageMetadata) TokenUsage() *globals.TokenUsage {
 		return nil
 	}
 
-	promptTokens := m.PromptTokenCount
-	if promptTokens == 0 && m.CachedContentTokenCount > 0 {
-		promptTokens = m.CachedContentTokenCount
+	promptTokens := firstGeminiUsageValue(m.PromptTokenCount, m.PromptTokenCountSnake)
+	cachedContentTokens := firstGeminiUsageValue(m.CachedContentTokenCount, m.CachedContentTokenCountSnake)
+	if promptTokens == 0 && cachedContentTokens > 0 {
+		promptTokens = cachedContentTokens
 	}
 
 	return globals.NormalizeTokenUsage(&globals.TokenUsage{
 		PromptTokens:         promptTokens,
-		CompletionTokens:     m.CandidatesTokenCount,
-		TotalTokens:          m.TotalTokenCount,
-		PromptCacheHitTokens: m.CachedContentTokenCount,
+		CompletionTokens:     firstGeminiUsageValue(m.CandidatesTokenCount, m.CandidatesTokenCountSnake),
+		TotalTokens:          firstGeminiUsageValue(m.TotalTokenCount, m.TotalTokenCountSnake),
+		PromptCacheHitTokens: cachedContentTokens,
 		CompletionTokensDetails: globals.CompletionTokensDetails{
-			ReasoningTokens: m.ThoughtsTokenCount,
+			ReasoningTokens: firstGeminiUsageValue(m.ThoughtsTokenCount, m.ThoughtsTokenCountSnake),
 		},
 	})
+}
+
+func firstGeminiUsageValue(values ...int) int {
+	for _, value := range values {
+		if value > 0 {
+			return value
+		}
+	}
+	return 0
 }

@@ -126,6 +126,11 @@ func NormalizeTokenUsage(usage *TokenUsage) *TokenUsage {
 	if normalized.TotalTokens == 0 && (normalized.PromptTokens > 0 || normalized.CompletionTokens > 0) {
 		normalized.TotalTokens = normalized.PromptTokens + normalized.CompletionTokens
 	}
+	if normalized.PromptCacheHitTokens > 0 &&
+		normalized.PromptCacheMissTokens == 0 &&
+		normalized.PromptTokens > normalized.PromptCacheHitTokens {
+		normalized.PromptCacheMissTokens = normalized.PromptTokens - normalized.PromptCacheHitTokens
+	}
 
 	return &normalized
 }
