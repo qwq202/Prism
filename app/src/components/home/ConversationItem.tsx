@@ -1,4 +1,4 @@
-import { phone } from "@/utils/device.ts";
+import { isPhone } from "@/utils/device.ts";
 import { filterMessage } from "@/utils/processor.ts";
 import { setMenu } from "@/store/menu.ts";
 import {
@@ -154,7 +154,7 @@ function ConversationItem({
         )
           return;
         await toggle(conversation.id);
-        if (phone) dispatch(setMenu(false));
+        if (isPhone()) dispatch(setMenu(false));
       }}
       onContextMenu={(e) => {
         e.preventDefault();
