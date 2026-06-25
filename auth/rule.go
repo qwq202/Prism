@@ -15,6 +15,7 @@ import (
 const (
 	ErrNotAuthenticated  = "not authenticated error (model: %s)"
 	ErrNotSetPrice       = "the price of the model is not set (model: %s)"
+	ErrImagePrice        = "the image price of the model is not configured for this request (model: %s)"
 	ErrNotEnoughQuota    = "user quota is not enough error (model: %s, minimum quota: %s, your quota: %s)"
 	ErrEstimatedCost     = "estimated cost exceeds user quota (model: %s, estimated cost: %s, your quota: %s)"
 	ErrSubscriptionQuota = "subscription quota is not enough error (model: %s, remaining quota: %s, minimum quota: %s, remaining percent: %s, minimum percent: %s, credit fallback: disabled)"
@@ -100,6 +101,13 @@ func estimateImageBillingCost(charge *channel.Charge, messages []globals.Message
 	return cost
 }
 
+func validateImageBillingCost(charge *channel.Charge, responseFormat interface{}) error {
+	if charge == nil || !charge.IsBillingType(globals.ImageBilling) {
+		return nil
+	}
+	return charge.ValidateImageBilling(responseFormat)
+}
+
 func CanEnableModel(db *sql.DB, user *User, model string, messages []globals.Message) error {
 	return CanEnableModelForRequest(db, user, model, messages, nil)
 }
@@ -143,6 +151,9 @@ func CanEnableModelForRequest(db *sql.DB, user *User, model string, messages []g
 	}
 
 	if charge.IsBillingType(globals.ImageBilling) {
+		if err := validateImageBillingCost(charge, responseFormat); err != nil {
+			return fmt.Errorf("%s: %w", fmt.Sprintf(ErrImagePrice, model), err)
+		}
 		estimatedCost := estimateImageBillingCost(charge, messages, responseFormat)
 		if estimatedCost > 0 && quota < estimatedCost {
 			return fmt.Errorf(
@@ -182,6 +193,9 @@ func CanEnableModelWithSubscriptionForRequest(db *sql.DB, cache *redis.Client, u
 	inputTokens := utils.NumTokensFromMessages(messages, model, false)
 	estimatedInputCost := float32(inputTokens) / 1000 * charge.GetInput()
 	if charge.IsBillingType(globals.ImageBilling) {
+		if err := validateImageBillingCost(charge, responseFormat); err != nil {
+			return fmt.Errorf("%s: %w", fmt.Sprintf(ErrImagePrice, model), err), false
+		}
 		estimatedInputCost = estimateImageBillingCost(charge, messages, responseFormat)
 	}
 	subscriptionPreflightCost := minimumCost

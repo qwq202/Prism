@@ -81,12 +81,14 @@ type CompletionTokensDetails struct {
 
 type PromptTokensDetails struct {
 	CachedTokens int `json:"cached_tokens,omitempty"`
+	ImageTokens  int `json:"image_tokens,omitempty"`
 }
 
 type TokenUsage struct {
 	PromptTokens            int                     `json:"prompt_tokens,omitempty"`
 	CompletionTokens        int                     `json:"completion_tokens,omitempty"`
 	TotalTokens             int                     `json:"total_tokens,omitempty"`
+	ImageTokens             int                     `json:"image_tokens,omitempty"`
 	PromptTokensDetails     *PromptTokensDetails    `json:"prompt_tokens_details,omitempty"`
 	PromptCacheHitTokens    int                     `json:"prompt_cache_hit_tokens,omitempty"`
 	PromptCacheMissTokens   int                     `json:"prompt_cache_miss_tokens,omitempty"`
@@ -98,7 +100,9 @@ func (u *TokenUsage) IsEmpty() bool {
 		(u.PromptTokens == 0 &&
 			u.CompletionTokens == 0 &&
 			u.TotalTokens == 0 &&
-			(u.PromptTokensDetails == nil || u.PromptTokensDetails.CachedTokens == 0) &&
+			u.ImageTokens == 0 &&
+			(u.PromptTokensDetails == nil ||
+				(u.PromptTokensDetails.CachedTokens == 0 && u.PromptTokensDetails.ImageTokens == 0)) &&
 			u.PromptCacheHitTokens == 0 &&
 			u.PromptCacheMissTokens == 0 &&
 			u.CompletionTokensDetails.ReasoningTokens == 0)
@@ -113,6 +117,9 @@ func NormalizeTokenUsage(usage *TokenUsage) *TokenUsage {
 	if normalized.PromptTokensDetails != nil {
 		if normalized.PromptCacheHitTokens == 0 && normalized.PromptTokensDetails.CachedTokens > 0 {
 			normalized.PromptCacheHitTokens = normalized.PromptTokensDetails.CachedTokens
+		}
+		if normalized.ImageTokens == 0 && normalized.PromptTokensDetails.ImageTokens > 0 {
+			normalized.ImageTokens = normalized.PromptTokensDetails.ImageTokens
 		}
 		normalized.PromptTokensDetails = nil
 	}

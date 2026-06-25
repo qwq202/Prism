@@ -44,6 +44,7 @@ type OutputItem struct {
 
 type InputTokensDetails struct {
 	CachedTokens int `json:"cached_tokens,omitempty"`
+	ImageTokens  int `json:"image_tokens,omitempty"`
 }
 
 type OutputTokensDetails struct {
@@ -67,6 +68,11 @@ func (u *ResponseUsage) TokenUsage() *globals.TokenUsage {
 	if u.InputTokensDetails != nil && u.InputTokensDetails.CachedTokens > 0 {
 		promptDetails = &globals.PromptTokensDetails{
 			CachedTokens: u.InputTokensDetails.CachedTokens,
+			ImageTokens:  u.InputTokensDetails.ImageTokens,
+		}
+	} else if u.InputTokensDetails != nil && u.InputTokensDetails.ImageTokens > 0 {
+		promptDetails = &globals.PromptTokensDetails{
+			ImageTokens: u.InputTokensDetails.ImageTokens,
 		}
 	}
 

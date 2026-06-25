@@ -3,10 +3,35 @@ package channel
 import (
 	"chat/globals"
 	"chat/utils"
+	"fmt"
 	"strings"
 
 	"github.com/spf13/viper"
 )
+
+const (
+	ImageBillingModePerImage      = "per_image"
+	ImageBillingModeMatrix        = "matrix"
+	ImageBillingModeOfficialUsage = "official_usage"
+
+	ImageMissingPricePolicyDefault = "default"
+	ImageMissingPricePolicyReject  = "reject"
+)
+
+type ImageBillingQuote struct {
+	Mode               string
+	MissingPricePolicy string
+	OutputImages       int
+	ReferenceImages    int
+	UnitQuota          float32
+	RequestQuota       float32
+	ReferenceQuota     float32
+	UsageQuota         float32
+	TotalQuota         float32
+	MatchedRuleIndex   int
+	MatchedRule        *ImageChargeRule
+	MissingReason      string
+}
 
 var saveChargeConfig = func(seq ChargeSequence) error {
 	return utils.SaveConfig("charge", seq)
@@ -294,6 +319,13 @@ func cloneImageChargeConfig(item *ImageChargeConfig) *ImageChargeConfig {
 			copied.Quality[key] = value
 		}
 	}
+	if item.Rules != nil {
+		copied.Rules = append([]ImageChargeRule(nil), item.Rules...)
+	}
+	if item.Usage != nil {
+		usage := *item.Usage
+		copied.Usage = &usage
+	}
 	return &copied
 }
 
@@ -402,6 +434,26 @@ func (c *Charge) GetImageChargeConfig() ImageChargeConfig {
 	return *c.Image
 }
 
+func normalizeImageBillingMode(mode string) string {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case ImageBillingModeMatrix:
+		return ImageBillingModeMatrix
+	case ImageBillingModeOfficialUsage:
+		return ImageBillingModeOfficialUsage
+	default:
+		return ImageBillingModePerImage
+	}
+}
+
+func normalizeImageMissingPricePolicy(policy string) string {
+	switch strings.ToLower(strings.TrimSpace(policy)) {
+	case ImageMissingPricePolicyReject:
+		return ImageMissingPricePolicyReject
+	default:
+		return ImageMissingPricePolicyDefault
+	}
+}
+
 func normalizeImageBillingKey(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
 }
@@ -437,8 +489,50 @@ func lookupImagePrice(prices map[string]float32, value string) (float32, bool) {
 	return 0, false
 }
 
-func (c *Charge) imageUnitPrice(responseFormat interface{}) float32 {
-	config := c.GetImageChargeConfig()
+type imageBillingRequest struct {
+	Size        string
+	Quality     string
+	MimeType    string
+	AspectRatio string
+}
+
+func getImageBillingRequest(responseFormat interface{}) imageBillingRequest {
+	return imageBillingRequest{
+		Size:        getResponseFormatString(responseFormat, "image_size", "imageSize", "size"),
+		Quality:     getResponseFormatString(responseFormat, "quality", "image_quality", "imageQuality"),
+		MimeType:    getResponseFormatString(responseFormat, "mime_type", "mimeType", "format"),
+		AspectRatio: getResponseFormatString(responseFormat, "aspect_ratio", "aspectRatio"),
+	}
+}
+
+func imageRuleFieldMatches(expected string, actual string) bool {
+	expected = normalizeImageBillingKey(expected)
+	if expected == "" {
+		return true
+	}
+	return expected == normalizeImageBillingKey(actual)
+}
+
+func imageRuleMatches(rule ImageChargeRule, request imageBillingRequest) bool {
+	return imageRuleFieldMatches(rule.Size, request.Size) &&
+		imageRuleFieldMatches(rule.Quality, request.Quality) &&
+		imageRuleFieldMatches(rule.MimeType, request.MimeType) &&
+		imageRuleFieldMatches(rule.AspectRatio, request.AspectRatio)
+}
+
+func findImageChargeRule(config ImageChargeConfig, request imageBillingRequest) (ImageChargeRule, int, bool) {
+	for index, rule := range config.Rules {
+		if rule.Quota <= 0 {
+			continue
+		}
+		if imageRuleMatches(rule, request) {
+			return rule, index, true
+		}
+	}
+	return ImageChargeRule{}, -1, false
+}
+
+func (c *Charge) legacyImageUnitPrice(config ImageChargeConfig, responseFormat interface{}) float32 {
 	price := config.Default
 	if price <= 0 {
 		price = c.GetOutput()
@@ -460,36 +554,172 @@ func (c *Charge) imageUnitPrice(responseFormat interface{}) float32 {
 	return price
 }
 
-func (c *Charge) EstimateImageQuota(referenceImages int, responseFormat interface{}, outputImages int) float32 {
-	if c == nil || c.GetType() != globals.ImageBilling {
+func getImageTokens(usage *globals.TokenUsage) int {
+	if usage == nil {
 		return 0
 	}
+	if usage.PromptTokensDetails != nil && usage.PromptTokensDetails.ImageTokens > 0 {
+		return usage.PromptTokensDetails.ImageTokens
+	}
+	return usage.ImageTokens
+}
+
+func (c *Charge) imageUsageQuota(config ImageChargeConfig, usage *globals.TokenUsage) (float32, bool) {
+	if usage.IsEmpty() || config.Usage == nil {
+		return 0, false
+	}
+
+	prices := config.Usage
+	if prices.Input <= 0 && prices.Output <= 0 && prices.Image <= 0 {
+		return 0, false
+	}
+
+	inputTokens := usage.PromptTokens
+	if inputTokens == 0 {
+		inputTokens = usage.PromptCacheHitTokens + usage.PromptCacheMissTokens
+	}
+	outputTokens := usage.CompletionTokens
+	if outputTokens == 0 && usage.TotalTokens > inputTokens {
+		outputTokens = usage.TotalTokens - inputTokens
+	}
+	imageTokens := getImageTokens(usage)
+	if inputTokens <= 0 && outputTokens <= 0 && imageTokens <= 0 {
+		return 0, false
+	}
+
+	return float32(inputTokens)/1000*prices.Input +
+		float32(outputTokens)/1000*prices.Output +
+		float32(imageTokens)/1000*prices.Image, true
+}
+
+func (c *Charge) GetImageBillingQuote(referenceImages int, responseFormat interface{}, outputImages int, usage *globals.TokenUsage) (ImageBillingQuote, error) {
+	quote := ImageBillingQuote{
+		MatchedRuleIndex: -1,
+	}
+	if c == nil || c.GetType() != globals.ImageBilling {
+		return quote, nil
+	}
 	if outputImages <= 0 {
-		return 0
+		return quote, nil
 	}
 	if referenceImages < 0 {
 		referenceImages = 0
 	}
 
 	config := c.GetImageChargeConfig()
-	quota := config.Request
-	quota += c.imageUnitPrice(responseFormat) * float32(outputImages)
-	quota += config.Reference * float32(referenceImages)
-	if quota < 0 {
+	mode := normalizeImageBillingMode(config.Mode)
+	policy := normalizeImageMissingPricePolicy(config.MissingPricePolicy)
+	quote.Mode = mode
+	quote.MissingPricePolicy = policy
+	quote.OutputImages = outputImages
+	quote.ReferenceImages = referenceImages
+	quote.RequestQuota = config.Request
+	quote.ReferenceQuota = config.Reference * float32(referenceImages)
+
+	if mode == ImageBillingModeOfficialUsage {
+		if usageQuota, ok := c.imageUsageQuota(config, usage); ok {
+			quote.UsageQuota = usageQuota
+			quote.TotalQuota = quote.RequestQuota + quote.ReferenceQuota + quote.UsageQuota
+			if quote.TotalQuota < 0 {
+				quote.TotalQuota = 0
+			}
+			return quote, nil
+		}
+		if fallback := c.legacyImageUnitPrice(config, responseFormat); fallback > 0 {
+			quote.UnitQuota = fallback
+			quote.MissingReason = "official usage is unavailable; fallback image price was used"
+			quote.TotalQuota = quote.RequestQuota + quote.ReferenceQuota + quote.UnitQuota*float32(outputImages)
+			if quote.TotalQuota < 0 {
+				quote.TotalQuota = 0
+			}
+			return quote, nil
+		}
+		if policy == ImageMissingPricePolicyReject {
+			quote.MissingReason = "official usage is unavailable or usage prices are not configured"
+			return quote, fmt.Errorf("image billing price is not configured for official usage")
+		}
+	}
+
+	request := getImageBillingRequest(responseFormat)
+	if mode == ImageBillingModeMatrix {
+		if rule, index, ok := findImageChargeRule(config, request); ok {
+			ruleCopy := rule
+			quote.MatchedRule = &ruleCopy
+			quote.MatchedRuleIndex = index
+			quote.UnitQuota = rule.Quota
+		} else if policy == ImageMissingPricePolicyReject {
+			quote.MissingReason = "no matrix rule matched request parameters"
+			return quote, fmt.Errorf("image billing price is not configured for the requested parameters")
+		}
+	}
+
+	if quote.UnitQuota <= 0 {
+		quote.UnitQuota = c.legacyImageUnitPrice(config, responseFormat)
+	}
+	quote.TotalQuota = quote.RequestQuota + quote.ReferenceQuota + quote.UnitQuota*float32(outputImages)
+	if quote.TotalQuota < 0 {
+		quote.TotalQuota = 0
+	}
+	return quote, nil
+}
+
+func (c *Charge) EstimateImageQuotaWithUsage(referenceImages int, responseFormat interface{}, outputImages int, usage *globals.TokenUsage) float32 {
+	quote, err := c.GetImageBillingQuote(referenceImages, responseFormat, outputImages, usage)
+	if err != nil {
 		return 0
 	}
-	return quota
+	return quote.TotalQuota
+}
+
+func (c *Charge) ValidateImageBilling(responseFormat interface{}) error {
+	config := c.GetImageChargeConfig()
+	mode := normalizeImageBillingMode(config.Mode)
+	policy := normalizeImageMissingPricePolicy(config.MissingPricePolicy)
+	if policy != ImageMissingPricePolicyReject {
+		return nil
+	}
+	if mode == ImageBillingModeOfficialUsage {
+		if config.Usage == nil || (config.Usage.Input <= 0 && config.Usage.Output <= 0 && config.Usage.Image <= 0) {
+			return fmt.Errorf("image billing usage prices are not configured")
+		}
+		return nil
+	}
+	_, err := c.GetImageBillingQuote(0, responseFormat, 1, nil)
+	return err
+}
+
+func (c *Charge) EstimateImageQuota(referenceImages int, responseFormat interface{}, outputImages int) float32 {
+	return c.EstimateImageQuotaWithUsage(referenceImages, responseFormat, outputImages, nil)
 }
 
 func (c *Charge) GetImageBillingDetail(referenceImages int, responseFormat interface{}, outputImages int) map[string]interface{} {
+	return c.GetImageBillingDetailWithUsage(referenceImages, responseFormat, outputImages, nil)
+}
+
+func (c *Charge) GetImageBillingDetailWithUsage(referenceImages int, responseFormat interface{}, outputImages int, usage *globals.TokenUsage) map[string]interface{} {
 	config := c.GetImageChargeConfig()
+	quote, err := c.GetImageBillingQuote(referenceImages, responseFormat, outputImages, usage)
 	detail := map[string]interface{}{
 		"billing_unit":     utils.Multi(config.BillingUnit != "", config.BillingUnit, "final_image"),
+		"mode":             quote.Mode,
+		"missing_policy":   quote.MissingPricePolicy,
 		"output_images":    outputImages,
 		"reference_images": referenceImages,
-		"unit_quota":       c.imageUnitPrice(responseFormat),
-		"request_quota":    config.Request,
+		"unit_quota":       quote.UnitQuota,
+		"request_quota":    quote.RequestQuota,
 		"reference_quota":  config.Reference,
+		"usage_quota":      quote.UsageQuota,
+		"total_quota":      quote.TotalQuota,
+	}
+	if err != nil {
+		detail["error"] = err.Error()
+	}
+	if quote.MissingReason != "" {
+		detail["missing_reason"] = quote.MissingReason
+	}
+	if quote.MatchedRule != nil {
+		detail["matched_rule_index"] = quote.MatchedRuleIndex
+		detail["matched_rule"] = quote.MatchedRule
 	}
 
 	if size := getResponseFormatString(responseFormat, "image_size", "imageSize", "size"); size != "" {

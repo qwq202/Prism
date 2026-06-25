@@ -23,6 +23,11 @@ type ImageBillingEstimator interface {
 	GetImageBillingDetail(referenceImages int, responseFormat interface{}, outputImages int) map[string]interface{}
 }
 
+type ImageUsageBillingEstimator interface {
+	EstimateImageQuotaWithUsage(referenceImages int, responseFormat interface{}, outputImages int, usage *globals.TokenUsage) float32
+	GetImageBillingDetailWithUsage(referenceImages int, responseFormat interface{}, outputImages int, usage *globals.TokenUsage) map[string]interface{}
+}
+
 type TokenCacheCharge interface {
 	GetCacheHit() (float32, bool)
 	GetCacheMiss() (float32, bool)
@@ -126,11 +131,16 @@ func (b *Buffer) GetRecordQuota() float32 {
 
 	if b.Charge.IsBillingType(globals.ImageBilling) {
 		if estimator, ok := b.Charge.(ImageBillingEstimator); ok {
-			return estimator.EstimateImageQuota(
-				b.ReferenceImages,
-				b.ResponseFormat,
-				b.CountRecordOutputImages(),
-			)
+			outputImages := b.CountRecordOutputImages()
+			if usageEstimator, ok := b.Charge.(ImageUsageBillingEstimator); ok {
+				return usageEstimator.EstimateImageQuotaWithUsage(
+					b.ReferenceImages,
+					b.ResponseFormat,
+					outputImages,
+					b.Usage,
+				)
+			}
+			return estimator.EstimateImageQuota(b.ReferenceImages, b.ResponseFormat, outputImages)
 		}
 	}
 
@@ -305,6 +315,7 @@ func mergeTokenUsage(left *globals.TokenUsage, right *globals.TokenUsage) *globa
 		PromptTokens:          left.PromptTokens + right.PromptTokens,
 		CompletionTokens:      left.CompletionTokens + right.CompletionTokens,
 		TotalTokens:           left.TotalTokens + right.TotalTokens,
+		ImageTokens:           left.ImageTokens + right.ImageTokens,
 		PromptCacheHitTokens:  left.PromptCacheHitTokens + right.PromptCacheHitTokens,
 		PromptCacheMissTokens: left.PromptCacheMissTokens + right.PromptCacheMissTokens,
 		CompletionTokensDetails: globals.CompletionTokensDetails{
@@ -349,11 +360,20 @@ func (b *Buffer) GetBillingDetail() string {
 	if b.Charge != nil && b.Charge.IsBillingType(globals.ImageBilling) {
 		if estimator, ok := b.Charge.(ImageBillingEstimator); ok {
 			outputImages := b.CountRecordOutputImages()
-			detail["image_billing"] = estimator.GetImageBillingDetail(
-				b.ReferenceImages,
-				b.ResponseFormat,
-				outputImages,
-			)
+			if usageEstimator, ok := b.Charge.(ImageUsageBillingEstimator); ok {
+				detail["image_billing"] = usageEstimator.GetImageBillingDetailWithUsage(
+					b.ReferenceImages,
+					b.ResponseFormat,
+					outputImages,
+					b.Usage,
+				)
+			} else {
+				detail["image_billing"] = estimator.GetImageBillingDetail(
+					b.ReferenceImages,
+					b.ResponseFormat,
+					outputImages,
+				)
+			}
 		}
 	}
 
