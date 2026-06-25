@@ -133,7 +133,7 @@ func formatReasoningContent(reasoning *string, content string) string {
 func (c *ChatInstance) getChoices(form *ChatStreamResponse) *globals.Chunk {
 	if len(form.Choices) == 0 {
 		if form.Usage != nil {
-			return &globals.Chunk{Usage: form.Usage}
+			return &globals.Chunk{Usage: globals.NormalizeTokenUsage(form.Usage)}
 		}
 		return &globals.Chunk{Content: ""}
 	}

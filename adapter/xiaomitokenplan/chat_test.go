@@ -148,6 +148,24 @@ func TestProcessLineStreamsReasoningContent(t *testing.T) {
 	}
 }
 
+func TestProcessLineNormalizesPromptTokensDetailsUsage(t *testing.T) {
+	instance := NewChatInstance("", "tp-test")
+
+	chunk, err := instance.ProcessLine(`{"choices":[],"usage":{"prompt_tokens":50,"completion_tokens":5,"prompt_tokens_details":{"cached_tokens":30}}}`)
+	if err != nil {
+		t.Fatalf("unexpected usage chunk error: %v", err)
+	}
+	if chunk.Usage == nil {
+		t.Fatalf("expected usage chunk")
+	}
+	if chunk.Usage.PromptCacheHitTokens != 30 || chunk.Usage.PromptCacheMissTokens != 20 {
+		t.Fatalf("unexpected normalized cache usage: %#v", chunk.Usage)
+	}
+	if chunk.Usage.PromptTokensDetails != nil {
+		t.Fatalf("expected prompt token details to be flattened, got %#v", chunk.Usage.PromptTokensDetails)
+	}
+}
+
 func findToolCallByID(calls globals.ToolCalls, id string) *globals.ToolCall {
 	for i := range calls {
 		if calls[i].Id == id {

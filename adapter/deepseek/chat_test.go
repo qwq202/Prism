@@ -160,6 +160,30 @@ func TestGetChoicesReturnsUsageOnlyChunk(t *testing.T) {
 	}
 }
 
+func TestGetChoicesNormalizesPromptTokensDetailsUsage(t *testing.T) {
+	instance := NewChatInstance("https://api.deepseek.com", "secret")
+
+	chunk := instance.getChoices(&ChatStreamResponse{
+		Usage: &globals.TokenUsage{
+			PromptTokens:     30,
+			CompletionTokens: 7,
+			PromptTokensDetails: &globals.PromptTokensDetails{
+				CachedTokens: 20,
+			},
+		},
+	})
+
+	if chunk.Usage == nil {
+		t.Fatalf("expected usage to be preserved")
+	}
+	if chunk.Usage.PromptCacheHitTokens != 20 || chunk.Usage.PromptCacheMissTokens != 10 {
+		t.Fatalf("unexpected normalized prompt cache usage: %#v", chunk.Usage)
+	}
+	if chunk.Usage.PromptTokensDetails != nil {
+		t.Fatalf("expected prompt token details to be flattened, got %#v", chunk.Usage.PromptTokensDetails)
+	}
+}
+
 func TestSanitizeDSMLToolMarkupPreservesWhitespaceWithoutMarker(t *testing.T) {
 	input := "\n\n## 标题\n\n- 第一项\n"
 	got := sanitizeDSMLToolMarkup(input)

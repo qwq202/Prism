@@ -2,6 +2,7 @@ package openai
 
 import (
 	adaptercommon "chat/adapter/common"
+	"chat/globals"
 	"strings"
 	"testing"
 )
@@ -57,6 +58,24 @@ func TestOpenRouterStreamErrorUsesProviderPrefix(t *testing.T) {
 	}
 }
 
+func TestProcessLineNormalizesPromptCacheUsage(t *testing.T) {
+	instance := NewChatInstance("https://api.openai.com", "sk-test")
+
+	chunk, err := instance.ProcessLine(`{"choices":[],"usage":{"prompt_tokens":100,"completion_tokens":10,"total_tokens":110,"prompt_tokens_details":{"cached_tokens":64}}}`, false)
+	if err != nil {
+		t.Fatalf("expected usage-only stream chunk to parse, got %v", err)
+	}
+	if chunk.Usage == nil {
+		t.Fatalf("expected usage chunk")
+	}
+	if chunk.Usage.PromptCacheHitTokens != 64 || chunk.Usage.PromptCacheMissTokens != 36 {
+		t.Fatalf("expected cached prompt usage to be normalized, got %#v", chunk.Usage)
+	}
+	if chunk.Usage.PromptTokensDetails != nil {
+		t.Fatalf("expected provider-specific prompt details to be normalized away, got %#v", chunk.Usage.PromptTokensDetails)
+	}
+}
+
 func TestSiliconFlowUsesDocumentedBaseURL(t *testing.T) {
 	props := &adaptercommon.ChatProps{Model: "Qwen/Qwen3-Coder-480B-A35B-Instruct"}
 	instance := NewSiliconFlowChatInstance("", "sk-sf-test")
@@ -93,5 +112,22 @@ func TestSiliconFlowStreamErrorUsesProviderPrefix(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "siliconflow error: invalid api key") {
 		t.Fatalf("expected SiliconFlow error prefix, got %q", err.Error())
+	}
+}
+
+func TestSiliconFlowRequestsStreamUsageByDefault(t *testing.T) {
+	instance := NewSiliconFlowChatInstance("", "sk-sf-test")
+
+	body, ok := instance.GetChatBody(&adaptercommon.ChatProps{
+		Model:   "Pro/zai-org/GLM-4.7",
+		Message: []globals.Message{{Role: globals.User, Content: "hello"}},
+	}, true).(ChatRequest)
+	if !ok {
+		t.Fatalf("expected ChatRequest body")
+	}
+
+	options, ok := body.StreamOptions.(map[string]bool)
+	if !ok || !options["include_usage"] {
+		t.Fatalf("expected stream_options.include_usage to be enabled, got %#v", body.StreamOptions)
 	}
 }

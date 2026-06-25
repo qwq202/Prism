@@ -195,8 +195,7 @@ func sanitizeDeepseekStreamText(content string) string {
 func (c *ChatInstance) getChoices(form *ChatStreamResponse) *globals.Chunk {
 	if len(form.Choices) == 0 {
 		if form.Usage != nil {
-			usage := *form.Usage
-			return &globals.Chunk{Usage: &usage}
+			return &globals.Chunk{Usage: globals.NormalizeTokenUsage(form.Usage)}
 		}
 		return &globals.Chunk{Content: ""}
 	}

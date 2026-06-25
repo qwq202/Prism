@@ -25,3 +25,19 @@ func TestNormalizeTokenUsageKeepsExplicitPromptCacheMissTokens(t *testing.T) {
 		t.Fatalf("expected explicit cache miss tokens to be preserved, got %#v", usage)
 	}
 }
+
+func TestNormalizeTokenUsageUsesPromptTokensDetailsCachedTokens(t *testing.T) {
+	usage := NormalizeTokenUsage(&TokenUsage{
+		PromptTokens: 120,
+		PromptTokensDetails: &PromptTokensDetails{
+			CachedTokens: 96,
+		},
+	})
+
+	if usage.PromptCacheHitTokens != 96 || usage.PromptCacheMissTokens != 24 {
+		t.Fatalf("expected cached prompt details to become hit=96 miss=24, got %#v", usage)
+	}
+	if usage.PromptTokensDetails != nil {
+		t.Fatalf("expected provider-specific prompt details to be normalized away, got %#v", usage.PromptTokensDetails)
+	}
+}
