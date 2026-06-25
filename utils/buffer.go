@@ -318,6 +318,8 @@ func mergeTokenUsage(left *globals.TokenUsage, right *globals.TokenUsage) *globa
 		ImageTokens:           left.ImageTokens + right.ImageTokens,
 		PromptCacheHitTokens:  left.PromptCacheHitTokens + right.PromptCacheHitTokens,
 		PromptCacheMissTokens: left.PromptCacheMissTokens + right.PromptCacheMissTokens,
+		PromptCacheWriteTokens: left.PromptCacheWriteTokens +
+			right.PromptCacheWriteTokens,
 		CompletionTokensDetails: globals.CompletionTokensDetails{
 			ReasoningTokens: left.CompletionTokensDetails.ReasoningTokens + right.CompletionTokensDetails.ReasoningTokens,
 		},
@@ -519,7 +521,9 @@ func (b *Buffer) CountRecordInputToken() int {
 
 	usageTokens := b.Usage.PromptTokens
 	if usageTokens == 0 {
-		usageTokens = b.Usage.PromptCacheHitTokens + b.Usage.PromptCacheMissTokens
+		usageTokens = b.Usage.PromptCacheHitTokens +
+			b.Usage.PromptCacheMissTokens +
+			b.Usage.PromptCacheWriteTokens
 	}
 	if usageTokens > tokens {
 		return usageTokens
@@ -547,7 +551,9 @@ func (b *Buffer) CountRecordOutputToken() int {
 	if usageTokens == 0 {
 		promptTokens := b.Usage.PromptTokens
 		if promptTokens == 0 {
-			promptTokens = b.Usage.PromptCacheHitTokens + b.Usage.PromptCacheMissTokens
+			promptTokens = b.Usage.PromptCacheHitTokens +
+				b.Usage.PromptCacheMissTokens +
+				b.Usage.PromptCacheWriteTokens
 		}
 		if b.Usage.TotalTokens > promptTokens {
 			usageTokens = b.Usage.TotalTokens - promptTokens

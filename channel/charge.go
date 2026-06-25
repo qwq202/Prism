@@ -576,7 +576,9 @@ func (c *Charge) imageUsageQuota(config ImageChargeConfig, usage *globals.TokenU
 
 	inputTokens := usage.PromptTokens
 	if inputTokens == 0 {
-		inputTokens = usage.PromptCacheHitTokens + usage.PromptCacheMissTokens
+		inputTokens = usage.PromptCacheHitTokens +
+			usage.PromptCacheMissTokens +
+			usage.PromptCacheWriteTokens
 	}
 	outputTokens := usage.CompletionTokens
 	if outputTokens == 0 && usage.TotalTokens > inputTokens {

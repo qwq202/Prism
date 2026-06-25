@@ -23,6 +23,7 @@ const recordFilterWhereSQL = `
 		  AND (? = 0 OR b.model LIKE ?)
 		  AND (? = 0 OR b.type = ?)
 		  AND (? = 0 OR COALESCE(b.detail, '') LIKE ?)
+		  AND (? = 0 OR COALESCE(b.detail, '') LIKE ?)
 `
 
 type Record struct {
@@ -55,6 +56,7 @@ type RecordQuery struct {
 	ShowChannel bool   `json:"show_channel"`
 	Self        bool   `json:"self"`
 	CacheHit    bool   `json:"cache_hit"`
+	CacheWrite  bool   `json:"cache_write"`
 }
 
 type RecordData struct {
@@ -218,6 +220,7 @@ func buildRecordFilterArgs(isAdmin bool, userId int64, query RecordQuery) ([]int
 	modelEnabled := query.Model != ""
 	typeEnabled := query.Type != "" && query.Type != "all"
 	cacheHitEnabled := query.CacheHit
+	cacheWriteEnabled := query.CacheWrite
 	usernameLike := recordLikeFilter(query.Username)
 
 	return []interface{}{
@@ -231,6 +234,7 @@ func buildRecordFilterArgs(isAdmin bool, userId int64, query RecordQuery) ([]int
 		sqlFlag(modelEnabled), recordLikeFilter(query.Model),
 		sqlFlag(typeEnabled), query.Type,
 		sqlFlag(cacheHitEnabled), `%"prompt_cache_hit_tokens":%`,
+		sqlFlag(cacheWriteEnabled), `%"prompt_cache_write_tokens":%`,
 	}, nil
 }
 

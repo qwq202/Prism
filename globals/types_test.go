@@ -41,3 +41,19 @@ func TestNormalizeTokenUsageUsesPromptTokensDetailsCachedTokens(t *testing.T) {
 		t.Fatalf("expected provider-specific prompt details to be normalized away, got %#v", usage.PromptTokensDetails)
 	}
 }
+
+func TestNormalizeTokenUsageUsesPromptTokensDetailsCacheWriteTokens(t *testing.T) {
+	usage := NormalizeTokenUsage(&TokenUsage{
+		PromptTokens: 120,
+		PromptTokensDetails: &PromptTokensDetails{
+			CacheWriteTokens: 80,
+		},
+	})
+
+	if usage.PromptCacheWriteTokens != 80 || usage.PromptCacheMissTokens != 80 {
+		t.Fatalf("expected cache write tokens to normalize as write=80 miss=80, got %#v", usage)
+	}
+	if usage.PromptTokensDetails != nil {
+		t.Fatalf("expected provider-specific prompt details to be normalized away, got %#v", usage.PromptTokensDetails)
+	}
+}

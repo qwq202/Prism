@@ -80,8 +80,9 @@ type CompletionTokensDetails struct {
 }
 
 type PromptTokensDetails struct {
-	CachedTokens int `json:"cached_tokens,omitempty"`
-	ImageTokens  int `json:"image_tokens,omitempty"`
+	CachedTokens     int `json:"cached_tokens,omitempty"`
+	CacheWriteTokens int `json:"cache_write_tokens,omitempty"`
+	ImageTokens      int `json:"image_tokens,omitempty"`
 }
 
 type TokenUsage struct {
@@ -92,6 +93,7 @@ type TokenUsage struct {
 	PromptTokensDetails     *PromptTokensDetails    `json:"prompt_tokens_details,omitempty"`
 	PromptCacheHitTokens    int                     `json:"prompt_cache_hit_tokens,omitempty"`
 	PromptCacheMissTokens   int                     `json:"prompt_cache_miss_tokens,omitempty"`
+	PromptCacheWriteTokens  int                     `json:"prompt_cache_write_tokens,omitempty"`
 	CompletionTokensDetails CompletionTokensDetails `json:"completion_tokens_details,omitempty"`
 }
 
@@ -102,9 +104,12 @@ func (u *TokenUsage) IsEmpty() bool {
 			u.TotalTokens == 0 &&
 			u.ImageTokens == 0 &&
 			(u.PromptTokensDetails == nil ||
-				(u.PromptTokensDetails.CachedTokens == 0 && u.PromptTokensDetails.ImageTokens == 0)) &&
+				(u.PromptTokensDetails.CachedTokens == 0 &&
+					u.PromptTokensDetails.CacheWriteTokens == 0 &&
+					u.PromptTokensDetails.ImageTokens == 0)) &&
 			u.PromptCacheHitTokens == 0 &&
 			u.PromptCacheMissTokens == 0 &&
+			u.PromptCacheWriteTokens == 0 &&
 			u.CompletionTokensDetails.ReasoningTokens == 0)
 }
 
@@ -118,6 +123,9 @@ func NormalizeTokenUsage(usage *TokenUsage) *TokenUsage {
 		if normalized.PromptCacheHitTokens == 0 && normalized.PromptTokensDetails.CachedTokens > 0 {
 			normalized.PromptCacheHitTokens = normalized.PromptTokensDetails.CachedTokens
 		}
+		if normalized.PromptCacheWriteTokens == 0 && normalized.PromptTokensDetails.CacheWriteTokens > 0 {
+			normalized.PromptCacheWriteTokens = normalized.PromptTokensDetails.CacheWriteTokens
+		}
 		if normalized.ImageTokens == 0 && normalized.PromptTokensDetails.ImageTokens > 0 {
 			normalized.ImageTokens = normalized.PromptTokensDetails.ImageTokens
 		}
@@ -127,9 +135,14 @@ func NormalizeTokenUsage(usage *TokenUsage) *TokenUsage {
 		normalized.TotalTokens = normalized.PromptTokens + normalized.CompletionTokens
 	}
 	if normalized.PromptCacheHitTokens > 0 &&
+		normalized.PromptCacheWriteTokens == 0 &&
 		normalized.PromptCacheMissTokens == 0 &&
 		normalized.PromptTokens > normalized.PromptCacheHitTokens {
 		normalized.PromptCacheMissTokens = normalized.PromptTokens - normalized.PromptCacheHitTokens
+	}
+	if normalized.PromptCacheWriteTokens > 0 &&
+		normalized.PromptCacheMissTokens == 0 {
+		normalized.PromptCacheMissTokens = normalized.PromptCacheWriteTokens
 	}
 
 	return &normalized

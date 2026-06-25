@@ -131,6 +131,26 @@ func TestListRecordsFiltersCacheHitUsage(t *testing.T) {
 	}
 }
 
+func TestListRecordsFiltersCacheWriteUsage(t *testing.T) {
+	db := openBillingTestDB(t)
+
+	seedBillingRecordWithDetail(t, db, "cache-write-token", `{"official_usage":{"prompt_tokens":100,"prompt_cache_write_tokens":60}}`)
+	seedBillingRecordWithDetail(t, db, "cache-hit-token", `{"official_usage":{"prompt_tokens":100,"prompt_cache_hit_tokens":60}}`)
+	seedBillingRecordWithDetail(t, db, "plain-token", `{"official_usage":{"prompt_tokens":100}}`)
+
+	data, err := ListRecords(db, true, 1, 0, RecordQuery{CacheWrite: true})
+	if err != nil {
+		t.Fatalf("list records: %v", err)
+	}
+
+	if len(data.Records) != 1 {
+		t.Fatalf("expected 1 cache-write record, got %d (%#v)", len(data.Records), data.Records)
+	}
+	if data.Records[0].TokenName != "cache-write-token" {
+		t.Fatalf("expected cache-write-token, got %#v", data.Records[0])
+	}
+}
+
 func TestListRecordsFiltersByPartialTokenNameAndInclusiveDate(t *testing.T) {
 	db := openBillingTestDB(t)
 

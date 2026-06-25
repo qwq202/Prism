@@ -58,6 +58,7 @@ const defaultRecordQuery: RecordQuery = {
   type: RecordType.All,
   show_channel: true,
   cache_hit: false,
+  cache_write: false,
 };
 
 const defaultRecordInput = {
@@ -68,6 +69,7 @@ const defaultRecordInput = {
   end_time: "",
   type: RecordType.All as RecordType,
   cache_hit: false,
+  cache_write: false,
 };
 
 function StatCard({
@@ -175,6 +177,11 @@ function CacheUsageBadges({ record }: { record: BillingRecord }) {
           {t("record.cache-miss-short", { tokens: usage.missTokens })}
         </Badge>
       )}
+      {usage.writeTokens > 0 && (
+        <Badge variant="outline" className="text-[10px] font-medium">
+          {t("record.cache-write-short", { tokens: usage.writeTokens })}
+        </Badge>
+      )}
     </div>
   );
 }
@@ -264,6 +271,7 @@ function RecordTable() {
       start_time: input.start_time || undefined,
       end_time: input.end_time || undefined,
       cache_hit: input.cache_hit || undefined,
+      cache_write: input.cache_write || undefined,
       show_channel: true,
     };
     setQuery(q);
@@ -360,6 +368,17 @@ function RecordTable() {
           />
           <span className="whitespace-nowrap text-sm">
             {t("record.cache-hit-only")}
+          </span>
+        </div>
+        <div className="flex h-10 items-center gap-2 rounded-md border px-3">
+          <Switch
+            checked={input.cache_write}
+            onCheckedChange={(cache_write) =>
+              setInput({ ...input, cache_write })
+            }
+          />
+          <span className="whitespace-nowrap text-sm">
+            {t("record.cache-write-only")}
           </span>
         </div>
         <Button onClick={handleSearch} variant="outline" size="icon">

@@ -132,9 +132,11 @@ func CountRecordInputQuota(charge Charge, fallbackTokens int, usage *globals.Tok
 	promptTokens := usage.PromptTokens
 	cacheHitTokens := usage.PromptCacheHitTokens
 	cacheMissTokens := usage.PromptCacheMissTokens
+	cacheWriteTokens := usage.PromptCacheWriteTokens
 	if promptTokens == 0 {
-		promptTokens = cacheHitTokens + cacheMissTokens
+		promptTokens = cacheHitTokens + cacheMissTokens + cacheWriteTokens
 	}
+	cacheMissAndWriteTokens := cacheMissTokens + cacheWriteTokens
 
 	cacheCharge, hasCachePrices := charge.(TokenCacheCharge)
 	if !hasCachePrices {
@@ -159,7 +161,7 @@ func CountRecordInputQuota(charge Charge, fallbackTokens int, usage *globals.Tok
 		cacheMissPrice = charge.GetInput()
 	}
 
-	regularTokens := promptTokens - cacheHitTokens - cacheMissTokens
+	regularTokens := promptTokens - cacheHitTokens - cacheMissAndWriteTokens
 	if regularTokens < 0 {
 		regularTokens = 0
 	}
@@ -169,7 +171,7 @@ func CountRecordInputQuota(charge Charge, fallbackTokens int, usage *globals.Tok
 
 	return float32(regularTokens)/1000*charge.GetInput() +
 		float32(cacheHitTokens)/1000*cacheHitPrice +
-		float32(cacheMissTokens)/1000*cacheMissPrice
+		float32(cacheMissAndWriteTokens)/1000*cacheMissPrice
 }
 
 func CountOutputToken(charge Charge, token int) float32 {

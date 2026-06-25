@@ -78,7 +78,8 @@ func TestBufferNormalizesOfficialPromptTokenDetails(t *testing.T) {
 			PromptTokens:     30,
 			CompletionTokens: 7,
 			PromptTokensDetails: &globals.PromptTokensDetails{
-				CachedTokens: 12,
+				CachedTokens:     12,
+				CacheWriteTokens: 5,
 			},
 		},
 	})
@@ -89,6 +90,9 @@ func TestBufferNormalizesOfficialPromptTokenDetails(t *testing.T) {
 	}
 	if usage.PromptCacheHitTokens != 12 {
 		t.Fatalf("expected cached prompt tokens to normalize as cache-hit tokens, got %#v", usage)
+	}
+	if usage.PromptCacheWriteTokens != 5 {
+		t.Fatalf("expected cache-write prompt tokens to be recorded, got %#v", usage)
 	}
 	if usage.PromptTokensDetails != nil {
 		t.Fatalf("expected provider-specific prompt token details to be cleared, got %#v", usage.PromptTokensDetails)
@@ -101,6 +105,9 @@ func TestBufferNormalizesOfficialPromptTokenDetails(t *testing.T) {
 	if !strings.Contains(detail, `"prompt_cache_hit_tokens":12`) {
 		t.Fatalf("expected billing detail to include normalized cache-hit tokens, got %q", detail)
 	}
+	if !strings.Contains(detail, `"prompt_cache_write_tokens":5`) {
+		t.Fatalf("expected billing detail to include normalized cache-write tokens, got %q", detail)
+	}
 	if strings.Contains(detail, "prompt_tokens_details") {
 		t.Fatalf("expected billing detail to omit provider-specific token details, got %q", detail)
 	}
@@ -112,20 +119,22 @@ func TestBufferMergesOfficialUsage(t *testing.T) {
 
 	target.WriteChunk(&globals.Chunk{
 		Usage: &globals.TokenUsage{
-			PromptTokens:          10,
-			CompletionTokens:      2,
-			TotalTokens:           12,
-			PromptCacheHitTokens:  6,
-			PromptCacheMissTokens: 4,
+			PromptTokens:           10,
+			CompletionTokens:       2,
+			TotalTokens:            12,
+			PromptCacheHitTokens:   6,
+			PromptCacheMissTokens:  4,
+			PromptCacheWriteTokens: 2,
 		},
 	})
 	source.WriteChunk(&globals.Chunk{
 		Usage: &globals.TokenUsage{
-			PromptTokens:          20,
-			CompletionTokens:      3,
-			TotalTokens:           23,
-			PromptCacheHitTokens:  15,
-			PromptCacheMissTokens: 5,
+			PromptTokens:           20,
+			CompletionTokens:       3,
+			TotalTokens:            23,
+			PromptCacheHitTokens:   15,
+			PromptCacheMissTokens:  5,
+			PromptCacheWriteTokens: 3,
 		},
 	})
 
@@ -139,6 +148,9 @@ func TestBufferMergesOfficialUsage(t *testing.T) {
 	}
 	if usage.PromptCacheHitTokens != 21 || usage.PromptCacheMissTokens != 9 {
 		t.Fatalf("unexpected merged cache tokens: %#v", usage)
+	}
+	if usage.PromptCacheWriteTokens != 5 {
+		t.Fatalf("unexpected merged cache write tokens: %#v", usage)
 	}
 }
 
@@ -169,17 +181,18 @@ func TestBufferRecordQuotaUsesCacheTokenPrices(t *testing.T) {
 	})
 	buffer.Write("visible")
 	buffer.SetUsage(&globals.TokenUsage{
-		PromptTokens:          1000,
-		CompletionTokens:      1000,
-		TotalTokens:           2000,
-		PromptCacheHitTokens:  300,
-		PromptCacheMissTokens: 200,
+		PromptTokens:           1000,
+		CompletionTokens:       1000,
+		TotalTokens:            2000,
+		PromptCacheHitTokens:   300,
+		PromptCacheMissTokens:  200,
+		PromptCacheWriteTokens: 100,
 	})
 
-	// input: 500 regular * 1 + 300 cache-hit * 0.2 + 200 cache-miss * 0.6 = 0.68
+	// input: 400 regular * 1 + 300 cache-hit * 0.2 + 300 cache-miss/write * 0.6 = 0.64
 	// output: 1000 * 2 = 2
-	if got := buffer.GetRecordQuota(); math.Abs(float64(got-2.68)) > 0.001 {
-		t.Fatalf("expected cache-aware quota 2.68, got %f", got)
+	if got := buffer.GetRecordQuota(); math.Abs(float64(got-2.64)) > 0.001 {
+		t.Fatalf("expected cache-aware quota 2.64, got %f", got)
 	}
 }
 
