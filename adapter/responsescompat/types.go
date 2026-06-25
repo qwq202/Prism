@@ -43,8 +43,9 @@ type OutputItem struct {
 }
 
 type InputTokensDetails struct {
-	CachedTokens int `json:"cached_tokens,omitempty"`
-	ImageTokens  int `json:"image_tokens,omitempty"`
+	CachedTokens     int `json:"cached_tokens,omitempty"`
+	CacheWriteTokens int `json:"cache_write_tokens,omitempty"`
+	ImageTokens      int `json:"image_tokens,omitempty"`
 }
 
 type OutputTokensDetails struct {
@@ -67,12 +68,15 @@ func (u *ResponseUsage) TokenUsage() *globals.TokenUsage {
 	var promptDetails *globals.PromptTokensDetails
 	if u.InputTokensDetails != nil && u.InputTokensDetails.CachedTokens > 0 {
 		promptDetails = &globals.PromptTokensDetails{
-			CachedTokens: u.InputTokensDetails.CachedTokens,
-			ImageTokens:  u.InputTokensDetails.ImageTokens,
+			CachedTokens:     u.InputTokensDetails.CachedTokens,
+			CacheWriteTokens: u.InputTokensDetails.CacheWriteTokens,
+			ImageTokens:      u.InputTokensDetails.ImageTokens,
 		}
-	} else if u.InputTokensDetails != nil && u.InputTokensDetails.ImageTokens > 0 {
+	} else if u.InputTokensDetails != nil &&
+		(u.InputTokensDetails.CacheWriteTokens > 0 || u.InputTokensDetails.ImageTokens > 0) {
 		promptDetails = &globals.PromptTokensDetails{
-			ImageTokens: u.InputTokensDetails.ImageTokens,
+			CacheWriteTokens: u.InputTokensDetails.CacheWriteTokens,
+			ImageTokens:      u.InputTokensDetails.ImageTokens,
 		}
 	}
 

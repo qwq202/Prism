@@ -36,14 +36,7 @@ import {
 import { PaginationAction } from "@/components/ui/pagination.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import {
-  RotateCw,
-  Search,
-  DollarSign,
-  Hash,
-  Zap,
-  Clock,
-} from "lucide-react";
+import { RotateCw, Search, DollarSign, Hash, Zap, Clock } from "lucide-react";
 import { Switch } from "@/components/ui/switch.tsx";
 import { mobile } from "@/utils/device.ts";
 import { cn } from "@/components/ui/lib/utils.ts";
@@ -362,9 +355,7 @@ function RecordTable() {
         <div className="flex h-10 items-center gap-2 rounded-md border px-3">
           <Switch
             checked={input.cache_hit}
-            onCheckedChange={(cache_hit) =>
-              setInput({ ...input, cache_hit })
-            }
+            onCheckedChange={(cache_hit) => setInput({ ...input, cache_hit })}
           />
           <span className="whitespace-nowrap text-sm">
             {t("record.cache-hit-only")}

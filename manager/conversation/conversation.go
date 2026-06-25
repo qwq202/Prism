@@ -15,34 +15,39 @@ const maxConversationContext = 25
 const defaultConversationContext = minConversationContext
 
 type Conversation struct {
-	Auth                     bool              `json:"auth"`
-	UserID                   int64             `json:"user_id"`
-	Id                       int64             `json:"id"`
-	Name                     string            `json:"name"`
-	Message                  []globals.Message `json:"message"`
-	Model                    string            `json:"model"`
-	TaskID                   string            `json:"task_id,omitempty"`
-	UpdatedAt                string            `json:"updated_at,omitempty"`
-	Favorite                 bool              `json:"favorite"`
-	Persisted                bool              `json:"-"`
-	EnableWeb                bool              `json:"enable_web"`
-	WebSearch                bool              `json:"web_search"`
-	URLContext               bool              `json:"url_context"`
-	XSearch                  bool              `json:"x_search"`
-	Fetch                    bool              `json:"fetch"`
-	GeminiThinkingBudget     int               `json:"gemini_thinking_budget"`
-	DeepseekThinkingDisabled bool              `json:"deepseek_thinking_disabled"`
-	DeepseekReasoningEffort  string            `json:"deepseek_reasoning_effort"`
-	OpenAIReasoningEffort    string            `json:"openai_reasoning_effort"`
-	OpenAIReasoningSummary   string            `json:"openai_reasoning_summary"`
-	Shared                   bool              `json:"shared"`
-	Context                  int               `json:"context"`
-	CustomInstruction        string            `json:"custom_instruction,omitempty"`
-	LearningMode             bool              `json:"learning_mode"`
-	MemoryEnabled            bool              `json:"memory_enabled"`
-	MemoryHistoryEnabled     bool              `json:"memory_history_enabled"`
-	ResponseFormat           interface{}       `json:"-"`
-	Thinking                 interface{}       `json:"-"`
+	Auth                     bool                   `json:"auth"`
+	UserID                   int64                  `json:"user_id"`
+	Id                       int64                  `json:"id"`
+	Name                     string                 `json:"name"`
+	Message                  []globals.Message      `json:"message"`
+	Model                    string                 `json:"model"`
+	TaskID                   string                 `json:"task_id,omitempty"`
+	UpdatedAt                string                 `json:"updated_at,omitempty"`
+	Favorite                 bool                   `json:"favorite"`
+	Persisted                bool                   `json:"-"`
+	EnableWeb                bool                   `json:"enable_web"`
+	WebSearch                bool                   `json:"web_search"`
+	URLContext               bool                   `json:"url_context"`
+	XSearch                  bool                   `json:"x_search"`
+	Fetch                    bool                   `json:"fetch"`
+	GeminiThinkingBudget     int                    `json:"gemini_thinking_budget"`
+	DeepseekThinkingDisabled bool                   `json:"deepseek_thinking_disabled"`
+	DeepseekReasoningEffort  string                 `json:"deepseek_reasoning_effort"`
+	OpenAIReasoningEffort    string                 `json:"openai_reasoning_effort"`
+	OpenAIReasoningSummary   string                 `json:"openai_reasoning_summary"`
+	Shared                   bool                   `json:"shared"`
+	Context                  int                    `json:"context"`
+	CustomInstruction        string                 `json:"custom_instruction,omitempty"`
+	LearningMode             bool                   `json:"learning_mode"`
+	MemoryEnabled            bool                   `json:"memory_enabled"`
+	MemoryHistoryEnabled     bool                   `json:"memory_history_enabled"`
+	ResponseFormat           interface{}            `json:"-"`
+	CacheControl             map[string]interface{} `json:"cache_control,omitempty"`
+	PromptCacheKey           string                 `json:"prompt_cache_key,omitempty"`
+	PromptCacheRetention     string                 `json:"prompt_cache_retention,omitempty"`
+	CachedContent            string                 `json:"cachedContent,omitempty"`
+	CachedContentSnake       string                 `json:"cached_content,omitempty"`
+	Thinking                 interface{}            `json:"-"`
 
 	MaxTokens         *int     `json:"max_tokens,omitempty"`
 	Temperature       *float32 `json:"temperature,omitempty"`
@@ -54,27 +59,32 @@ type Conversation struct {
 }
 
 type FormMessage struct {
-	Type                    string      `json:"type"`
-	Message                 string      `json:"message"`
-	Web                     bool        `json:"web"`
-	WebSearch               bool        `json:"web_search"`
-	URLContext              bool        `json:"url_context"`
-	XSearch                 bool        `json:"x_search"`
-	Fetch                   bool        `json:"fetch"`
-	GeminiThinkingBudget    int         `json:"gemini_thinking_budget"`
-	DeepseekThinkingEnabled *bool       `json:"deepseek_thinking_enabled,omitempty"`
-	DeepseekReasoningEffort string      `json:"deepseek_reasoning_effort"`
-	OpenAIReasoningEffort   string      `json:"openai_reasoning_effort"`
-	OpenAIReasoningSummary  string      `json:"openai_reasoning_summary"`
-	Model                   string      `json:"model"`
-	IgnoreContext           bool        `json:"ignore_context"`
-	Context                 int         `json:"context"`
-	CustomInstruction       string      `json:"custom_instruction,omitempty"`
-	LearningMode            bool        `json:"learning_mode"`
-	MemoryEnabled           bool        `json:"memory_enabled"`
-	MemoryHistoryEnabled    bool        `json:"memory_history_enabled"`
-	ResponseFormat          interface{} `json:"response_format,omitempty"`
-	Thinking                interface{} `json:"thinking,omitempty"`
+	Type                    string                 `json:"type"`
+	Message                 string                 `json:"message"`
+	Web                     bool                   `json:"web"`
+	WebSearch               bool                   `json:"web_search"`
+	URLContext              bool                   `json:"url_context"`
+	XSearch                 bool                   `json:"x_search"`
+	Fetch                   bool                   `json:"fetch"`
+	GeminiThinkingBudget    int                    `json:"gemini_thinking_budget"`
+	DeepseekThinkingEnabled *bool                  `json:"deepseek_thinking_enabled,omitempty"`
+	DeepseekReasoningEffort string                 `json:"deepseek_reasoning_effort"`
+	OpenAIReasoningEffort   string                 `json:"openai_reasoning_effort"`
+	OpenAIReasoningSummary  string                 `json:"openai_reasoning_summary"`
+	Model                   string                 `json:"model"`
+	IgnoreContext           bool                   `json:"ignore_context"`
+	Context                 int                    `json:"context"`
+	CustomInstruction       string                 `json:"custom_instruction,omitempty"`
+	LearningMode            bool                   `json:"learning_mode"`
+	MemoryEnabled           bool                   `json:"memory_enabled"`
+	MemoryHistoryEnabled    bool                   `json:"memory_history_enabled"`
+	ResponseFormat          interface{}            `json:"response_format,omitempty"`
+	CacheControl            map[string]interface{} `json:"cache_control,omitempty"`
+	PromptCacheKey          string                 `json:"prompt_cache_key,omitempty"`
+	PromptCacheRetention    string                 `json:"prompt_cache_retention,omitempty"`
+	CachedContent           string                 `json:"cachedContent,omitempty"`
+	CachedContentSnake      string                 `json:"cached_content,omitempty"`
+	Thinking                interface{}            `json:"thinking,omitempty"`
 
 	// request params
 	MaxTokens         *int     `json:"max_tokens,omitempty"`
@@ -184,6 +194,37 @@ func (c *Conversation) GetResponseFormat() interface{} {
 	return c.ResponseFormat
 }
 
+func (c *Conversation) GetCacheControl() map[string]interface{} {
+	if len(c.CacheControl) == 0 {
+		return nil
+	}
+	return c.CacheControl
+}
+
+func optionalStringPtr(value string) *string {
+	text := strings.TrimSpace(value)
+	if text == "" {
+		return nil
+	}
+	return &text
+}
+
+func (c *Conversation) GetPromptCacheKey() *string {
+	return optionalStringPtr(c.PromptCacheKey)
+}
+
+func (c *Conversation) GetPromptCacheRetention() *string {
+	return optionalStringPtr(c.PromptCacheRetention)
+}
+
+func (c *Conversation) GetCachedContent() *string {
+	return optionalStringPtr(c.CachedContent)
+}
+
+func (c *Conversation) GetCachedContentSnake() *string {
+	return optionalStringPtr(c.CachedContentSnake)
+}
+
 func (c *Conversation) GetThinking() interface{} {
 	return c.Thinking
 }
@@ -245,6 +286,30 @@ func (c *Conversation) SetOpenAIReasoningSummary(summary string) {
 
 func (c *Conversation) SetResponseFormat(format interface{}) {
 	c.ResponseFormat = format
+}
+
+func (c *Conversation) SetCacheControl(cacheControl map[string]interface{}) {
+	if len(cacheControl) == 0 {
+		c.CacheControl = nil
+		return
+	}
+	c.CacheControl = cacheControl
+}
+
+func (c *Conversation) SetPromptCacheKey(key string) {
+	c.PromptCacheKey = strings.TrimSpace(key)
+}
+
+func (c *Conversation) SetPromptCacheRetention(retention string) {
+	c.PromptCacheRetention = strings.TrimSpace(retention)
+}
+
+func (c *Conversation) SetCachedContent(cachedContent string) {
+	c.CachedContent = strings.TrimSpace(cachedContent)
+}
+
+func (c *Conversation) SetCachedContentSnake(cachedContent string) {
+	c.CachedContentSnake = strings.TrimSpace(cachedContent)
 }
 
 func (c *Conversation) SetThinking(thinking interface{}) {
@@ -564,6 +629,11 @@ func (c *Conversation) ApplyParam(form *FormMessage) {
 	c.SetMemoryEnabled(form.MemoryEnabled)
 	c.SetMemoryHistoryEnabled(form.MemoryHistoryEnabled)
 	c.SetResponseFormat(form.ResponseFormat)
+	c.SetCacheControl(form.CacheControl)
+	c.SetPromptCacheKey(form.PromptCacheKey)
+	c.SetPromptCacheRetention(form.PromptCacheRetention)
+	c.SetCachedContent(form.CachedContent)
+	c.SetCachedContentSnake(form.CachedContentSnake)
 	c.SetThinking(form.Thinking)
 
 	c.SetMaxTokens(form.MaxTokens)

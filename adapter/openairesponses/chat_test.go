@@ -59,6 +59,28 @@ func TestGetChatBodyMapsResponseFormatToTextFormat(t *testing.T) {
 	}
 }
 
+func TestGetChatBodyIncludesPromptCacheParams(t *testing.T) {
+	instance := &ChatInstance{}
+	cacheKey := "stable-prefix"
+	cacheRetention := "24h"
+	props := &adaptercommon.ChatProps{
+		Model:                "gpt-5.1",
+		PromptCacheKey:       &cacheKey,
+		PromptCacheRetention: &cacheRetention,
+		Message: []globals.Message{
+			{Role: globals.User, Content: "hello"},
+		},
+	}
+
+	body := instance.GetChatBody(props, false)
+	if body.PromptCacheKey == nil || *body.PromptCacheKey != cacheKey {
+		t.Fatalf("expected prompt_cache_key to be included, got %#v", body.PromptCacheKey)
+	}
+	if body.PromptCacheRetention == nil || *body.PromptCacheRetention != cacheRetention {
+		t.Fatalf("expected prompt_cache_retention to be included, got %#v", body.PromptCacheRetention)
+	}
+}
+
 func TestGetChatBodySkipsNativeWebToolForUnsupportedModel(t *testing.T) {
 	instance := &ChatInstance{}
 	props := &adaptercommon.ChatProps{

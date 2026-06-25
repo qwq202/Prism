@@ -94,6 +94,46 @@ func TestBuildResponseChunkIncludesReasoningSummary(t *testing.T) {
 	}
 }
 
+func TestResponseUsageTokenUsageNormalizesCachedInputTokens(t *testing.T) {
+	usage := (&ResponseUsage{
+		InputTokens: 150,
+		InputTokensDetails: &InputTokensDetails{
+			CachedTokens: 128,
+			ImageTokens:  7,
+		},
+		OutputTokens: 20,
+		TotalTokens:  170,
+		OutputTokensDetails: OutputTokensDetails{
+			ReasoningTokens: 12,
+		},
+	}).TokenUsage()
+
+	if usage.PromptTokens != 150 || usage.CompletionTokens != 20 || usage.TotalTokens != 170 {
+		t.Fatalf("expected responses usage token counts to map to chat usage, got %#v", usage)
+	}
+	if usage.PromptCacheHitTokens != 128 || usage.PromptCacheMissTokens != 22 {
+		t.Fatalf("expected cached input tokens to become hit=128 miss=22, got %#v", usage)
+	}
+	if usage.ImageTokens != 7 || usage.CompletionTokensDetails.ReasoningTokens != 12 {
+		t.Fatalf("expected image and reasoning token details to be preserved, got %#v", usage)
+	}
+}
+
+func TestResponseUsageTokenUsageNormalizesCacheWriteTokens(t *testing.T) {
+	usage := (&ResponseUsage{
+		InputTokens: 120,
+		InputTokensDetails: &InputTokensDetails{
+			CacheWriteTokens: 80,
+		},
+		OutputTokens: 8,
+		TotalTokens:  128,
+	}).TokenUsage()
+
+	if usage.PromptCacheWriteTokens != 80 || usage.PromptCacheMissTokens != 0 {
+		t.Fatalf("expected cache write tokens to stay separate from miss tokens, got %#v", usage)
+	}
+}
+
 func TestEmitFunctionCallEvent(t *testing.T) {
 	chunk := EmitFunctionCallEvent(&OutputItem{
 		Type:      "function_call",

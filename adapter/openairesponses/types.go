@@ -16,21 +16,23 @@ type ResponseTool struct {
 }
 
 type ResponseRequest struct {
-	Model              string         `json:"model"`
-	Instructions       *string        `json:"instructions,omitempty"`
-	Input              interface{}    `json:"input"`
-	MaxOutputTokens    *int           `json:"max_output_tokens,omitempty"`
-	Temperature        *float32       `json:"temperature,omitempty"`
-	TopP               *float32       `json:"top_p,omitempty"`
-	Tools              []ResponseTool `json:"tools,omitempty"`
-	ToolChoice         *interface{}   `json:"tool_choice,omitempty"`
-	ParallelToolCalls  *bool          `json:"parallel_tool_calls,omitempty"`
-	Text               interface{}    `json:"text,omitempty"`
-	Reasoning          interface{}    `json:"reasoning,omitempty"`
-	Include            []string       `json:"include,omitempty"`
-	PreviousResponseID *string        `json:"previous_response_id,omitempty"`
-	Store              *bool          `json:"store,omitempty"`
-	Stream             bool           `json:"stream,omitempty"`
+	Model                string         `json:"model"`
+	Instructions         *string        `json:"instructions,omitempty"`
+	Input                interface{}    `json:"input"`
+	MaxOutputTokens      *int           `json:"max_output_tokens,omitempty"`
+	Temperature          *float32       `json:"temperature,omitempty"`
+	TopP                 *float32       `json:"top_p,omitempty"`
+	Tools                []ResponseTool `json:"tools,omitempty"`
+	ToolChoice           *interface{}   `json:"tool_choice,omitempty"`
+	ParallelToolCalls    *bool          `json:"parallel_tool_calls,omitempty"`
+	Text                 interface{}    `json:"text,omitempty"`
+	Reasoning            interface{}    `json:"reasoning,omitempty"`
+	Include              []string       `json:"include,omitempty"`
+	PreviousResponseID   *string        `json:"previous_response_id,omitempty"`
+	PromptCacheKey       *string        `json:"prompt_cache_key,omitempty"`
+	PromptCacheRetention *string        `json:"prompt_cache_retention,omitempty"`
+	Store                *bool          `json:"store,omitempty"`
+	Stream               bool           `json:"stream,omitempty"`
 }
 
 type OutputContent = compat.OutputContent

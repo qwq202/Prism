@@ -36,6 +36,7 @@ type ChatProps struct {
 	OriginalModel string `json:"-"`
 
 	Message              []globals.Message      `json:"messages,omitempty"`
+	CacheControl         map[string]interface{} `json:"cache_control,omitempty"`
 	CustomInstruction    string                 `json:"custom_instruction,omitempty"`
 	LearningMode         bool                   `json:"learning_mode,omitempty"`
 	MemoryPrompt         string                 `json:"memory_prompt,omitempty"`
@@ -57,6 +58,9 @@ type ChatProps struct {
 	ResponseStore        *bool                  `json:"store,omitempty"`
 	ParallelToolCalls    *bool                  `json:"parallel_tool_calls,omitempty"`
 	StreamOptions        interface{}            `json:"stream_options,omitempty"`
+	PromptCacheKey       *string                `json:"prompt_cache_key,omitempty"`
+	PromptCacheRetention *string                `json:"prompt_cache_retention,omitempty"`
+	SessionID            *string                `json:"session_id,omitempty"`
 	Thinking             interface{}            `json:"thinking,omitempty"`
 	CachedContent        *string                `json:"cachedContent,omitempty"`
 	CachedContentSnake   *string                `json:"cached_content,omitempty"`

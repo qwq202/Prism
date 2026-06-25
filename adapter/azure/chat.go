@@ -44,17 +44,30 @@ func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps, stream bool) 
 	}
 
 	return ChatRequest{
-		Messages:         formatMessages(props),
-		MaxToken:         props.MaxTokens,
-		Stream:           stream,
-		StreamOptions:    getStreamOptions(props, stream),
-		PresencePenalty:  props.PresencePenalty,
-		FrequencyPenalty: props.FrequencyPenalty,
-		Temperature:      props.Temperature,
-		TopP:             props.TopP,
-		Tools:            props.Tools,
-		ToolChoice:       props.ToolChoice,
+		Messages:             formatMessages(props),
+		MaxToken:             props.MaxTokens,
+		Stream:               stream,
+		StreamOptions:        getStreamOptions(props, stream),
+		PresencePenalty:      props.PresencePenalty,
+		FrequencyPenalty:     props.FrequencyPenalty,
+		Temperature:          props.Temperature,
+		TopP:                 props.TopP,
+		PromptCacheKey:       normalizedStringPtr(props.PromptCacheKey),
+		PromptCacheRetention: normalizedStringPtr(props.PromptCacheRetention),
+		Tools:                props.Tools,
+		ToolChoice:           props.ToolChoice,
 	}
+}
+
+func normalizedStringPtr(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	text := strings.TrimSpace(*value)
+	if text == "" {
+		return nil
+	}
+	return &text
 }
 
 func getStreamOptions(props *adaptercommon.ChatProps, stream bool) interface{} {

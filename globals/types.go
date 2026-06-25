@@ -50,19 +50,20 @@ func (m *GeminiHiddenMetadata) UnmarshalJSON(data []byte) error {
 }
 
 type Message struct {
-	Role                 string                `json:"role"`
-	Content              string                `json:"content"`
-	Model                string                `json:"model,omitempty"`
-	Name                 *string               `json:"name,omitempty"`
-	FunctionCall         *FunctionCall         `json:"function_call,omitempty"`          // only `function` role
-	ToolCallId           *string               `json:"tool_call_id,omitempty"`           // only `tool` role
-	ToolCalls            *ToolCalls            `json:"tool_calls,omitempty"`             // only `assistant` role
-	ReasoningContent     *string               `json:"reasoning_content,omitempty"`      // only for deepseek reasoner models
-	GeminiHiddenMetadata *GeminiHiddenMetadata `json:"gemini_hidden_metadata,omitempty"` // hidden gemini metadata for replay
-	ClaudeHiddenMetadata *ClaudeHiddenMetadata `json:"claude_hidden_metadata,omitempty"` // hidden claude thinking metadata for replay
-	Quota                float32               `json:"quota,omitempty"`                  // persisted display cost
-	Plan                 bool                  `json:"plan,omitempty"`                   // whether the cost used subscription quota
-	ContextCleared       bool                  `json:"context_cleared,omitempty"`        // internal marker for context window resets
+	Role                 string                 `json:"role"`
+	Content              string                 `json:"content"`
+	CacheControl         map[string]interface{} `json:"cache_control,omitempty"`
+	Model                string                 `json:"model,omitempty"`
+	Name                 *string                `json:"name,omitempty"`
+	FunctionCall         *FunctionCall          `json:"function_call,omitempty"`          // only `function` role
+	ToolCallId           *string                `json:"tool_call_id,omitempty"`           // only `tool` role
+	ToolCalls            *ToolCalls             `json:"tool_calls,omitempty"`             // only `assistant` role
+	ReasoningContent     *string                `json:"reasoning_content,omitempty"`      // only for deepseek reasoner models
+	GeminiHiddenMetadata *GeminiHiddenMetadata  `json:"gemini_hidden_metadata,omitempty"` // hidden gemini metadata for replay
+	ClaudeHiddenMetadata *ClaudeHiddenMetadata  `json:"claude_hidden_metadata,omitempty"` // hidden claude thinking metadata for replay
+	Quota                float32                `json:"quota,omitempty"`                  // persisted display cost
+	Plan                 bool                   `json:"plan,omitempty"`                   // whether the cost used subscription quota
+	ContextCleared       bool                   `json:"context_cleared,omitempty"`        // internal marker for context window resets
 }
 
 type Chunk struct {
@@ -140,11 +141,6 @@ func NormalizeTokenUsage(usage *TokenUsage) *TokenUsage {
 		normalized.PromptTokens > normalized.PromptCacheHitTokens {
 		normalized.PromptCacheMissTokens = normalized.PromptTokens - normalized.PromptCacheHitTokens
 	}
-	if normalized.PromptCacheWriteTokens > 0 &&
-		normalized.PromptCacheMissTokens == 0 {
-		normalized.PromptCacheMissTokens = normalized.PromptCacheWriteTokens
-	}
-
 	return &normalized
 }
 

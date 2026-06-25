@@ -50,8 +50,8 @@ func TestNormalizeTokenUsageUsesPromptTokensDetailsCacheWriteTokens(t *testing.T
 		},
 	})
 
-	if usage.PromptCacheWriteTokens != 80 || usage.PromptCacheMissTokens != 80 {
-		t.Fatalf("expected cache write tokens to normalize as write=80 miss=80, got %#v", usage)
+	if usage.PromptCacheWriteTokens != 80 || usage.PromptCacheMissTokens != 0 {
+		t.Fatalf("expected cache write tokens to stay separate from miss tokens, got %#v", usage)
 	}
 	if usage.PromptTokensDetails != nil {
 		t.Fatalf("expected provider-specific prompt details to be normalized away, got %#v", usage.PromptTokensDetails)

@@ -28,7 +28,9 @@ export function getRecordCacheUsage(
       };
     };
     const hitTokens = toNumber(detail.official_usage?.prompt_cache_hit_tokens);
-    const missTokens = toNumber(detail.official_usage?.prompt_cache_miss_tokens);
+    const missTokens = toNumber(
+      detail.official_usage?.prompt_cache_miss_tokens,
+    );
     const writeTokens = toNumber(
       detail.official_usage?.prompt_cache_write_tokens,
     );

@@ -2,6 +2,7 @@ package xai
 
 import (
 	adaptercommon "chat/adapter/common"
+	compat "chat/adapter/responsescompat"
 	"chat/globals"
 	"testing"
 )
@@ -233,6 +234,26 @@ func TestBuildResponseChunkExtractsFunctionCalls(t *testing.T) {
 	}
 	if (*chunk.ToolCall)[0].Function.Name != "memory_tool" {
 		t.Fatalf("unexpected function call payload: %#v", (*chunk.ToolCall)[0])
+	}
+}
+
+func TestBuildResponseUsageChunkNormalizesCachedInputTokens(t *testing.T) {
+	chunk := buildResponseUsageChunk(&ResponseResponse{
+		Usage: &compat.ResponseUsage{
+			InputTokens: 131,
+			InputTokensDetails: &compat.InputTokensDetails{
+				CachedTokens: 128,
+			},
+			OutputTokens: 624,
+			TotalTokens:  755,
+		},
+	})
+
+	if chunk.Usage == nil {
+		t.Fatalf("expected usage chunk")
+	}
+	if chunk.Usage.PromptCacheHitTokens != 128 || chunk.Usage.PromptCacheMissTokens != 3 {
+		t.Fatalf("expected xai cached input tokens to be normalized, got %#v", chunk.Usage)
 	}
 }
 

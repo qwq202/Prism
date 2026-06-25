@@ -46,6 +46,48 @@ func TestOpenRouterHeaders(t *testing.T) {
 	}
 }
 
+func TestOpenRouterChatBodyIncludesSessionID(t *testing.T) {
+	instance := NewOpenRouterChatInstance("", "sk-or-test")
+	sessionID := "conversation-42"
+
+	body, ok := instance.GetChatBody(&adaptercommon.ChatProps{
+		Model:     "openai/gpt-4o-mini",
+		Message:   []globals.Message{{Role: globals.User, Content: "hello"}},
+		SessionID: &sessionID,
+	}, false).(ChatRequest)
+	if !ok {
+		t.Fatalf("expected ChatRequest body")
+	}
+	if body.SessionID == nil || *body.SessionID != sessionID {
+		t.Fatalf("expected OpenRouter session_id to be included, got %#v", body.SessionID)
+	}
+}
+
+func TestOpenAIChatBodyIncludesPromptCacheParams(t *testing.T) {
+	instance := NewChatInstance("https://api.openai.com", "sk-test")
+	cacheKey := "stable-prefix"
+	cacheRetention := "24h"
+
+	body, ok := instance.GetChatBody(&adaptercommon.ChatProps{
+		Model:                "gpt-5.1",
+		Message:              []globals.Message{{Role: globals.User, Content: "hello"}},
+		PromptCacheKey:       &cacheKey,
+		PromptCacheRetention: &cacheRetention,
+	}, false).(ChatRequest)
+	if !ok {
+		t.Fatalf("expected ChatRequest body")
+	}
+	if body.PromptCacheKey == nil || *body.PromptCacheKey != cacheKey {
+		t.Fatalf("expected prompt_cache_key to be included, got %#v", body.PromptCacheKey)
+	}
+	if body.PromptCacheRetention == nil || *body.PromptCacheRetention != cacheRetention {
+		t.Fatalf("expected prompt_cache_retention to be included, got %#v", body.PromptCacheRetention)
+	}
+	if body.SessionID != nil {
+		t.Fatalf("expected non-OpenRouter request to omit session_id, got %#v", body.SessionID)
+	}
+}
+
 func TestOpenRouterStreamErrorUsesProviderPrefix(t *testing.T) {
 	instance := NewOpenRouterChatInstance("", "sk-or-test")
 
@@ -73,6 +115,24 @@ func TestProcessLineNormalizesPromptCacheUsage(t *testing.T) {
 	}
 	if chunk.Usage.PromptTokensDetails != nil {
 		t.Fatalf("expected provider-specific prompt details to be normalized away, got %#v", chunk.Usage.PromptTokensDetails)
+	}
+}
+
+func TestProcessLineNormalizesPromptCacheWriteUsage(t *testing.T) {
+	instance := NewOpenRouterChatInstance("", "sk-or-test")
+
+	chunk, err := instance.ProcessLine(`{"choices":[],"usage":{"prompt_tokens":100,"completion_tokens":10,"total_tokens":110,"prompt_tokens_details":{"cached_tokens":64,"cache_write_tokens":20}}}`, false)
+	if err != nil {
+		t.Fatalf("expected usage-only stream chunk to parse, got %v", err)
+	}
+	if chunk.Usage == nil {
+		t.Fatalf("expected usage chunk")
+	}
+	if chunk.Usage.PromptCacheHitTokens != 64 || chunk.Usage.PromptCacheWriteTokens != 20 {
+		t.Fatalf("expected cached prompt usage to include hit and write tokens, got %#v", chunk.Usage)
+	}
+	if chunk.Usage.PromptCacheMissTokens != 0 {
+		t.Fatalf("expected cache write tokens to stay separate from miss tokens, got %#v", chunk.Usage)
 	}
 }
 

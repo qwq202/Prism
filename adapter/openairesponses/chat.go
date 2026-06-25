@@ -212,22 +212,35 @@ func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps, stream bool) 
 	)
 
 	return ResponseRequest{
-		Model:              props.Model,
-		Instructions:       instructions,
-		Input:              input,
-		MaxOutputTokens:    props.MaxTokens,
-		Temperature:        temperature,
-		TopP:               topP,
-		Tools:              tools,
-		ToolChoice:         props.ToolChoice,
-		ParallelToolCalls:  props.ParallelToolCalls,
-		Text:               getResponseTextConfig(props),
-		Reasoning:          props.Thinking,
-		Include:            props.ResponseInclude,
-		PreviousResponseID: props.PreviousResponseID,
-		Store:              props.ResponseStore,
-		Stream:             stream,
+		Model:                props.Model,
+		Instructions:         instructions,
+		Input:                input,
+		MaxOutputTokens:      props.MaxTokens,
+		Temperature:          temperature,
+		TopP:                 topP,
+		Tools:                tools,
+		ToolChoice:           props.ToolChoice,
+		ParallelToolCalls:    props.ParallelToolCalls,
+		Text:                 getResponseTextConfig(props),
+		Reasoning:            props.Thinking,
+		Include:              props.ResponseInclude,
+		PreviousResponseID:   props.PreviousResponseID,
+		PromptCacheKey:       normalizedStringPtr(props.PromptCacheKey),
+		PromptCacheRetention: normalizedStringPtr(props.PromptCacheRetention),
+		Store:                props.ResponseStore,
+		Stream:               stream,
 	}
+}
+
+func normalizedStringPtr(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	text := strings.TrimSpace(*value)
+	if text == "" {
+		return nil
+	}
+	return &text
 }
 
 func buildResponseChunk(form *ResponseResponse) *globals.Chunk {

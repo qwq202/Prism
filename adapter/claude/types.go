@@ -40,18 +40,19 @@ type ToolChoice struct {
 }
 
 type ChatBody struct {
-	Messages    []Message        `json:"messages"`
-	MaxTokens   int              `json:"max_tokens"`
-	Model       string           `json:"model"`
-	System      string           `json:"system,omitempty"`
-	Stream      bool             `json:"stream"`
-	Temperature *float32         `json:"temperature,omitempty"`
-	TopP        *float32         `json:"top_p,omitempty"`
-	TopK        *int             `json:"top_k,omitempty"`
-	StopSeqs    interface{}      `json:"stop_sequences,omitempty"`
-	Tools       []ToolDefinition `json:"tools,omitempty"`
-	ToolChoice  *ToolChoice      `json:"tool_choice,omitempty"`
-	Thinking    interface{}      `json:"thinking,omitempty"`
+	Messages    []Message              `json:"messages"`
+	MaxTokens   int                    `json:"max_tokens"`
+	Model       string                 `json:"model"`
+	System      interface{}            `json:"system,omitempty"`
+	CacheCtrl   map[string]interface{} `json:"cache_control,omitempty"`
+	Stream      bool                   `json:"stream"`
+	Temperature *float32               `json:"temperature,omitempty"`
+	TopP        *float32               `json:"top_p,omitempty"`
+	TopK        *int                   `json:"top_k,omitempty"`
+	StopSeqs    interface{}            `json:"stop_sequences,omitempty"`
+	Tools       []ToolDefinition       `json:"tools,omitempty"`
+	ToolChoice  *ToolChoice            `json:"tool_choice,omitempty"`
+	Thinking    interface{}            `json:"thinking,omitempty"`
 }
 
 type StreamEvent struct {
@@ -107,11 +108,11 @@ func (u *AnthropicUsage) TokenUsage() *globals.TokenUsage {
 
 	promptTokens := u.InputTokens + u.CacheCreationInputTokens + u.CacheReadInputTokens
 	return globals.NormalizeTokenUsage(&globals.TokenUsage{
-		PromptTokens:          promptTokens,
-		CompletionTokens:      u.OutputTokens,
-		TotalTokens:           promptTokens + u.OutputTokens,
-		PromptCacheHitTokens:  u.CacheReadInputTokens,
-		PromptCacheMissTokens: u.CacheCreationInputTokens,
+		PromptTokens:           promptTokens,
+		CompletionTokens:       u.OutputTokens,
+		TotalTokens:            promptTokens + u.OutputTokens,
+		PromptCacheHitTokens:   u.CacheReadInputTokens,
+		PromptCacheWriteTokens: u.CacheCreationInputTokens,
 	})
 }
 

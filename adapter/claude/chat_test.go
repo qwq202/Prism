@@ -9,6 +9,59 @@ import (
 
 const claudeInlineBase64Png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=="
 
+func TestAnthropicUsageCountsPromptCacheTokens(t *testing.T) {
+	usage := (&AnthropicUsage{
+		InputTokens:              50,
+		OutputTokens:             7,
+		CacheCreationInputTokens: 100,
+		CacheReadInputTokens:     200,
+	}).TokenUsage()
+
+	if usage.PromptTokens != 350 ||
+		usage.CompletionTokens != 7 ||
+		usage.TotalTokens != 357 ||
+		usage.PromptCacheWriteTokens != 100 ||
+		usage.PromptCacheMissTokens != 0 ||
+		usage.PromptCacheHitTokens != 200 {
+		t.Fatalf("unexpected anthropic cache usage mapping: %#v", usage)
+	}
+}
+
+func TestGetChatBodyPreservesPromptCacheControls(t *testing.T) {
+	instance := NewChatInstance("https://api.anthropic.com", "test")
+	topLevelCacheControl := map[string]interface{}{"type": "ephemeral"}
+	systemCacheControl := map[string]interface{}{"type": "ephemeral", "ttl": "1h"}
+	messageCacheControl := map[string]interface{}{"type": "ephemeral", "ttl": "5m"}
+
+	body := instance.GetChatBody(&adaptercommon.ChatProps{
+		Model:        "claude-sonnet-4-20250514",
+		CacheControl: topLevelCacheControl,
+		Message: []globals.Message{
+			{Role: globals.System, Content: "Long-lived instructions", CacheControl: systemCacheControl},
+			{Role: globals.User, Content: "Reusable context", CacheControl: messageCacheControl},
+		},
+	}, false)
+
+	if body.CacheCtrl["type"] != "ephemeral" {
+		t.Fatalf("expected top-level cache_control to be preserved, got %#v", body.CacheCtrl)
+	}
+
+	systemBlocks, ok := body.System.([]ContentBlock)
+	if !ok || len(systemBlocks) != 1 {
+		t.Fatalf("expected cache-controlled system content blocks, got %#v", body.System)
+	}
+	if systemBlocks[0].CacheCtrl["ttl"] != "1h" {
+		t.Fatalf("expected system cache_control to be preserved, got %#v", systemBlocks[0].CacheCtrl)
+	}
+
+	if len(body.Messages) != 1 || len(body.Messages[0].Content) != 1 {
+		t.Fatalf("expected one user text block, got %#v", body.Messages)
+	}
+	if body.Messages[0].Content[0].CacheCtrl["ttl"] != "5m" {
+		t.Fatalf("expected message block cache_control to be preserved, got %#v", body.Messages[0].Content[0].CacheCtrl)
+	}
+}
+
 func TestGetMessagesReplaysThinkingToolsAndToolResults(t *testing.T) {
 	instance := NewChatInstance("https://api.anthropic.com", "test")
 	toolCalls := globals.ToolCalls{

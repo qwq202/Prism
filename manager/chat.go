@@ -653,6 +653,12 @@ func buildChatProps(
 		Tools:                tools,
 		ToolChoice:           toolChoice,
 		ResponseFormat:       instance.GetResponseFormat(),
+		CacheControl:         instance.GetCacheControl(),
+		PromptCacheKey:       instance.GetPromptCacheKey(),
+		PromptCacheRetention: instance.GetPromptCacheRetention(),
+		CachedContent:        instance.GetCachedContent(),
+		CachedContentSnake:   instance.GetCachedContentSnake(),
+		SessionID:            conversationSessionID(instance),
 		EnableWeb:            instance.IsEnableWeb(),
 		EnableWebSearch:      instance.IsEnableWebSearch(),
 		EnableURLContext:     instance.IsEnableURLContext(),
@@ -670,6 +676,14 @@ func buildChatProps(
 		ClientContext:        extractClientContext(conn.GetCtx()),
 		DisableCache:         disableCache,
 	}, buffer)
+}
+
+func conversationSessionID(instance *conversation.Conversation) *string {
+	if instance == nil || instance.GetUserID() < 0 || instance.GetId() < 0 {
+		return nil
+	}
+	sessionID := fmt.Sprintf("user-%d-conversation-%d", instance.GetUserID(), instance.GetId())
+	return &sessionID
 }
 
 func createRoundTask(
@@ -1430,6 +1444,12 @@ func createChatTask(
 			Message:              segment,
 			CustomInstruction:    instance.GetCustomInstruction(),
 			ResponseFormat:       instance.GetResponseFormat(),
+			CacheControl:         instance.GetCacheControl(),
+			PromptCacheKey:       instance.GetPromptCacheKey(),
+			PromptCacheRetention: instance.GetPromptCacheRetention(),
+			CachedContent:        instance.GetCachedContent(),
+			CachedContentSnake:   instance.GetCachedContentSnake(),
+			SessionID:            conversationSessionID(instance),
 			Thinking:             instance.GetThinking(),
 			EnableWeb:            instance.IsEnableWeb(),
 			EnableWebSearch:      instance.IsEnableWebSearch(),

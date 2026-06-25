@@ -232,7 +232,7 @@ func toolResultMessage(message globals.Message) *Message {
 
 	toolUseID := strings.TrimSpace(*message.ToolCallId)
 	content := strings.TrimSpace(message.Content)
-	return &Message{
+	result := &Message{
 		Role: "user",
 		Content: []ContentBlock{
 			{
@@ -242,6 +242,19 @@ func toolResultMessage(message globals.Message) *Message {
 			},
 		},
 	}
+	applyCacheControlToLastBlock(result.Content, message.CacheControl)
+	return result
+}
+
+func hasCacheControl(cacheControl map[string]interface{}) bool {
+	return len(cacheControl) > 0
+}
+
+func applyCacheControlToLastBlock(blocks []ContentBlock, cacheControl map[string]interface{}) {
+	if len(blocks) == 0 || !hasCacheControl(cacheControl) {
+		return
+	}
+	blocks[len(blocks)-1].CacheCtrl = cacheControl
 }
 
 func (c *ChatInstance) GetMessages(props *adaptercommon.ChatProps) []Message {
@@ -276,6 +289,7 @@ func (c *ChatInstance) GetMessages(props *adaptercommon.ChatProps) []Message {
 			continue
 		}
 
+		applyCacheControlToLastBlock(blocks, message.CacheControl)
 		messages = append(messages, Message{
 			Role:    role,
 			Content: blocks,
@@ -285,13 +299,41 @@ func (c *ChatInstance) GetMessages(props *adaptercommon.ChatProps) []Message {
 	return messages
 }
 
-func (c *ChatInstance) GetSystemPrompt(props *adaptercommon.ChatProps) (prompt string) {
+func (c *ChatInstance) GetSystemPrompt(props *adaptercommon.ChatProps) interface{} {
+	blocks := make([]ContentBlock, 0)
+	hasBlockCacheControl := false
 	for _, message := range props.Message {
 		if message.Role == globals.System {
-			prompt += message.Content
+			content := strings.TrimSpace(message.Content)
+			if content == "" {
+				continue
+			}
+			text := content
+			block := ContentBlock{
+				Type: "text",
+				Text: &text,
+			}
+			if hasCacheControl(message.CacheControl) {
+				block.CacheCtrl = message.CacheControl
+				hasBlockCacheControl = true
+			}
+			blocks = append(blocks, block)
 		}
 	}
-	return
+	if len(blocks) == 0 {
+		return nil
+	}
+	if hasBlockCacheControl {
+		return blocks
+	}
+
+	var prompt strings.Builder
+	for _, block := range blocks {
+		if block.Text != nil {
+			prompt.WriteString(*block.Text)
+		}
+	}
+	return prompt.String()
 }
 
 func getTools(tools *globals.FunctionTools) []ToolDefinition {
@@ -361,6 +403,7 @@ func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps, stream bool) 
 		MaxTokens:   c.GetTokens(props),
 		Model:       props.Model,
 		System:      c.GetSystemPrompt(props),
+		CacheCtrl:   props.CacheControl,
 		Stream:      stream,
 		Temperature: props.Temperature,
 		TopP:        props.TopP,

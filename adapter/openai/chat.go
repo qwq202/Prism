@@ -58,16 +58,19 @@ func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps, stream bool) 
 	}
 
 	request := ChatRequest{
-		Model:            props.Model,
-		Messages:         messages,
-		Stream:           stream,
-		StreamOptions:    getStreamOptions(props, stream),
-		PresencePenalty:  props.PresencePenalty,
-		FrequencyPenalty: props.FrequencyPenalty,
-		Temperature:      temperature,
-		TopP:             props.TopP,
-		Tools:            props.Tools,
-		ToolChoice:       props.ToolChoice,
+		Model:                props.Model,
+		Messages:             messages,
+		Stream:               stream,
+		StreamOptions:        getStreamOptions(props, stream),
+		PresencePenalty:      props.PresencePenalty,
+		FrequencyPenalty:     props.FrequencyPenalty,
+		Temperature:          temperature,
+		TopP:                 props.TopP,
+		PromptCacheKey:       normalizedStringPtr(props.PromptCacheKey),
+		PromptCacheRetention: normalizedStringPtr(props.PromptCacheRetention),
+		SessionID:            getOpenRouterSessionID(c, props),
+		Tools:                props.Tools,
+		ToolChoice:           props.ToolChoice,
 	}
 
 	if isNewModel {
@@ -76,6 +79,24 @@ func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps, stream bool) 
 		request.MaxToken = props.MaxTokens
 	}
 	return request
+}
+
+func normalizedStringPtr(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	text := strings.TrimSpace(*value)
+	if text == "" {
+		return nil
+	}
+	return &text
+}
+
+func getOpenRouterSessionID(c *ChatInstance, props *adaptercommon.ChatProps) *string {
+	if c == nil || props == nil || c.GetErrorPrefix() != "openrouter" {
+		return nil
+	}
+	return normalizedStringPtr(props.SessionID)
 }
 
 func getStreamOptions(props *adaptercommon.ChatProps, stream bool) interface{} {

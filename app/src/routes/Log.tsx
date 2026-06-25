@@ -66,6 +66,7 @@ type LogFilters = {
   start_time: string;
   end_time: string;
   cache_hit: boolean;
+  cache_write: boolean;
 };
 
 type MetricCardProps = {
@@ -137,6 +138,7 @@ function getInitialFilters(timeZone: string): LogFilters {
     start_time: toTimeZoneDateInputValue(start, timeZone),
     end_time: toTimeZoneDateInputValue(end, timeZone),
     cache_hit: false,
+    cache_write: false,
   };
 }
 
@@ -379,6 +381,11 @@ function CacheUsageBadges({ record }: { record: BillingRecord }) {
       {usage.missTokens > 0 && (
         <Badge variant="outline" className="text-[10px] font-medium">
           {t("record.cache-miss-short", { tokens: usage.missTokens })}
+        </Badge>
+      )}
+      {usage.writeTokens > 0 && (
+        <Badge variant="outline" className="text-[10px] font-medium">
+          {t("record.cache-write-short", { tokens: usage.writeTokens })}
         </Badge>
       )}
     </div>
@@ -648,6 +655,17 @@ function Log() {
                 checked={filters.cache_hit}
                 onCheckedChange={(cache_hit) =>
                   setFilters({ ...filters, cache_hit })
+                }
+              />
+            </div>
+            <FieldLabel icon={<Cloud />}>
+              {t("record.cache-write-only")}
+            </FieldLabel>
+            <div className="flex h-10 items-center">
+              <Switch
+                checked={filters.cache_write}
+                onCheckedChange={(cache_write) =>
+                  setFilters({ ...filters, cache_write })
                 }
               />
             </div>
