@@ -15,6 +15,7 @@ type ConversationSerializedCache = {
   messages: ConversationInstance["message"];
   updated_at?: string;
   cache_complete?: boolean;
+  server_synced?: boolean;
 };
 
 type ConversationListSerializedCache =
@@ -161,9 +162,12 @@ export async function getCachedConversation(
   id: number,
 ): Promise<ConversationSerializedCache | undefined> {
   if (id === -1) return undefined;
-  return await getClientCache<ConversationSerializedCache>(
+  const cached = await getClientCache<ConversationSerializedCache>(
     getConversationCacheKey(id),
   );
+  return cached?.server_synced === true && cached.cache_complete === true
+    ? cached
+    : undefined;
 }
 
 export async function setCachedConversation(

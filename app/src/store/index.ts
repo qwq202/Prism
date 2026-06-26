@@ -44,22 +44,35 @@ function isStreamingConversation(
   return last?.role === "assistant" && last.end === false;
 }
 
+function hasPendingLocalMutation(
+  conversation: ConversationSerialized,
+): boolean {
+  return (conversation.local_pending_until ?? 0) > Date.now();
+}
+
 function getCacheableConversation(conversation: ConversationSerialized): {
   model: ConversationSerialized["model"];
   messages: ConversationSerialized["messages"];
   updated_at: ConversationSerialized["updated_at"];
   cache_complete: ConversationSerialized["cache_complete"];
-} {
+  server_synced: ConversationSerialized["server_synced"];
+} | null {
   const streaming = isStreamingConversation(conversation);
-  const messages = streaming
-    ? conversation.messages.slice(0, -1)
-    : conversation.messages;
+  if (
+    streaming ||
+    hasPendingLocalMutation(conversation) ||
+    conversation.cache_complete !== true ||
+    conversation.server_synced !== true
+  ) {
+    return null;
+  }
 
   return {
     model: conversation.model,
-    messages,
+    messages: conversation.messages,
     updated_at: conversation.updated_at,
-    cache_complete: !streaming && conversation.cache_complete !== false,
+    cache_complete: true,
+    server_synced: true,
   };
 }
 

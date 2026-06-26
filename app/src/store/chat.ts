@@ -119,6 +119,7 @@ export type ConversationSerialized = {
   messages: Message[];
   updated_at?: string;
   cache_complete?: boolean;
+  server_synced?: boolean;
   local_pending_until?: number;
   local_revision?: number;
 };
@@ -417,6 +418,8 @@ function shouldReplaceCachedConversation(
 function markConversationPending(conversation: ConversationSerialized) {
   conversation.local_revision = getConversationLocalRevision(conversation) + 1;
   conversation.local_pending_until = Date.now() + localMutationProtectionMs;
+  conversation.cache_complete = false;
+  conversation.server_synced = false;
 }
 
 function hasPendingLocalMutation(
@@ -1203,6 +1206,7 @@ const chatSlice = createSlice({
         messages: conversation.message,
         updated_at: conversation.updated_at,
         cache_complete: true,
+        server_synced: true,
       };
       state.conversations[id] = nextConversation;
       if (state.current === id) {
@@ -1804,6 +1808,7 @@ export function useConversationActions() {
           messages: cached.messages,
           updated_at: cached.updated_at,
           cache_complete: cached.cache_complete === true,
+          server_synced: cached.server_synced === true,
         };
         dispatch(
           setConversation({
