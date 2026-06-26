@@ -729,9 +729,142 @@ func (c *Conversation) SaveResponse(db *sql.DB, message globals.Message) bool {
 		return false
 	}
 
+	baseMessages := CopyMessage(c.Message)
 	c.AddMessage(message)
-	c.SaveConversation(db)
+	if c.UserID == -1 || db == nil {
+		return true
+	}
+	if !c.Persisted {
+		return c.SaveConversation(db)
+	}
+
+	merged, ok := c.mergeResponseIntoStoredConversation(db, baseMessages, message)
+	if !ok {
+		return c.SaveConversation(db)
+	}
+
+	c.Message = merged
 	return true
+}
+
+func sameMessageForMerge(left globals.Message, right globals.Message) bool {
+	if left.Role != right.Role || left.Content != right.Content {
+		return false
+	}
+	if left.Role == globals.Assistant && left.Model != "" && right.Model != "" && left.Model != right.Model {
+		return false
+	}
+	if utils.ToString(left.ToolCallId) != utils.ToString(right.ToolCallId) {
+		return false
+	}
+	if left.Name != nil || right.Name != nil {
+		return utils.ToString(left.Name) == utils.ToString(right.Name)
+	}
+	return true
+}
+
+func sameAssistantResponseForMerge(left globals.Message, right globals.Message) bool {
+	if !sameMessageForMerge(left, right) {
+		return false
+	}
+	if left.Role != globals.Assistant || right.Role != globals.Assistant {
+		return false
+	}
+	if utils.ToString(left.ReasoningContent) != utils.ToString(right.ReasoningContent) {
+		return false
+	}
+	if utils.ToJson(left.FunctionCall) != utils.ToJson(right.FunctionCall) {
+		return false
+	}
+	if utils.ToJson(left.ToolCalls) != utils.ToJson(right.ToolCalls) {
+		return false
+	}
+	return true
+}
+
+func findResponseAnchorIndex(existing []globals.Message, base []globals.Message) int {
+	if len(existing) == 0 || len(base) == 0 {
+		return -1
+	}
+
+	searchFrom := 0
+	anchor := -1
+	for _, target := range base {
+		match := -1
+		for index := searchFrom; index < len(existing); index++ {
+			if sameMessageForMerge(existing[index], target) {
+				match = index
+				break
+			}
+		}
+		if match < 0 {
+			continue
+		}
+		anchor = match
+		searchFrom = match + 1
+	}
+	return anchor
+}
+
+func mergeAssistantResponseMessages(existing []globals.Message, base []globals.Message, response globals.Message) []globals.Message {
+	anchor := findResponseAnchorIndex(existing, base)
+	if anchor < 0 {
+		for _, message := range existing {
+			if sameAssistantResponseForMerge(message, response) {
+				return existing
+			}
+		}
+		return append(CopyMessage(existing), response)
+	}
+
+	for index := anchor + 1; index < len(existing); index++ {
+		if sameAssistantResponseForMerge(existing[index], response) {
+			return existing
+		}
+	}
+
+	merged := make([]globals.Message, 0, len(existing)+1)
+	merged = append(merged, existing[:anchor+1]...)
+	merged = append(merged, response)
+	merged = append(merged, existing[anchor+1:]...)
+	return merged
+}
+
+func (c *Conversation) mergeResponseIntoStoredConversation(db *sql.DB, base []globals.Message, response globals.Message) ([]globals.Message, bool) {
+	stored := LoadConversation(db, c.UserID, c.Id)
+	if stored == nil {
+		return nil, false
+	}
+
+	merged := mergeAssistantResponseMessages(stored.GetMessage(), base, response)
+	data := utils.ToJson(merged)
+	var taskID sql.NullString
+	if c.TaskID != "" {
+		taskID = sql.NullString{String: c.TaskID, Valid: true}
+	} else if stored.TaskID != "" {
+		taskID = sql.NullString{String: stored.TaskID, Valid: true}
+	}
+
+	name := stored.Name
+	if strings.TrimSpace(name) == "" || name == defaultConversationName {
+		name = c.Name
+	}
+	model := stored.Model
+	if strings.TrimSpace(model) == "" {
+		model = c.Model
+	}
+
+	_, err := globals.ExecDb(db, `
+		UPDATE conversation
+		SET conversation_name = ?, data = ?, model = ?, task_id = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE user_id = ? AND conversation_id = ?
+	`, name, data, model, taskID, c.UserID, c.Id)
+	if err != nil {
+		globals.Warn("failed to merge assistant response into stored conversation: " + err.Error())
+		return nil, false
+	}
+
+	return merged, true
 }
 
 func (c *Conversation) CountMessagesByRole(role string) int {

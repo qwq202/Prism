@@ -6,6 +6,7 @@ import (
 	"chat/globals"
 	"chat/manager/conversation"
 	"chat/utils"
+	"database/sql"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"strconv"
@@ -68,10 +69,26 @@ func maybeAutoTitle(conn *Connection, user *auth.User, instance *conversation.Co
 		return
 	}
 
-	instance.SetName(conn.GetDB(), title)
+	name := utils.Extract(title, 50, "...")
+	instance.Name = name
+	if !instance.RenameConversation(conn.GetDB(), name) {
+		return
+	}
 	_ = conn.SendClient(globals.ChatSegmentResponse{
-		Title: title,
+		Title: name,
 	})
+}
+
+func refreshPersistedConversation(db *sql.DB, userID int64, instance *conversation.Conversation) *conversation.Conversation {
+	if db == nil || instance == nil || instance.IsTransient() || !instance.Persisted || instance.GetId() == -1 {
+		return instance
+	}
+
+	if fresh := conversation.LoadConversation(db, userID, instance.GetId()); fresh != nil {
+		return fresh
+	}
+
+	return instance
 }
 
 func hasVisibleAssistantText(message globals.Message) bool {
@@ -117,6 +134,7 @@ func ChatAPI(c *gin.Context) {
 				return nil
 			}
 
+			instance = refreshPersistedConversation(db, id, instance)
 			if instance.HandleMessage(db, form) {
 				response := ChatHandler(buf, user, instance, false)
 				if instance.SaveResponse(db, response) {
@@ -130,6 +148,7 @@ func ChatAPI(c *gin.Context) {
 		case ShareType:
 			instance.LoadSharing(db, form.Message)
 		case RestartType:
+			instance = refreshPersistedConversation(db, id, instance)
 			// reset the params if set
 			instance.ApplyParam(form)
 

@@ -11,6 +11,39 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+func openConversationTestDB(t *testing.T, filename string) *sql.DB {
+	t.Helper()
+
+	previous := globals.SqliteEngine
+	globals.SqliteEngine = true
+	t.Cleanup(func() {
+		globals.SqliteEngine = previous
+	})
+
+	db, err := sql.Open("sqlite3", filepath.Join(t.TempDir(), filename))
+	if err != nil {
+		t.Fatalf("open sqlite db: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+	connection.CreateConversationTable(db)
+	return db
+}
+
+func assertMessageContents(t *testing.T, messages []globals.Message, want []string) {
+	t.Helper()
+
+	if len(messages) != len(want) {
+		t.Fatalf("expected %d messages, got %#v", len(want), messages)
+	}
+	for index, content := range want {
+		if messages[index].Content != content {
+			t.Fatalf("expected message %d content %q, got %#v", index, content, messages[index])
+		}
+	}
+}
+
 func TestSaveResponseSkipsMetadataOnlyAssistantReply(t *testing.T) {
 	instance := NewAnonymousConversation()
 
@@ -139,6 +172,105 @@ func TestSaveResponsePersistsConversationModelOnAssistantReply(t *testing.T) {
 	}
 }
 
+func TestSaveResponseMergesWithStoredConversationFromStaleSnapshot(t *testing.T) {
+	db := openConversationTestDB(t, "stale-response-merge.db")
+
+	first := &Conversation{
+		UserID:  1,
+		Id:      1,
+		Name:    "first snapshot",
+		Model:   "model-first",
+		Message: []globals.Message{{Role: globals.User, Content: "金针菇有几种"}},
+	}
+	if !first.SaveConversation(db) {
+		t.Fatalf("expected first conversation snapshot to save")
+	}
+
+	second := LoadConversation(db, 1, 1)
+	if second == nil {
+		t.Fatalf("expected conversation to load")
+	}
+	second.Name = "second snapshot"
+	second.Model = "model-second"
+	second.AddMessage(globals.Message{Role: globals.User, Content: "介绍一下白色金针菇和黄色金针菇"})
+	if !second.SaveConversation(db) {
+		t.Fatalf("expected second conversation snapshot to save")
+	}
+
+	if !first.SaveResponse(db, globals.Message{Content: "金针菇主要分为白色和黄色两类"}) {
+		t.Fatalf("expected stale first response to save")
+	}
+
+	loaded := LoadConversation(db, 1, 1)
+	if loaded == nil {
+		t.Fatalf("expected merged conversation to load")
+	}
+	assertMessageContents(t, loaded.GetMessage(), []string{
+		"金针菇有几种",
+		"金针菇主要分为白色和黄色两类",
+		"介绍一下白色金针菇和黄色金针菇",
+	})
+	if loaded.Name != "second snapshot" {
+		t.Fatalf("expected stored conversation name to be preserved, got %q", loaded.Name)
+	}
+	if loaded.Model != "model-second" {
+		t.Fatalf("expected stored conversation model to be preserved, got %q", loaded.Model)
+	}
+
+	if !second.SaveResponse(db, globals.Message{Content: "白色更主流，黄色更小众"}) {
+		t.Fatalf("expected second response to save")
+	}
+
+	loaded = LoadConversation(db, 1, 1)
+	if loaded == nil {
+		t.Fatalf("expected final conversation to load")
+	}
+	assertMessageContents(t, loaded.GetMessage(), []string{
+		"金针菇有几种",
+		"金针菇主要分为白色和黄色两类",
+		"介绍一下白色金针菇和黄色金针菇",
+		"白色更主流，黄色更小众",
+	})
+}
+
+func TestSaveResponseDoesNotDuplicateMergedAssistantResponse(t *testing.T) {
+	db := openConversationTestDB(t, "response-dedupe.db")
+
+	instance := &Conversation{
+		UserID:  1,
+		Id:      1,
+		Name:    defaultConversationName,
+		Model:   globals.GPT3Turbo,
+		Message: []globals.Message{{Role: globals.User, Content: "hello"}},
+	}
+	if !instance.SaveConversation(db) {
+		t.Fatalf("expected conversation to save")
+	}
+
+	response := globals.Message{Content: "world"}
+	if !instance.SaveResponse(db, response) {
+		t.Fatalf("expected first response save")
+	}
+
+	stale := &Conversation{
+		UserID:    1,
+		Id:        1,
+		Name:      defaultConversationName,
+		Model:     globals.GPT3Turbo,
+		Persisted: true,
+		Message:   []globals.Message{{Role: globals.User, Content: "hello"}},
+	}
+	if !stale.SaveResponse(db, response) {
+		t.Fatalf("expected duplicate stale response save to be treated as success")
+	}
+
+	loaded := LoadConversation(db, 1, 1)
+	if loaded == nil {
+		t.Fatalf("expected conversation to load")
+	}
+	assertMessageContents(t, loaded.GetMessage(), []string{"hello", "world"})
+}
+
 func TestSaveConversationQueryUpdatesModelColumn(t *testing.T) {
 	if !strings.Contains(saveConversationQuery, "model = VALUES(model)") {
 		t.Fatalf("expected save conversation query to update model column, got %q", saveConversationQuery)
@@ -168,20 +300,7 @@ func TestSaveConversationQuerySqlitePreflightUpdatesModelColumn(t *testing.T) {
 }
 
 func TestNewConversationRetriesOnConversationIDCollision(t *testing.T) {
-	previous := globals.SqliteEngine
-	globals.SqliteEngine = true
-	t.Cleanup(func() {
-		globals.SqliteEngine = previous
-	})
-
-	db, err := sql.Open("sqlite3", filepath.Join(t.TempDir(), "conversation-collision.db"))
-	if err != nil {
-		t.Fatalf("open sqlite db: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = db.Close()
-	})
-	connection.CreateConversationTable(db)
+	db := openConversationTestDB(t, "conversation-collision.db")
 
 	first := &Conversation{
 		UserID:  1,
