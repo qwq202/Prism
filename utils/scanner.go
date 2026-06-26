@@ -33,7 +33,8 @@ func getErrorBody(resp *http.Response) string {
 	}
 
 	if content, truncated, err := readErrorBody(resp.Body); err == nil {
-		return appendTruncatedNotice(string(content), truncated, maxHTTPErrorBodyBytes)
+		body := formatBodyForLog(content, resp.Header.Get("Content-Type"))
+		return appendTruncatedNotice(body, truncated, maxHTTPErrorBodyBytes)
 	}
 
 	return ""
@@ -49,7 +50,8 @@ func EventScanner(props *EventScannerProps, config ...globals.ProxyConfig) *Even
 	}()
 
 	if globals.DebugMode {
-		globals.Debug(fmt.Sprintf("[sse] event source: %s %s\nheaders: %v\nbody: %v", props.Method, props.Uri, Marshal(props.Headers), Marshal(props.Body)))
+		body := formatBodyForLog([]byte(Marshal(props.Body)), "")
+		globals.Debug(fmt.Sprintf("[sse] event source: %s %s\nheaders: %v\nbody: %v", props.Method, formatURIForLog(props.Uri), formatHeadersForLog(props.Headers), body))
 	}
 
 	client := newClient(config)
@@ -117,7 +119,7 @@ func processFullSSE(body io.ReadCloser, callback func(string) error) *EventScann
 
 				eventStr := buffer.String()
 				if globals.DebugMode {
-					globals.Debug(fmt.Sprintf("[sse-full] event: %s", eventStr))
+					globals.Debug(fmt.Sprintf("[sse-full] event: %s", formatBodyForLog([]byte(eventStr), "")))
 				}
 
 				if err := callback(eventStr); err != nil {
@@ -164,7 +166,7 @@ func processFullSSE(body io.ReadCloser, callback func(string) error) *EventScann
 
 		eventStr := buffer.String()
 		if globals.DebugMode {
-			globals.Debug(fmt.Sprintf("[sse-full] last event: %s", eventStr))
+			globals.Debug(fmt.Sprintf("[sse-full] last event: %s", formatBodyForLog([]byte(eventStr), "")))
 		}
 
 		if err := callback(eventStr); err != nil {
@@ -207,7 +209,7 @@ func processLegacySSE(body io.ReadCloser, callback func(string) error) *EventSca
 		}
 
 		if globals.DebugMode {
-			globals.Debug(fmt.Sprintf("[sse] chunk: %s", raw))
+			globals.Debug(fmt.Sprintf("[sse] chunk: %s", formatBodyForLog([]byte(raw), "")))
 		}
 
 		chunk := strings.TrimSpace(strings.TrimPrefix(raw, "data:"))

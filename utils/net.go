@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"runtime/debug"
 	"strings"
 	"unicode/utf8"
@@ -19,9 +20,14 @@ import (
 )
 
 const (
-	maxHTTPLogBodyBytes   = 64 * 1024
-	maxHTTPErrorBodyBytes = 1024 * 1024
+	maxHTTPLogBodyBytes       = 64 * 1024
+	maxHTTPErrorBodyBytes     = 1024 * 1024
+	minBase64LogRedactLength  = 256
+	redactedLogSecretValue    = "[redacted]"
+	redactedLogBase64Template = "[base64 omitted, encoded=%s (%d chars)]"
 )
+
+var dataURLBase64LogPattern = regexp.MustCompile(`data:[\w.+-]+/[\w.+-]+;base64,[A-Za-z0-9+/=\r\n]+`)
 
 func newClient(c []globals.ProxyConfig) *http.Client {
 	client := &http.Client{
@@ -117,10 +123,269 @@ func appendTruncatedNotice(content string, truncated bool, limit int) string {
 	return fmt.Sprintf("%s\n...[truncated to %s]", content, formatSize(limit))
 }
 
+func formatHeadersForLog(headers map[string]string) string {
+	if len(headers) == 0 {
+		return "{}"
+	}
+
+	safe := make(map[string]string, len(headers))
+	for key, value := range headers {
+		if isSensitiveLogHeader(key) {
+			safe[key] = redactedLogSecretValue
+			continue
+		}
+		safe[key] = value
+	}
+
+	return Marshal(safe)
+}
+
+func formatURIForLog(uri string) string {
+	parsed, err := url.Parse(uri)
+	if err != nil {
+		return uri
+	}
+
+	query := parsed.Query()
+	changed := false
+	for key := range query {
+		if isSensitiveLogKey(key) {
+			query.Set(key, redactedLogSecretValue)
+			changed = true
+		}
+	}
+	if !changed {
+		return uri
+	}
+
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
+}
+
+func isSensitiveLogHeader(key string) bool {
+	return isSensitiveLogKey(key)
+}
+
+func isSensitiveLogKey(key string) bool {
+	normalized := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(key), "-", ""), "_", ""))
+	if normalized == "" {
+		return false
+	}
+
+	return normalized == "authorization" ||
+		normalized == "proxyauthorization" ||
+		normalized == "key" ||
+		normalized == "apikey" ||
+		normalized == "xapikey" ||
+		normalized == "xgoogapikey" ||
+		strings.Contains(normalized, "apikey") ||
+		strings.Contains(normalized, "token") ||
+		strings.Contains(normalized, "secret")
+}
+
 func fillHeaders(req *http.Request, headers map[string]string) {
 	for key, value := range headers {
 		req.Header.Set(key, value)
 	}
+}
+
+func sanitizeJSONLogBody(data []byte) (string, bool) {
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) == 0 || (trimmed[0] != '{' && trimmed[0] != '[') {
+		return "", false
+	}
+
+	var payload interface{}
+	if err := json.Unmarshal(trimmed, &payload); err != nil {
+		return "", false
+	}
+
+	sanitized, changed := sanitizeLogValue(payload, "")
+	if !changed {
+		return "", false
+	}
+
+	return MarshalWithIndent(sanitized, 2), true
+}
+
+func sanitizeSSELogText(value string) (string, bool) {
+	if !strings.Contains(value, "data:") {
+		return value, false
+	}
+
+	var builder strings.Builder
+	changed := false
+	start := 0
+	for start < len(value) {
+		end := strings.IndexByte(value[start:], '\n')
+		lineEnd := len(value)
+		newline := ""
+		if end >= 0 {
+			lineEnd = start + end
+			newline = "\n"
+		}
+
+		line := value[start:lineEnd]
+		if sanitized, ok := sanitizeSSELogLine(line); ok {
+			builder.WriteString(sanitized)
+			changed = true
+		} else {
+			builder.WriteString(line)
+		}
+		builder.WriteString(newline)
+
+		if end < 0 {
+			break
+		}
+		start = lineEnd + 1
+	}
+
+	return builder.String(), changed
+}
+
+func sanitizeSSELogLine(line string) (string, bool) {
+	trimmedLeft := strings.TrimLeft(line, " \t")
+	prefixLen := len(line) - len(trimmedLeft)
+	if !strings.HasPrefix(trimmedLeft, "data:") {
+		return line, false
+	}
+
+	afterPrefix := trimmedLeft[len("data:"):]
+	payload := strings.TrimLeft(afterPrefix, " \t")
+	spaceLen := len(afterPrefix) - len(payload)
+	if payload == "" {
+		return line, false
+	}
+
+	sanitized, ok := sanitizeJSONLogBody([]byte(payload))
+	if !ok {
+		return line, false
+	}
+
+	return line[:prefixLen] + "data:" + afterPrefix[:spaceLen] + sanitized, true
+}
+
+func sanitizeLogValue(value interface{}, key string) (interface{}, bool) {
+	switch typed := value.(type) {
+	case map[string]interface{}:
+		changed := false
+		sanitized := make(map[string]interface{}, len(typed))
+		for itemKey, itemValue := range typed {
+			nextValue, nextChanged := sanitizeLogValue(itemValue, itemKey)
+			sanitized[itemKey] = nextValue
+			changed = changed || nextChanged
+		}
+		return sanitized, changed
+	case []interface{}:
+		changed := false
+		sanitized := make([]interface{}, len(typed))
+		for index, item := range typed {
+			nextValue, nextChanged := sanitizeLogValue(item, key)
+			sanitized[index] = nextValue
+			changed = changed || nextChanged
+		}
+		return sanitized, changed
+	case string:
+		return sanitizeLogString(key, typed)
+	default:
+		return value, false
+	}
+}
+
+func sanitizeLogString(key string, value string) (string, bool) {
+	if value == "" {
+		return value, false
+	}
+
+	redacted, changed := redactDataURLBase64(value)
+	if changed {
+		return redacted, true
+	}
+
+	if shouldRedactBase64LogKey(key) && isLikelyBase64LogValue(value) {
+		return formatRedactedBase64LogValue(value), true
+	}
+
+	return value, false
+}
+
+func shouldRedactBase64LogKey(key string) bool {
+	normalized := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(key), "-", ""), "_", ""))
+	if normalized == "" {
+		return false
+	}
+
+	return normalized == "data" ||
+		normalized == "base64" ||
+		normalized == "b64" ||
+		normalized == "b64json" ||
+		normalized == "imagedata" ||
+		normalized == "audiodata" ||
+		normalized == "videodata"
+}
+
+func isLikelyBase64LogValue(value string) bool {
+	normalized := removeLogBase64Whitespace(value)
+	if len(normalized) < minBase64LogRedactLength {
+		return false
+	}
+	if strings.Contains(strings.ToLower(normalized), "http") {
+		return false
+	}
+
+	for _, char := range normalized {
+		if (char >= 'a' && char <= 'z') ||
+			(char >= 'A' && char <= 'Z') ||
+			(char >= '0' && char <= '9') ||
+			char == '+' ||
+			char == '/' ||
+			char == '=' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func removeLogBase64Whitespace(value string) string {
+	return strings.Map(func(r rune) rune {
+		switch r {
+		case '\n', '\r', '\t':
+			return -1
+		default:
+			return r
+		}
+	}, value)
+}
+
+func redactDataURLBase64(value string) (string, bool) {
+	matches := dataURLBase64LogPattern.FindAllStringIndex(value, -1)
+	if len(matches) == 0 {
+		return value, false
+	}
+
+	var builder strings.Builder
+	cursor := 0
+	for _, match := range matches {
+		raw := value[match[0]:match[1]]
+		comma := strings.Index(raw, ",")
+		if comma < 0 {
+			continue
+		}
+
+		builder.WriteString(value[cursor:match[0]])
+		builder.WriteString(raw[:comma+1])
+		builder.WriteString(formatRedactedBase64LogValue(raw[comma+1:]))
+		cursor = match[1]
+	}
+	builder.WriteString(value[cursor:])
+
+	return builder.String(), true
+}
+
+func formatRedactedBase64LogValue(value string) string {
+	normalized := removeLogBase64Whitespace(value)
+	return fmt.Sprintf(redactedLogBase64Template, formatSize(len(normalized)), len(normalized))
 }
 
 func formatBodyForLog(data []byte, contentType string) string {
@@ -172,7 +437,19 @@ func formatBodyForLog(data []byte, contentType string) string {
 		return fmt.Sprintf("[Binary Content] Type: %s, Size: %s (%d bytes)", detectedType, sizeStr, size)
 	}
 
-	content, truncated := truncateLogText(data)
+	if sanitized, ok := sanitizeJSONLogBody(data); ok {
+		content, truncated := truncateLogText([]byte(sanitized))
+		return appendTruncatedNotice(content, truncated, maxHTTPLogBodyBytes)
+	}
+
+	text := string(data)
+	if sanitized, ok := sanitizeSSELogText(text); ok {
+		content, truncated := truncateLogText([]byte(sanitized))
+		return appendTruncatedNotice(content, truncated, maxHTTPLogBodyBytes)
+	}
+
+	text, _ = sanitizeLogString("", text)
+	content, truncated := truncateLogText([]byte(text))
 	return appendTruncatedNotice(content, truncated, maxHTTPLogBodyBytes)
 }
 
@@ -201,7 +478,7 @@ func Http(uri string, method string, ptr interface{}, headers map[string]string,
 				formattedRequestBody = fmt.Sprintf("[Body Read Error] %s", readErr)
 			}
 		}
-		globals.Debug(fmt.Sprintf("[http] %s %s\nheaders: \n%s\nbody: \n%s", method, uri, Marshal(headers), formattedRequestBody))
+		globals.Debug(fmt.Sprintf("[http] %s %s\nheaders: \n%s\nbody: \n%s", method, formatURIForLog(uri), formatHeadersForLog(headers), formattedRequestBody))
 	}
 
 	req, err := http.NewRequest(method, uri, requestBody)
@@ -266,7 +543,7 @@ func HttpRaw(uri string, method string, headers map[string]string, body io.Reade
 				formattedBody = fmt.Sprintf("[Body Read Error] %s", readErr)
 			}
 		}
-		globals.Debug(fmt.Sprintf("[http] %s %s\nheaders: \n%s\nbody: \n%s", method, uri, Marshal(headers), formattedBody))
+		globals.Debug(fmt.Sprintf("[http] %s %s\nheaders: \n%s\nbody: \n%s", method, formatURIForLog(uri), formatHeadersForLog(headers), formattedBody))
 	}
 
 	req, err := http.NewRequest(method, uri, body)
@@ -376,7 +653,8 @@ func EventSource(method string, uri string, headers map[string]string, body inte
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 
 	if globals.DebugMode {
-		globals.Debug(fmt.Sprintf("[http-stream] %s %s\nheaders: \n%s\nbody: \n%s", method, uri, Marshal(headers), Marshal(body)))
+		formattedBody := formatBodyForLog([]byte(Marshal(body)), "")
+		globals.Debug(fmt.Sprintf("[http-stream] %s %s\nheaders: \n%s\nbody: \n%s", method, formatURIForLog(uri), formatHeadersForLog(headers), formattedBody))
 	}
 
 	client := newClient(config)
@@ -404,16 +682,17 @@ func EventSource(method string, uri string, headers map[string]string, body inte
 
 	if res.StatusCode >= 400 {
 		if globals.DebugMode {
-			globals.Debug(fmt.Sprintf("[http-stream] request failed with status: %s\nresponse: %s", res.Status, res.Body))
+			globals.Debug(fmt.Sprintf("[http-stream] request failed with status: %s", res.Status))
 		}
 
 		if content, truncated, err := readErrorBody(res.Body); err == nil {
 			if form, err := Unmarshal[map[string]interface{}](content); err == nil {
-				data := MarshalWithIndent(form, 2)
+				data := formatBodyForLog([]byte(MarshalWithIndent(form, 2)), res.Header.Get("Content-Type"))
 				return fmt.Errorf("request failed with status: %s\n```json\n%s\n```", res.Status, appendTruncatedNotice(data, truncated, maxHTTPErrorBodyBytes))
 			}
 
-			return fmt.Errorf("request failed with status: %s\n%s", res.Status, appendTruncatedNotice(string(content), truncated, maxHTTPErrorBodyBytes))
+			data := formatBodyForLog(content, res.Header.Get("Content-Type"))
+			return fmt.Errorf("request failed with status: %s\n%s", res.Status, appendTruncatedNotice(data, truncated, maxHTTPErrorBodyBytes))
 		}
 
 		return fmt.Errorf("request failed with status: %s", res.Status)
@@ -432,7 +711,7 @@ func EventSource(method string, uri string, headers map[string]string, body inte
 		data := string(buf[:n])
 		for _, item := range strings.Split(data, "\n") {
 			if globals.DebugMode {
-				globals.Debug(fmt.Sprintf("[http-stream] response: %s", item))
+				globals.Debug(fmt.Sprintf("[http-stream] response: %s", formatBodyForLog([]byte(item), "")))
 			}
 
 			segment := strings.TrimSpace(item)
