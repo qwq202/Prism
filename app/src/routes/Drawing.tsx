@@ -34,19 +34,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/components/ui/lib/utils";
 import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
-import {
-  selectSupportModels,
-  useMessageActions,
-  useMessages,
-  useWorking,
-} from "@/store/chat.ts";
+import { selectSupportModels } from "@/store/chat.ts";
 import { isDrawingModel } from "@/conf/model.ts";
 import ModelAvatar from "@/components/ModelAvatar.tsx";
 import FileProvider, {
   type FileProviderAction,
 } from "@/components/FileProvider.tsx";
 import type { FileArray } from "@/api/file.ts";
-import type { Message } from "@/api/types.ts";
+import {
+  Connection,
+  type ChatProps,
+  type StreamMessage,
+} from "@/api/connection.ts";
 import { formatMessage } from "@/utils/processor.ts";
 import { toast } from "sonner";
 import { blobEvent } from "@/events/blob.ts";
@@ -106,16 +105,11 @@ type DrawingWorkspace = {
   accent: number;
 };
 
-type PendingGeneration = {
-  workspaceId: string;
-  startIndex: number;
-  prompt: string;
-  createdAt: number;
-};
-
 const DRAWING_WORKSPACES_KEY = "drawing.workspaces.v1";
 const DRAWING_ACTIVE_WORKSPACE_KEY = "drawing.activeWorkspaceId.v1";
 const DRAWING_MODEL_QUERY_PARAM = "model";
+const DRAWING_TRANSIENT_CONVERSATION_ID = -1;
+const DRAWING_REQUEST_TIMEOUT_MS = 120000;
 
 const WORKSPACE_ACCENTS = [
   {
@@ -398,33 +392,6 @@ function normalizeDrawingImages(value: unknown): DrawingGeneratedImage[] {
     .filter((image): image is DrawingGeneratedImage => Boolean(image));
 }
 
-function extractGeneratedImages(
-  messages: Message[],
-  startIndex: number,
-  prompt: string,
-  createdAt: number,
-): DrawingGeneratedImage[] {
-  const images: DrawingGeneratedImage[] = [];
-  const seen = new Set<string>();
-
-  messages.slice(startIndex).forEach((message, messageIndex) => {
-    if (message.role !== "assistant" || message.end !== true) return;
-
-    extractImagesFromMessage(message.content).forEach((src, imageIndex) => {
-      if (seen.has(src)) return;
-      seen.add(src);
-      images.push({
-        id: `${createdAt}-${messageIndex}-${imageIndex}`,
-        src,
-        prompt,
-        createdAt,
-      });
-    });
-  });
-
-  return images;
-}
-
 function mergeGeneratedImages(
   current: DrawingGeneratedImage[],
   incoming: DrawingGeneratedImage[],
@@ -441,10 +408,17 @@ function mergeGeneratedImages(
   return next;
 }
 
-function hasCompletedAssistantAfter(messages: Message[], startIndex: number) {
-  return messages
-    .slice(startIndex)
-    .some((message) => message.role === "assistant" && message.end === true);
+function createGeneratedImagesFromContent(
+  content: string,
+  prompt: string,
+  createdAt: number,
+): DrawingGeneratedImage[] {
+  return extractImagesFromMessage(content).map((src, index) => ({
+    id: `${createdAt}-${index}`,
+    src,
+    prompt,
+    createdAt,
+  }));
 }
 
 function getClipboardImageFiles(clipboardData: DataTransfer | null): File[] {
@@ -454,6 +428,72 @@ function getClipboardImageFiles(clipboardData: DataTransfer | null): File[] {
     .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
     .map((item) => item.getAsFile())
     .filter((file): file is File => Boolean(file));
+}
+
+function sendTransientDrawingRequest(
+  message: string,
+  model: string,
+  requestOptions: Pick<ChatProps, "response_format" | "thinking">,
+  timeoutMessage: string,
+  onProgress?: (content: string) => void,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let content = "";
+    let settled = false;
+    let connection: Connection | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      connection?.close();
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve(content);
+    };
+
+    timeoutId = setTimeout(() => {
+      finish(new Error(timeoutMessage));
+    }, DRAWING_REQUEST_TIMEOUT_MS);
+
+    connection = new Connection(
+      DRAWING_TRANSIENT_CONVERSATION_ID,
+      (_id: number, stream: StreamMessage) => {
+        if (typeof stream.message === "string" && stream.message.length > 0) {
+          content += stream.message;
+          onProgress?.(content);
+        }
+
+        if (!stream.end) return;
+        finish();
+      },
+    );
+
+    connection.init();
+    connection.sendWithRetry(undefined, {
+      type: "chat",
+      transient: true,
+      message,
+      model,
+      web: false,
+      web_search: false,
+      url_context: false,
+      x_search: false,
+      fetch: false,
+      learning_mode: false,
+      context: 0,
+      ignore_context: true,
+      memory_enabled: false,
+      memory_history_enabled: false,
+      response_format: requestOptions.response_format,
+      thinking: requestOptions.thinking,
+    });
+  });
 }
 
 function loadDrawingWorkspaces(): DrawingWorkspace[] {
@@ -591,13 +631,9 @@ function DrawingOptionSelect<T extends string>({
 
 function Drawing() {
   const { t } = useTranslation();
-  const { send } = useMessageActions();
-  const messages = useMessages();
-  const working = useWorking();
   const supportModels = useSelector(selectSupportModels);
   const [requestedDrawingModelId] = useState(getRequestedDrawingModelId);
   const handledRequestedDrawingModel = useRef(false);
-  const pendingGenerationRef = useRef<PendingGeneration | null>(null);
   const dragDepthRef = useRef(0);
   const [files, dispatchFiles] = useReducer(drawingFileReducer, []);
   const [workspaces, setWorkspaces] = useState<DrawingWorkspace[]>(() =>
@@ -638,7 +674,7 @@ function Drawing() {
   });
   const generatedImages = activeWorkspace?.images ?? [];
   const activeWorkspacePending = Boolean(activeWorkspace?.pending);
-  const requestInFlight = generating || (activeWorkspacePending && working);
+  const requestInFlight = generating || activeWorkspacePending;
   const referencesRemaining = Math.max(0, referenceImageLimit - files.length);
   const canGenerate = Boolean(
     prompt.trim() && selectedDrawingModelId && !requestInFlight,
@@ -769,38 +805,6 @@ function Drawing() {
     requestedDrawingModelId,
     t,
   ]);
-
-  useEffect(() => {
-    const pending = pendingGenerationRef.current;
-    if (!pending) return;
-
-    const incomingImages = extractGeneratedImages(
-      messages,
-      pending.startIndex,
-      pending.prompt,
-      pending.createdAt,
-    );
-    const completed = hasCompletedAssistantAfter(messages, pending.startIndex);
-    if (incomingImages.length === 0 && !completed) return;
-
-    setWorkspaces((current) =>
-      current.map((workspace) => {
-        if (workspace.id !== pending.workspaceId) return workspace;
-
-        return {
-          ...workspace,
-          pending: false,
-          images: mergeGeneratedImages(workspace.images, incomingImages),
-        };
-      }),
-    );
-
-    if (incomingImages.length === 0 && completed) {
-      toast.info(t("drawing.noResult"));
-    }
-
-    pendingGenerationRef.current = null;
-  }, [messages, t]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -940,10 +944,6 @@ function Drawing() {
   };
 
   const deleteWorkspace = (workspaceId: string) => {
-    if (pendingGenerationRef.current?.workspaceId === workspaceId) {
-      pendingGenerationRef.current = null;
-    }
-
     const workspaceIndex = workspaces.findIndex(
       (workspace) => workspace.id === workspaceId,
     );
@@ -1037,33 +1037,45 @@ function Drawing() {
       return;
     }
 
-    const createdAt = Date.now();
-    pendingGenerationRef.current = {
-      workspaceId,
-      startIndex: messages.length,
-      prompt: text,
-      createdAt,
-    };
     updateWorkspaceById(workspaceId, {
       pending: true,
       lastPrompt: text,
     });
     setGenerating(true);
     try {
-      if (
-        await send(
-          formatMessage(files, text),
-          selectedDrawingModelId,
-          buildDrawingRequestOptions(options, drawingModelCapabilities),
-        )
-      ) {
+      const createdAt = Date.now();
+      const content = await sendTransientDrawingRequest(
+        formatMessage(files, text),
+        selectedDrawingModelId,
+        buildDrawingRequestOptions(options, drawingModelCapabilities),
+        t("drawing.requestTimeout"),
+      );
+      const incomingImages = createGeneratedImagesFromContent(
+        content,
+        text,
+        createdAt,
+      );
+
+      setWorkspaces((current) =>
+        current.map((workspace) => {
+          if (workspace.id !== workspaceId) return workspace;
+
+          return {
+            ...workspace,
+            pending: false,
+            images: mergeGeneratedImages(workspace.images, incomingImages),
+          };
+        }),
+      );
+
+      if (incomingImages.length > 0) {
         dispatchFiles({ type: "clear" });
       } else {
-        pendingGenerationRef.current = null;
-        updateWorkspaceById(workspaceId, { pending: false });
+        toast.info(t("drawing.noResult"), {
+          description: content.trim() || undefined,
+        });
       }
     } catch (error) {
-      pendingGenerationRef.current = null;
       updateWorkspaceById(workspaceId, { pending: false });
       toast.error(t("drawing.generateFailed"), {
         description: error instanceof Error ? error.message : undefined,

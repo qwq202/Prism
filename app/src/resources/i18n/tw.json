@@ -614,6 +614,7 @@
     "generating": "正在生成中",
     "generatingTitle": "正在生成圖片",
     "generateFailed": "生成失敗",
+    "requestTimeout": "繪圖請求逾時，請稍後再試",
     "noResult": "本次沒有解析到生成圖片",
     "resultsTitle": "生成結果",
     "resultsCount": "{{count}} 張圖片",

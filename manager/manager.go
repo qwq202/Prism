@@ -108,6 +108,14 @@ func ChatAPI(c *gin.Context) {
 	buf.Handle(func(form *conversation.FormMessage) error {
 		switch form.Type {
 		case ChatType:
+			if form.Transient {
+				if err := instance.AddMessageFromForm(form); err != nil {
+					return err
+				}
+				ChatHandler(buf, user, instance, false)
+				return nil
+			}
+
 			if instance.HandleMessage(db, form) {
 				response := ChatHandler(buf, user, instance, false)
 				if instance.SaveResponse(db, response) {

@@ -61,6 +61,7 @@ type Conversation struct {
 type FormMessage struct {
 	Type                    string                 `json:"type"`
 	Message                 string                 `json:"message"`
+	Transient               bool                   `json:"transient,omitempty"`
 	Web                     bool                   `json:"web"`
 	WebSearch               bool                   `json:"web_search"`
 	URLContext              bool                   `json:"url_context"`

@@ -526,6 +526,7 @@
     "generating": "生成中",
     "generatingTitle": "画像を生成しています",
     "generateFailed": "生成に失敗しました",
+    "requestTimeout": "描画リクエストがタイムアウトしました。後でもう一度お試しください。",
     "noResult": "この応答から生成画像を見つけられませんでした。",
     "resultsTitle": "生成結果",
     "resultsCount": "{{count}} 枚の画像",

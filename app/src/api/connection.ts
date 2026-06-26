@@ -54,6 +54,7 @@ export type ChatProps = {
   type?: string;
   message: string;
   model: string;
+  transient?: boolean;
   web?: boolean;
   web_search?: boolean;
   url_context?: boolean;
@@ -94,6 +95,7 @@ type StreamCallback = (id: number, message: StreamMessage) => void;
 function summarizeChatProps(data: ChatProps): Record<string, unknown> {
   return {
     type: data.type ?? "chat",
+    transient: data.transient,
     model: data.model,
     message_length:
       typeof data.message === "string" ? data.message.length : undefined,

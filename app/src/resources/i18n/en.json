@@ -526,6 +526,7 @@
     "generating": "Generating",
     "generatingTitle": "Generating image",
     "generateFailed": "Generation failed",
+    "requestTimeout": "The drawing request timed out. Try again later.",
     "noResult": "No generated image was found in this response.",
     "resultsTitle": "Generated results",
     "resultsCount": "{{count}} images",

@@ -351,6 +351,50 @@ func TestChatAPIWebsocketStopAndRestartPersistedHistory(t *testing.T) {
 	}
 }
 
+func TestChatAPIWebsocketTransientChatSkipsPersistence(t *testing.T) {
+	env := newWebsocketChatTestEnv(t)
+
+	conn := env.dial(t, -1)
+	defer conn.Close()
+
+	if err := conn.WriteJSON(conversation.FormMessage{
+		Type:      ChatType,
+		Message:   "draw a small pig",
+		Model:     websocketTestModel,
+		Transient: true,
+	}); err != nil {
+		t.Fatalf("send transient chat message: %v", err)
+	}
+
+	var conversationID int64
+	var streamed string
+	for {
+		response := readWebsocketResponse(t, conn)
+		if response.Conversation != 0 {
+			conversationID = response.Conversation
+			continue
+		}
+
+		streamed += response.Message
+		if response.End {
+			break
+		}
+	}
+
+	if conversationID == 0 {
+		t.Fatalf("expected server to assign a transient conversation id")
+	}
+	if !strings.Contains(streamed, "first chunk") {
+		t.Fatalf("expected transient request to stream upstream response, got %q", streamed)
+	}
+	if persisted := conversation.LoadConversation(env.db, env.rootID, conversationID); persisted != nil {
+		t.Fatalf("expected transient conversation %d to skip persistence, got %#v", conversationID, persisted.GetMessage())
+	}
+	if got := atomic.LoadInt32(env.requestCount); got != 1 {
+		t.Fatalf("expected transient request to issue one upstream request, got %d", got)
+	}
+}
+
 func TestChatAPIWebsocketCloseContinuesAndPersistsFullResponse(t *testing.T) {
 	env := newWebsocketChatTestEnv(t)
 
