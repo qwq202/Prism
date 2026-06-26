@@ -83,7 +83,10 @@ func TestNonRetryableRequestErrorsAreNotRetriedButCountAsChannelErrors(t *testin
 		errors.New("gemini error: No available channel for model gemini-3-pro-image (type: new_api_error, code: model_not_found)"),
 		errors.New("gemini error: Invalid URL (POST /v1beta/interactions) (type: invalid_request_error)"),
 	} {
-		if IsAvailableError(err) {
+		if !IsAvailableError(err) {
+			t.Fatalf("expected %q to remain available for user-facing error handling", err.Error())
+		}
+		if IsRetryableError(err) {
 			t.Fatalf("expected %q to be unavailable for same-channel retry", err.Error())
 		}
 		if IsSkipError(err) {

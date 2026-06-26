@@ -280,7 +280,11 @@ func isNonRetryableRequestError(err error) bool {
 }
 
 func IsAvailableError(err error) bool {
-	return err != nil && !isClientInterruptError(err) && !isNonRetryableRequestError(err)
+	return err != nil && !isClientInterruptError(err)
+}
+
+func IsRetryableError(err error) bool {
+	return IsAvailableError(err) && !isNonRetryableRequestError(err)
 }
 
 func IsSkipError(err error) bool {
@@ -303,7 +307,7 @@ func NewChatRequest(conf globals.ChannelConfig, props *adaptercommon.ChatProps, 
 	retries := conf.GetRetry()
 	props.Current++
 
-	if IsAvailableError(err) {
+	if IsRetryableError(err) {
 		if isQPSOverLimit(props.OriginalModel, err) {
 			// sleep for 0.5s to avoid qps limit
 
@@ -328,7 +332,7 @@ func NewVideoRequest(conf globals.ChannelConfig, props *adaptercommon.VideoProps
 	retries := conf.GetRetry()
 	props.Current++
 
-	if IsAvailableError(err) {
+	if IsRetryableError(err) {
 		if isQPSOverLimit(props.OriginalModel, err) {
 			// sleep for 0.5s to avoid qps limit
 
