@@ -275,6 +275,8 @@ func isNonRetryableRequestError(err error) bool {
 	return strings.Contains(content, "model_not_found") ||
 		strings.Contains(content, "model not found") ||
 		strings.Contains(content, "no available channel for model") ||
+		strings.Contains(content, "thinking_level is not supported") ||
+		strings.Contains(content, "not supported by this model") ||
 		strings.Contains(content, "invalid_request_error") ||
 		strings.Contains(content, "invalid url")
 }

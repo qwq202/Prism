@@ -61,12 +61,22 @@ type GeminiConfig struct {
 	TopK               *int                  `json:"topK,omitempty"`
 	ThinkingConfig     *GeminiThinkingConfig `json:"thinkingConfig,omitempty"`
 	ResponseModalities []string              `json:"responseModalities,omitempty"`
+	ResponseFormat     *GeminiResponseFormat `json:"responseFormat,omitempty"`
 }
 
 type GeminiThinkingConfig struct {
 	ThinkingBudget  *int    `json:"thinkingBudget,omitempty"`
 	ThinkingLevel   *string `json:"thinkingLevel,omitempty"`
 	IncludeThoughts *bool   `json:"includeThoughts,omitempty"`
+}
+
+type GeminiResponseFormat struct {
+	Image *GeminiImageConfig `json:"image,omitempty"`
+}
+
+type GeminiImageConfig struct {
+	AspectRatio string `json:"aspectRatio,omitempty"`
+	ImageSize   string `json:"imageSize,omitempty"`
 }
 
 type GeminiContent struct {

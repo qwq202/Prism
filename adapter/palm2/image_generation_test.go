@@ -171,6 +171,9 @@ func TestGeminiImageGenerationDowngradesUnsupportedInteractions(t *testing.T) {
 			if !strings.Contains(payload, `"responseModalities":["TEXT","IMAGE"]`) {
 				t.Fatalf("expected image response modalities, got %s", payload)
 			}
+			if !strings.Contains(payload, `"responseFormat":{"image":{"aspectRatio":"1:1","imageSize":"1K"}}`) {
+				t.Fatalf("expected image response format, got %s", payload)
+			}
 			_, _ = w.Write([]byte(`{
 				"candidates": [
 					{
@@ -227,6 +230,57 @@ func TestGeminiImageGenerationDowngradesUnsupportedInteractions(t *testing.T) {
 	}
 	if len(paths) != 1 || paths[0] != "/v1beta/models/gemini-3.1-flash-image:generateContent" {
 		t.Fatalf("expected remembered downgrade to skip interactions, got %#v", paths)
+	}
+}
+
+func TestGemini3ProImageGenerateContentFallbackOmitsThinkingConfig(t *testing.T) {
+	instance := NewChatInstance("https://generativelanguage.googleapis.com", "test-key")
+
+	body := instance.GetGeminiImageGenerateContentBody(&adaptercommon.ChatProps{
+		Model: globals.Gemini3ProImage,
+		Message: []globals.Message{
+			{Role: globals.User, Content: "draw a pig"},
+		},
+		ResponseFormat: map[string]interface{}{
+			"type":         "image",
+			"mime_type":    "image/png",
+			"aspect_ratio": "21:9",
+			"image_size":   "4K",
+		},
+		GeminiThinkingBudget: utilsIntPtr(0),
+		Thinking: map[string]interface{}{
+			"thinking_level": "minimal",
+		},
+	})
+
+	if body.GenerationConfig.ThinkingConfig != nil {
+		t.Fatalf("gemini 3 pro image fallback should not receive thinkingConfig, got %#v", body.GenerationConfig.ThinkingConfig)
+	}
+	if body.GenerationConfig.ResponseFormat == nil ||
+		body.GenerationConfig.ResponseFormat.Image == nil ||
+		body.GenerationConfig.ResponseFormat.Image.AspectRatio != "21:9" ||
+		body.GenerationConfig.ResponseFormat.Image.ImageSize != "4K" {
+		t.Fatalf("expected image response format to survive fallback, got %#v", body.GenerationConfig.ResponseFormat)
+	}
+}
+
+func TestGemini31FlashImageGenerateContentFallbackKeepsExplicitThinkingLevel(t *testing.T) {
+	instance := NewChatInstance("https://generativelanguage.googleapis.com", "test-key")
+
+	body := instance.GetGeminiImageGenerateContentBody(&adaptercommon.ChatProps{
+		Model: globals.Gemini31FlashImage,
+		Message: []globals.Message{
+			{Role: globals.User, Content: "draw a pig"},
+		},
+		Thinking: map[string]interface{}{
+			"thinking_level": "high",
+		},
+	})
+
+	if body.GenerationConfig.ThinkingConfig == nil ||
+		body.GenerationConfig.ThinkingConfig.ThinkingLevel == nil ||
+		*body.GenerationConfig.ThinkingConfig.ThinkingLevel != "high" {
+		t.Fatalf("expected explicit gemini 3.1 flash image thinking level, got %#v", body.GenerationConfig.ThinkingConfig)
 	}
 }
 

@@ -82,6 +82,7 @@ func TestNonRetryableRequestErrorsAreNotRetriedButCountAsChannelErrors(t *testin
 	for _, err := range []error{
 		errors.New("gemini error: No available channel for model gemini-3-pro-image (type: new_api_error, code: model_not_found)"),
 		errors.New("gemini error: Invalid URL (POST /v1beta/interactions) (type: invalid_request_error)"),
+		errors.New("gemini error: Unable to submit request because thinking_level is not supported by this model (type: upstream_error, code: 400)"),
 	} {
 		if !IsAvailableError(err) {
 			t.Fatalf("expected %q to remain available for user-facing error handling", err.Error())

@@ -403,6 +403,44 @@ func (c *ChatInstance) GetGeminiInteractionBody(props *adaptercommon.ChatProps) 
 	}
 }
 
+func getGeminiImageGenerateContentThinkingConfig(props *adaptercommon.ChatProps) *GeminiThinkingConfig {
+	if props == nil || props.Thinking == nil {
+		return nil
+	}
+
+	if !geminiInteractionSupportsThinkingLevel(props.Model) {
+		return nil
+	}
+
+	level := normalizeGeminiInteractionThinkingLevel(getStringFromMap(props.Thinking, "thinking_level", "thinkingLevel"))
+	if level == "" {
+		return nil
+	}
+
+	return &GeminiThinkingConfig{ThinkingLevel: utils.ToPtr(level)}
+}
+
+func getGeminiImageGenerateContentResponseFormat(props *adaptercommon.ChatProps) *GeminiResponseFormat {
+	if props == nil {
+		return nil
+	}
+
+	format := getGeminiInteractionResponseFormat(props)
+	if format == nil {
+		return nil
+	}
+
+	image := &GeminiImageConfig{
+		AspectRatio: format.AspectRatio,
+		ImageSize:   format.ImageSize,
+	}
+	if image.AspectRatio == "" && image.ImageSize == "" {
+		return nil
+	}
+
+	return &GeminiResponseFormat{Image: image}
+}
+
 func geminiInteractionsEndpointKey(endpoint string) string {
 	return strings.TrimRight(strings.TrimSpace(endpoint), "/")
 }
@@ -430,8 +468,9 @@ func (c *ChatInstance) GetGeminiImageGenerateContentBody(props *adaptercommon.Ch
 		MaxOutputTokens:    props.MaxTokens,
 		TopP:               props.TopP,
 		TopK:               props.TopK,
-		ThinkingConfig:     getGeminiThinkingConfig(props),
+		ThinkingConfig:     getGeminiImageGenerateContentThinkingConfig(props),
 		ResponseModalities: []string{"TEXT", "IMAGE"},
+		ResponseFormat:     getGeminiImageGenerateContentResponseFormat(props),
 	}
 
 	content := ""
