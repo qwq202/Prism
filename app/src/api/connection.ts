@@ -8,6 +8,8 @@ import { logClientEvent } from "@/utils/client-logger.ts";
 export const endpoint = `${websocketEndpoint}/chat`;
 export const maxRetry = 60; // 30s max websocket retry
 export const maxConnection = 5;
+const staleConnectionMs = 45_000;
+const connectingTimeoutMs = 10_000;
 
 export type StreamMessage = {
   conversation?: number;
@@ -92,6 +94,33 @@ export type ChatProps = {
 
 type StreamCallback = (id: number, message: StreamMessage) => void;
 
+const connectionStacks = new Set<ConnectionStack>();
+let lifecycleListenersAttached = false;
+
+function attachConnectionLifecycleListeners(): void {
+  if (lifecycleListenersAttached || typeof window === "undefined") return;
+
+  lifecycleListenersAttached = true;
+  const reconnectStaleConnections = (reason: string) => {
+    connectionStacks.forEach((stack) => stack.reconnectStale(reason));
+  };
+  const handleVisibilityChange = () => {
+    if (typeof document === "undefined") return;
+    if (document.visibilityState === "visible") {
+      reconnectStaleConnections("visibility");
+    }
+  };
+
+  window.addEventListener("focus", () => reconnectStaleConnections("focus"));
+  window.addEventListener("pageshow", () =>
+    reconnectStaleConnections("pageshow"),
+  );
+  window.addEventListener("online", () => reconnectStaleConnections("online"));
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+  }
+}
+
 function summarizeChatProps(data: ChatProps): Record<string, unknown> {
   return {
     type: data.type ?? "chat",
@@ -161,6 +190,7 @@ export class Connection {
   protected callback?: StreamCallback;
   protected reconnectTimer?: ReturnType<typeof setTimeout>;
   protected stack?: Record<string, unknown>;
+  protected lastActivityAt: number;
   protected streamStats: {
     chunks: number;
     totalMessageLength: number;
@@ -174,6 +204,7 @@ export class Connection {
     this.state = false;
     this.disposed = false;
     this.id = id;
+    this.lastActivityAt = Date.now();
     this.streamStats = {
       chunks: 0,
       totalMessageLength: 0,
@@ -185,14 +216,24 @@ export class Connection {
 
   public init(): void {
     if (this.disposed) return;
-    this.connection = new WebSocket(endpoint);
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
+    this.closeCurrentSocket();
+
+    const socket = new WebSocket(endpoint);
+    this.connection = socket;
     this.state = false;
+    this.lastActivityAt = Date.now();
     logClientEvent("chat.websocket", "init", {
       id: this.id,
       endpoint,
     });
-    this.connection.onopen = () => {
+    socket.onopen = () => {
+      if (socket !== this.connection || this.disposed) return;
       this.state = true;
+      this.lastActivityAt = Date.now();
       logClientEvent("chat.websocket", "open", {
         id: this.id,
       });
@@ -201,8 +242,10 @@ export class Connection {
         id: this.id,
       });
     };
-    this.connection.onclose = (event) => {
+    socket.onclose = (event) => {
+      if (socket !== this.connection) return;
       this.state = false;
+      this.lastActivityAt = Date.now();
       if (this.disposed) return;
 
       this.stack = {
@@ -233,7 +276,21 @@ export class Connection {
         this.init();
       }, 3000);
     };
-    this.connection.onmessage = (event) => {
+    socket.onerror = () => {
+      if (socket !== this.connection || this.disposed) return;
+      logClientEvent(
+        "chat.websocket",
+        "error",
+        {
+          id: this.id,
+          ready_state: socket.readyState,
+        },
+        "warn",
+      );
+    };
+    socket.onmessage = (event) => {
+      if (socket !== this.connection || this.disposed) return;
+      this.lastActivityAt = Date.now();
       try {
         const message = JSON.parse(event.data);
         this.triggerCallback(message as StreamMessage);
@@ -256,13 +313,60 @@ export class Connection {
     };
   }
 
-  public reconnect(): void {
+  protected closeCurrentSocket(): void {
+    const socket = this.connection;
+    if (!socket) return;
+
+    socket.onopen = null;
+    socket.onclose = null;
+    socket.onerror = null;
+    socket.onmessage = null;
+
+    if (
+      socket.readyState === WebSocket.CONNECTING ||
+      socket.readyState === WebSocket.OPEN
+    ) {
+      socket.close();
+    }
+  }
+
+  public reconnect(reason = "manual"): void {
     this.disposed = false;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    logClientEvent("chat.websocket", "reconnect", {
+      id: this.id,
+      reason,
+      ready_state: this.connection?.readyState,
+      idle_ms: Date.now() - this.lastActivityAt,
+    });
     this.init();
   }
 
+  public reconnectStale(reason = "stale"): void {
+    if (this.disposed) return;
+
+    const readyState = this.connection?.readyState;
+    const idleMs = Date.now() - this.lastActivityAt;
+    const stale =
+      !this.connection ||
+      readyState === WebSocket.CLOSED ||
+      readyState === WebSocket.CLOSING ||
+      (readyState === WebSocket.CONNECTING && idleMs > connectingTimeoutMs) ||
+      (readyState === WebSocket.OPEN && idleMs > staleConnectionMs);
+
+    if (!stale) return;
+
+    logClientEvent("chat.websocket", "stale-reconnect", {
+      id: this.id,
+      reason,
+      ready_state: readyState,
+      idle_ms: idleMs,
+    });
+    this.reconnect(reason);
+  }
+
   public send(data: Record<string, unknown>): boolean {
+    this.reconnectStale("before-send");
     if (!this.connection || this.connection.readyState !== WebSocket.OPEN) {
       this.state = false;
       if (
@@ -280,6 +384,7 @@ export class Connection {
       return false;
     }
     this.connection.send(JSON.stringify(data));
+    this.lastActivityAt = Date.now();
     logClientEvent("chat.websocket", "send", {
       id: this.id,
       type: typeof data.type === "string" ? data.type : "auth",
@@ -473,6 +578,8 @@ export class ConnectionStack {
   public constructor(callback?: StreamCallback) {
     this.connections = [];
     this.callback = callback;
+    connectionStacks.add(this);
+    attachConnectionLifecycleListeners();
   }
 
   public getConnection(id: number): Connection | undefined {
@@ -596,6 +703,10 @@ export class ConnectionStack {
 
   public reconnectAll(): void {
     this.connections.forEach((conn) => conn.reconnect());
+  }
+
+  public reconnectStale(reason = "stale"): void {
+    this.connections.forEach((conn) => conn.reconnectStale(reason));
   }
 
   public raiseConnection(id: number): void {
