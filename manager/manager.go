@@ -109,6 +109,7 @@ func ChatAPI(c *gin.Context) {
 		switch form.Type {
 		case ChatType:
 			if form.Transient {
+				instance.SetTransient(true)
 				if err := instance.AddMessageFromForm(form); err != nil {
 					return err
 				}

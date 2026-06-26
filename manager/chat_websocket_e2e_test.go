@@ -366,13 +366,11 @@ func TestChatAPIWebsocketTransientChatSkipsPersistence(t *testing.T) {
 		t.Fatalf("send transient chat message: %v", err)
 	}
 
-	var conversationID int64
 	var streamed string
 	for {
 		response := readWebsocketResponse(t, conn)
 		if response.Conversation != 0 {
-			conversationID = response.Conversation
-			continue
+			t.Fatalf("transient request should not promote a conversation id, got %d", response.Conversation)
 		}
 
 		streamed += response.Message
@@ -381,14 +379,11 @@ func TestChatAPIWebsocketTransientChatSkipsPersistence(t *testing.T) {
 		}
 	}
 
-	if conversationID == 0 {
-		t.Fatalf("expected server to assign a transient conversation id")
-	}
 	if !strings.Contains(streamed, "first chunk") {
 		t.Fatalf("expected transient request to stream upstream response, got %q", streamed)
 	}
-	if persisted := conversation.LoadConversation(env.db, env.rootID, conversationID); persisted != nil {
-		t.Fatalf("expected transient conversation %d to skip persistence, got %#v", conversationID, persisted.GetMessage())
+	if persisted := conversation.LoadConversation(env.db, env.rootID, 1); persisted != nil {
+		t.Fatalf("expected transient conversation to skip persistence, got %#v", persisted.GetMessage())
 	}
 	if got := atomic.LoadInt32(env.requestCount); got != 1 {
 		t.Fatalf("expected transient request to issue one upstream request, got %d", got)

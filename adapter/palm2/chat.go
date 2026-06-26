@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -458,6 +459,195 @@ func appendGeminiInteractionContent(builder *strings.Builder, content GeminiInte
 	}
 }
 
+type geminiInteractionCollector struct {
+	builder strings.Builder
+	images  map[string]bool
+}
+
+func (c *geminiInteractionCollector) appendText(text string) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return
+	}
+	if c.builder.Len() > 0 {
+		c.builder.WriteString("\n\n")
+	}
+	c.builder.WriteString(text)
+}
+
+func (c *geminiInteractionCollector) appendImage(image GeminiInteractionImage) {
+	data := strings.TrimSpace(image.Data)
+	url := strings.TrimSpace(image.URL)
+	if data == "" && url == "" {
+		return
+	}
+
+	mimeType := strings.TrimSpace(image.MimeType)
+	if mimeType == "" {
+		mimeType = strings.TrimSpace(image.MimeTypeCamel)
+	}
+	if mimeType == "" {
+		mimeType = "image/png"
+	}
+
+	key := url
+	if key == "" {
+		key = mimeType + ":" + data
+	}
+	if c.images == nil {
+		c.images = map[string]bool{}
+	}
+	if c.images[key] {
+		return
+	}
+	c.images[key] = true
+
+	appendGeminiInteractionImage(&c.builder, GeminiInteractionImage{
+		Data:     data,
+		MimeType: mimeType,
+		URL:      url,
+	})
+}
+
+func getMapStringValue(data map[string]interface{}, keys ...string) string {
+	for _, key := range keys {
+		for itemKey, value := range data {
+			if !strings.EqualFold(itemKey, key) {
+				continue
+			}
+			if text, ok := value.(string); ok {
+				return strings.TrimSpace(text)
+			}
+		}
+	}
+	return ""
+}
+
+func getMapValue(data map[string]interface{}, keys ...string) (interface{}, bool) {
+	for _, key := range keys {
+		for itemKey, value := range data {
+			if strings.EqualFold(itemKey, key) {
+				return value, true
+			}
+		}
+	}
+	return nil, false
+}
+
+func isImageLikeURL(value string) bool {
+	value = strings.ToLower(strings.TrimSpace(value))
+	return strings.HasPrefix(value, "data:image/") ||
+		strings.Contains(value, ".png") ||
+		strings.Contains(value, ".jpg") ||
+		strings.Contains(value, ".jpeg") ||
+		strings.Contains(value, ".webp") ||
+		strings.Contains(value, ".gif")
+}
+
+func isGeminiInteractionImageObject(key string, data map[string]interface{}) bool {
+	key = strings.ToLower(strings.TrimSpace(key))
+	contentType := strings.ToLower(getMapStringValue(data, "type"))
+	mimeType := strings.ToLower(getMapStringValue(data, "mime_type", "mimeType", "media_type", "mediaType"))
+	url := getMapStringValue(data, "url", "uri", "image_url", "imageUrl")
+
+	return strings.Contains(key, "image") ||
+		strings.Contains(key, "inline") ||
+		strings.Contains(contentType, "image") ||
+		strings.HasPrefix(mimeType, "image/") ||
+		isImageLikeURL(url)
+}
+
+func (c *geminiInteractionCollector) collect(key string, value interface{}, imageContext bool) {
+	switch typed := value.(type) {
+	case []interface{}:
+		for _, item := range typed {
+			c.collect(key, item, imageContext)
+		}
+	case map[string]interface{}:
+		currentImageContext := imageContext || isGeminiInteractionImageObject(key, typed)
+
+		if text := getMapStringValue(typed, "output_text", "outputText"); text != "" {
+			c.appendText(text)
+		}
+
+		contentType := strings.ToLower(getMapStringValue(typed, "type"))
+		if text := getMapStringValue(typed, "text"); text != "" && (contentType == "" || strings.Contains(contentType, "text")) {
+			c.appendText(text)
+		}
+
+		data := getMapStringValue(typed, "data", "b64_json", "b64Json", "base64")
+		url := getMapStringValue(typed, "url", "uri", "image_url", "imageUrl")
+		mimeType := getMapStringValue(typed, "mime_type", "mimeType", "media_type", "mediaType")
+		if currentImageContext || data != "" && strings.HasPrefix(strings.ToLower(mimeType), "image/") || isImageLikeURL(url) {
+			c.appendImage(GeminiInteractionImage{
+				Data:     data,
+				MimeType: mimeType,
+				URL:      url,
+			})
+		}
+
+		for itemKey, itemValue := range typed {
+			nextImageContext := currentImageContext ||
+				strings.Contains(strings.ToLower(itemKey), "image") ||
+				strings.EqualFold(itemKey, "inlineData") ||
+				strings.EqualFold(itemKey, "inline_data")
+			c.collect(itemKey, itemValue, nextImageContext)
+		}
+	}
+}
+
+func collectGeminiInteractionContent(data interface{}) string {
+	collector := &geminiInteractionCollector{}
+	collector.collect("", data, false)
+	return strings.TrimSpace(collector.builder.String())
+}
+
+func summarizeGeminiInteractionResponse(data interface{}) string {
+	switch typed := data.(type) {
+	case map[string]interface{}:
+		keys := make([]string, 0, len(typed))
+		for key := range typed {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		if len(keys) > 12 {
+			keys = append(keys[:12], fmt.Sprintf("+%d more", len(keys)-12))
+		}
+
+		parts := make([]string, 0, len(keys))
+		for _, key := range keys {
+			if strings.HasPrefix(key, "+") {
+				parts = append(parts, key)
+				continue
+			}
+			value, _ := getMapValue(typed, key)
+			switch nested := value.(type) {
+			case map[string]interface{}:
+				nestedKeys := make([]string, 0, len(nested))
+				for nestedKey := range nested {
+					nestedKeys = append(nestedKeys, nestedKey)
+				}
+				sort.Strings(nestedKeys)
+				if len(nestedKeys) > 6 {
+					nestedKeys = append(nestedKeys[:6], fmt.Sprintf("+%d more", len(nestedKeys)-6))
+				}
+				parts = append(parts, fmt.Sprintf("%s:{%s}", key, strings.Join(nestedKeys, ",")))
+			case []interface{}:
+				parts = append(parts, fmt.Sprintf("%s:[%d]", key, len(nested)))
+			default:
+				parts = append(parts, key)
+			}
+		}
+		return "keys=" + strings.Join(parts, " ")
+	case []interface{}:
+		return fmt.Sprintf("array_len=%d", len(typed))
+	case nil:
+		return "nil"
+	default:
+		return fmt.Sprintf("type=%T", data)
+	}
+}
+
 func (c *ChatInstance) GetGeminiInteractionChunk(data interface{}) (*globals.Chunk, error) {
 	if form := utils.MapToStruct[GeminiInteractionResponse](data); form != nil {
 		var builder strings.Builder
@@ -497,11 +687,19 @@ func (c *ChatInstance) GetGeminiInteractionChunk(data interface{}) (*globals.Chu
 		}
 	}
 
-	if form := utils.MapToStruct[GeminiChatErrorResponse](data); form != nil {
+	if content := collectGeminiInteractionContent(data); content != "" {
+		var usage *globals.TokenUsage
+		if form := utils.MapToStruct[GeminiInteractionResponse](data); form != nil {
+			usage = getGeminiInteractionUsage(form)
+		}
+		return &globals.Chunk{Content: content, Usage: usage}, nil
+	}
+
+	if form := utils.MapToStruct[GeminiChatErrorResponse](data); form != nil && strings.TrimSpace(form.Error.Message) != "" {
 		return nil, fmt.Errorf("gemini error: %s (code: %d, status: %s)", form.Error.Message, form.Error.Code, form.Error.Status)
 	}
 
-	return nil, fmt.Errorf("gemini interactions: cannot parse response")
+	return nil, fmt.Errorf("gemini interactions: cannot parse response (%s)", summarizeGeminiInteractionResponse(data))
 }
 
 func getGeminiInteractionUsage(form *GeminiInteractionResponse) *globals.TokenUsage {
@@ -551,7 +749,7 @@ func (c *ChatInstance) GetGeminiChunk(model string, data interface{}) (*globals.
 		}
 	}
 
-	if form := utils.MapToStruct[GeminiChatErrorResponse](data); form != nil {
+	if form := utils.MapToStruct[GeminiChatErrorResponse](data); form != nil && strings.TrimSpace(form.Error.Message) != "" {
 		return nil, fmt.Errorf("gemini error: %s (code: %d, status: %s)", form.Error.Message, form.Error.Code, form.Error.Status)
 	}
 

@@ -216,3 +216,99 @@ func TestGeminiInteractionChunkParsesStepContent(t *testing.T) {
 		t.Fatalf("expected image markdown, got %q", chunk.Content)
 	}
 }
+
+func TestGeminiInteractionChunkParsesGenerateContentInlineData(t *testing.T) {
+	instance := NewChatInstance("https://generativelanguage.googleapis.com", "test-key")
+
+	var response map[string]interface{}
+	if err := json.Unmarshal([]byte(`{
+		"candidates": [
+			{
+				"content": {
+					"parts": [
+						{"text": "ready"},
+						{
+							"inlineData": {
+								"mimeType": "image/png",
+								"data": "`+palm2InlineBase64Png+`"
+							}
+						}
+					]
+				}
+			}
+		],
+		"usageMetadata": {
+			"promptTokenCount": 12,
+			"candidatesTokenCount": 8,
+			"totalTokenCount": 20
+		}
+	}`), &response); err != nil {
+		t.Fatalf("unmarshal gemini response: %v", err)
+	}
+
+	chunk, err := instance.GetGeminiInteractionChunk(response)
+	if err != nil {
+		t.Fatalf("parse gemini generateContent-shaped response: %v", err)
+	}
+
+	if !strings.Contains(chunk.Content, "ready") {
+		t.Fatalf("expected text output, got %q", chunk.Content)
+	}
+	if !strings.Contains(chunk.Content, "![image](data:image/png;base64,"+palm2InlineBase64Png+")") {
+		t.Fatalf("expected image markdown, got %q", chunk.Content)
+	}
+}
+
+func TestGeminiInteractionChunkParsesNestedImageURL(t *testing.T) {
+	instance := NewChatInstance("https://generativelanguage.googleapis.com", "test-key")
+
+	var response map[string]interface{}
+	if err := json.Unmarshal([]byte(`{
+		"output": [
+			{
+				"type": "message",
+				"content": [
+					{"type": "output_text", "text": "done"},
+					{
+						"type": "image_generation_call",
+						"result": {
+							"type": "output_image",
+							"image_url": "https://example.com/result.webp"
+						}
+					}
+				]
+			}
+		]
+	}`), &response); err != nil {
+		t.Fatalf("unmarshal gemini response: %v", err)
+	}
+
+	chunk, err := instance.GetGeminiInteractionChunk(response)
+	if err != nil {
+		t.Fatalf("parse gemini nested image response: %v", err)
+	}
+
+	if !strings.Contains(chunk.Content, "done") {
+		t.Fatalf("expected text output, got %q", chunk.Content)
+	}
+	if !strings.Contains(chunk.Content, "![image](https://example.com/result.webp)") {
+		t.Fatalf("expected image url markdown, got %q", chunk.Content)
+	}
+}
+
+func TestGeminiInteractionChunkParseErrorIncludesResponseShape(t *testing.T) {
+	instance := NewChatInstance("https://generativelanguage.googleapis.com", "test-key")
+
+	_, err := instance.GetGeminiInteractionChunk(map[string]interface{}{
+		"name": "operations/test",
+		"metadata": map[string]interface{}{
+			"state": "running",
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected parse error")
+	}
+	if !strings.Contains(err.Error(), "keys=metadata:{state} name") {
+		t.Fatalf("expected response shape in error, got %q", err.Error())
+	}
+}

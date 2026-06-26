@@ -48,6 +48,7 @@ type Conversation struct {
 	CachedContent            string                 `json:"cachedContent,omitempty"`
 	CachedContentSnake       string                 `json:"cached_content,omitempty"`
 	Thinking                 interface{}            `json:"-"`
+	Transient                bool                   `json:"-"`
 
 	MaxTokens         *int     `json:"max_tokens,omitempty"`
 	Temperature       *float32 `json:"temperature,omitempty"`
@@ -149,6 +150,14 @@ func (c *Conversation) GetModel() string {
 		return globals.GPT3Turbo
 	}
 	return c.Model
+}
+
+func (c *Conversation) IsTransient() bool {
+	return c != nil && c.Transient
+}
+
+func (c *Conversation) SetTransient(transient bool) {
+	c.Transient = transient
 }
 
 func (c *Conversation) IsEnableWeb() bool {

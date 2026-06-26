@@ -609,6 +609,19 @@ func recordBuiltinToolRequest(buffer *utils.Buffer, instance *conversation.Conve
 		}
 	}
 
+	if instance.IsTransient() {
+		globals.Debug(fmt.Sprintf(
+			"[builtin-tools] transient request request_id=%d model=%s tools_requested=%s web_search_enabled=%v url_context_enabled=%v x_search_enabled=%v",
+			instance.GetId(),
+			model,
+			formatBuiltinToolNames(requestedTools),
+			instance.IsEnableWebSearch(),
+			instance.IsEnableURLContext(),
+			instance.IsEnableXSearch(),
+		))
+		return
+	}
+
 	globals.Debug(fmt.Sprintf(
 		"[builtin-tools] request conversation_id=%d model=%s tools_requested=%s web_search_enabled=%v url_context_enabled=%v x_search_enabled=%v",
 		instance.GetId(),
@@ -1010,6 +1023,19 @@ func buildMemoryContext(db *sql.DB, user *auth.User, instance *conversation.Conv
 	}
 
 	userID := user.GetID(db)
+	if instance.IsTransient() {
+		globals.Debug(fmt.Sprintf(
+			"[memory] building context user_id=%d request_id=%d transient=true model=%s group=%s memory_enabled=%v history_enabled=%v",
+			userID,
+			instance.GetId(),
+			model,
+			group,
+			instance.IsMemoryEnabled(),
+			instance.IsMemoryHistoryEnabled(),
+		))
+		return ctx
+	}
+
 	globals.Debug(fmt.Sprintf(
 		"[memory] building context user_id=%d conversation_id=%d model=%s group=%s memory_enabled=%v history_enabled=%v",
 		userID,
@@ -1653,9 +1679,11 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 		segment,
 		instance.GetResponseFormat(),
 	)
-	conn.Send(globals.ChatSegmentResponse{
-		Conversation: instance.GetId(),
-	})
+	if !instance.IsTransient() {
+		conn.Send(globals.ChatSegmentResponse{
+			Conversation: instance.GetId(),
+		})
+	}
 
 	if check != nil {
 		message := check.Error()
