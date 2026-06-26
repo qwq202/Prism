@@ -43,6 +43,29 @@ func openDrawingWorkspaceTestDB(t *testing.T) *sql.DB {
 	if err != nil {
 		t.Fatalf("create drawing workspace table: %v", err)
 	}
+	_, err = globals.ExecDb(db, `
+		CREATE TABLE IF NOT EXISTS drawing_task (
+		  id INT PRIMARY KEY AUTO_INCREMENT,
+		  task_id VARCHAR(64) UNIQUE,
+		  user_id INT NOT NULL,
+		  workspace_id VARCHAR(128) NOT NULL,
+		  status VARCHAR(32) NOT NULL,
+		  model VARCHAR(255) NOT NULL,
+		  prompt TEXT,
+		  message MEDIUMTEXT,
+		  request_options MEDIUMTEXT,
+		  result_images MEDIUMTEXT,
+		  error TEXT,
+		  quota DECIMAL(24, 6) DEFAULT 0,
+		  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		  started_at DATETIME NULL,
+		  completed_at DATETIME NULL
+		);
+	`)
+	if err != nil {
+		t.Fatalf("create drawing task table: %v", err)
+	}
 
 	return db
 }
@@ -68,6 +91,8 @@ func TestSaveWorkspaceStateStoresDataURLImagesAsAttachments(t *testing.T) {
 			"id": "workspace-1",
 			"model": "gemini-3-pro-image",
 			"pending": true,
+			"taskId": "task-1",
+			"taskStatus": "running",
 			"references": [{"name": "ref.png", "content": "` + dataURL + `"}],
 			"images": [{"id": "image-1", "src": "` + dataURL + `", "prompt": "pig", "createdAt": 1}]
 		}
@@ -91,6 +116,9 @@ func TestSaveWorkspaceStateStoresDataURLImagesAsAttachments(t *testing.T) {
 	if strings.Contains(payload, `"pending":true`) {
 		t.Fatalf("expected pending state to be cleared before persistence, got %s", payload)
 	}
+	if strings.Contains(payload, "taskStatus") || strings.Contains(payload, "taskId") {
+		t.Fatalf("expected task fields to be cleared before persistence, got %s", payload)
+	}
 
 	loaded, err := LoadWorkspaceState(db, 7)
 	if err != nil {
@@ -98,5 +126,154 @@ func TestSaveWorkspaceStateStoresDataURLImagesAsAttachments(t *testing.T) {
 	}
 	if string(loaded.Workspaces) != string(state.Workspaces) {
 		t.Fatalf("expected saved workspace payload to load back unchanged")
+	}
+}
+
+func TestCreateTaskStoresMessageImagesAsAttachments(t *testing.T) {
+	t.Chdir(t.TempDir())
+	db := openDrawingWorkspaceTestDB(t)
+
+	dataURL := tinyPNGDataURL(t)
+	task, err := CreateTask(db, 7, createTaskForm{
+		WorkspaceID: "workspace-1",
+		Model:       "gemini-3-pro-image",
+		Prompt:      "pig",
+		Message:     "```file\n[[ref.png]]\n" + dataURL + "\n```\n\npig",
+	})
+	if err != nil {
+		t.Fatalf("create task: %v", err)
+	}
+	if strings.Contains(task.Message, "data:image/") {
+		t.Fatalf("expected task message image data to be stored as attachment, got %s", task.Message)
+	}
+	if !strings.Contains(task.Message, "/attachments/") {
+		t.Fatalf("expected task message to reference attachment, got %s", task.Message)
+	}
+}
+
+func TestAppendImagesToWorkspaceMergesTaskImages(t *testing.T) {
+	t.Chdir(t.TempDir())
+	db := openDrawingWorkspaceTestDB(t)
+
+	_, err := SaveWorkspaceState(db, 7, WorkspaceState{
+		ActiveWorkspaceID: "workspace-1",
+		Workspaces: json.RawMessage(`[
+			{
+				"id": "workspace-1",
+				"model": "gemini-3-pro-image",
+				"pending": true,
+				"taskId": "task-1",
+				"taskStatus": "running",
+				"images": []
+			}
+	]`),
+	})
+	if err != nil {
+		t.Fatalf("save workspace: %v", err)
+	}
+
+	err = AppendImagesToWorkspace(db, 7, "workspace-1", "gemini-3-pro-image", []GeneratedImage{
+		{
+			ID:        "task-1-0",
+			Src:       "/attachments/image.png",
+			Prompt:    "pig",
+			CreatedAt: 123,
+		},
+	}, "pig")
+	if err != nil {
+		t.Fatalf("append images: %v", err)
+	}
+
+	loaded, err := LoadWorkspaceState(db, 7)
+	if err != nil {
+		t.Fatalf("load workspace: %v", err)
+	}
+	payload := string(loaded.Workspaces)
+	if !strings.Contains(payload, "task-1-0") {
+		t.Fatalf("expected task image to be merged, got %s", payload)
+	}
+	if strings.Contains(payload, `"pending":true`) {
+		t.Fatalf("expected pending to be cleared, got %s", payload)
+	}
+	if strings.Contains(payload, "taskStatus") || strings.Contains(payload, "taskId") {
+		t.Fatalf("expected completed task fields to be cleared, got %s", payload)
+	}
+}
+
+func TestAppendImagesToWorkspaceCreatesMissingWorkspace(t *testing.T) {
+	t.Chdir(t.TempDir())
+	db := openDrawingWorkspaceTestDB(t)
+
+	err := AppendImagesToWorkspace(db, 7, "workspace-late", "gemini-3-pro-image", []GeneratedImage{
+		{
+			ID:        "task-1-0",
+			Src:       "/attachments/image.png",
+			Prompt:    "pig",
+			CreatedAt: 123,
+		},
+	}, "pig")
+	if err != nil {
+		t.Fatalf("append images: %v", err)
+	}
+
+	loaded, err := LoadWorkspaceState(db, 7)
+	if err != nil {
+		t.Fatalf("load workspace: %v", err)
+	}
+	payload := string(loaded.Workspaces)
+	if !strings.Contains(payload, "workspace-late") || !strings.Contains(payload, "task-1-0") {
+		t.Fatalf("expected missing workspace to be created with task image, got %s", payload)
+	}
+	if !strings.Contains(payload, "gemini-3-pro-image") {
+		t.Fatalf("expected created workspace to keep model, got %s", payload)
+	}
+}
+
+func TestSaveWorkspaceStatePreservesServerImagesForActiveTaskSnapshot(t *testing.T) {
+	t.Chdir(t.TempDir())
+	db := openDrawingWorkspaceTestDB(t)
+
+	_, err := SaveWorkspaceState(db, 7, WorkspaceState{
+		ActiveWorkspaceID: "workspace-1",
+		Workspaces: json.RawMessage(`[
+			{
+				"id": "workspace-1",
+				"model": "gemini-3-pro-image",
+				"pending": false,
+				"images": [{"id": "task-1-0", "src": "/attachments/image.png", "prompt": "pig", "createdAt": 123}]
+			}
+		]`),
+	})
+	if err != nil {
+		t.Fatalf("seed workspace: %v", err)
+	}
+
+	_, err = SaveWorkspaceState(db, 7, WorkspaceState{
+		ActiveWorkspaceID: "workspace-1",
+		Workspaces: json.RawMessage(`[
+			{
+				"id": "workspace-1",
+				"model": "gemini-3-pro-image",
+				"pending": true,
+				"taskId": "task-1",
+				"taskStatus": "running",
+				"images": []
+			}
+		]`),
+	})
+	if err != nil {
+		t.Fatalf("save stale active task snapshot: %v", err)
+	}
+
+	loaded, err := LoadWorkspaceState(db, 7)
+	if err != nil {
+		t.Fatalf("load workspace: %v", err)
+	}
+	payload := string(loaded.Workspaces)
+	if !strings.Contains(payload, "task-1-0") {
+		t.Fatalf("expected existing server image to be preserved, got %s", payload)
+	}
+	if strings.Contains(payload, "taskStatus") || strings.Contains(payload, "taskId") {
+		t.Fatalf("expected transient task fields to be cleared, got %s", payload)
 	}
 }

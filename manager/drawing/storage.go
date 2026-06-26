@@ -10,12 +10,14 @@ import (
 	"mime"
 	"net/http"
 	"strings"
+	"time"
 )
 
 const (
 	emptyWorkspaceArray      = "[]"
 	maxDrawingWorkspaceCount = 64
 	maxDrawingImageBytes     = 100 * 1024 * 1024
+	maxDrawingTaskListCount  = 20
 )
 
 func normalizeOptionalText(value interface{}) string {
@@ -146,6 +148,19 @@ func normalizeImageCollection(workspace map[string]interface{}, field string, so
 	return nil
 }
 
+func storeDrawingImagesInText(content string) (string, error) {
+	for _, image := range utils.ExtractBase64Images(content) {
+		stored, changed, err := storeDrawingDataURL(image)
+		if err != nil {
+			return "", err
+		}
+		if changed {
+			content = strings.ReplaceAll(content, image, stored)
+		}
+	}
+	return content, nil
+}
+
 func normalizeWorkspaceSnapshot(raw json.RawMessage) (json.RawMessage, error) {
 	raw = bytes.TrimSpace(raw)
 	if len(raw) == 0 {
@@ -165,6 +180,9 @@ func normalizeWorkspaceSnapshot(raw json.RawMessage) (json.RawMessage, error) {
 
 	for _, workspace := range workspaces {
 		workspace["pending"] = false
+		delete(workspace, "taskId")
+		delete(workspace, "taskStatus")
+		delete(workspace, "taskError")
 		if err := normalizeImageCollection(workspace, "images", "src"); err != nil {
 			return nil, err
 		}
@@ -178,6 +196,405 @@ func normalizeWorkspaceSnapshot(raw json.RawMessage) (json.RawMessage, error) {
 		return nil, err
 	}
 	return normalized, nil
+}
+
+func activeTaskWorkspaceIDs(raw json.RawMessage) map[string]bool {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 {
+		return nil
+	}
+
+	var workspaces []map[string]interface{}
+	if err := json.Unmarshal(raw, &workspaces); err != nil {
+		return nil
+	}
+
+	ids := map[string]bool{}
+	for _, workspace := range workspaces {
+		workspaceID := normalizeOptionalText(workspace["id"])
+		if workspaceID == "" {
+			continue
+		}
+
+		taskStatus := normalizeOptionalText(workspace["taskStatus"])
+		pending, _ := workspace["pending"].(bool)
+		if pending || taskStatus == TaskStatusQueued || taskStatus == TaskStatusRunning {
+			ids[workspaceID] = true
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	return ids
+}
+
+func mergeWorkspaceImagesForIDs(raw json.RawMessage, existingRaw json.RawMessage, workspaceIDs map[string]bool) (json.RawMessage, error) {
+	if len(workspaceIDs) == 0 {
+		return raw, nil
+	}
+
+	var incoming []map[string]interface{}
+	if err := json.Unmarshal(raw, &incoming); err != nil {
+		return nil, err
+	}
+
+	var existing []map[string]interface{}
+	if err := json.Unmarshal(bytes.TrimSpace(existingRaw), &existing); err != nil {
+		return raw, nil
+	}
+
+	existingImages := map[string][]interface{}{}
+	for _, workspace := range existing {
+		workspaceID := normalizeOptionalText(workspace["id"])
+		if !workspaceIDs[workspaceID] {
+			continue
+		}
+		images, ok := workspace["images"].([]interface{})
+		if ok && len(images) > 0 {
+			existingImages[workspaceID] = images
+		}
+	}
+	if len(existingImages) == 0 {
+		return raw, nil
+	}
+
+	for _, workspace := range incoming {
+		workspaceID := normalizeOptionalText(workspace["id"])
+		storedImages := existingImages[workspaceID]
+		if len(storedImages) == 0 {
+			continue
+		}
+
+		currentImages, _ := workspace["images"].([]interface{})
+		seen := make(map[string]bool, len(currentImages)+len(storedImages))
+		for _, rawItem := range currentImages {
+			item, ok := rawItem.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if id := normalizeOptionalText(item["id"]); id != "" {
+				seen["id:"+id] = true
+			}
+			if src := normalizeOptionalText(item["src"]); src != "" {
+				seen["src:"+src] = true
+			}
+		}
+
+		for _, rawItem := range storedImages {
+			item, ok := rawItem.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			id := normalizeOptionalText(item["id"])
+			src := normalizeOptionalText(item["src"])
+			if id == "" && src == "" {
+				continue
+			}
+			if (id != "" && seen["id:"+id]) || (src != "" && seen["src:"+src]) {
+				continue
+			}
+			currentImages = append(currentImages, rawItem)
+			if id != "" {
+				seen["id:"+id] = true
+			}
+			if src != "" {
+				seen["src:"+src] = true
+			}
+		}
+		workspace["images"] = currentImages
+	}
+
+	next, err := json.Marshal(incoming)
+	if err != nil {
+		return nil, err
+	}
+	return next, nil
+}
+
+func normalizeJSONRaw(raw json.RawMessage) json.RawMessage {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	return raw
+}
+
+func taskOptionsToJSON(options TaskOptions) string {
+	payload := map[string]json.RawMessage{}
+	if raw := normalizeJSONRaw(options.ResponseFormat); len(raw) > 0 {
+		payload["response_format"] = raw
+	}
+	if raw := normalizeJSONRaw(options.Thinking); len(raw) > 0 {
+		payload["thinking"] = raw
+	}
+	return utils.Marshal(payload)
+}
+
+func parseTaskOptions(raw string) TaskOptions {
+	var payload map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		return TaskOptions{}
+	}
+	return TaskOptions{
+		ResponseFormat: normalizeJSONRaw(payload["response_format"]),
+		Thinking:       normalizeJSONRaw(payload["thinking"]),
+	}
+}
+
+func parseGeneratedImages(raw string) []GeneratedImage {
+	var images []GeneratedImage
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	if err := json.Unmarshal([]byte(raw), &images); err != nil {
+		return nil
+	}
+	return images
+}
+
+func generatedImagesToJSON(images []GeneratedImage) string {
+	if len(images) == 0 {
+		return "[]"
+	}
+	return utils.Marshal(images)
+}
+
+func taskFromScan(
+	id int64,
+	taskID interface{},
+	userID int64,
+	workspaceID interface{},
+	status interface{},
+	model interface{},
+	prompt interface{},
+	message interface{},
+	options interface{},
+	resultImages interface{},
+	errText interface{},
+	quota sql.NullFloat64,
+	createdAt interface{},
+	updatedAt interface{},
+	startedAt interface{},
+	completedAt interface{},
+) *Task {
+	return &Task{
+		ID:          id,
+		TaskID:      normalizeOptionalText(taskID),
+		UserID:      userID,
+		WorkspaceID: normalizeOptionalText(workspaceID),
+		Status:      normalizeOptionalText(status),
+		Model:       normalizeOptionalText(model),
+		Prompt:      normalizeOptionalText(prompt),
+		Message:     normalizeOptionalText(message),
+		Options:     parseTaskOptions(normalizeOptionalText(options)),
+		Images:      parseGeneratedImages(normalizeOptionalText(resultImages)),
+		Error:       normalizeOptionalText(errText),
+		Quota:       utils.Multi[float64](quota.Valid, quota.Float64, 0),
+		CreatedAt:   normalizeOptionalText(createdAt),
+		UpdatedAt:   normalizeOptionalText(updatedAt),
+		StartedAt:   normalizeOptionalText(startedAt),
+		CompletedAt: normalizeOptionalText(completedAt),
+	}
+}
+
+func CreateTask(db *sql.DB, userID int64, form createTaskForm) (*Task, error) {
+	if db == nil {
+		return nil, fmt.Errorf("database is not initialized")
+	}
+
+	workspaceID := strings.TrimSpace(form.WorkspaceID)
+	model := strings.TrimSpace(form.Model)
+	prompt := strings.TrimSpace(form.Prompt)
+	message := strings.TrimSpace(form.Message)
+	if workspaceID == "" || model == "" || prompt == "" || message == "" {
+		return nil, fmt.Errorf("invalid task form")
+	}
+	if len(workspaceID) > 128 {
+		return nil, fmt.Errorf("workspace id is too long")
+	}
+	active, err := HasActiveTask(db, userID, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	if active {
+		return nil, fmt.Errorf("workspace already has a running drawing task")
+	}
+
+	storedMessage, err := storeDrawingImagesInText(message)
+	if err != nil {
+		return nil, err
+	}
+
+	options := TaskOptions{
+		ResponseFormat: normalizeJSONRaw(form.ResponseFormat),
+		Thinking:       normalizeJSONRaw(form.Thinking),
+	}
+	now := time.Now().Format("20060102150405")
+	var lastErr error
+	for i := 0; i < 3; i++ {
+		taskID := fmt.Sprintf("draw_%s_%s", now, utils.GenerateChar(12))
+		_, err := globals.ExecDb(db, `
+			INSERT INTO drawing_task (
+				task_id, user_id, workspace_id, status, model, prompt,
+				message, request_options, result_images
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, taskID, userID, workspaceID, TaskStatusQueued, model, prompt, storedMessage, taskOptionsToJSON(options), "[]")
+		if err == nil {
+			return LoadTask(db, userID, taskID)
+		}
+		lastErr = err
+	}
+	return nil, lastErr
+}
+
+func HasActiveTask(db *sql.DB, userID int64, workspaceID string) (bool, error) {
+	var count int
+	err := globals.QueryRowDb(db, `
+		SELECT COUNT(*)
+		FROM drawing_task
+		WHERE user_id = ? AND workspace_id = ? AND status IN (?, ?)
+	`, userID, strings.TrimSpace(workspaceID), TaskStatusQueued, TaskStatusRunning).Scan(&count)
+	return count > 0, err
+}
+
+func scanTask(row interface {
+	Scan(dest ...interface{}) error
+}) (*Task, error) {
+	var id, userID int64
+	var taskID, workspaceID, status, model, prompt, message, options, resultImages, errText interface{}
+	var quota sql.NullFloat64
+	var createdAt, updatedAt, startedAt, completedAt interface{}
+	err := row.Scan(
+		&id,
+		&taskID,
+		&userID,
+		&workspaceID,
+		&status,
+		&model,
+		&prompt,
+		&message,
+		&options,
+		&resultImages,
+		&errText,
+		&quota,
+		&createdAt,
+		&updatedAt,
+		&startedAt,
+		&completedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return taskFromScan(
+		id, taskID, userID, workspaceID, status, model, prompt, message,
+		options, resultImages, errText, quota, createdAt, updatedAt, startedAt, completedAt,
+	), nil
+}
+
+const taskSelectColumns = `
+	id, task_id, user_id, workspace_id, status, model, prompt, message,
+	request_options, result_images, error, quota, created_at, updated_at,
+	started_at, completed_at
+`
+
+func LoadTask(db *sql.DB, userID int64, taskID string) (*Task, error) {
+	if db == nil {
+		return nil, fmt.Errorf("database is not initialized")
+	}
+	return scanTask(globals.QueryRowDb(db, `
+		SELECT `+taskSelectColumns+`
+		FROM drawing_task
+		WHERE user_id = ? AND task_id = ?
+		LIMIT 1
+	`, userID, strings.TrimSpace(taskID)))
+}
+
+func LoadActiveTasks(db *sql.DB, userID int64) ([]Task, error) {
+	if db == nil {
+		return nil, fmt.Errorf("database is not initialized")
+	}
+
+	rows, err := globals.QueryDb(db, `
+		SELECT `+taskSelectColumns+`
+		FROM drawing_task
+		WHERE user_id = ?
+		  AND status IN (?, ?)
+		ORDER BY id DESC
+		LIMIT ?
+	`, userID, TaskStatusQueued, TaskStatusRunning, maxDrawingTaskListCount)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	tasks := make([]Task, 0)
+	for rows.Next() {
+		task, err := scanTask(rows)
+		if err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, *task)
+	}
+	return tasks, rows.Err()
+}
+
+func IsTaskCanceled(db *sql.DB, taskID string) bool {
+	var status interface{}
+	err := globals.QueryRowDb(db, `
+		SELECT status
+		FROM drawing_task
+		WHERE task_id = ?
+		LIMIT 1
+	`, strings.TrimSpace(taskID)).Scan(&status)
+	return err == nil && normalizeOptionalText(status) == TaskStatusCanceled
+}
+
+func MarkTaskRunning(db *sql.DB, taskID string) error {
+	_, err := globals.ExecDb(db, `
+		UPDATE drawing_task
+		SET status = ?, started_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+		WHERE task_id = ? AND status = ?
+	`, TaskStatusRunning, strings.TrimSpace(taskID), TaskStatusQueued)
+	return err
+}
+
+func MarkTaskSucceeded(db *sql.DB, taskID string, images []GeneratedImage, quota float64) error {
+	_, err := globals.ExecDb(db, `
+		UPDATE drawing_task
+		SET status = ?, result_images = ?, error = '', quota = ?,
+		    completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+		WHERE task_id = ? AND status <> ?
+	`, TaskStatusSucceeded, generatedImagesToJSON(images), quota, strings.TrimSpace(taskID), TaskStatusCanceled)
+	return err
+}
+
+func MarkTaskFailed(db *sql.DB, taskID string, err error) error {
+	message := ""
+	if err != nil {
+		message = err.Error()
+	}
+	_, execErr := globals.ExecDb(db, `
+		UPDATE drawing_task
+		SET status = ?, error = ?, completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+		WHERE task_id = ? AND status <> ?
+	`, TaskStatusFailed, message, strings.TrimSpace(taskID), TaskStatusCanceled)
+	return execErr
+}
+
+func MarkTaskCanceled(db *sql.DB, userID int64, taskID string) (*Task, error) {
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return nil, fmt.Errorf("invalid task id")
+	}
+	_, err := globals.ExecDb(db, `
+		UPDATE drawing_task
+		SET status = ?, completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+		WHERE user_id = ? AND task_id = ? AND status IN (?, ?)
+	`, TaskStatusCanceled, userID, taskID, TaskStatusQueued, TaskStatusRunning)
+	if err != nil {
+		return nil, err
+	}
+	return LoadTask(db, userID, taskID)
 }
 
 func LoadWorkspaceState(db *sql.DB, userID int64) (*WorkspaceState, error) {
@@ -221,9 +638,21 @@ func SaveWorkspaceState(db *sql.DB, userID int64, state WorkspaceState) (*Worksp
 		return nil, fmt.Errorf("active workspace id is too long")
 	}
 
+	activeTaskWorkspaces := activeTaskWorkspaceIDs(state.Workspaces)
 	normalized, err := normalizeWorkspaceSnapshot(state.Workspaces)
 	if err != nil {
 		return nil, err
+	}
+
+	existingState, existingErr := LoadWorkspaceState(db, userID)
+	if existingErr != nil && existingErr != sql.ErrNoRows {
+		return nil, existingErr
+	}
+	if existingState != nil {
+		normalized, err = mergeWorkspaceImagesForIDs(normalized, existingState.Workspaces, activeTaskWorkspaces)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	result, err := globals.ExecDb(db, `
@@ -256,4 +685,136 @@ func SaveWorkspaceState(db *sql.DB, userID int64, state WorkspaceState) (*Worksp
 	}
 
 	return LoadWorkspaceState(db, userID)
+}
+
+func appendImagesToWorkspaceSnapshot(raw json.RawMessage, workspaceID string, model string, images []GeneratedImage, prompt string) (json.RawMessage, bool, error) {
+	workspaceID = strings.TrimSpace(workspaceID)
+	if workspaceID == "" || len(images) == 0 {
+		return raw, false, nil
+	}
+
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 {
+		raw = json.RawMessage(emptyWorkspaceArray)
+	}
+
+	var workspaces []map[string]interface{}
+	if err := json.Unmarshal(raw, &workspaces); err != nil {
+		return nil, false, err
+	}
+
+	changed := false
+	found := false
+	for _, workspace := range workspaces {
+		if normalizeOptionalText(workspace["id"]) != workspaceID {
+			continue
+		}
+		found = true
+
+		existing, _ := workspace["images"].([]interface{})
+		seen := make(map[string]bool, len(existing))
+		for _, rawItem := range existing {
+			item, ok := rawItem.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			id := normalizeOptionalText(item["id"])
+			src := normalizeOptionalText(item["src"])
+			if id != "" {
+				seen["id:"+id] = true
+			}
+			if src != "" {
+				seen["src:"+src] = true
+			}
+		}
+
+		for _, image := range images {
+			if image.ID == "" || image.Src == "" {
+				continue
+			}
+			if seen["id:"+image.ID] || seen["src:"+image.Src] {
+				continue
+			}
+			existing = append(existing, map[string]interface{}{
+				"id":        image.ID,
+				"src":       image.Src,
+				"prompt":    image.Prompt,
+				"createdAt": image.CreatedAt,
+			})
+			seen["id:"+image.ID] = true
+			seen["src:"+image.Src] = true
+			changed = true
+		}
+
+		workspace["images"] = existing
+		workspace["pending"] = false
+		delete(workspace, "taskId")
+		delete(workspace, "taskStatus")
+		delete(workspace, "taskError")
+		if strings.TrimSpace(prompt) != "" {
+			workspace["lastPrompt"] = prompt
+		}
+		break
+	}
+
+	if !found {
+		workspace := map[string]interface{}{
+			"id":         workspaceID,
+			"model":      strings.TrimSpace(model),
+			"mode":       "generate",
+			"prompt":     "",
+			"options":    map[string]interface{}{},
+			"references": []interface{}{},
+			"images":     []interface{}{},
+			"pending":    false,
+			"lastPrompt": prompt,
+			"createdAt":  time.Now().UnixMilli(),
+			"accent":     len(workspaces),
+		}
+		workspaces = append(workspaces, workspace)
+		next, _, err := appendImagesToWorkspaceSnapshot(mustMarshalRaw(workspaces), workspaceID, model, images, prompt)
+		return next, true, err
+	}
+
+	if !changed {
+		return raw, false, nil
+	}
+
+	next, err := json.Marshal(workspaces)
+	if err != nil {
+		return nil, false, err
+	}
+	return next, true, nil
+}
+
+func mustMarshalRaw(value interface{}) json.RawMessage {
+	return json.RawMessage(utils.Marshal(value))
+}
+
+func AppendImagesToWorkspace(db *sql.DB, userID int64, workspaceID string, model string, images []GeneratedImage, prompt string) error {
+	if db == nil {
+		return fmt.Errorf("database is not initialized")
+	}
+	if len(images) == 0 {
+		return nil
+	}
+
+	state, err := LoadWorkspaceState(db, userID)
+	if err != nil {
+		return err
+	}
+
+	next, changed, err := appendImagesToWorkspaceSnapshot(state.Workspaces, workspaceID, model, images, prompt)
+	if err != nil {
+		return err
+	}
+	if !changed {
+		return nil
+	}
+
+	_, err = SaveWorkspaceState(db, userID, WorkspaceState{
+		ActiveWorkspaceID: state.ActiveWorkspaceID,
+		Workspaces:        next,
+	})
+	return err
 }

@@ -41,13 +41,13 @@ import FileProvider, {
 } from "@/components/FileProvider.tsx";
 import type { FileArray } from "@/api/file.ts";
 import {
-  Connection,
-  type ChatProps,
-  type StreamMessage,
-} from "@/api/connection.ts";
-import {
+  cancelDrawingTask,
+  createDrawingTask,
+  getDrawingTask,
+  listDrawingTasks,
   loadDrawingWorkspaceState,
   saveDrawingWorkspaceState,
+  type DrawingTask,
 } from "@/api/drawing.ts";
 import { formatMessage } from "@/utils/processor.ts";
 import { toast } from "sonner";
@@ -104,6 +104,9 @@ type DrawingWorkspace = {
   references: FileArray;
   images: DrawingGeneratedImage[];
   pending: boolean;
+  taskId?: string;
+  taskStatus?: DrawingTask["status"];
+  taskError?: string;
   lastPrompt: string;
   createdAt: number;
   accent: number;
@@ -112,8 +115,7 @@ type DrawingWorkspace = {
 const DRAWING_WORKSPACES_KEY = "drawing.workspaces.v1";
 const DRAWING_ACTIVE_WORKSPACE_KEY = "drawing.activeWorkspaceId.v1";
 const DRAWING_MODEL_QUERY_PARAM = "model";
-const DRAWING_TRANSIENT_CONVERSATION_ID = -1;
-const DRAWING_REQUEST_TIMEOUT_MS = 120000;
+const DRAWING_TASK_POLL_INTERVAL_MS = 2500;
 
 const WORKSPACE_ACCENTS = [
   {
@@ -204,6 +206,9 @@ function createDrawingWorkspace(index = 0, model = ""): DrawingWorkspace {
     references: [],
     images: [],
     pending: false,
+    taskId: undefined,
+    taskStatus: undefined,
+    taskError: undefined,
     lastPrompt: "",
     createdAt: Date.now(),
     accent: index % WORKSPACE_ACCENTS.length,
@@ -342,33 +347,6 @@ function buildDrawingRequestOptions(
   return requestOptions;
 }
 
-const IMAGE_MARKDOWN_PATTERN = /!\[[^\]]*]\(([^)\s]+)[^)]*\)/g;
-const IMAGE_TAG_PATTERN = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
-const IMAGE_URL_PATTERN =
-  /(https?:\/\/[^\s"'<>)]*\.(?:png|jpe?g|webp|gif)(?:\?[^\s"'<>)]*)?)/gi;
-
-function extractImagesFromMessage(content: string): string[] {
-  const sources = new Set<string>();
-  let match: RegExpExecArray | null;
-
-  IMAGE_MARKDOWN_PATTERN.lastIndex = 0;
-  while ((match = IMAGE_MARKDOWN_PATTERN.exec(content)) !== null) {
-    if (match[1]) sources.add(normalizeImageURL(match[1]));
-  }
-
-  IMAGE_TAG_PATTERN.lastIndex = 0;
-  while ((match = IMAGE_TAG_PATTERN.exec(content)) !== null) {
-    if (match[1]) sources.add(normalizeImageURL(match[1]));
-  }
-
-  IMAGE_URL_PATTERN.lastIndex = 0;
-  while ((match = IMAGE_URL_PATTERN.exec(content)) !== null) {
-    if (match[1]) sources.add(normalizeImageURL(match[1]));
-  }
-
-  return Array.from(sources);
-}
-
 function normalizeDrawingImages(value: unknown): DrawingGeneratedImage[] {
   if (!Array.isArray(value)) return [];
 
@@ -439,17 +417,84 @@ function mergeGeneratedImages(
   return next;
 }
 
-function createGeneratedImagesFromContent(
-  content: string,
-  prompt: string,
-  createdAt: number,
-): DrawingGeneratedImage[] {
-  return extractImagesFromMessage(content).map((src, index) => ({
-    id: `${createdAt}-${index}`,
-    src,
-    prompt,
-    createdAt,
-  }));
+function isActiveDrawingTask(task?: Pick<DrawingTask, "status"> | null) {
+  return task?.status === "queued" || task?.status === "running";
+}
+
+function applyDrawingTaskToWorkspaces(
+  current: DrawingWorkspace[],
+  task: DrawingTask<DrawingGeneratedImage>,
+): DrawingWorkspace[] {
+  return current.map((workspace) => {
+    if (workspace.id !== task.workspace_id) {
+      return workspace;
+    }
+
+    if (task.status === "succeeded") {
+      return {
+        ...workspace,
+        pending: false,
+        taskId: undefined,
+        taskStatus: undefined,
+        taskError: undefined,
+        images: mergeGeneratedImages(workspace.images, task.images ?? []),
+      };
+    }
+
+    if (task.status === "failed" || task.status === "canceled") {
+      return {
+        ...workspace,
+        pending: false,
+        taskId: task.task_id,
+        taskStatus: task.status,
+        taskError: task.error,
+      };
+    }
+
+    return {
+      ...workspace,
+      pending: true,
+      taskId: task.task_id,
+      taskStatus: task.status,
+      taskError: undefined,
+      lastPrompt: task.prompt || workspace.lastPrompt,
+    };
+  });
+}
+
+function preserveLocalActiveTaskState(
+  next: DrawingWorkspace[],
+  current: DrawingWorkspace[],
+): DrawingWorkspace[] {
+  const currentById = new Map(
+    current.map((workspace) => [workspace.id, workspace]),
+  );
+
+  return next.map((workspace) => {
+    const currentWorkspace = currentById.get(workspace.id);
+    if (
+      !currentWorkspace?.taskId ||
+      !(
+        currentWorkspace.pending ||
+        isActiveDrawingTask(
+          currentWorkspace.taskStatus
+            ? { status: currentWorkspace.taskStatus }
+            : undefined,
+        )
+      )
+    ) {
+      return workspace;
+    }
+
+    return {
+      ...workspace,
+      pending: true,
+      taskId: currentWorkspace.taskId,
+      taskStatus: currentWorkspace.taskStatus,
+      taskError: currentWorkspace.taskError,
+      lastPrompt: currentWorkspace.lastPrompt || workspace.lastPrompt,
+    };
+  });
 }
 
 function getClipboardImageFiles(clipboardData: DataTransfer | null): File[] {
@@ -459,72 +504,6 @@ function getClipboardImageFiles(clipboardData: DataTransfer | null): File[] {
     .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
     .map((item) => item.getAsFile())
     .filter((file): file is File => Boolean(file));
-}
-
-function sendTransientDrawingRequest(
-  message: string,
-  model: string,
-  requestOptions: Pick<ChatProps, "response_format" | "thinking">,
-  timeoutMessage: string,
-  onProgress?: (content: string) => void,
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let content = "";
-    let settled = false;
-    let connection: Connection | undefined;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-
-    const finish = (error?: Error) => {
-      if (settled) return;
-      settled = true;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      connection?.close();
-      if (error) {
-        reject(error);
-        return;
-      }
-      resolve(content);
-    };
-
-    timeoutId = setTimeout(() => {
-      finish(new Error(timeoutMessage));
-    }, DRAWING_REQUEST_TIMEOUT_MS);
-
-    connection = new Connection(
-      DRAWING_TRANSIENT_CONVERSATION_ID,
-      (_id: number, stream: StreamMessage) => {
-        if (typeof stream.message === "string" && stream.message.length > 0) {
-          content += stream.message;
-          onProgress?.(content);
-        }
-
-        if (!stream.end) return;
-        finish();
-      },
-    );
-
-    connection.init();
-    connection.sendWithRetry(undefined, {
-      type: "chat",
-      transient: true,
-      message,
-      model,
-      web: false,
-      web_search: false,
-      url_context: false,
-      x_search: false,
-      fetch: false,
-      learning_mode: false,
-      context: 0,
-      ignore_context: true,
-      memory_enabled: false,
-      memory_history_enabled: false,
-      response_format: requestOptions.response_format,
-      thinking: requestOptions.thinking,
-    });
-  });
 }
 
 function normalizeDrawingWorkspaces(value: unknown): DrawingWorkspace[] {
@@ -551,7 +530,20 @@ function normalizeDrawingWorkspaces(value: unknown): DrawingWorkspace[] {
         options: normalizeDrawingOptions(workspace.options),
         references: normalizeDrawingReferences(workspace.references),
         images: normalizeDrawingImages(workspace.images),
-        pending: false,
+        pending:
+          workspace.taskStatus === "queued" ||
+          workspace.taskStatus === "running"
+            ? Boolean(workspace.pending)
+            : false,
+        taskId:
+          typeof workspace.taskId === "string" && workspace.taskId
+            ? workspace.taskId
+            : undefined,
+        taskStatus: workspace.taskStatus,
+        taskError:
+          typeof workspace.taskError === "string"
+            ? workspace.taskError
+            : undefined,
         lastPrompt:
           typeof workspace.lastPrompt === "string" ? workspace.lastPrompt : "",
         createdAt:
@@ -683,7 +675,6 @@ function Drawing() {
   const [cloudSyncEnabled, setCloudSyncEnabled] = useState(false);
   const [cloudSyncReady, setCloudSyncReady] = useState(false);
   const [focused, setFocused] = useState(false);
-  const [generating, setGenerating] = useState(false);
   const [draggingReferences, setDraggingReferences] = useState(false);
   const activeWorkspace =
     workspaces.find((workspace) => workspace.id === activeWorkspaceId) ??
@@ -717,8 +708,14 @@ function Drawing() {
     limit: referenceImageLimit,
   });
   const generatedImages = activeWorkspace?.images ?? [];
-  const activeWorkspacePending = Boolean(activeWorkspace?.pending);
-  const requestInFlight = generating || activeWorkspacePending;
+  const activeWorkspacePending =
+    Boolean(activeWorkspace?.pending) ||
+    isActiveDrawingTask(
+      activeWorkspace?.taskStatus
+        ? { status: activeWorkspace.taskStatus }
+        : undefined,
+    );
+  const requestInFlight = activeWorkspacePending;
   const referencesRemaining = Math.max(0, referenceImageLimit - files.length);
   const canGenerate = Boolean(
     prompt.trim() && selectedDrawingModelId && !requestInFlight,
@@ -730,6 +727,22 @@ function Drawing() {
       : requestInFlight
         ? t("drawing.generating")
         : "";
+  const activeTaskIds = useMemo(
+    () =>
+      workspaces
+        .filter(
+          (workspace) =>
+            workspace.taskId &&
+            (isActiveDrawingTask(
+              workspace.taskStatus
+                ? { status: workspace.taskStatus }
+                : undefined,
+            ) ||
+              workspace.pending),
+        )
+        .map((workspace) => workspace.taskId as string),
+    [workspaces],
+  );
 
   useEffect(() => {
     const resetDragState = () => {
@@ -787,35 +800,45 @@ function Drawing() {
   useEffect(() => {
     let cancelled = false;
 
-    void loadDrawingWorkspaceState<DrawingWorkspace>().then((response) => {
-      if (cancelled) return;
+    void loadDrawingWorkspaceState<DrawingWorkspace>().then(
+      async (response) => {
+        if (cancelled) return;
 
-      if (!response.status || !response.data) {
-        setCloudSyncEnabled(false);
-        setCloudSyncReady(true);
-        return;
-      }
-
-      setCloudSyncEnabled(true);
-      const serverWorkspaces = response.data.workspaces;
-      if (Array.isArray(serverWorkspaces) && serverWorkspaces.length > 0) {
-        const normalized = normalizeDrawingWorkspaces(serverWorkspaces);
-        setWorkspaces(normalized);
-
-        const serverActiveWorkspaceId =
-          response.data.active_workspace_id &&
-          normalized.some(
-            (workspace) => workspace.id === response.data?.active_workspace_id,
-          )
-            ? response.data.active_workspace_id
-            : normalized[0]?.id;
-        if (serverActiveWorkspaceId) {
-          setActiveWorkspaceId(serverActiveWorkspaceId);
+        if (!response.status || !response.data) {
+          setCloudSyncEnabled(false);
+          setCloudSyncReady(true);
+          return;
         }
-      }
 
-      setCloudSyncReady(true);
-    });
+        setCloudSyncEnabled(true);
+        let normalized: DrawingWorkspace[] | undefined;
+        const serverWorkspaces = response.data.workspaces;
+        if (Array.isArray(serverWorkspaces) && serverWorkspaces.length > 0) {
+          normalized = normalizeDrawingWorkspaces(serverWorkspaces);
+
+          const serverActiveWorkspaceId =
+            response.data.active_workspace_id &&
+            normalized.some(
+              (workspace) =>
+                workspace.id === response.data?.active_workspace_id,
+            )
+              ? response.data.active_workspace_id
+              : normalized[0]?.id;
+          if (serverActiveWorkspaceId) {
+            setActiveWorkspaceId(serverActiveWorkspaceId);
+          }
+        }
+
+        const tasksResponse = await listDrawingTasks<DrawingGeneratedImage>();
+        if (cancelled) return;
+        if (normalized) {
+          const tasks = tasksResponse.status ? tasksResponse.data || [] : [];
+          setWorkspaces(tasks.reduce(applyDrawingTaskToWorkspaces, normalized));
+        }
+
+        setCloudSyncReady(true);
+      },
+    );
 
     return () => {
       cancelled = true;
@@ -937,7 +960,10 @@ function Drawing() {
           return;
         }
 
-        const normalized = normalizeDrawingWorkspaces(response.data.workspaces);
+        const normalized = preserveLocalActiveTaskState(
+          normalizeDrawingWorkspaces(response.data.workspaces),
+          workspaces,
+        );
         const normalizedSnapshot = JSON.stringify(normalized);
         if (normalizedSnapshot !== workspacesSnapshot) {
           setWorkspaces(normalized);
@@ -981,6 +1007,9 @@ function Drawing() {
           | "references"
           | "images"
           | "pending"
+          | "taskId"
+          | "taskStatus"
+          | "taskError"
           | "lastPrompt"
         >
       >,
@@ -1036,6 +1065,64 @@ function Drawing() {
     },
     [],
   );
+
+  const refreshWorkspacesFromServer = useCallback(async () => {
+    const response = await loadDrawingWorkspaceState<DrawingWorkspace>();
+    if (!response.status || !response.data) {
+      return false;
+    }
+
+    const normalized = normalizeDrawingWorkspaces(response.data.workspaces);
+    setWorkspaces(normalized);
+    if (
+      response.data.active_workspace_id &&
+      normalized.some(
+        (workspace) => workspace.id === response.data?.active_workspace_id,
+      )
+    ) {
+      setActiveWorkspaceId(response.data.active_workspace_id);
+    }
+    return true;
+  }, []);
+
+  useEffect(() => {
+    if (activeTaskIds.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+    const poll = async () => {
+      for (const taskId of activeTaskIds) {
+        const response = await getDrawingTask<DrawingGeneratedImage>(taskId);
+        if (cancelled || !response.status || !response.data) {
+          continue;
+        }
+
+        const task = response.data;
+        if (task.status === "succeeded") {
+          const refreshed = await refreshWorkspacesFromServer();
+          if (!cancelled && !refreshed) {
+            setWorkspaces((current) =>
+              applyDrawingTaskToWorkspaces(current, task),
+            );
+          }
+          continue;
+        }
+
+        setWorkspaces((current) => applyDrawingTaskToWorkspaces(current, task));
+      }
+    };
+
+    void poll();
+    const timer = setInterval(() => {
+      void poll();
+    }, DRAWING_TASK_POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [activeTaskIds, refreshWorkspacesFromServer]);
 
   const canUseReferencesWithModel = useCallback(
     (modelId: string, references: FileArray = files) =>
@@ -1212,50 +1299,60 @@ function Drawing() {
 
     updateWorkspaceById(workspaceId, {
       pending: true,
+      taskId: undefined,
+      taskStatus: "queued",
+      taskError: undefined,
       lastPrompt: text,
     });
-    setGenerating(true);
     try {
-      const createdAt = Date.now();
-      const content = await sendTransientDrawingRequest(
-        formatMessage(files, text),
-        selectedDrawingModelId,
-        buildDrawingRequestOptions(options, drawingModelCapabilities),
-        t("drawing.requestTimeout"),
+      const requestOptions = buildDrawingRequestOptions(
+        options,
+        drawingModelCapabilities,
       );
-      const incomingImages = createGeneratedImagesFromContent(
-        content,
-        text,
-        createdAt,
-      );
-
-      setWorkspaces((current) =>
-        current.map((workspace) => {
-          if (workspace.id !== workspaceId) return workspace;
-
-          return {
-            ...workspace,
-            pending: false,
-            images: mergeGeneratedImages(workspace.images, incomingImages),
-          };
-        }),
-      );
-
-      if (incomingImages.length > 0) {
-        dispatchFiles({ type: "clear" });
-      } else {
-        toast.info(t("drawing.noResult"), {
-          description: content.trim() || undefined,
-        });
+      const response = await createDrawingTask<DrawingGeneratedImage>({
+        workspace_id: workspaceId,
+        message: formatMessage(files, text),
+        prompt: text,
+        model: selectedDrawingModelId,
+        response_format: requestOptions.response_format,
+        thinking: requestOptions.thinking,
+      });
+      if (!response.status || !response.data) {
+        throw new Error(response.message || response.error || "");
       }
+      setWorkspaces((current) =>
+        applyDrawingTaskToWorkspaces(current, response.data!),
+      );
+      dispatchFiles({ type: "clear" });
     } catch (error) {
-      updateWorkspaceById(workspaceId, { pending: false });
+      updateWorkspaceById(workspaceId, {
+        pending: false,
+        taskStatus: "failed",
+        taskError: error instanceof Error ? error.message : undefined,
+      });
       toast.error(t("drawing.generateFailed"), {
         description: error instanceof Error ? error.message : undefined,
       });
-    } finally {
-      setGenerating(false);
     }
+  };
+
+  const cancelActiveTask = async () => {
+    const taskId = activeWorkspace?.taskId;
+    if (!taskId || !requestInFlight) {
+      return;
+    }
+
+    const response = await cancelDrawingTask<DrawingGeneratedImage>(taskId);
+    if (!response.status || !response.data) {
+      toast.error(t("drawing.generateFailed"), {
+        description: response.message || response.error,
+      });
+      return;
+    }
+
+    setWorkspaces((current) =>
+      applyDrawingTaskToWorkspaces(current, response.data!),
+    );
   };
 
   return (
@@ -1502,6 +1599,12 @@ function Drawing() {
                   </div>
                 </div>
               )}
+              {!activeWorkspacePending &&
+                activeWorkspace?.taskStatus === "failed" && (
+                  <div className="mb-4 rounded-2xl border border-destructive/25 bg-destructive/5 p-4 text-sm text-destructive">
+                    {activeWorkspace.taskError || t("drawing.generateFailed")}
+                  </div>
+                )}
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 {generatedImages.map((image, index) => (
                   <div
@@ -1662,23 +1765,33 @@ function Drawing() {
               </div>
 
               <button
-                onClick={generateImage}
-                disabled={!canGenerate}
+                onClick={() =>
+                  requestInFlight
+                    ? void cancelActiveTask()
+                    : void generateImage()
+                }
+                disabled={!requestInFlight && !canGenerate}
                 className={cn(
                   "flex h-9 w-9 items-center justify-center rounded-full transition-all duration-150 shrink-0 select-none",
-                  canGenerate
-                    ? "bg-foreground text-background hover:opacity-85 active:scale-[0.96] shadow-sm"
-                    : "bg-muted/60 text-muted-foreground/40 cursor-not-allowed",
+                  requestInFlight
+                    ? "bg-destructive text-destructive-foreground hover:opacity-85 active:scale-[0.96] shadow-sm"
+                    : canGenerate
+                      ? "bg-foreground text-background hover:opacity-85 active:scale-[0.96] shadow-sm"
+                      : "bg-muted/60 text-muted-foreground/40 cursor-not-allowed",
                 )}
-                aria-label={t("drawing.generateImage")}
+                aria-label={
+                  requestInFlight ? t("cancel") : t("drawing.generateImage")
+                }
                 title={
-                  canGenerate
-                    ? t("drawing.generateImage")
-                    : generateDisabledReason
+                  requestInFlight
+                    ? t("cancel")
+                    : canGenerate
+                      ? t("drawing.generateImage")
+                      : generateDisabledReason
                 }
               >
                 {requestInFlight ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <X className="h-4 w-4" />
                 ) : (
                   <ArrowUp className="h-4 w-4" />
                 )}

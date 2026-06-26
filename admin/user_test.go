@@ -38,6 +38,7 @@ func openAdminUserTestDB(t *testing.T) *sql.DB {
 	connection.CreateQuotaTable(db)
 	connection.CreateConversationTable(db)
 	connection.CreateDrawingWorkspaceTable(db)
+	connection.CreateDrawingTaskTable(db)
 	connection.CreateMemoryTable(db)
 	connection.CreateMaskTable(db)
 	connection.CreateSharingTable(db)

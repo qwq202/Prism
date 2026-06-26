@@ -104,6 +104,7 @@ func ConnectDatabase() *sql.DB {
 	CreateUserTable(db)
 	CreateConversationTable(db)
 	CreateDrawingWorkspaceTable(db)
+	CreateDrawingTaskTable(db)
 	CreateMaskTable(db)
 	CreateSharingTable(db)
 	CreatePackageTable(db)
@@ -251,6 +252,30 @@ func CreateDrawingWorkspaceTable(db *sql.DB) {
 		  data MEDIUMTEXT,
 		  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		  FOREIGN KEY (user_id) REFERENCES auth(id)
+		);
+	`)
+}
+
+func CreateDrawingTaskTable(db *sql.DB) {
+	mustCreateTable(db, "drawing_task", `
+		CREATE TABLE IF NOT EXISTS drawing_task (
+		  id INT PRIMARY KEY AUTO_INCREMENT,
+		  task_id VARCHAR(64) UNIQUE,
+		  user_id INT NOT NULL,
+		  workspace_id VARCHAR(128) NOT NULL,
+		  status VARCHAR(32) NOT NULL,
+		  model VARCHAR(255) NOT NULL,
+		  prompt TEXT,
+		  message MEDIUMTEXT,
+		  request_options MEDIUMTEXT,
+		  result_images MEDIUMTEXT,
+		  error TEXT,
+		  quota DECIMAL(24, 6) DEFAULT 0,
+		  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		  started_at DATETIME NULL,
+		  completed_at DATETIME NULL,
 		  FOREIGN KEY (user_id) REFERENCES auth(id)
 		);
 	`)
