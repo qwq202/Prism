@@ -18,6 +18,10 @@ const defaultVertexAIExpressEndpoint = "https://aiplatform.googleapis.com"
 const defaultGeminiInteractionAPIVersion = "v1beta"
 
 func getGeminiAPIVersion(model string) string {
+	if globals.IsGeminiImageGenerationModel(model) {
+		return "v1beta"
+	}
+
 	if strings.Contains(model, "preview") || strings.Contains(model, "exp") || strings.Contains(model, "latest") {
 		return "v1beta"
 	}
@@ -82,15 +86,7 @@ func (c *ChatInstance) GetGeminiInteractionsEndpoint() string {
 	)
 }
 
-func (c *ChatInstance) GetChatEndpoint(model string, stream bool) string {
-	if c.VertexAIExpress {
-		return c.GetVertexAIExpressChatEndpoint(model, stream)
-	}
-
-	if c.useGeminiInteractions(model) {
-		return c.GetGeminiInteractionsEndpoint()
-	}
-
+func (c *ChatInstance) GetGeminiGenerateContentEndpoint(model string, stream bool) string {
 	if model == globals.ChatBison001 {
 		return fmt.Sprintf("%s/v1beta2/models/%s:generateMessage?key=%s", c.Endpoint, model, c.ApiKey)
 	}
@@ -102,6 +98,18 @@ func (c *ChatInstance) GetChatEndpoint(model string, stream bool) string {
 	}
 
 	return fmt.Sprintf("%s/%s/models/%s:generateContent?key=%s", c.Endpoint, version, model, c.ApiKey)
+}
+
+func (c *ChatInstance) GetChatEndpoint(model string, stream bool) string {
+	if c.VertexAIExpress {
+		return c.GetVertexAIExpressChatEndpoint(model, stream)
+	}
+
+	if c.useGeminiInteractions(model) {
+		return c.GetGeminiInteractionsEndpoint()
+	}
+
+	return c.GetGeminiGenerateContentEndpoint(model, stream)
 }
 
 func (c *ChatInstance) ConvertMessage(message []globals.Message) []PalmMessage {
@@ -602,6 +610,29 @@ func collectGeminiInteractionContent(data interface{}) string {
 	return strings.TrimSpace(collector.builder.String())
 }
 
+func formatGeminiCompatibleError(data interface{}) string {
+	form := utils.MapToStruct[GeminiCompatibleErrorResponse](data)
+	if form == nil || strings.TrimSpace(form.Error.Message) == "" {
+		return ""
+	}
+
+	details := make([]string, 0, 3)
+	if form.Error.Status != "" {
+		details = append(details, "status: "+form.Error.Status)
+	}
+	if form.Error.Type != "" {
+		details = append(details, "type: "+form.Error.Type)
+	}
+	if code := strings.TrimSpace(utils.ToString(form.Error.Code)); code != "" && code != "<nil>" && code != "0" {
+		details = append(details, "code: "+code)
+	}
+
+	if len(details) == 0 {
+		return form.Error.Message
+	}
+	return fmt.Sprintf("%s (%s)", form.Error.Message, strings.Join(details, ", "))
+}
+
 func summarizeGeminiInteractionResponse(data interface{}) string {
 	switch typed := data.(type) {
 	case map[string]interface{}:
@@ -695,8 +726,8 @@ func (c *ChatInstance) GetGeminiInteractionChunk(data interface{}) (*globals.Chu
 		return &globals.Chunk{Content: content, Usage: usage}, nil
 	}
 
-	if form := utils.MapToStruct[GeminiChatErrorResponse](data); form != nil && strings.TrimSpace(form.Error.Message) != "" {
-		return nil, fmt.Errorf("gemini error: %s (code: %d, status: %s)", form.Error.Message, form.Error.Code, form.Error.Status)
+	if message := formatGeminiCompatibleError(data); message != "" {
+		return nil, fmt.Errorf("gemini error: %s", message)
 	}
 
 	return nil, fmt.Errorf("gemini interactions: cannot parse response (%s)", summarizeGeminiInteractionResponse(data))
@@ -749,8 +780,8 @@ func (c *ChatInstance) GetGeminiChunk(model string, data interface{}) (*globals.
 		}
 	}
 
-	if form := utils.MapToStruct[GeminiChatErrorResponse](data); form != nil && strings.TrimSpace(form.Error.Message) != "" {
-		return nil, fmt.Errorf("gemini error: %s (code: %d, status: %s)", form.Error.Message, form.Error.Code, form.Error.Status)
+	if message := formatGeminiCompatibleError(data); message != "" {
+		return nil, fmt.Errorf("gemini error: %s", message)
 	}
 
 	return nil, fmt.Errorf("gemini: cannot parse response")
@@ -885,13 +916,47 @@ func (c *ChatInstance) CreateGeminiChatRequest(props *adaptercommon.ChatProps) (
 		}, c.GetGeminiInteractionBody(props), props.Proxy)
 
 		if err != nil {
-			return nil, fmt.Errorf("gemini interactions error: %s", err.Error())
+			interactionErr := fmt.Errorf("gemini interactions error: %s", err.Error())
+			if shouldDowngradeGeminiInteractions(interactionErr) {
+				return c.CreateGeminiGenerateContentRequest(props)
+			}
+			return nil, interactionErr
 		}
 
-		return c.GetGeminiInteractionChunk(data)
+		chunk, err := c.GetGeminiInteractionChunk(data)
+		if err == nil {
+			return chunk, nil
+		}
+		if shouldDowngradeGeminiInteractions(err) {
+			globals.Debug(fmt.Sprintf(
+				"[gemini] interactions unsupported for endpoint %s, downgrading to generateContent (model: %s, error: %s)",
+				strings.TrimRight(strings.TrimSpace(c.Endpoint), "/"),
+				props.Model,
+				err.Error(),
+			))
+			return c.CreateGeminiGenerateContentRequest(props)
+		}
+		return nil, err
 	}
 
-	data, err := utils.Post(c.GetChatEndpoint(props.Model, false), map[string]string{
+	return c.CreateGeminiGenerateContentRequest(props)
+}
+
+func shouldDowngradeGeminiInteractions(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "invalid url") ||
+		strings.Contains(message, "404") ||
+		strings.Contains(message, "not found") ||
+		strings.Contains(message, "unsupported") ||
+		strings.Contains(message, "unknown") && strings.Contains(message, "interactions")
+}
+
+func (c *ChatInstance) CreateGeminiGenerateContentRequest(props *adaptercommon.ChatProps) (*globals.Chunk, error) {
+	data, err := utils.Post(c.GetGeminiGenerateContentEndpoint(props.Model, false), map[string]string{
 		"Content-Type": "application/json",
 	}, c.GetGeminiChatBody(props), props.Proxy)
 

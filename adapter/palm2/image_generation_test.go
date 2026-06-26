@@ -4,6 +4,8 @@ import (
 	adaptercommon "chat/adapter/common"
 	"chat/globals"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -144,6 +146,64 @@ func TestGemini3ProImageInteractionOptionsAreModelScoped(t *testing.T) {
 		body.ResponseFormat.AspectRatio != "21:9" ||
 		body.ResponseFormat.ImageSize != "4K" {
 		t.Fatalf("expected gemini 3 pro supported options, got %#v", body.ResponseFormat)
+	}
+}
+
+func TestGeminiImageGenerationDowngradesUnsupportedInteractions(t *testing.T) {
+	paths := make([]string, 0, 2)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+
+		switch r.URL.Path {
+		case "/v1beta/interactions":
+			_, _ = w.Write([]byte(`{"error":{"message":"Invalid URL (POST /v1beta/interactions)","type":"invalid_request_error","param":"","code":""}}`))
+		case "/v1beta/models/gemini-3.1-flash-image:generateContent":
+			_, _ = w.Write([]byte(`{
+				"candidates": [
+					{
+						"content": {
+							"parts": [
+								{
+									"inlineData": {
+										"mimeType": "image/png",
+										"data": "` + palm2InlineBase64Png + `"
+									}
+								}
+							]
+						}
+					}
+				]
+			}`))
+		default:
+			t.Fatalf("unexpected request path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	instance := NewChatInstance(server.URL, "test-key")
+	chunk, err := instance.CreateGeminiChatRequest(&adaptercommon.ChatProps{
+		Model: globals.Gemini31FlashImage,
+		Message: []globals.Message{
+			{Role: globals.User, Content: "draw a pig"},
+		},
+		ResponseFormat: map[string]interface{}{
+			"type":         "image",
+			"mime_type":    "image/png",
+			"aspect_ratio": "1:1",
+			"image_size":   "1K",
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected generateContent downgrade, got error: %v", err)
+	}
+	if !strings.Contains(chunk.Content, "![image](data:image/png;base64,"+palm2InlineBase64Png+")") {
+		t.Fatalf("expected downgraded image markdown, got %q", chunk.Content)
+	}
+	if len(paths) != 2 ||
+		paths[0] != "/v1beta/interactions" ||
+		paths[1] != "/v1beta/models/gemini-3.1-flash-image:generateContent" {
+		t.Fatalf("expected interactions then generateContent, got %#v", paths)
 	}
 }
 
@@ -310,5 +370,25 @@ func TestGeminiInteractionChunkParseErrorIncludesResponseShape(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "keys=metadata:{state} name") {
 		t.Fatalf("expected response shape in error, got %q", err.Error())
+	}
+}
+
+func TestGeminiInteractionChunkParsesCompatibleError(t *testing.T) {
+	instance := NewChatInstance("https://generativelanguage.googleapis.com", "test-key")
+
+	_, err := instance.GetGeminiInteractionChunk(map[string]interface{}{
+		"error": map[string]interface{}{
+			"message": "Invalid URL (POST /v1beta/interactions)",
+			"type":    "invalid_request_error",
+			"param":   "",
+			"code":    "",
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected compatible error")
+	}
+	if !strings.Contains(err.Error(), "Invalid URL (POST /v1beta/interactions)") ||
+		!strings.Contains(err.Error(), "invalid_request_error") {
+		t.Fatalf("expected compatible error details, got %q", err.Error())
 	}
 }

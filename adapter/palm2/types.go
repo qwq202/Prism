@@ -173,6 +173,16 @@ type GeminiChatErrorResponse struct {
 	} `json:"error"`
 }
 
+type GeminiCompatibleErrorResponse struct {
+	Error struct {
+		Code    interface{} `json:"code"`
+		Message string      `json:"message"`
+		Status  string      `json:"status"`
+		Type    string      `json:"type"`
+		Param   string      `json:"param"`
+	} `json:"error"`
+}
+
 type GeminiStreamResponse struct {
 	Candidates         []GeminiCandidate    `json:"candidates"`
 	UsageMetadata      *GeminiUsageMetadata `json:"usageMetadata,omitempty"`
