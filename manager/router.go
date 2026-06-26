@@ -2,6 +2,7 @@ package manager
 
 import (
 	"chat/manager/broadcast"
+	"chat/manager/drawing"
 
 	"github.com/gin-gonic/gin"
 )
@@ -19,4 +20,5 @@ func Register(app *gin.RouterGroup) {
 	app.GET("/videos/:id/content", VideoContentAPI)
 
 	broadcast.Register(app)
+	drawing.Register(app)
 }

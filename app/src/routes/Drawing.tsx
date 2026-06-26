@@ -4,7 +4,6 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useReducer,
   useState,
 } from "react";
 import {
@@ -46,6 +45,10 @@ import {
   type ChatProps,
   type StreamMessage,
 } from "@/api/connection.ts";
+import {
+  loadDrawingWorkspaceState,
+  saveDrawingWorkspaceState,
+} from "@/api/drawing.ts";
 import { formatMessage } from "@/utils/processor.ts";
 import { toast } from "sonner";
 import { blobEvent } from "@/events/blob.ts";
@@ -98,6 +101,7 @@ type DrawingWorkspace = {
   mode: Mode;
   prompt: string;
   options: DrawingOptions;
+  references: FileArray;
   images: DrawingGeneratedImage[];
   pending: boolean;
   lastPrompt: string;
@@ -197,6 +201,7 @@ function createDrawingWorkspace(index = 0, model = ""): DrawingWorkspace {
     mode: "generate",
     prompt: "",
     options: { ...DEFAULT_DRAWING_OPTIONS },
+    references: [],
     images: [],
     pending: false,
     lastPrompt: "",
@@ -392,6 +397,32 @@ function normalizeDrawingImages(value: unknown): DrawingGeneratedImage[] {
     .filter((image): image is DrawingGeneratedImage => Boolean(image));
 }
 
+function normalizeDrawingReferences(value: unknown): FileArray {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item): FileArray[number] | null => {
+      if (!item || typeof item !== "object") return null;
+      const file = item as Partial<FileArray[number]>;
+      if (typeof file.content !== "string" || file.content.trim() === "") {
+        return null;
+      }
+
+      return {
+        name:
+          typeof file.name === "string" && file.name.trim()
+            ? file.name
+            : "reference.png",
+        content: normalizeImageURL(file.content),
+        size:
+          typeof file.size === "number" && Number.isFinite(file.size)
+            ? file.size
+            : undefined,
+      };
+    })
+    .filter((file): file is FileArray[number] => Boolean(file));
+}
+
 function mergeGeneratedImages(
   current: DrawingGeneratedImage[],
   incoming: DrawingGeneratedImage[],
@@ -496,6 +527,50 @@ function sendTransientDrawingRequest(
   });
 }
 
+function normalizeDrawingWorkspaces(value: unknown): DrawingWorkspace[] {
+  if (!Array.isArray(value)) {
+    return [createDrawingWorkspace()];
+  }
+
+  const workspaces = value
+    .map((item, index): DrawingWorkspace | null => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const workspace = item as Partial<DrawingWorkspace>;
+
+      return {
+        id:
+          typeof workspace.id === "string" && workspace.id
+            ? workspace.id
+            : createWorkspaceId(),
+        model: typeof workspace.model === "string" ? workspace.model : "",
+        mode: workspace.mode === "edit" ? "edit" : "generate",
+        prompt: typeof workspace.prompt === "string" ? workspace.prompt : "",
+        options: normalizeDrawingOptions(workspace.options),
+        references: normalizeDrawingReferences(workspace.references),
+        images: normalizeDrawingImages(workspace.images),
+        pending: false,
+        lastPrompt:
+          typeof workspace.lastPrompt === "string" ? workspace.lastPrompt : "",
+        createdAt:
+          typeof workspace.createdAt === "number" &&
+          Number.isFinite(workspace.createdAt)
+            ? workspace.createdAt
+            : Date.now(),
+        accent:
+          typeof workspace.accent === "number" &&
+          Number.isFinite(workspace.accent)
+            ? workspace.accent
+            : index,
+      };
+    })
+    .filter((workspace): workspace is DrawingWorkspace => Boolean(workspace));
+
+  return workspaces.length > 0 ? workspaces : [createDrawingWorkspace()];
+}
+
 function loadDrawingWorkspaces(): DrawingWorkspace[] {
   if (typeof window === "undefined") {
     return [createDrawingWorkspace()];
@@ -512,45 +587,7 @@ function loadDrawingWorkspaces(): DrawingWorkspace[] {
       return [createDrawingWorkspace()];
     }
 
-    const workspaces = parsed
-      .map((item, index): DrawingWorkspace | null => {
-        if (!item || typeof item !== "object") {
-          return null;
-        }
-
-        const workspace = item as Partial<DrawingWorkspace>;
-
-        return {
-          id:
-            typeof workspace.id === "string" && workspace.id
-              ? workspace.id
-              : createWorkspaceId(),
-          model: typeof workspace.model === "string" ? workspace.model : "",
-          mode: workspace.mode === "edit" ? "edit" : "generate",
-          prompt: typeof workspace.prompt === "string" ? workspace.prompt : "",
-          options: normalizeDrawingOptions(workspace.options),
-          images: normalizeDrawingImages(workspace.images),
-          pending:
-            typeof workspace.pending === "boolean" ? workspace.pending : false,
-          lastPrompt:
-            typeof workspace.lastPrompt === "string"
-              ? workspace.lastPrompt
-              : "",
-          createdAt:
-            typeof workspace.createdAt === "number" &&
-            Number.isFinite(workspace.createdAt)
-              ? workspace.createdAt
-              : Date.now(),
-          accent:
-            typeof workspace.accent === "number" &&
-            Number.isFinite(workspace.accent)
-              ? workspace.accent
-              : index,
-        };
-      })
-      .filter((workspace): workspace is DrawingWorkspace => Boolean(workspace));
-
-    return workspaces.length > 0 ? workspaces : [createDrawingWorkspace()];
+    return normalizeDrawingWorkspaces(parsed);
   } catch {
     return [createDrawingWorkspace()];
   }
@@ -635,13 +672,16 @@ function Drawing() {
   const [requestedDrawingModelId] = useState(getRequestedDrawingModelId);
   const handledRequestedDrawingModel = useRef(false);
   const dragDepthRef = useRef(0);
-  const [files, dispatchFiles] = useReducer(drawingFileReducer, []);
+  const latestWorkspaceSnapshotRef = useRef("");
+  const latestActiveWorkspaceIdRef = useRef("");
   const [workspaces, setWorkspaces] = useState<DrawingWorkspace[]>(() =>
     loadDrawingWorkspaces(),
   );
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(() =>
     loadActiveWorkspaceId(),
   );
+  const [cloudSyncEnabled, setCloudSyncEnabled] = useState(false);
+  const [cloudSyncReady, setCloudSyncReady] = useState(false);
   const [focused, setFocused] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [draggingReferences, setDraggingReferences] = useState(false);
@@ -649,6 +689,10 @@ function Drawing() {
     workspaces.find((workspace) => workspace.id === activeWorkspaceId) ??
     workspaces[0];
   const activeWorkspaceIdForStorage = activeWorkspace?.id ?? "";
+  const files = useMemo(
+    () => activeWorkspace?.references ?? [],
+    [activeWorkspace?.references],
+  );
   const drawingModels = useMemo(
     () => supportModels.filter((model) => isDrawingModel(model)),
     [supportModels],
@@ -741,6 +785,44 @@ function Drawing() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
+    void loadDrawingWorkspaceState<DrawingWorkspace>().then((response) => {
+      if (cancelled) return;
+
+      if (!response.status || !response.data) {
+        setCloudSyncEnabled(false);
+        setCloudSyncReady(true);
+        return;
+      }
+
+      setCloudSyncEnabled(true);
+      const serverWorkspaces = response.data.workspaces;
+      if (Array.isArray(serverWorkspaces) && serverWorkspaces.length > 0) {
+        const normalized = normalizeDrawingWorkspaces(serverWorkspaces);
+        setWorkspaces(normalized);
+
+        const serverActiveWorkspaceId =
+          response.data.active_workspace_id &&
+          normalized.some(
+            (workspace) => workspace.id === response.data?.active_workspace_id,
+          )
+            ? response.data.active_workspace_id
+            : normalized[0]?.id;
+        if (serverActiveWorkspaceId) {
+          setActiveWorkspaceId(serverActiveWorkspaceId);
+        }
+      }
+
+      setCloudSyncReady(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     const firstWorkspaceId = workspaces[0]?.id;
     if (
       firstWorkspaceId &&
@@ -811,11 +893,14 @@ function Drawing() {
       return;
     }
 
+    latestWorkspaceSnapshotRef.current = JSON.stringify(workspaces);
+    latestActiveWorkspaceIdRef.current = activeWorkspaceIdForStorage;
+
     window.localStorage.setItem(
       DRAWING_WORKSPACES_KEY,
-      JSON.stringify(workspaces),
+      latestWorkspaceSnapshotRef.current,
     );
-  }, [workspaces]);
+  }, [activeWorkspaceIdForStorage, workspaces]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !activeWorkspaceIdForStorage) {
@@ -828,6 +913,62 @@ function Drawing() {
     );
   }, [activeWorkspaceIdForStorage]);
 
+  useEffect(() => {
+    if (!cloudSyncReady || !cloudSyncEnabled) {
+      return;
+    }
+
+    const workspacesSnapshot = JSON.stringify(workspaces);
+    const activeWorkspaceIdSnapshot = activeWorkspaceIdForStorage;
+
+    const timer = setTimeout(() => {
+      void saveDrawingWorkspaceState<DrawingWorkspace>({
+        active_workspace_id: activeWorkspaceIdSnapshot,
+        workspaces,
+      }).then((response) => {
+        if (!response.status || !response.data) {
+          return;
+        }
+
+        if (
+          latestWorkspaceSnapshotRef.current !== workspacesSnapshot ||
+          latestActiveWorkspaceIdRef.current !== activeWorkspaceIdSnapshot
+        ) {
+          return;
+        }
+
+        const normalized = normalizeDrawingWorkspaces(response.data.workspaces);
+        const normalizedSnapshot = JSON.stringify(normalized);
+        if (normalizedSnapshot !== workspacesSnapshot) {
+          setWorkspaces(normalized);
+        }
+
+        const nextActiveWorkspaceId =
+          response.data.active_workspace_id &&
+          normalized.some(
+            (workspace) => workspace.id === response.data?.active_workspace_id,
+          )
+            ? response.data.active_workspace_id
+            : normalized[0]?.id;
+        if (
+          nextActiveWorkspaceId &&
+          nextActiveWorkspaceId !== activeWorkspaceIdSnapshot
+        ) {
+          setActiveWorkspaceId(nextActiveWorkspaceId);
+        }
+      });
+    }, 700);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [
+    activeWorkspaceIdForStorage,
+    cloudSyncEnabled,
+    cloudSyncReady,
+    workspaces,
+  ]);
+
   const updateActiveWorkspace = useCallback(
     (
       updates: Partial<
@@ -837,6 +978,7 @@ function Drawing() {
           | "mode"
           | "prompt"
           | "options"
+          | "references"
           | "images"
           | "pending"
           | "lastPrompt"
@@ -858,6 +1000,30 @@ function Drawing() {
     [activeWorkspace],
   );
 
+  const dispatchFiles = useCallback(
+    (action: FileProviderAction) => {
+      const workspaceId = activeWorkspaceIdForStorage;
+      if (!workspaceId) {
+        return;
+      }
+
+      setWorkspaces((current) =>
+        current.map((workspace) =>
+          workspace.id === workspaceId
+            ? {
+                ...workspace,
+                references: drawingFileReducer(
+                  normalizeDrawingReferences(workspace.references),
+                  action,
+                ),
+              }
+            : workspace,
+        ),
+      );
+    },
+    [activeWorkspaceIdForStorage],
+  );
+
   const updateWorkspaceById = useCallback(
     (workspaceId: string, updates: Partial<DrawingWorkspace>) => {
       setWorkspaces((current) =>
@@ -871,21 +1037,22 @@ function Drawing() {
     [],
   );
 
-  const canUseCurrentReferencesWithModel = useCallback(
-    (modelId: string) =>
-      files.length <= getDrawingModelCapabilities(modelId).maxReferenceImages,
-    [files.length],
+  const canUseReferencesWithModel = useCallback(
+    (modelId: string, references: FileArray = files) =>
+      references.length <=
+      getDrawingModelCapabilities(modelId).maxReferenceImages,
+    [files],
   );
 
   const notifyReferenceImageLimit = useCallback(
-    (modelId: string) => {
+    (modelId: string, count = files.length) => {
       const capabilities = getDrawingModelCapabilities(modelId);
       const modelName =
         drawingModels.find((model) => model.id === modelId)?.name || modelId;
 
       toast.error(t("drawing.referenceLimitExceeded"), {
         description: t("drawing.referenceLimitExceededPrompt", {
-          count: files.length,
+          count,
           limit: capabilities.maxReferenceImages,
           model: modelName,
         }),
@@ -896,7 +1063,7 @@ function Drawing() {
 
   const selectDrawingModel = useCallback(
     (modelId: string) => {
-      if (!canUseCurrentReferencesWithModel(modelId)) {
+      if (!canUseReferencesWithModel(modelId)) {
         notifyReferenceImageLimit(modelId);
         return;
       }
@@ -910,7 +1077,7 @@ function Drawing() {
       });
     },
     [
-      canUseCurrentReferencesWithModel,
+      canUseReferencesWithModel,
       notifyReferenceImageLimit,
       options,
       updateActiveWorkspace,
@@ -920,18 +1087,18 @@ function Drawing() {
   const selectWorkspace = useCallback(
     (workspace: DrawingWorkspace) => {
       const targetModelId = workspace.model || drawingModels[0]?.id || "";
-      if (targetModelId && !canUseCurrentReferencesWithModel(targetModelId)) {
-        notifyReferenceImageLimit(targetModelId);
+      const targetReferences = normalizeDrawingReferences(workspace.references);
+      if (
+        targetModelId &&
+        !canUseReferencesWithModel(targetModelId, targetReferences)
+      ) {
+        notifyReferenceImageLimit(targetModelId, targetReferences.length);
         return;
       }
 
       setActiveWorkspaceId(workspace.id);
     },
-    [
-      canUseCurrentReferencesWithModel,
-      drawingModels,
-      notifyReferenceImageLimit,
-    ],
+    [canUseReferencesWithModel, drawingModels, notifyReferenceImageLimit],
   );
 
   const addWorkspace = () => {
@@ -969,12 +1136,18 @@ function Drawing() {
         nextWorkspaces[0];
       const nextActiveModelId =
         nextActiveWorkspace?.model || drawingModels[0]?.id || "";
+      const nextActiveReferences = normalizeDrawingReferences(
+        nextActiveWorkspace?.references,
+      );
 
       if (
         nextActiveModelId &&
-        !canUseCurrentReferencesWithModel(nextActiveModelId)
+        !canUseReferencesWithModel(nextActiveModelId, nextActiveReferences)
       ) {
-        notifyReferenceImageLimit(nextActiveModelId);
+        notifyReferenceImageLimit(
+          nextActiveModelId,
+          nextActiveReferences.length,
+        );
         return;
       }
 
@@ -1032,7 +1205,7 @@ function Drawing() {
     if (!text || !selectedDrawingModelId || requestInFlight || !workspaceId) {
       return;
     }
-    if (!canUseCurrentReferencesWithModel(selectedDrawingModelId)) {
+    if (!canUseReferencesWithModel(selectedDrawingModelId)) {
       notifyReferenceImageLimit(selectedDrawingModelId);
       return;
     }

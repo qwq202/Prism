@@ -103,6 +103,7 @@ func ConnectDatabase() *sql.DB {
 
 	CreateUserTable(db)
 	CreateConversationTable(db)
+	CreateDrawingWorkspaceTable(db)
 	CreateMaskTable(db)
 	CreateSharingTable(db)
 	CreatePackageTable(db)
@@ -237,6 +238,20 @@ func CreateConversationTable(db *sql.DB) {
 		  favorite BOOLEAN DEFAULT FALSE,
 		  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		  UNIQUE KEY (user_id, conversation_id)
+		);
+	`)
+}
+
+func CreateDrawingWorkspaceTable(db *sql.DB) {
+	mustCreateTable(db, "drawing_workspace", `
+		CREATE TABLE IF NOT EXISTS drawing_workspace (
+		  id INT PRIMARY KEY AUTO_INCREMENT,
+		  user_id INT UNIQUE,
+		  active_workspace_id VARCHAR(128),
+		  data MEDIUMTEXT,
+		  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		  FOREIGN KEY (user_id) REFERENCES auth(id)
 		);
 	`)
 }
