@@ -62,27 +62,12 @@ type Buffer struct {
 }
 
 func initInputToken(model string, history []globals.Message) int {
-	if globals.IsVisionModel(model) {
-		for _, message := range history {
-			if message.Role == globals.User {
-				content, _ := ExtractImages(message.Content, true)
-				message.Content = content
-			}
-		}
-
+	if globals.IsVisionModel(model) || globals.IsDrawingModel("", model) {
 		history = Each(history, func(message globals.Message) globals.Message {
 			if message.Role == globals.User {
 				raw, _ := ExtractImages(message.Content, true)
-				return globals.Message{
-					Role:         message.Role,
-					Content:      raw,
-					Name:         message.Name,
-					FunctionCall: message.FunctionCall,
-					ToolCalls:    message.ToolCalls,
-					ToolCallId:   message.ToolCallId,
-				}
+				message.Content = raw
 			}
-
 			return message
 		})
 	}

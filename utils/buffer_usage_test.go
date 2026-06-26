@@ -224,3 +224,32 @@ func TestNewBufferDoesNotCountBase64FileContentForConfiguredVisionModel(t *testi
 		t.Fatalf("expected only surrounding text to be counted, got %d tokens", buffer.CountInputToken())
 	}
 }
+
+func TestUnknownModelUsesFallbackTokenizerWithoutModelSwap(t *testing.T) {
+	_, fallback, err := getEncodingForChatModel("custom-unknown-model")
+	if err != nil {
+		t.Fatalf("expected fallback tokenizer for unknown model, got error: %v", err)
+	}
+	if fallback != "cl100k_base" {
+		t.Fatalf("expected cl100k_base fallback tokenizer, got %q", fallback)
+	}
+}
+
+func TestNewBufferDoesNotCountBase64FileContentForDrawingModel(t *testing.T) {
+	image := "data:image/png;base64," + strings.Repeat("A", 20000)
+	history := []globals.Message{
+		{
+			Role:    globals.User,
+			Content: "参考这张图画一只猪\n" + image,
+		},
+	}
+	rawTokens := NumTokensFromMessages(history, globals.GPT3Turbo, false)
+	buffer := NewBuffer(globals.Gemini3ProImage, history, usageTestCharge{})
+
+	if buffer.CountInputToken() >= rawTokens {
+		t.Fatalf("expected drawing buffer to strip base64 before text token count, got %d >= %d", buffer.CountInputToken(), rawTokens)
+	}
+	if buffer.CountInputToken() > 80 {
+		t.Fatalf("expected only drawing text prompt to be counted, got %d tokens", buffer.CountInputToken())
+	}
+}

@@ -190,13 +190,15 @@ func CanEnableModelWithSubscriptionForRequest(db *sql.DB, cache *redis.Client, u
 	// use subscription quota first
 	charge := channel.ChargeInstance.GetCharge(model)
 	minimumCost := charge.GetLimit()
-	inputTokens := utils.NumTokensFromMessages(messages, model, false)
-	estimatedInputCost := float32(inputTokens) / 1000 * charge.GetInput()
+	var estimatedInputCost float32
 	if charge.IsBillingType(globals.ImageBilling) {
 		if err := validateImageBillingCost(charge, responseFormat); err != nil {
 			return fmt.Errorf("%s: %w", fmt.Sprintf(ErrImagePrice, model), err), false
 		}
 		estimatedInputCost = estimateImageBillingCost(charge, messages, responseFormat)
+	} else {
+		inputTokens := utils.NumTokensFromMessages(messages, model, false)
+		estimatedInputCost = float32(inputTokens) / 1000 * charge.GetInput()
 	}
 	subscriptionPreflightCost := minimumCost
 	if estimatedInputCost > subscriptionPreflightCost {

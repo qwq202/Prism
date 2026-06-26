@@ -53,13 +53,9 @@ func getEncodingForChatModel(model string) (*tiktoken.Tiktoken, string, error) {
 		return tkm, "", nil
 	}
 
-	normalized := strings.ToLower(strings.TrimSpace(model))
-	switch {
-	case strings.HasPrefix(normalized, "deepseek"):
-		fallback, fallbackErr := tiktoken.GetEncoding("cl100k_base")
-		if fallbackErr == nil {
-			return fallback, "cl100k_base", nil
-		}
+	fallback, fallbackErr := tiktoken.GetEncoding("cl100k_base")
+	if fallbackErr == nil {
+		return fallback, "cl100k_base", nil
 	}
 
 	return nil, "", err
@@ -70,17 +66,20 @@ func NumTokensFromMessages(messages []globals.Message, model string, responseTyp
 	tkm, fallbackEncoding, err := getEncodingForChatModel(model)
 
 	if err != nil {
-		// the method above was deprecated, use the recall method instead
-		// can not encode messages, use length of messages as a proxy for number of tokens
-		// using rune instead of byte to account for unicode characters (e.g. emojis, non-english characters)
-		// data := Marshal(messages)
-		// return len([]rune(data)) * weight
-
-		// use the recall method instead (default encoder model is gpt-3.5-turbo-0613)
+		// If even the fallback tokenizer cannot load, use length as a final rough proxy.
 		if globals.DebugMode {
-			globals.Debug(fmt.Sprintf("[tiktoken] error encoding messages: %s (model: %s), using default model instead", err, model))
+			globals.Debug(fmt.Sprintf("[tiktoken] error encoding messages: %s (model: %s), using text-length fallback", err, model))
 		}
-		return NumTokensFromMessages(messages, globals.GPT3Turbo0613, responseType)
+		for _, message := range messages {
+			tokens += len([]rune(message.Content))
+			if !responseType {
+				tokens += len([]rune(message.Role)) + tokensPerMessage
+			}
+		}
+		if !responseType {
+			tokens += 3
+		}
+		return tokens
 	}
 
 	for _, message := range messages {
@@ -97,7 +96,7 @@ func NumTokensFromMessages(messages []globals.Message, model string, responseTyp
 
 	if globals.DebugMode {
 		if fallbackEncoding != "" {
-			globals.Debug(fmt.Sprintf("[tiktoken] num tokens from messages: %d (tokens per message: %d, model: %s, fallback encoding: %s)", tokens, tokensPerMessage, model, fallbackEncoding))
+			globals.Debug(fmt.Sprintf("[tiktoken] num tokens from messages: %d (tokens per message: %d, model: %s, fallback tokenizer: %s)", tokens, tokensPerMessage, model, fallbackEncoding))
 			return tokens
 		}
 		globals.Debug(fmt.Sprintf("[tiktoken] num tokens from messages: %d (tokens per message: %d, model: %s)", tokens, tokensPerMessage, model))
