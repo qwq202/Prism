@@ -10,12 +10,14 @@ import {
 import {
   Wand2,
   Plus,
-  SlidersHorizontal,
-  Palette,
   Ratio,
   Upload,
   ArrowUp,
   Brain,
+  Download,
+  ImagePlus,
+  Sparkles,
+  Trash2,
   FileType2,
   Image as ImageIcon,
   Loader2,
@@ -32,16 +34,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/components/ui/lib/utils";
 import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
-import { selectSupportModels, useMessageActions } from "@/store/chat.ts";
+import {
+  selectSupportModels,
+  useMessageActions,
+  useMessages,
+  useWorking,
+} from "@/store/chat.ts";
 import { isDrawingModel } from "@/conf/model.ts";
 import ModelAvatar from "@/components/ModelAvatar.tsx";
 import FileProvider, {
   type FileProviderAction,
 } from "@/components/FileProvider.tsx";
 import type { FileArray } from "@/api/file.ts";
+import type { Message } from "@/api/types.ts";
 import { formatMessage } from "@/utils/processor.ts";
 import { toast } from "sonner";
-import { blobEvent, filePanelEvent } from "@/events/blob.ts";
+import { blobEvent } from "@/events/blob.ts";
+import { normalizeImageURL } from "@/utils/image-url.ts";
 
 type Mode = "generate" | "edit";
 type GeminiImageAspectRatio =
@@ -77,14 +86,31 @@ type DrawingModelCapabilities = {
   maxReferenceImages: number;
 };
 
+type DrawingGeneratedImage = {
+  id: string;
+  src: string;
+  prompt: string;
+  createdAt: number;
+};
+
 type DrawingWorkspace = {
   id: string;
   model: string;
   mode: Mode;
   prompt: string;
   options: DrawingOptions;
+  images: DrawingGeneratedImage[];
+  pending: boolean;
+  lastPrompt: string;
   createdAt: number;
   accent: number;
+};
+
+type PendingGeneration = {
+  workspaceId: string;
+  startIndex: number;
+  prompt: string;
+  createdAt: number;
 };
 
 const DRAWING_WORKSPACES_KEY = "drawing.workspaces.v1";
@@ -129,8 +155,7 @@ const GEMINI_25_FLASH_IMAGE_ASPECT_RATIOS: readonly GeminiImageAspectRatio[] = [
   "16:9",
   "21:9",
 ];
-const GEMINI_3_PRO_IMAGE_ASPECT_RATIOS =
-  GEMINI_25_FLASH_IMAGE_ASPECT_RATIOS;
+const GEMINI_3_PRO_IMAGE_ASPECT_RATIOS = GEMINI_25_FLASH_IMAGE_ASPECT_RATIOS;
 const GEMINI_31_FLASH_IMAGE_ASPECT_RATIOS: readonly GeminiImageAspectRatio[] = [
   ...GEMINI_3_PRO_IMAGE_ASPECT_RATIOS,
   "1:4",
@@ -144,11 +169,7 @@ const GEMINI_31_FLASH_IMAGE_SIZES: readonly GeminiImageSize[] = [
   "2K",
   "4K",
 ];
-const GEMINI_3_PRO_IMAGE_SIZES: readonly GeminiImageSize[] = [
-  "1K",
-  "2K",
-  "4K",
-];
+const GEMINI_3_PRO_IMAGE_SIZES: readonly GeminiImageSize[] = ["1K", "2K", "4K"];
 const MIME_TYPE_OPTIONS: readonly GeminiImageMimeType[] = [
   "image/png",
   "image/jpeg",
@@ -182,6 +203,9 @@ function createDrawingWorkspace(index = 0, model = ""): DrawingWorkspace {
     mode: "generate",
     prompt: "",
     options: { ...DEFAULT_DRAWING_OPTIONS },
+    images: [],
+    pending: false,
+    lastPrompt: "",
     createdAt: Date.now(),
     accent: index % WORKSPACE_ACCENTS.length,
   };
@@ -229,7 +253,9 @@ function hasStringOption<T extends string>(
   return typeof value === "string" && options.includes(value as T);
 }
 
-function getDrawingModelCapabilities(modelId: string): DrawingModelCapabilities {
+function getDrawingModelCapabilities(
+  modelId: string,
+): DrawingModelCapabilities {
   const normalizedModelId = modelId.trim().toLowerCase();
 
   if (normalizedModelId.includes("gemini-3.1-flash-image")) {
@@ -276,10 +302,7 @@ function normalizeDrawingOptions(
     mimeType: hasStringOption(MIME_TYPE_OPTIONS, mimeType)
       ? mimeType
       : DEFAULT_DRAWING_OPTIONS.mimeType,
-    thinkingLevel: hasStringOption(
-      capabilities.thinkingLevels,
-      thinkingLevel,
-    )
+    thinkingLevel: hasStringOption(capabilities.thinkingLevels, thinkingLevel)
       ? thinkingLevel
       : DEFAULT_DRAWING_OPTIONS.thinkingLevel,
   };
@@ -320,6 +343,119 @@ function buildDrawingRequestOptions(
   return requestOptions;
 }
 
+const IMAGE_MARKDOWN_PATTERN = /!\[[^\]]*]\(([^)\s]+)[^)]*\)/g;
+const IMAGE_TAG_PATTERN = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+const IMAGE_URL_PATTERN =
+  /(https?:\/\/[^\s"'<>)]*\.(?:png|jpe?g|webp|gif)(?:\?[^\s"'<>)]*)?)/gi;
+
+function extractImagesFromMessage(content: string): string[] {
+  const sources = new Set<string>();
+  let match: RegExpExecArray | null;
+
+  IMAGE_MARKDOWN_PATTERN.lastIndex = 0;
+  while ((match = IMAGE_MARKDOWN_PATTERN.exec(content)) !== null) {
+    if (match[1]) sources.add(normalizeImageURL(match[1]));
+  }
+
+  IMAGE_TAG_PATTERN.lastIndex = 0;
+  while ((match = IMAGE_TAG_PATTERN.exec(content)) !== null) {
+    if (match[1]) sources.add(normalizeImageURL(match[1]));
+  }
+
+  IMAGE_URL_PATTERN.lastIndex = 0;
+  while ((match = IMAGE_URL_PATTERN.exec(content)) !== null) {
+    if (match[1]) sources.add(normalizeImageURL(match[1]));
+  }
+
+  return Array.from(sources);
+}
+
+function normalizeDrawingImages(value: unknown): DrawingGeneratedImage[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item): DrawingGeneratedImage | null => {
+      if (!item || typeof item !== "object") return null;
+      const image = item as Partial<DrawingGeneratedImage>;
+      if (typeof image.src !== "string" || image.src.trim() === "") {
+        return null;
+      }
+
+      return {
+        id:
+          typeof image.id === "string" && image.id
+            ? image.id
+            : createWorkspaceId(),
+        src: normalizeImageURL(image.src),
+        prompt: typeof image.prompt === "string" ? image.prompt : "",
+        createdAt:
+          typeof image.createdAt === "number" &&
+          Number.isFinite(image.createdAt)
+            ? image.createdAt
+            : Date.now(),
+      };
+    })
+    .filter((image): image is DrawingGeneratedImage => Boolean(image));
+}
+
+function extractGeneratedImages(
+  messages: Message[],
+  startIndex: number,
+  prompt: string,
+  createdAt: number,
+): DrawingGeneratedImage[] {
+  const images: DrawingGeneratedImage[] = [];
+  const seen = new Set<string>();
+
+  messages.slice(startIndex).forEach((message, messageIndex) => {
+    if (message.role !== "assistant" || message.end !== true) return;
+
+    extractImagesFromMessage(message.content).forEach((src, imageIndex) => {
+      if (seen.has(src)) return;
+      seen.add(src);
+      images.push({
+        id: `${createdAt}-${messageIndex}-${imageIndex}`,
+        src,
+        prompt,
+        createdAt,
+      });
+    });
+  });
+
+  return images;
+}
+
+function mergeGeneratedImages(
+  current: DrawingGeneratedImage[],
+  incoming: DrawingGeneratedImage[],
+): DrawingGeneratedImage[] {
+  if (incoming.length === 0) return current;
+
+  const seen = new Set(current.map((image) => image.src));
+  const next = [...current];
+  incoming.forEach((image) => {
+    if (seen.has(image.src)) return;
+    seen.add(image.src);
+    next.unshift(image);
+  });
+  return next;
+}
+
+function hasCompletedAssistantAfter(messages: Message[], startIndex: number) {
+  return messages
+    .slice(startIndex)
+    .some((message) => message.role === "assistant" && message.end === true);
+}
+
+function getClipboardImageFiles(clipboardData: DataTransfer | null): File[] {
+  if (!clipboardData) return [];
+
+  return Array.from(clipboardData.items)
+    .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => Boolean(file));
+}
+
 function loadDrawingWorkspaces(): DrawingWorkspace[] {
   if (typeof window === "undefined") {
     return [createDrawingWorkspace()];
@@ -353,6 +489,13 @@ function loadDrawingWorkspaces(): DrawingWorkspace[] {
           mode: workspace.mode === "edit" ? "edit" : "generate",
           prompt: typeof workspace.prompt === "string" ? workspace.prompt : "",
           options: normalizeDrawingOptions(workspace.options),
+          images: normalizeDrawingImages(workspace.images),
+          pending:
+            typeof workspace.pending === "boolean" ? workspace.pending : false,
+          lastPrompt:
+            typeof workspace.lastPrompt === "string"
+              ? workspace.lastPrompt
+              : "",
           createdAt:
             typeof workspace.createdAt === "number" &&
             Number.isFinite(workspace.createdAt)
@@ -449,9 +592,13 @@ function DrawingOptionSelect<T extends string>({
 function Drawing() {
   const { t } = useTranslation();
   const { send } = useMessageActions();
+  const messages = useMessages();
+  const working = useWorking();
   const supportModels = useSelector(selectSupportModels);
   const [requestedDrawingModelId] = useState(getRequestedDrawingModelId);
   const handledRequestedDrawingModel = useRef(false);
+  const pendingGenerationRef = useRef<PendingGeneration | null>(null);
+  const dragDepthRef = useRef(0);
   const [files, dispatchFiles] = useReducer(drawingFileReducer, []);
   const [workspaces, setWorkspaces] = useState<DrawingWorkspace[]>(() =>
     loadDrawingWorkspaces(),
@@ -461,6 +608,7 @@ function Drawing() {
   );
   const [focused, setFocused] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [draggingReferences, setDraggingReferences] = useState(false);
   const activeWorkspace =
     workspaces.find((workspace) => workspace.id === activeWorkspaceId) ??
     workspaces[0];
@@ -488,29 +636,54 @@ function Drawing() {
   const uploadReferenceTitle = t("drawing.uploadReferenceWithLimit", {
     limit: referenceImageLimit,
   });
+  const generatedImages = activeWorkspace?.images ?? [];
+  const activeWorkspacePending = Boolean(activeWorkspace?.pending);
+  const requestInFlight = generating || (activeWorkspacePending && working);
+  const referencesRemaining = Math.max(0, referenceImageLimit - files.length);
+  const canGenerate = Boolean(
+    prompt.trim() && selectedDrawingModelId && !requestInFlight,
+  );
+  const generateDisabledReason = !selectedDrawingModelId
+    ? t("drawing.needModel")
+    : !prompt.trim()
+      ? t("drawing.needPrompt")
+      : requestInFlight
+        ? t("drawing.generating")
+        : "";
 
   useEffect(() => {
-    const openReferencePanel = (event: DragEvent) => {
-      if (!hasDraggedFiles(event.dataTransfer)) return false;
-      event.preventDefault();
-      if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
-      filePanelEvent.emit(undefined);
-      return true;
+    const resetDragState = () => {
+      dragDepthRef.current = 0;
+      setDraggingReferences(false);
     };
 
     const handleDragEnter = (event: DragEvent) => {
-      openReferencePanel(event);
+      if (!hasDraggedFiles(event.dataTransfer)) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+      dragDepthRef.current += 1;
+      setDraggingReferences(true);
     };
 
     const handleDragOver = (event: DragEvent) => {
-      openReferencePanel(event);
+      if (!hasDraggedFiles(event.dataTransfer)) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+      setDraggingReferences(true);
+    };
+
+    const handleDragLeave = (event: DragEvent) => {
+      if (!hasDraggedFiles(event.dataTransfer)) return;
+      dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+      if (dragDepthRef.current === 0) {
+        setDraggingReferences(false);
+      }
     };
 
     const handleDrop = (event: DragEvent) => {
-      if (event.defaultPrevented || !hasDraggedFiles(event.dataTransfer)) {
-        return;
-      }
+      if (!hasDraggedFiles(event.dataTransfer)) return;
       event.preventDefault();
+      resetDragState();
 
       const droppedFiles = getDroppedFiles(event.dataTransfer);
       if (droppedFiles.length > 0) {
@@ -520,11 +693,13 @@ function Drawing() {
 
     window.addEventListener("dragenter", handleDragEnter);
     window.addEventListener("dragover", handleDragOver);
+    window.addEventListener("dragleave", handleDragLeave);
     window.addEventListener("drop", handleDrop);
 
     return () => {
       window.removeEventListener("dragenter", handleDragEnter);
       window.removeEventListener("dragover", handleDragOver);
+      window.removeEventListener("dragleave", handleDragLeave);
       window.removeEventListener("drop", handleDrop);
     };
   }, []);
@@ -596,6 +771,38 @@ function Drawing() {
   ]);
 
   useEffect(() => {
+    const pending = pendingGenerationRef.current;
+    if (!pending) return;
+
+    const incomingImages = extractGeneratedImages(
+      messages,
+      pending.startIndex,
+      pending.prompt,
+      pending.createdAt,
+    );
+    const completed = hasCompletedAssistantAfter(messages, pending.startIndex);
+    if (incomingImages.length === 0 && !completed) return;
+
+    setWorkspaces((current) =>
+      current.map((workspace) => {
+        if (workspace.id !== pending.workspaceId) return workspace;
+
+        return {
+          ...workspace,
+          pending: false,
+          images: mergeGeneratedImages(workspace.images, incomingImages),
+        };
+      }),
+    );
+
+    if (incomingImages.length === 0 && completed) {
+      toast.info(t("drawing.noResult"));
+    }
+
+    pendingGenerationRef.current = null;
+  }, [messages, t]);
+
+  useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
@@ -620,7 +827,16 @@ function Drawing() {
   const updateActiveWorkspace = useCallback(
     (
       updates: Partial<
-        Pick<DrawingWorkspace, "model" | "mode" | "prompt" | "options">
+        Pick<
+          DrawingWorkspace,
+          | "model"
+          | "mode"
+          | "prompt"
+          | "options"
+          | "images"
+          | "pending"
+          | "lastPrompt"
+        >
       >,
     ) => {
       if (!activeWorkspace) {
@@ -636,6 +852,19 @@ function Drawing() {
       );
     },
     [activeWorkspace],
+  );
+
+  const updateWorkspaceById = useCallback(
+    (workspaceId: string, updates: Partial<DrawingWorkspace>) => {
+      setWorkspaces((current) =>
+        current.map((workspace) =>
+          workspace.id === workspaceId
+            ? { ...workspace, ...updates }
+            : workspace,
+        ),
+      );
+    },
+    [],
   );
 
   const canUseCurrentReferencesWithModel = useCallback(
@@ -687,17 +916,18 @@ function Drawing() {
   const selectWorkspace = useCallback(
     (workspace: DrawingWorkspace) => {
       const targetModelId = workspace.model || drawingModels[0]?.id || "";
-      if (
-        targetModelId &&
-        !canUseCurrentReferencesWithModel(targetModelId)
-      ) {
+      if (targetModelId && !canUseCurrentReferencesWithModel(targetModelId)) {
         notifyReferenceImageLimit(targetModelId);
         return;
       }
 
       setActiveWorkspaceId(workspace.id);
     },
-    [canUseCurrentReferencesWithModel, drawingModels, notifyReferenceImageLimit],
+    [
+      canUseCurrentReferencesWithModel,
+      drawingModels,
+      notifyReferenceImageLimit,
+    ],
   );
 
   const addWorkspace = () => {
@@ -710,6 +940,10 @@ function Drawing() {
   };
 
   const deleteWorkspace = (workspaceId: string) => {
+    if (pendingGenerationRef.current?.workspaceId === workspaceId) {
+      pendingGenerationRef.current = null;
+    }
+
     const workspaceIndex = workspaces.findIndex(
       (workspace) => workspace.id === workspaceId,
     );
@@ -768,9 +1002,34 @@ function Drawing() {
     });
   };
 
+  const removeReferenceFile = (index: number) => {
+    dispatchFiles({ type: "remove", payload: index });
+  };
+
+  const clearGeneratedImages = () => {
+    updateActiveWorkspace({ images: [] });
+  };
+
+  const addGeneratedImageAsReference = (image: DrawingGeneratedImage) => {
+    if (files.length >= referenceImageLimit) {
+      notifyReferenceImageLimit(selectedDrawingModelId);
+      return;
+    }
+
+    dispatchFiles({
+      type: "add",
+      payload: {
+        name: `drawing-${new Date(image.createdAt).toISOString()}.png`,
+        content: image.src,
+      },
+    });
+    toast.success(t("drawing.referenceAdded"));
+  };
+
   const generateImage = async () => {
     const text = prompt.trim();
-    if (!text || !selectedDrawingModelId || generating) {
+    const workspaceId = activeWorkspaceIdForStorage;
+    if (!text || !selectedDrawingModelId || requestInFlight || !workspaceId) {
       return;
     }
     if (!canUseCurrentReferencesWithModel(selectedDrawingModelId)) {
@@ -778,6 +1037,17 @@ function Drawing() {
       return;
     }
 
+    const createdAt = Date.now();
+    pendingGenerationRef.current = {
+      workspaceId,
+      startIndex: messages.length,
+      prompt: text,
+      createdAt,
+    };
+    updateWorkspaceById(workspaceId, {
+      pending: true,
+      lastPrompt: text,
+    });
     setGenerating(true);
     try {
       if (
@@ -788,14 +1058,32 @@ function Drawing() {
         )
       ) {
         dispatchFiles({ type: "clear" });
+      } else {
+        pendingGenerationRef.current = null;
+        updateWorkspaceById(workspaceId, { pending: false });
       }
+    } catch (error) {
+      pendingGenerationRef.current = null;
+      updateWorkspaceById(workspaceId, { pending: false });
+      toast.error(t("drawing.generateFailed"), {
+        description: error instanceof Error ? error.message : undefined,
+      });
     } finally {
       setGenerating(false);
     }
   };
 
   return (
-    <div className="flex h-full min-h-0 w-full bg-background text-foreground overflow-hidden">
+    <div
+      className="flex h-full min-h-0 w-full bg-background text-foreground overflow-hidden"
+      onPaste={(event) => {
+        const pastedImages = getClipboardImageFiles(event.clipboardData);
+        if (pastedImages.length === 0) return;
+
+        event.preventDefault();
+        blobEvent.emit(pastedImages);
+      }}
+    >
       {/* Left Sidebar */}
       <aside className="w-72 min-h-0 flex flex-col z-10 shrink-0 border-r border-border/60 bg-card/50 backdrop-blur-sm">
         <div className="p-5 flex-1 flex flex-col gap-5 overflow-y-auto">
@@ -909,6 +1197,23 @@ function Drawing() {
         {/* Background */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,hsl(var(--primary)/0.06),transparent)]" />
         <div className="absolute inset-0 bg-[radial-gradient(hsl(var(--muted-foreground))_1px,transparent_1px)] [background-size:28px_28px] opacity-[0.035]" />
+        {draggingReferences && (
+          <div className="pointer-events-none absolute inset-4 z-30 flex items-center justify-center rounded-3xl border-2 border-dashed border-primary/45 bg-background/80 shadow-2xl backdrop-blur-xl">
+            <div className="flex flex-col items-center text-center">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <Upload className="h-6 w-6" />
+              </div>
+              <div className="text-base font-semibold text-foreground">
+                {t("drawing.dropReferenceTitle")}
+              </div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                {t("drawing.dropReferencePrompt", {
+                  remaining: referencesRemaining,
+                })}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Mode Toggle */}
         <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20">
@@ -937,14 +1242,118 @@ function Drawing() {
           </div>
         </div>
 
-        {/* Empty Canvas */}
-        <div className="flex-1 flex flex-col items-center justify-center pb-44 relative z-10">
-          <p className="text-base font-semibold text-foreground/70 tracking-wide">
-            {t("drawing.emptyTitle")}
-          </p>
-          <p className="text-sm text-muted-foreground/50 mt-3">
-            {t("drawing.emptyPrompt")}
-          </p>
+        {/* Canvas / Results */}
+        <div className="relative z-10 flex-1 min-h-0 overflow-y-auto">
+          {drawingModels.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center pb-44">
+              <div className="flex max-w-sm flex-col items-center text-center">
+                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-3xl border border-border/70 bg-background/80 shadow-sm">
+                  <ImageIcon className="h-7 w-7 text-muted-foreground" />
+                </div>
+                <p className="text-base font-semibold text-foreground/80 tracking-wide">
+                  {t("drawing.noModels")}
+                </p>
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                  {t("drawing.noModelsPrompt")}
+                </p>
+                <a
+                  href="/model"
+                  className="mt-5 rounded-xl bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-85"
+                >
+                  {t("drawing.goSettings")}
+                </a>
+              </div>
+            </div>
+          ) : generatedImages.length === 0 && !activeWorkspacePending ? (
+            <div className="flex h-full flex-col items-center justify-center px-8 pb-44 text-center">
+              <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-3xl border border-border/70 bg-background/80 shadow-sm">
+                <Sparkles className="h-7 w-7 text-muted-foreground" />
+              </div>
+              <p className="text-base font-semibold text-foreground/70 tracking-wide">
+                {t("drawing.emptyTitle")}
+              </p>
+              <p className="text-sm text-muted-foreground/50 mt-3">
+                {t("drawing.emptyPrompt")}
+              </p>
+            </div>
+          ) : (
+            <div className="mx-auto w-full max-w-6xl px-6 pb-44 pt-24">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-foreground">
+                    {t("drawing.resultsTitle")}
+                  </div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">
+                    {t("drawing.resultsCount", {
+                      count: generatedImages.length,
+                    })}
+                  </div>
+                </div>
+                {generatedImages.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={clearGeneratedImages}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border/60 bg-background/70 px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    {t("drawing.clearResults")}
+                  </button>
+                )}
+              </div>
+              {activeWorkspacePending && (
+                <div className="mb-4 rounded-2xl border border-border/60 bg-card/70 p-4 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-foreground">
+                        {t("drawing.generatingTitle")}
+                      </div>
+                      <div className="mt-1 truncate text-xs text-muted-foreground">
+                        {activeWorkspace?.lastPrompt || prompt}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                {generatedImages.map((image, index) => (
+                  <div
+                    key={image.id}
+                    className="group relative overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm"
+                  >
+                    <img
+                      src={image.src}
+                      alt={t("drawing.generatedImage")}
+                      loading="lazy"
+                      className="aspect-square w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                    />
+                    <a
+                      href={image.src}
+                      download={`drawing-${index + 1}.png`}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={t("drawing.downloadImage")}
+                      title={t("drawing.downloadImage")}
+                      className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg border border-border/70 bg-background/90 text-muted-foreground opacity-0 shadow-sm backdrop-blur transition-opacity duration-150 hover:text-foreground group-hover:opacity-100"
+                    >
+                      <Download className="h-4 w-4" />
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => addGeneratedImageAsReference(image)}
+                      aria-label={t("drawing.useAsReference")}
+                      title={t("drawing.useAsReference")}
+                      className="absolute right-12 top-2 flex h-8 w-8 items-center justify-center rounded-lg border border-border/70 bg-background/90 text-muted-foreground opacity-0 shadow-sm backdrop-blur transition-opacity duration-150 hover:text-foreground group-hover:opacity-100"
+                    >
+                      <ImagePlus className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Floating Input */}
@@ -996,12 +1405,52 @@ function Drawing() {
               />
             </div>
 
+            {files.length > 0 && (
+              <div className="mx-4 mt-3 flex gap-2 overflow-x-auto pb-1">
+                {files.map((file, index) => {
+                  const imageUrl = normalizeImageURL(file.content);
+                  return (
+                    <div
+                      key={`${file.name}-${index}`}
+                      className="group relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-border/70 bg-muted/30"
+                      title={file.name}
+                    >
+                      <img
+                        src={imageUrl}
+                        alt={file.name}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeReferenceFile(index)}
+                        aria-label={t("remove")}
+                        className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-background/90 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-destructive group-hover:opacity-100"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             {/* Textarea */}
             <Textarea
               value={prompt}
               onChange={(e) =>
                 updateActiveWorkspace({ prompt: e.target.value })
               }
+              onKeyDown={(event) => {
+                if (
+                  event.key !== "Enter" ||
+                  (!event.metaKey && !event.ctrlKey)
+                ) {
+                  return;
+                }
+                event.preventDefault();
+                void generateImage();
+              }}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
               className="min-h-[84px] w-full resize-none border-0 bg-transparent px-4 py-3 text-sm leading-relaxed text-foreground shadow-none placeholder:text-muted-foreground/35 focus-visible:ring-0 focus-visible:ring-offset-0"
@@ -1010,41 +1459,40 @@ function Drawing() {
 
             {/* Toolbar */}
             <div className="flex items-center justify-between px-2.5 pb-2.5 gap-2">
-              <div className="flex items-center">
-                {[
-                  { icon: Palette, key: "style" },
-                  { icon: Ratio, key: "ratio" },
-                ].map(({ icon: Icon, key }) => (
-                  <button
-                    key={key}
-                    className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs text-muted-foreground/70 hover:text-foreground hover:bg-muted/50 transition-all duration-150 font-medium"
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    {t(`drawing.tools.${key}`)}
-                  </button>
-                ))}
-                <div className="mx-1 h-4 w-px bg-border/60" />
-                <button
-                  className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50 transition-all duration-150"
-                  title={t("drawing.advanced")}
-                >
-                  <SlidersHorizontal className="h-3.5 w-3.5" />
-                </button>
+              <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+                <span className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-muted/45 px-2.5 text-xs font-medium text-muted-foreground">
+                  <Ratio className="h-3.5 w-3.5" />
+                  {options.aspectRatio}
+                </span>
+                {drawingModelCapabilities.imageSizes.length > 0 && (
+                  <span className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-muted/45 px-2.5 text-xs font-medium text-muted-foreground">
+                    <ImageIcon className="h-3.5 w-3.5" />
+                    {options.imageSize}
+                  </span>
+                )}
+                <span className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-muted/45 px-2.5 text-xs font-medium text-muted-foreground">
+                  <Upload className="h-3.5 w-3.5" />
+                  {files.length}/{referenceImageLimit}
+                </span>
               </div>
 
               <button
                 onClick={generateImage}
-                disabled={!prompt.trim() || !selectedDrawingModelId || generating}
+                disabled={!canGenerate}
                 className={cn(
                   "flex h-9 w-9 items-center justify-center rounded-full transition-all duration-150 shrink-0 select-none",
-                  prompt.trim() && selectedDrawingModelId && !generating
+                  canGenerate
                     ? "bg-foreground text-background hover:opacity-85 active:scale-[0.96] shadow-sm"
                     : "bg-muted/60 text-muted-foreground/40 cursor-not-allowed",
                 )}
                 aria-label={t("drawing.generateImage")}
-                title={t("drawing.generateImage")}
+                title={
+                  canGenerate
+                    ? t("drawing.generateImage")
+                    : generateDisabledReason
+                }
               >
-                {generating ? (
+                {requestInFlight ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <ArrowUp className="h-4 w-4" />
