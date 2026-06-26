@@ -266,8 +266,21 @@ func isClientInterruptError(err error) bool {
 		strings.Contains(content, "interrupted")
 }
 
+func isNonRetryableRequestError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	content := strings.ToLower(err.Error())
+	return strings.Contains(content, "model_not_found") ||
+		strings.Contains(content, "model not found") ||
+		strings.Contains(content, "no available channel for model") ||
+		strings.Contains(content, "invalid_request_error") ||
+		strings.Contains(content, "invalid url")
+}
+
 func IsAvailableError(err error) bool {
-	return err != nil && !isClientInterruptError(err)
+	return err != nil && !isClientInterruptError(err) && !isNonRetryableRequestError(err)
 }
 
 func IsSkipError(err error) bool {

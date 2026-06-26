@@ -77,6 +77,8 @@ type ChatProps struct {
 	ClientContext        string                 `json:"-"`
 	DisableCache         bool                   `json:"-"`
 	Buffer               *utils.Buffer          `json:"-"`
+
+	GeminiInteractionsUnsupportedEndpoints map[string]bool `json:"-"`
 }
 
 const currentDateTimePromptPrefix = "Current date and time reference:"

@@ -4,6 +4,7 @@ import (
 	adaptercommon "chat/adapter/common"
 	"chat/globals"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -159,6 +160,17 @@ func TestGeminiImageGenerationDowngradesUnsupportedInteractions(t *testing.T) {
 		case "/v1beta/interactions":
 			_, _ = w.Write([]byte(`{"error":{"message":"Invalid URL (POST /v1beta/interactions)","type":"invalid_request_error","param":"","code":""}}`))
 		case "/v1beta/models/gemini-3.1-flash-image:generateContent":
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatalf("read generateContent body: %v", err)
+			}
+			payload := string(body)
+			if strings.Contains(payload, "systemInstruction") {
+				t.Fatalf("image generateContent fallback should not include chat systemInstruction, got %s", payload)
+			}
+			if !strings.Contains(payload, `"responseModalities":["TEXT","IMAGE"]`) {
+				t.Fatalf("expected image response modalities, got %s", payload)
+			}
 			_, _ = w.Write([]byte(`{
 				"candidates": [
 					{
@@ -182,9 +194,10 @@ func TestGeminiImageGenerationDowngradesUnsupportedInteractions(t *testing.T) {
 	defer server.Close()
 
 	instance := NewChatInstance(server.URL, "test-key")
-	chunk, err := instance.CreateGeminiChatRequest(&adaptercommon.ChatProps{
+	props := &adaptercommon.ChatProps{
 		Model: globals.Gemini31FlashImage,
 		Message: []globals.Message{
+			{Role: globals.System, Content: "chat-only system prompt"},
 			{Role: globals.User, Content: "draw a pig"},
 		},
 		ResponseFormat: map[string]interface{}{
@@ -193,7 +206,9 @@ func TestGeminiImageGenerationDowngradesUnsupportedInteractions(t *testing.T) {
 			"aspect_ratio": "1:1",
 			"image_size":   "1K",
 		},
-	})
+	}
+
+	chunk, err := instance.CreateGeminiChatRequest(props)
 	if err != nil {
 		t.Fatalf("expected generateContent downgrade, got error: %v", err)
 	}
@@ -204,6 +219,14 @@ func TestGeminiImageGenerationDowngradesUnsupportedInteractions(t *testing.T) {
 		paths[0] != "/v1beta/interactions" ||
 		paths[1] != "/v1beta/models/gemini-3.1-flash-image:generateContent" {
 		t.Fatalf("expected interactions then generateContent, got %#v", paths)
+	}
+
+	paths = paths[:0]
+	if _, err := instance.CreateGeminiChatRequest(props); err != nil {
+		t.Fatalf("expected cached generateContent downgrade, got error: %v", err)
+	}
+	if len(paths) != 1 || paths[0] != "/v1beta/models/gemini-3.1-flash-image:generateContent" {
+		t.Fatalf("expected remembered downgrade to skip interactions, got %#v", paths)
 	}
 }
 

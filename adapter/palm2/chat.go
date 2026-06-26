@@ -403,6 +403,53 @@ func (c *ChatInstance) GetGeminiInteractionBody(props *adaptercommon.ChatProps) 
 	}
 }
 
+func geminiInteractionsEndpointKey(endpoint string) string {
+	return strings.TrimRight(strings.TrimSpace(endpoint), "/")
+}
+
+func (c *ChatInstance) geminiInteractionsUnsupported(props *adaptercommon.ChatProps) bool {
+	if props == nil || len(props.GeminiInteractionsUnsupportedEndpoints) == 0 {
+		return false
+	}
+	return props.GeminiInteractionsUnsupportedEndpoints[geminiInteractionsEndpointKey(c.Endpoint)]
+}
+
+func (c *ChatInstance) markGeminiInteractionsUnsupported(props *adaptercommon.ChatProps) {
+	if props == nil {
+		return
+	}
+	if props.GeminiInteractionsUnsupportedEndpoints == nil {
+		props.GeminiInteractionsUnsupportedEndpoints = map[string]bool{}
+	}
+	props.GeminiInteractionsUnsupportedEndpoints[geminiInteractionsEndpointKey(c.Endpoint)] = true
+}
+
+func (c *ChatInstance) GetGeminiImageGenerateContentBody(props *adaptercommon.ChatProps) *GeminiChatBody {
+	config := GeminiConfig{
+		Temperature:        props.Temperature,
+		MaxOutputTokens:    props.MaxTokens,
+		TopP:               props.TopP,
+		TopK:               props.TopK,
+		ThinkingConfig:     getGeminiThinkingConfig(props),
+		ResponseModalities: []string{"TEXT", "IMAGE"},
+	}
+
+	content := ""
+	if props != nil && len(props.Message) > 0 {
+		content = props.Message[len(props.Message)-1].Content
+	}
+
+	return &GeminiChatBody{
+		Contents: []GeminiContent{
+			{
+				Role:  GeminiUserType,
+				Parts: getGeminiContent(nil, content, props.Model),
+			},
+		},
+		GenerationConfig: config,
+	}
+}
+
 func (c *ChatInstance) GetPalm2ChatResponse(data interface{}) (string, error) {
 	if form := utils.MapToStruct[PalmChatResponse](data); form != nil {
 		if len(form.Candidates) == 0 {
@@ -909,7 +956,7 @@ func (c *ChatInstance) CreateStreamChatRequest(props *adaptercommon.ChatProps, c
 }
 
 func (c *ChatInstance) CreateGeminiChatRequest(props *adaptercommon.ChatProps) (*globals.Chunk, error) {
-	if c.useGeminiInteractions(props.Model) {
+	if c.useGeminiInteractions(props.Model) && !c.geminiInteractionsUnsupported(props) {
 		data, err := utils.Post(c.GetGeminiInteractionsEndpoint(), map[string]string{
 			"Content-Type":   "application/json",
 			"x-goog-api-key": c.ApiKey,
@@ -918,6 +965,7 @@ func (c *ChatInstance) CreateGeminiChatRequest(props *adaptercommon.ChatProps) (
 		if err != nil {
 			interactionErr := fmt.Errorf("gemini interactions error: %s", err.Error())
 			if shouldDowngradeGeminiInteractions(interactionErr) {
+				c.markGeminiInteractionsUnsupported(props)
 				return c.CreateGeminiGenerateContentRequest(props)
 			}
 			return nil, interactionErr
@@ -928,6 +976,7 @@ func (c *ChatInstance) CreateGeminiChatRequest(props *adaptercommon.ChatProps) (
 			return chunk, nil
 		}
 		if shouldDowngradeGeminiInteractions(err) {
+			c.markGeminiInteractionsUnsupported(props)
 			globals.Debug(fmt.Sprintf(
 				"[gemini] interactions unsupported for endpoint %s, downgrading to generateContent (model: %s, error: %s)",
 				strings.TrimRight(strings.TrimSpace(c.Endpoint), "/"),
@@ -956,9 +1005,14 @@ func shouldDowngradeGeminiInteractions(err error) bool {
 }
 
 func (c *ChatInstance) CreateGeminiGenerateContentRequest(props *adaptercommon.ChatProps) (*globals.Chunk, error) {
+	body := interface{}(c.GetGeminiChatBody(props))
+	if globals.IsGeminiImageGenerationModel(props.Model) && !c.VertexAIExpress {
+		body = c.GetGeminiImageGenerateContentBody(props)
+	}
+
 	data, err := utils.Post(c.GetGeminiGenerateContentEndpoint(props.Model, false), map[string]string{
 		"Content-Type": "application/json",
-	}, c.GetGeminiChatBody(props), props.Proxy)
+	}, body, props.Proxy)
 
 	if err != nil {
 		return nil, fmt.Errorf("gemini error: %s", err.Error())
