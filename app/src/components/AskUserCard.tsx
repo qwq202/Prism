@@ -220,7 +220,7 @@ export function AskUserCard({ toolCall, onSubmit }: AskUserCardProps) {
 
   return (
     <section
-      className="mb-2 mt-3 flex h-[min(24.5rem,58dvh)] min-h-[20rem] w-full min-w-0 max-w-[calc(100vw-2rem)] self-stretch flex-col overflow-hidden rounded-2xl border border-border/70 bg-background shadow-sm sm:h-[24.5rem] sm:min-h-0 md:max-w-[44rem]"
+      className="mb-2 mt-3 flex h-[min(24.5rem,58dvh)] min-h-[20rem] w-full min-w-0 max-w-[calc(100vw-2rem)] self-start flex-col overflow-hidden rounded-2xl border border-border/70 bg-background shadow-sm sm:h-[24.5rem] sm:min-h-0 sm:w-[min(44rem,calc(100vw-6rem))]"
       aria-label={t("ask-user.title")}
     >
       <header className="flex min-h-20 shrink-0 items-start gap-2 px-3 py-3 sm:h-20 sm:min-h-0 sm:gap-3 sm:px-5 sm:py-3.5">
