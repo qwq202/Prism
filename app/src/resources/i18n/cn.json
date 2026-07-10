@@ -769,6 +769,7 @@
     "queuedTitle": "任务已加入队列",
     "generatingTitle": "正在生成图片",
     "canceledTitle": "生成已取消",
+    "cancelingTitle": "正在取消生成",
     "generateFailed": "生成失败",
     "cancelFailed": "取消生成失败",
     "syncUnavailable": "绘画记录同步暂时不可用",
@@ -806,6 +807,7 @@
     "addWorkspace": "新增工作区",
     "workspaceLimitReached": "工作区数量已达上限",
     "deleteWorkspace": "删除工作区 {{index}}",
+    "deleteWorkspacePrompt": "删除后，该工作区的提示词、参考图和生成结果将被移除。",
     "workspaceTitle": "工作区 {{index}}",
     "activeWorkspaceTitle": "当前工作区 {{index}}"
   },

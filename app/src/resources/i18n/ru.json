@@ -533,6 +533,7 @@
     "queuedTitle": "Задача поставлена в очередь",
     "generatingTitle": "Изображение генерируется",
     "canceledTitle": "Генерация отменена",
+    "cancelingTitle": "Отмена генерации",
     "generateFailed": "Ошибка генерации",
     "cancelFailed": "Не удалось отменить генерацию",
     "syncUnavailable": "Синхронизация рисунков временно недоступна",
@@ -570,6 +571,7 @@
     "addWorkspace": "Добавить рабочую область",
     "workspaceLimitReached": "Достигнут лимит рабочих областей",
     "deleteWorkspace": "Удалить рабочую область {{index}}",
+    "deleteWorkspacePrompt": "Будут удалены запрос, референсы и результаты этой рабочей области.",
     "workspaceTitle": "Рабочая область {{index}}",
     "activeWorkspaceTitle": "Активная рабочая область {{index}}"
   },

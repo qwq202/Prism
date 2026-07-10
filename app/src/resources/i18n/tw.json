@@ -621,6 +621,7 @@
     "queuedTitle": "任務已加入佇列",
     "generatingTitle": "正在生成圖片",
     "canceledTitle": "生成已取消",
+    "cancelingTitle": "正在取消生成",
     "generateFailed": "生成失敗",
     "cancelFailed": "取消生成失敗",
     "syncUnavailable": "繪畫記錄同步暫時無法使用",
@@ -658,6 +659,7 @@
     "addWorkspace": "新增工作區",
     "workspaceLimitReached": "工作區數量已達上限",
     "deleteWorkspace": "刪除工作區 {{index}}",
+    "deleteWorkspacePrompt": "刪除後，這個工作區的提示詞、參考圖和生成結果都會移除。",
     "workspaceTitle": "工作區 {{index}}",
     "activeWorkspaceTitle": "目前工作區 {{index}}"
   },

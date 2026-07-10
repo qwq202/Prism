@@ -71,6 +71,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog.tsx";
 import type { Model } from "@/api/types.ts";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog.tsx";
 
 type Mode = "generate" | "edit";
 type GeminiImageAspectRatio =
@@ -497,13 +507,26 @@ function mergeGeneratedImages(
 }
 
 function isActiveDrawingTask(task?: Pick<DrawingTask, "status"> | null) {
-  return task?.status === "queued" || task?.status === "running";
+  return (
+    task?.status === "queued" ||
+    task?.status === "running" ||
+    task?.status === "canceling"
+  );
 }
 
 function applyDrawingTaskToWorkspaces(
   current: DrawingWorkspace[],
   task: DrawingTask<DrawingGeneratedImage>,
 ): DrawingWorkspace[] {
+  if (!current.some((workspace) => workspace.id === task.workspace_id)) {
+    const workspace = {
+      ...createDrawingWorkspace(current.length, task.model),
+      id: task.workspace_id,
+      lastPrompt: task.prompt,
+    };
+    return applyDrawingTaskToWorkspaces([...current, workspace], task);
+  }
+
   let changed = false;
   const next = current.map((workspace) => {
     if (workspace.id !== task.workspace_id) {
@@ -640,7 +663,8 @@ function normalizeDrawingWorkspaces(value: unknown): DrawingWorkspace[] {
         images: normalizeDrawingImages(workspace.images),
         pending:
           workspace.taskStatus === "queued" ||
-          workspace.taskStatus === "running"
+          workspace.taskStatus === "running" ||
+          workspace.taskStatus === "canceling"
             ? Boolean(workspace.pending)
             : false,
         taskId:
@@ -792,6 +816,7 @@ function Drawing() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [previewImage, setPreviewImage] =
     useState<DrawingGeneratedImage | null>(null);
+  const [workspaceToDelete, setWorkspaceToDelete] = useState("");
   const activeWorkspace =
     workspaces.find((workspace) => workspace.id === activeWorkspaceId) ??
     workspaces[0];
@@ -837,6 +862,11 @@ function Drawing() {
         : undefined,
     );
   const requestInFlight = activeWorkspacePending;
+  const canCancelActiveTask = Boolean(
+    requestInFlight &&
+    activeWorkspace?.taskId &&
+    activeWorkspace.taskStatus !== "canceling",
+  );
   const referencesRemaining = Math.max(0, referenceImageLimit - files.length);
   const canGenerate = Boolean(
     prompt.trim() &&
@@ -982,9 +1012,13 @@ function Drawing() {
               t("drawing.syncUnavailable"),
           );
         }
+        const tasks = tasksResponse.status ? tasksResponse.data || [] : [];
         if (normalized) {
-          const tasks = tasksResponse.status ? tasksResponse.data || [] : [];
           setWorkspaces(tasks.reduce(applyDrawingTaskToWorkspaces, normalized));
+        } else if (tasks.length > 0) {
+          setWorkspaces((current) =>
+            tasks.reduce(applyDrawingTaskToWorkspaces, current),
+          );
         }
 
         setCloudSyncReady(true);
@@ -1424,6 +1458,21 @@ function Drawing() {
     setWorkspaces(nextWorkspaces);
   };
 
+  const requestDeleteWorkspace = (workspaceId: string) => {
+    const workspace = workspaces.find((item) => item.id === workspaceId);
+    if (!workspace) return;
+    if (
+      workspace.pending ||
+      isActiveDrawingTask(
+        workspace.taskStatus ? { status: workspace.taskStatus } : undefined,
+      )
+    ) {
+      toast.info(t("drawing.generating"));
+      return;
+    }
+    setWorkspaceToDelete(workspaceId);
+  };
+
   const updateDrawingOptions = (updates: Partial<DrawingOptions>) => {
     updateActiveWorkspace({
       options: normalizeDrawingOptions(
@@ -1763,7 +1812,7 @@ function Drawing() {
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
-                    deleteWorkspace(workspace.id);
+                    requestDeleteWorkspace(workspace.id);
                   }}
                   disabled={workspacePending}
                   className="pointer-events-none absolute -right-2 -top-2 z-20 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-background text-muted-foreground opacity-0 transition-colors hover:border-destructive/50 hover:bg-destructive hover:text-destructive-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 disabled:cursor-not-allowed disabled:opacity-40 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
@@ -1782,7 +1831,7 @@ function Drawing() {
       {!vertical && workspaces.length > 1 && (
         <button
           type="button"
-          onClick={() => deleteWorkspace(activeWorkspaceIdForStorage)}
+          onClick={() => requestDeleteWorkspace(activeWorkspaceIdForStorage)}
           disabled={activeWorkspacePending}
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-35"
           aria-label={t("drawing.deleteWorkspace", {
@@ -1974,7 +2023,9 @@ function Drawing() {
                         <div className="text-sm font-medium text-foreground">
                           {activeWorkspace?.taskStatus === "queued"
                             ? t("drawing.queuedTitle")
-                            : t("drawing.generatingTitle")}
+                            : activeWorkspace?.taskStatus === "canceling"
+                              ? t("drawing.cancelingTitle")
+                              : t("drawing.generatingTitle")}
                         </div>
                         <div className="mt-1 truncate text-xs text-muted-foreground">
                           {activeWorkspace?.lastPrompt || prompt}
@@ -2094,14 +2145,14 @@ function Drawing() {
                             <button
                               type="button"
                               onClick={() => setPreviewImage(image)}
-                              className="relative block w-full overflow-hidden bg-muted/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
+                              className="relative flex w-full justify-center overflow-hidden bg-muted/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
                               aria-label={t("drawing.generatedImage")}
                             >
                               <img
                                 src={image.src}
                                 alt={t("drawing.generatedImage")}
                                 loading="lazy"
-                                className="block h-auto max-h-[34rem] w-full object-contain motion-safe:transition-transform motion-safe:duration-300 group-hover:scale-[1.01]"
+                                className="block h-auto max-h-[34rem] w-auto max-w-full object-contain motion-safe:transition-transform motion-safe:duration-300 group-hover:scale-[1.01]"
                               />
                               <span className="absolute bottom-2 left-2 flex h-10 w-10 items-center justify-center rounded-xl bg-background/90 text-muted-foreground opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
                                 <ZoomIn className="h-4 w-4" />
@@ -2309,30 +2360,46 @@ function Drawing() {
               <button
                 onClick={() =>
                   requestInFlight
-                    ? void cancelActiveTask()
+                    ? canCancelActiveTask
+                      ? void cancelActiveTask()
+                      : undefined
                     : void generateImage()
                 }
-                disabled={!requestInFlight && !canGenerate}
+                disabled={requestInFlight ? !canCancelActiveTask : !canGenerate}
                 className={cn(
                   "flex h-11 w-11 shrink-0 select-none items-center justify-center rounded-full transition-all duration-150",
                   requestInFlight
-                    ? "bg-destructive text-destructive-foreground hover:opacity-85 active:scale-[0.96] shadow-sm"
+                    ? canCancelActiveTask
+                      ? "bg-destructive text-destructive-foreground shadow-sm hover:opacity-85 active:scale-[0.96]"
+                      : "cursor-wait bg-muted text-muted-foreground"
                     : canGenerate
                       ? "bg-foreground text-background hover:opacity-85 active:scale-[0.96] shadow-sm"
                       : "bg-muted/60 text-muted-foreground/40 cursor-not-allowed",
                 )}
                 aria-label={
-                  requestInFlight ? t("cancel") : t("drawing.generateImage")
+                  requestInFlight
+                    ? canCancelActiveTask
+                      ? t("cancel")
+                      : activeWorkspace?.taskStatus === "canceling"
+                        ? t("drawing.cancelingTitle")
+                        : t("drawing.generating")
+                    : t("drawing.generateImage")
                 }
                 title={
                   requestInFlight
-                    ? t("cancel")
+                    ? canCancelActiveTask
+                      ? t("cancel")
+                      : activeWorkspace?.taskStatus === "canceling"
+                        ? t("drawing.cancelingTitle")
+                        : t("drawing.generating")
                     : canGenerate
                       ? t("drawing.generateImage")
                       : generateDisabledReason
                 }
               >
-                {requestInFlight ? (
+                {requestInFlight && !canCancelActiveTask ? (
+                  <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />
+                ) : requestInFlight ? (
                   <X className="h-4 w-4" />
                 ) : (
                   <ArrowUp className="h-4 w-4" />
@@ -2345,6 +2412,42 @@ function Drawing() {
 
       {renderWorkspaceRail(false)}
       {renderWorkspaceRail(true)}
+
+      <AlertDialog
+        open={Boolean(workspaceToDelete)}
+        onOpenChange={(open) => {
+          if (!open) setWorkspaceToDelete("");
+        }}
+      >
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-md">
+          <AlertDialogHeader notTextCentered>
+            <AlertDialogTitle>
+              {t("drawing.deleteWorkspace", {
+                index:
+                  workspaces.findIndex(
+                    (workspace) => workspace.id === workspaceToDelete,
+                  ) + 1,
+              })}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("drawing.deleteWorkspacePrompt")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                const workspaceId = workspaceToDelete;
+                setWorkspaceToDelete("");
+                deleteWorkspace(workspaceId);
+              }}
+            >
+              {t("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog
         open={Boolean(previewImage)}

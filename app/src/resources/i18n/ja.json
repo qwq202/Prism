@@ -533,6 +533,7 @@
     "queuedTitle": "生成キューに追加しました",
     "generatingTitle": "画像を生成しています",
     "canceledTitle": "生成をキャンセルしました",
+    "cancelingTitle": "生成をキャンセルしています",
     "generateFailed": "生成に失敗しました",
     "cancelFailed": "生成をキャンセルできませんでした",
     "syncUnavailable": "描画データを一時的に同期できません",
@@ -570,6 +571,7 @@
     "addWorkspace": "ワークスペースを追加",
     "workspaceLimitReached": "ワークスペースの上限に達しました",
     "deleteWorkspace": "ワークスペース {{index}} を削除",
+    "deleteWorkspacePrompt": "このワークスペースのプロンプト、参照画像、生成結果が削除されます。",
     "workspaceTitle": "ワークスペース {{index}}",
     "activeWorkspaceTitle": "現在のワークスペース {{index}}"
   },

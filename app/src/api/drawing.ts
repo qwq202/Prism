@@ -10,6 +10,7 @@ export type DrawingWorkspaceSyncState<TWorkspace> = {
 export type DrawingTaskStatus =
   | "queued"
   | "running"
+  | "canceling"
   | "succeeded"
   | "failed"
   | "canceled";
@@ -91,7 +92,9 @@ export async function createDrawingTask<TImage>(
   payload: CreateDrawingTaskPayload,
 ): Promise<DrawingTaskResponse<TImage>> {
   try {
-    const response = await axios.post("/drawing/tasks", payload);
+    const response = await axios.post("/drawing/tasks", payload, {
+      timeout: 30_000,
+    });
     return response.data as DrawingTaskResponse<TImage>;
   } catch (error) {
     return {
