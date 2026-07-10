@@ -10,15 +10,37 @@ import (
 	"mime"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
 const (
-	emptyWorkspaceArray      = "[]"
-	maxDrawingWorkspaceCount = 64
-	maxDrawingImageBytes     = 100 * 1024 * 1024
-	maxDrawingTaskListCount  = 20
+	emptyWorkspaceArray              = "[]"
+	maxDrawingWorkspaceCount         = 64
+	maxDrawingImageBytes             = 100 * 1024 * 1024
+	maxDrawingTaskListCount          = 20
+	maxDrawingActiveTasksPerUser     = 4
+	maxDrawingTaskWorkspaceIDBytes   = 128
+	maxDrawingTaskModelBytes         = 255
+	maxDrawingTaskPromptBytes        = 32 * 1024
+	maxDrawingTaskMessageBytes       = 8 * 1024 * 1024
+	maxDrawingTaskOptionPayloadBytes = 64 * 1024
+	drawingTaskCreateLockShardCount  = 64
 )
+
+// Task creation is serialized per user (with fixed lock striping) so the active
+// task checks and insert behave atomically for concurrent in-process requests.
+// Deployments with multiple application processes should additionally enforce
+// their concurrency policy in shared infrastructure.
+var drawingTaskCreateLocks [drawingTaskCreateLockShardCount]sync.Mutex
+
+func drawingTaskCreateLock(userID int64) *sync.Mutex {
+	shard := userID % int64(len(drawingTaskCreateLocks))
+	if shard < 0 {
+		shard = -shard
+	}
+	return &drawingTaskCreateLocks[shard]
+}
 
 func normalizeOptionalText(value interface{}) string {
 	switch v := value.(type) {
@@ -319,6 +341,59 @@ func normalizeJSONRaw(raw json.RawMessage) json.RawMessage {
 	return raw
 }
 
+func normalizeAndValidateTaskOption(name string, raw json.RawMessage) (json.RawMessage, error) {
+	raw = normalizeJSONRaw(raw)
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	if len(raw) > maxDrawingTaskOptionPayloadBytes {
+		return nil, fmt.Errorf("%s is too large", name)
+	}
+	if !json.Valid(raw) {
+		return nil, fmt.Errorf("%s must be valid JSON", name)
+	}
+
+	var object map[string]interface{}
+	if err := json.Unmarshal(raw, &object); err != nil || object == nil {
+		return nil, fmt.Errorf("%s must be a JSON object", name)
+	}
+	return raw, nil
+}
+
+func normalizeAndValidateCreateTaskForm(form createTaskForm) (createTaskForm, error) {
+	form.WorkspaceID = strings.TrimSpace(form.WorkspaceID)
+	form.Model = strings.TrimSpace(form.Model)
+	form.Prompt = strings.TrimSpace(form.Prompt)
+	form.Message = strings.TrimSpace(form.Message)
+
+	if form.WorkspaceID == "" || form.Model == "" || form.Prompt == "" || form.Message == "" {
+		return createTaskForm{}, fmt.Errorf("invalid task form")
+	}
+	if len(form.WorkspaceID) > maxDrawingTaskWorkspaceIDBytes {
+		return createTaskForm{}, fmt.Errorf("workspace id is too long")
+	}
+	if len(form.Model) > maxDrawingTaskModelBytes {
+		return createTaskForm{}, fmt.Errorf("model is too long")
+	}
+	if len(form.Prompt) > maxDrawingTaskPromptBytes {
+		return createTaskForm{}, fmt.Errorf("prompt is too long")
+	}
+	if len(form.Message) > maxDrawingTaskMessageBytes {
+		return createTaskForm{}, fmt.Errorf("message is too long")
+	}
+
+	var err error
+	form.ResponseFormat, err = normalizeAndValidateTaskOption("response_format", form.ResponseFormat)
+	if err != nil {
+		return createTaskForm{}, err
+	}
+	form.Thinking, err = normalizeAndValidateTaskOption("thinking", form.Thinking)
+	if err != nil {
+		return createTaskForm{}, err
+	}
+	return form, nil
+}
+
 func taskOptionsToJSON(options TaskOptions) string {
 	payload := map[string]json.RawMessage{}
 	if raw := normalizeJSONRaw(options.ResponseFormat); len(raw) > 0 {
@@ -402,25 +477,31 @@ func CreateTask(db *sql.DB, userID int64, form createTaskForm) (*Task, error) {
 		return nil, fmt.Errorf("database is not initialized")
 	}
 
-	workspaceID := strings.TrimSpace(form.WorkspaceID)
-	model := strings.TrimSpace(form.Model)
-	prompt := strings.TrimSpace(form.Prompt)
-	message := strings.TrimSpace(form.Message)
-	if workspaceID == "" || model == "" || prompt == "" || message == "" {
-		return nil, fmt.Errorf("invalid task form")
+	form, err := normalizeAndValidateCreateTaskForm(form)
+	if err != nil {
+		return nil, err
 	}
-	if len(workspaceID) > 128 {
-		return nil, fmt.Errorf("workspace id is too long")
-	}
-	active, err := HasActiveTask(db, userID, workspaceID)
+
+	createLock := drawingTaskCreateLock(userID)
+	createLock.Lock()
+	defer createLock.Unlock()
+
+	active, err := HasActiveTask(db, userID, form.WorkspaceID)
 	if err != nil {
 		return nil, err
 	}
 	if active {
 		return nil, fmt.Errorf("workspace already has a running drawing task")
 	}
+	activeCount, err := countActiveTasks(db, userID)
+	if err != nil {
+		return nil, err
+	}
+	if activeCount >= maxDrawingActiveTasksPerUser {
+		return nil, fmt.Errorf("too many active drawing tasks")
+	}
 
-	storedMessage, err := storeDrawingImagesInText(message)
+	storedMessage, err := storeDrawingImagesInText(form.Message)
 	if err != nil {
 		return nil, err
 	}
@@ -438,13 +519,27 @@ func CreateTask(db *sql.DB, userID int64, form createTaskForm) (*Task, error) {
 				task_id, user_id, workspace_id, status, model, prompt,
 				message, request_options, result_images
 			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, taskID, userID, workspaceID, TaskStatusQueued, model, prompt, storedMessage, taskOptionsToJSON(options), "[]")
+		`, taskID, userID, form.WorkspaceID, TaskStatusQueued, form.Model, form.Prompt, storedMessage, taskOptionsToJSON(options), "[]")
 		if err == nil {
 			return LoadTask(db, userID, taskID)
 		}
 		lastErr = err
 	}
 	return nil, lastErr
+}
+
+func countActiveTasks(db *sql.DB, userID int64) (int, error) {
+	if db == nil {
+		return 0, fmt.Errorf("database is not initialized")
+	}
+
+	var count int
+	err := globals.QueryRowDb(db, `
+		SELECT COUNT(*)
+		FROM drawing_task
+		WHERE user_id = ? AND status IN (?, ?)
+	`, userID, TaskStatusQueued, TaskStatusRunning).Scan(&count)
+	return count, err
 }
 
 func HasActiveTask(db *sql.DB, userID int64, workspaceID string) (bool, error) {

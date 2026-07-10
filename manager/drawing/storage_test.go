@@ -6,8 +6,10 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -275,5 +277,184 @@ func TestSaveWorkspaceStatePreservesServerImagesForActiveTaskSnapshot(t *testing
 	}
 	if strings.Contains(payload, "taskStatus") || strings.Contains(payload, "taskId") {
 		t.Fatalf("expected transient task fields to be cleared, got %s", payload)
+	}
+}
+
+func validDrawingTaskForm(workspaceID string) createTaskForm {
+	return createTaskForm{
+		WorkspaceID:    workspaceID,
+		Model:          "gemini-3-pro-image",
+		Prompt:         "draw a pig",
+		Message:        "draw a pig",
+		ResponseFormat: json.RawMessage(`{"type":"image","aspect_ratio":"1:1"}`),
+		Thinking:       json.RawMessage(`{"thinking_level":"minimal"}`),
+	}
+}
+
+func TestNormalizeAndValidateCreateTaskFormRejectsInvalidFields(t *testing.T) {
+	tests := []struct {
+		name      string
+		mutate    func(*createTaskForm)
+		wantError string
+	}{
+		{
+			name: "workspace id too long",
+			mutate: func(form *createTaskForm) {
+				form.WorkspaceID = strings.Repeat("w", maxDrawingTaskWorkspaceIDBytes+1)
+			},
+			wantError: "workspace id is too long",
+		},
+		{
+			name: "model too long",
+			mutate: func(form *createTaskForm) {
+				form.Model = strings.Repeat("m", maxDrawingTaskModelBytes+1)
+			},
+			wantError: "model is too long",
+		},
+		{
+			name: "prompt too long",
+			mutate: func(form *createTaskForm) {
+				form.Prompt = strings.Repeat("p", maxDrawingTaskPromptBytes+1)
+			},
+			wantError: "prompt is too long",
+		},
+		{
+			name: "message too long",
+			mutate: func(form *createTaskForm) {
+				form.Message = strings.Repeat("x", maxDrawingTaskMessageBytes+1)
+			},
+			wantError: "message is too long",
+		},
+		{
+			name: "invalid response format json",
+			mutate: func(form *createTaskForm) {
+				form.ResponseFormat = json.RawMessage(`{"type":`)
+			},
+			wantError: "response_format must be valid JSON",
+		},
+		{
+			name: "response format must be object",
+			mutate: func(form *createTaskForm) {
+				form.ResponseFormat = json.RawMessage(`[]`)
+			},
+			wantError: "response_format must be a JSON object",
+		},
+		{
+			name: "thinking must be object",
+			mutate: func(form *createTaskForm) {
+				form.Thinking = json.RawMessage(`"high"`)
+			},
+			wantError: "thinking must be a JSON object",
+		},
+		{
+			name: "option payload too large",
+			mutate: func(form *createTaskForm) {
+				form.ResponseFormat = json.RawMessage(`{"value":"` + strings.Repeat("x", maxDrawingTaskOptionPayloadBytes) + `"}`)
+			},
+			wantError: "response_format is too large",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			form := validDrawingTaskForm("workspace-1")
+			test.mutate(&form)
+
+			_, err := normalizeAndValidateCreateTaskForm(form)
+			if err == nil || err.Error() != test.wantError {
+				t.Fatalf("expected %q, got %v", test.wantError, err)
+			}
+		})
+	}
+}
+
+func TestCreateTaskSerializesConcurrentRequestsForSameWorkspace(t *testing.T) {
+	db := openDrawingWorkspaceTestDB(t)
+
+	const attempts = 12
+	start := make(chan struct{})
+	errors := make(chan error, attempts)
+	var wg sync.WaitGroup
+	for i := 0; i < attempts; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			_, err := CreateTask(db, 7, validDrawingTaskForm("workspace-1"))
+			errors <- err
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(errors)
+
+	succeeded := 0
+	for err := range errors {
+		if err == nil {
+			succeeded++
+			continue
+		}
+		if err.Error() != "workspace already has a running drawing task" {
+			t.Fatalf("unexpected create error: %v", err)
+		}
+	}
+	if succeeded != 1 {
+		t.Fatalf("expected exactly one task to be created, got %d", succeeded)
+	}
+
+	count, err := countActiveTasks(db, 7)
+	if err != nil {
+		t.Fatalf("count active tasks: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected one active task, got %d", count)
+	}
+}
+
+func TestCreateTaskLimitsConcurrentTasksPerUser(t *testing.T) {
+	db := openDrawingWorkspaceTestDB(t)
+
+	attempts := maxDrawingActiveTasksPerUser + 8
+	start := make(chan struct{})
+	errors := make(chan error, attempts)
+	var wg sync.WaitGroup
+	for i := 0; i < attempts; i++ {
+		workspaceID := fmt.Sprintf("workspace-%d", i)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			_, err := CreateTask(db, 7, validDrawingTaskForm(workspaceID))
+			errors <- err
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(errors)
+
+	succeeded := 0
+	for err := range errors {
+		if err == nil {
+			succeeded++
+			continue
+		}
+		if err.Error() != "too many active drawing tasks" {
+			t.Fatalf("unexpected create error: %v", err)
+		}
+	}
+	if succeeded != maxDrawingActiveTasksPerUser {
+		t.Fatalf("expected %d tasks to be created, got %d", maxDrawingActiveTasksPerUser, succeeded)
+	}
+
+	count, err := countActiveTasks(db, 7)
+	if err != nil {
+		t.Fatalf("count active tasks: %v", err)
+	}
+	if count != maxDrawingActiveTasksPerUser {
+		t.Fatalf("expected %d active tasks, got %d", maxDrawingActiveTasksPerUser, count)
+	}
+
+	if _, err := CreateTask(db, 8, validDrawingTaskForm("workspace-other-user")); err != nil {
+		t.Fatalf("expected another user to have an independent task limit: %v", err)
 	}
 }

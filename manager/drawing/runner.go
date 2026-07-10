@@ -108,16 +108,9 @@ func executeTaskRequest(db *sql.DB, cache *redis.Client, user *auth.User, task *
 
 	buffer := utils.NewBuffer(task.Model, messages, channel.ChargeInstance.GetCharge(task.Model))
 	group := auth.GetGroup(db, user)
-	props := adaptercommon.CreateChatProps(&adaptercommon.ChatProps{
-		Model:          task.Model,
-		OriginalModel:  task.Model,
-		Message:        messages,
-		ResponseFormat: responseFormat,
-		Thinking:       thinking,
-		DisableCache:   false,
-	}, buffer)
+	props := newDrawingChatProps(task.Model, messages, responseFormat, thinking, buffer)
 
-	hit, err := channel.NewChatRequestWithCache(cache, buffer, group, props, func(data *globals.Chunk) error {
+	err := channel.NewChatRequest(group, props, func(data *globals.Chunk) error {
 		if IsTaskCanceled(db, task.TaskID) {
 			return errDrawingTaskCanceled
 		}
@@ -143,10 +136,8 @@ func executeTaskRequest(db *sql.DB, cache *redis.Client, user *auth.User, task *
 		return nil, 0, err
 	}
 
-	if !hit {
-		collectTaskQuota(db, cache, user, buffer, plan, nil)
-		createTaskBillingRecord(db, user, task.Model, buffer)
-	}
+	collectTaskQuota(db, cache, user, buffer, plan, nil)
+	createTaskBillingRecord(db, user, task.Model, buffer)
 
 	content := buffer.Read()
 	images, err := generatedImagesFromContent(content, task.Prompt, task.TaskID)
@@ -157,6 +148,23 @@ func executeTaskRequest(db *sql.DB, cache *redis.Client, user *auth.User, task *
 		return nil, float64(buffer.GetRecordQuota()), errors.New(strings.TrimSpace(content))
 	}
 	return images, float64(buffer.GetRecordQuota()), nil
+}
+
+func newDrawingChatProps(
+	model string,
+	messages []globals.Message,
+	responseFormat interface{},
+	thinking interface{},
+	buffer *utils.Buffer,
+) *adaptercommon.ChatProps {
+	return adaptercommon.CreateChatProps(&adaptercommon.ChatProps{
+		Model:          model,
+		OriginalModel:  model,
+		Message:        messages,
+		ResponseFormat: responseFormat,
+		Thinking:       thinking,
+		DisableCache:   true,
+	}, buffer)
 }
 
 func rawJSONToInterface(raw json.RawMessage) interface{} {
