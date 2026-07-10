@@ -510,6 +510,17 @@
     "goSettings": "設定へ",
     "settings": "描画設定",
     "closeSettings": "設定を閉じる",
+    "shortcuts": {
+      "open": "キーボードショートカット",
+      "title": "描画ショートカット",
+      "description": "組み合わせキーはプロンプト入力中でも使えます。単一キーはテキスト編集中以外でのみ有効です。",
+      "generate": "画像を生成",
+      "newWorkspace": "ワークスペースを追加",
+      "toggleMode": "描画・編集モードを切り替え",
+      "previousWorkspace": "前のワークスペース",
+      "nextWorkspace": "次のワークスペース",
+      "showHelp": "ショートカットヘルプを開く"
+    },
     "mode": {
       "generate": "描画",
       "edit": "編集"

@@ -510,6 +510,17 @@
     "goSettings": "Go to settings",
     "settings": "Drawing settings",
     "closeSettings": "Close settings",
+    "shortcuts": {
+      "open": "Keyboard shortcuts",
+      "title": "Drawing shortcuts",
+      "description": "Combined shortcuts work while entering a prompt. Single-key shortcuts only work outside text fields.",
+      "generate": "Generate image",
+      "newWorkspace": "Add workspace",
+      "toggleMode": "Switch Draw/Edit mode",
+      "previousWorkspace": "Previous workspace",
+      "nextWorkspace": "Next workspace",
+      "showHelp": "Open shortcut help"
+    },
     "mode": {
       "generate": "Draw",
       "edit": "Edit"

@@ -746,6 +746,17 @@
     "goSettings": "去设置",
     "settings": "绘画设置",
     "closeSettings": "关闭设置",
+    "shortcuts": {
+      "open": "快捷键",
+      "title": "绘画快捷键",
+      "description": "组合键可在输入提示词时使用；单键快捷键仅在未编辑文本时生效。",
+      "generate": "生成图片",
+      "newWorkspace": "新增工作区",
+      "toggleMode": "切换绘图与编辑模式",
+      "previousWorkspace": "上一个工作区",
+      "nextWorkspace": "下一个工作区",
+      "showHelp": "打开快捷键帮助"
+    },
     "mode": {
       "generate": "绘图",
       "edit": "编辑"

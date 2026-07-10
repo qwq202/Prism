@@ -20,6 +20,7 @@ import {
   FileType2,
   Image as ImageIcon,
   Loader2,
+  Keyboard,
   RotateCcw,
   SlidersHorizontal,
   ZoomIn,
@@ -190,6 +191,7 @@ function Drawing() {
   const [draggingReferences, setDraggingReferences] = useState(false);
   const [referenceUploadPending, setReferenceUploadPending] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [previewImage, setPreviewImage] =
     useState<DrawingGeneratedImage | null>(null);
   const [workspaceToDelete, setWorkspaceToDelete] = useState("");
@@ -759,7 +761,23 @@ function Drawing() {
     setActiveWorkspaceId(workspace.id);
   }, []);
 
-  const addWorkspace = () => {
+  const switchWorkspaceByOffset = useCallback(
+    (offset: number) => {
+      if (workspaces.length < 2) return;
+
+      const currentIndex = workspaces.findIndex(
+        (workspace) => workspace.id === activeWorkspaceIdForStorage,
+      );
+      const nextIndex =
+        (Math.max(0, currentIndex) + offset + workspaces.length) %
+        workspaces.length;
+      const nextWorkspace = workspaces[nextIndex];
+      if (nextWorkspace) setActiveWorkspaceId(nextWorkspace.id);
+    },
+    [activeWorkspaceIdForStorage, workspaces],
+  );
+
+  const addWorkspace = useCallback(() => {
     if (workspaces.length >= MAX_DRAWING_WORKSPACES) {
       toast.error(
         t("drawing.workspaceLimitReached", {
@@ -775,7 +793,7 @@ function Drawing() {
     );
     setWorkspaces((current) => [...current, workspace]);
     setActiveWorkspaceId(workspace.id);
-  };
+  }, [selectedDrawingModelId, t, workspaces]);
 
   const deleteWorkspace = (workspaceId: string) => {
     const workspaceIndex = workspaces.findIndex(
@@ -888,7 +906,7 @@ function Drawing() {
     toast.success(t("drawing.referenceAdded"));
   };
 
-  const generateImage = async () => {
+  const generateImage = useCallback(async () => {
     const text = prompt.trim();
     const workspaceId = activeWorkspaceIdForStorage;
     if (
@@ -954,7 +972,21 @@ function Drawing() {
         description: message,
       });
     }
-  };
+  }, [
+    activeWorkspaceIdForStorage,
+    canUseReferencesWithModel,
+    drawingModelCapabilities,
+    files,
+    mode,
+    notifyReferenceImageLimit,
+    options,
+    prompt,
+    referenceUploadPending,
+    requestInFlight,
+    selectedDrawingModelId,
+    t,
+    updateWorkspaceById,
+  ]);
 
   const cancelActiveTask = async () => {
     const taskId = activeWorkspace?.taskId;
@@ -974,6 +1006,96 @@ function Drawing() {
       applyDrawingTaskToWorkspaces(current, response.data!),
     );
   };
+
+  const toggleDrawingMode = useCallback(() => {
+    if (!drawingModelCapabilities.supportsEditing) return;
+    updateActiveWorkspace({ mode: mode === "edit" ? "generate" : "edit" });
+  }, [drawingModelCapabilities.supportsEditing, mode, updateActiveWorkspace]);
+
+  useEffect(() => {
+    const handleDrawingShortcut = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat || event.isComposing) return;
+      if (
+        shortcutsOpen ||
+        settingsOpen ||
+        Boolean(previewImage) ||
+        Boolean(workspaceToDelete)
+      ) {
+        return;
+      }
+
+      const primaryModifier = event.ctrlKey || event.metaKey;
+      if (primaryModifier && !event.altKey && event.key === "Enter") {
+        event.preventDefault();
+        void generateImage();
+        return;
+      }
+
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      if (
+        target?.closest(
+          'input, textarea, select, button, a, [contenteditable="true"], [role="button"], [role="dialog"], [role="menu"], [role="listbox"]',
+        )
+      ) {
+        return;
+      }
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+      if (event.key === "?") {
+        event.preventDefault();
+        setShortcutsOpen(true);
+        return;
+      }
+      if (event.shiftKey) return;
+
+      switch (event.key.toLowerCase()) {
+        case "n":
+          event.preventDefault();
+          addWorkspace();
+          break;
+        case "e":
+          if (!drawingModelCapabilities.supportsEditing) return;
+          event.preventDefault();
+          toggleDrawingMode();
+          break;
+        case "[":
+          event.preventDefault();
+          switchWorkspaceByOffset(-1);
+          break;
+        case "]":
+          event.preventDefault();
+          switchWorkspaceByOffset(1);
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleDrawingShortcut);
+    return () => window.removeEventListener("keydown", handleDrawingShortcut);
+  }, [
+    addWorkspace,
+    drawingModelCapabilities.supportsEditing,
+    generateImage,
+    previewImage,
+    settingsOpen,
+    shortcutsOpen,
+    switchWorkspaceByOffset,
+    toggleDrawingMode,
+    workspaceToDelete,
+  ]);
+
+  const shortcutItems = [
+    {
+      keys: ["Ctrl / ⌘", "Enter"],
+      label: t("drawing.shortcuts.generate"),
+    },
+    { keys: ["N"], label: t("drawing.shortcuts.newWorkspace") },
+    ...(drawingModelCapabilities.supportsEditing
+      ? [{ keys: ["E"], label: t("drawing.shortcuts.toggleMode") }]
+      : []),
+    { keys: ["["], label: t("drawing.shortcuts.previousWorkspace") },
+    { keys: ["]"], label: t("drawing.shortcuts.nextWorkspace") },
+    { keys: ["?"], label: t("drawing.shortcuts.showHelp") },
+  ];
 
   const hasGenerationOptions =
     drawingModelCapabilities.aspectRatios.length > 0 ||
@@ -1267,15 +1389,26 @@ function Drawing() {
               </span>
             )}
           </button>
-          <button
-            type="button"
-            onClick={() => setSettingsOpen(true)}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            aria-label={t("drawing.settings")}
-            title={t("drawing.settings")}
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-          </button>
+          <div className="flex shrink-0 items-center">
+            <button
+              type="button"
+              onClick={() => setShortcutsOpen(true)}
+              className="flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              aria-label={t("drawing.shortcuts.open")}
+              title={`${t("drawing.shortcuts.open")} (?)`}
+            >
+              <Keyboard className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              className="flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              aria-label={t("drawing.settings")}
+              title={t("drawing.settings")}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+            </button>
+          </div>
         </div>
         <Drawer open={settingsOpen} onOpenChange={setSettingsOpen}>
           <DrawerContent className="max-h-[88dvh]">
@@ -1290,6 +1423,16 @@ function Drawing() {
             </div>
           </DrawerContent>
         </Drawer>
+
+        <button
+          type="button"
+          onClick={() => setShortcutsOpen(true)}
+          className="absolute right-6 top-6 z-20 hidden h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:flex"
+          aria-label={t("drawing.shortcuts.open")}
+          title={`${t("drawing.shortcuts.open")} (?)`}
+        >
+          <Keyboard className="h-4 w-4" />
+        </button>
 
         {/* Background */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,hsl(var(--primary)/0.06),transparent)]" />
@@ -1673,16 +1816,6 @@ function Drawing() {
               onChange={(e) =>
                 updateActiveWorkspace({ prompt: e.target.value })
               }
-              onKeyDown={(event) => {
-                if (
-                  event.key !== "Enter" ||
-                  (!event.metaKey && !event.ctrlKey)
-                ) {
-                  return;
-                }
-                event.preventDefault();
-                void generateImage();
-              }}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
               className="min-h-[76px] w-full resize-none border-0 bg-transparent px-4 py-3 text-sm leading-relaxed text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0"
@@ -1776,6 +1909,42 @@ function Drawing() {
 
       {renderWorkspaceRail(false)}
       {renderWorkspaceRail(true)}
+
+      <Dialog open={shortcutsOpen} onOpenChange={setShortcutsOpen}>
+        <DialogContent className="max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("drawing.shortcuts.title")}</DialogTitle>
+            <DialogDescription>
+              {t("drawing.shortcuts.description")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="divide-y divide-border/60" role="list">
+            {shortcutItems.map((shortcut) => (
+              <div
+                key={shortcut.label}
+                className="flex min-h-12 items-center justify-between gap-4 py-2.5"
+                role="listitem"
+              >
+                <span className="text-sm text-foreground">
+                  {shortcut.label}
+                </span>
+                <span className="flex shrink-0 items-center gap-1.5">
+                  {shortcut.keys.map((key, index) => (
+                    <span key={key} className="flex items-center gap-1.5">
+                      {index > 0 && (
+                        <span className="text-xs text-muted-foreground">+</span>
+                      )}
+                      <kbd className="min-w-7 rounded-md border border-border bg-muted/60 px-2 py-1 text-center font-mono text-[11px] font-medium text-foreground shadow-sm">
+                        {key}
+                      </kbd>
+                    </span>
+                  ))}
+                </span>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog
         open={Boolean(workspaceToDelete)}

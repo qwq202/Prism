@@ -598,6 +598,17 @@
     "goSettings": "去設定",
     "settings": "繪畫設定",
     "closeSettings": "關閉設定",
+    "shortcuts": {
+      "open": "快速鍵",
+      "title": "繪畫快速鍵",
+      "description": "組合鍵可在輸入提示詞時使用；單鍵快速鍵僅在未編輯文字時生效。",
+      "generate": "生成圖片",
+      "newWorkspace": "新增工作區",
+      "toggleMode": "切換繪圖與編輯模式",
+      "previousWorkspace": "上一個工作區",
+      "nextWorkspace": "下一個工作區",
+      "showHelp": "開啟快速鍵說明"
+    },
     "mode": {
       "generate": "繪圖",
       "edit": "編輯"
