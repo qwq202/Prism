@@ -220,23 +220,23 @@ export function AskUserCard({ toolCall, onSubmit }: AskUserCardProps) {
 
   return (
     <section
-      className="mb-2 mt-3 flex h-[24.5rem] w-[44rem] max-w-full flex-col overflow-hidden rounded-2xl border border-border/70 bg-background shadow-sm"
+      className="mb-2 mt-3 flex h-[min(24.5rem,58dvh)] min-h-[20rem] w-full min-w-0 max-w-[calc(100vw-2rem)] self-stretch flex-col overflow-hidden rounded-2xl border border-border/70 bg-background shadow-sm sm:h-[24.5rem] sm:min-h-0 md:max-w-[44rem]"
       aria-label={t("ask-user.title")}
     >
-      <header className="flex h-20 shrink-0 items-start gap-3 px-4 py-3.5 sm:px-5">
+      <header className="flex min-h-20 shrink-0 items-start gap-2 px-3 py-3 sm:h-20 sm:min-h-0 sm:gap-3 sm:px-5 sm:py-3.5">
         <span className="mt-0.5 shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium tabular-nums text-primary">
           {questionIndex + 1}/{questions.length}
         </span>
         <div className="min-w-0 flex-1">
           <h3
-            className="truncate text-sm font-semibold leading-6 text-foreground sm:text-base"
+            className="max-h-10 overflow-hidden break-words text-sm font-semibold leading-5 text-foreground sm:truncate sm:text-base sm:leading-6"
             title={currentQuestion.question}
           >
             {currentQuestion.question}
           </h3>
-          <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground sm:gap-2">
             {currentQuestion.header && (
-              <span className="max-w-48 truncate">
+              <span className="max-w-full truncate sm:max-w-48">
                 {currentQuestion.header}
               </span>
             )}
@@ -267,7 +267,7 @@ export function AskUserCard({ toolCall, onSubmit }: AskUserCardProps) {
       <fieldset
         key={currentQuestion.id}
         disabled={submitting}
-        className="min-h-0 flex-1 animate-fade-in overflow-y-auto border-0 px-4 pb-4 sm:px-5"
+        className="thin-scrollbar min-h-0 min-w-0 flex-1 animate-fade-in overflow-x-hidden overflow-y-auto border-0 px-3 pb-3 sm:px-5 sm:pb-4"
       >
         <legend className="sr-only">{currentQuestion.question}</legend>
         <div className={cn("space-y-1.5", skipped && "opacity-45")}>
@@ -312,18 +312,18 @@ export function AskUserCard({ toolCall, onSubmit }: AskUserCardProps) {
                   });
                 }}
                 className={cn(
-                  "flex h-14 w-full items-center gap-3 rounded-xl border px-3.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "flex min-h-14 w-full min-w-0 items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:gap-3 sm:px-3.5 sm:py-2",
                   selected
                     ? "border-primary/40 bg-primary/10 text-foreground"
                     : "border-transparent bg-muted/45 text-foreground hover:bg-muted/70",
                 )}
               >
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium leading-5">
+                  <span className="block break-words text-sm font-medium leading-5 sm:truncate">
                     {option.label}
                   </span>
                   {option.description && (
-                    <span className="mt-0.5 block truncate text-xs leading-relaxed text-muted-foreground">
+                    <span className="mt-0.5 block break-words text-xs leading-relaxed text-muted-foreground sm:truncate">
                       {option.description}
                     </span>
                   )}
@@ -348,7 +348,7 @@ export function AskUserCard({ toolCall, onSubmit }: AskUserCardProps) {
 
           <label
             className={cn(
-              "flex h-14 cursor-text items-center gap-3 rounded-xl border px-3.5 py-2 transition-colors focus-within:ring-2 focus-within:ring-ring",
+              "flex min-h-14 cursor-text items-center gap-2.5 rounded-xl border px-3 py-2 transition-colors focus-within:ring-2 focus-within:ring-ring sm:gap-3 sm:px-3.5",
               selection.custom[currentQuestion.id]?.trim()
                 ? "border-primary/40 bg-primary/10"
                 : "border-transparent bg-muted/45 hover:bg-muted/70",
@@ -392,8 +392,8 @@ export function AskUserCard({ toolCall, onSubmit }: AskUserCardProps) {
         </div>
       </fieldset>
 
-      <footer className="flex shrink-0 items-center justify-between gap-3 px-4 pb-4 sm:px-5">
-        <div>
+      <footer className="flex min-w-0 shrink-0 items-center justify-between gap-2 px-3 pb-3 sm:gap-3 sm:px-5 sm:pb-4">
+        <div className="shrink-0">
           {questionIndex > 0 && (
             <Button
               type="button"
@@ -409,7 +409,7 @@ export function AskUserCard({ toolCall, onSubmit }: AskUserCardProps) {
             </Button>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
           <Button
             type="button"
             variant="outline"
