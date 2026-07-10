@@ -685,6 +685,8 @@
     "advanced": "進階參數",
     "generateImage": "生成圖片",
     "generatedImage": "生成的圖片",
+    "detailsTitle": "圖片詳情",
+    "openDetails": "查看圖片詳情",
     "downloadImage": "下載圖片",
     "addWorkspace": "新增工作區",
     "workspaceLimitReached": "工作區數量已達上限",

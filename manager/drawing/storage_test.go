@@ -180,6 +180,11 @@ func TestAppendImagesToWorkspaceMergesTaskImages(t *testing.T) {
 			Src:       "/attachments/image.png",
 			Prompt:    "pig",
 			CreatedAt: 123,
+			Model:     "gemini-3-pro-image",
+			Options: &TaskOptions{
+				ResponseFormat: json.RawMessage(`{"aspect_ratio":"4:3","image_size":"2K","mime_type":"image/png"}`),
+				Thinking:       json.RawMessage(`{"thinking_level":"high"}`),
+			},
 		},
 	}, "pig")
 	if err != nil {
@@ -199,6 +204,10 @@ func TestAppendImagesToWorkspaceMergesTaskImages(t *testing.T) {
 	}
 	if strings.Contains(payload, "taskStatus") || strings.Contains(payload, "taskId") {
 		t.Fatalf("expected completed task fields to be cleared, got %s", payload)
+	}
+	if !strings.Contains(payload, `"aspect_ratio":"4:3"`) ||
+		!strings.Contains(payload, `"thinking_level":"high"`) {
+		t.Fatalf("expected generated image metadata to be persisted, got %s", payload)
 	}
 }
 

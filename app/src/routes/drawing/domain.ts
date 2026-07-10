@@ -1,5 +1,5 @@
 import type { FileArray } from "@/api/file.ts";
-import type { DrawingTask } from "@/api/drawing.ts";
+import type { DrawingTask, DrawingTaskOptions } from "@/api/drawing.ts";
 import type { Model } from "@/api/types.ts";
 import { normalizeImageURL } from "@/utils/image-url.ts";
 
@@ -51,6 +51,8 @@ export type DrawingGeneratedImage = {
   src: string;
   prompt: string;
   createdAt: number;
+  model?: string;
+  options?: DrawingTaskOptions;
 };
 
 export type DrawingWorkspace = {
@@ -355,9 +357,64 @@ function normalizeDrawingImages(value: unknown): DrawingGeneratedImage[] {
           Number.isFinite(image.createdAt)
             ? image.createdAt
             : Date.now(),
+        model:
+          typeof image.model === "string" && image.model.trim()
+            ? image.model.trim()
+            : undefined,
+        options: normalizeDrawingImageOptions(image.options),
       };
     })
     .filter((image): image is DrawingGeneratedImage => Boolean(image));
+}
+
+function normalizeDrawingImageOptions(
+  value: unknown,
+): DrawingTaskOptions | undefined {
+  if (!value || typeof value !== "object") return undefined;
+
+  const raw = value as DrawingTaskOptions;
+  const rawResponseFormat = raw.response_format;
+  const responseFormat =
+    rawResponseFormat && typeof rawResponseFormat === "object"
+      ? {
+          aspect_ratio:
+            typeof rawResponseFormat.aspect_ratio === "string"
+              ? rawResponseFormat.aspect_ratio
+              : undefined,
+          image_size:
+            typeof rawResponseFormat.image_size === "string"
+              ? rawResponseFormat.image_size
+              : undefined,
+          mime_type:
+            typeof rawResponseFormat.mime_type === "string"
+              ? rawResponseFormat.mime_type
+              : undefined,
+        }
+      : undefined;
+  const rawThinking = raw.thinking;
+  const thinking =
+    rawThinking && typeof rawThinking === "object"
+      ? {
+          thinking_level:
+            typeof rawThinking.thinking_level === "string"
+              ? rawThinking.thinking_level
+              : undefined,
+        }
+      : undefined;
+
+  if (
+    !responseFormat?.aspect_ratio &&
+    !responseFormat?.image_size &&
+    !responseFormat?.mime_type &&
+    !thinking?.thinking_level
+  ) {
+    return undefined;
+  }
+
+  return {
+    response_format: responseFormat,
+    thinking,
+  };
 }
 
 export function normalizeDrawingReferences(value: unknown): FileArray {
@@ -408,16 +465,30 @@ function mergeGeneratedImages(
 ): DrawingGeneratedImage[] {
   if (incoming.length === 0) return current;
 
-  const seen = new Set(current.map((image) => image.src));
+  const indexes = new Map(
+    current.map((image, index) => [image.src, index] as const),
+  );
   const next = [...current];
+  const additions: DrawingGeneratedImage[] = [];
   let changed = false;
   incoming.forEach((image) => {
-    if (seen.has(image.src)) return;
-    seen.add(image.src);
-    next.unshift(image);
+    const existingIndex = indexes.get(image.src);
+    if (existingIndex !== undefined) {
+      if (existingIndex < 0) return;
+      const existing = next[existingIndex];
+      const model = existing.model || image.model;
+      const options = existing.options || image.options;
+      if (model !== existing.model || options !== existing.options) {
+        next[existingIndex] = { ...existing, model, options };
+        changed = true;
+      }
+      return;
+    }
+    indexes.set(image.src, -1);
+    additions.push(image);
     changed = true;
   });
-  return changed ? next : current;
+  return changed ? [...additions.reverse(), ...next] : current;
 }
 
 export function isActiveDrawingTask(task?: Pick<DrawingTask, "status"> | null) {
@@ -448,7 +519,12 @@ export function applyDrawingTaskToWorkspaces(
     }
 
     if (task.status === "succeeded") {
-      const images = mergeGeneratedImages(workspace.images, task.images ?? []);
+      const taskImages = (task.images ?? []).map((image) => ({
+        ...image,
+        model: image.model || task.model,
+        options: image.options || task.options,
+      }));
+      const images = mergeGeneratedImages(workspace.images, taskImages);
       if (
         !workspace.pending &&
         workspace.taskId === undefined &&

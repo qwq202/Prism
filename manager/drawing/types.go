@@ -18,10 +18,12 @@ type WorkspaceState struct {
 }
 
 type GeneratedImage struct {
-	ID        string `json:"id"`
-	Src       string `json:"src"`
-	Prompt    string `json:"prompt"`
-	CreatedAt int64  `json:"createdAt"`
+	ID        string       `json:"id"`
+	Src       string       `json:"src"`
+	Prompt    string       `json:"prompt"`
+	CreatedAt int64        `json:"createdAt"`
+	Model     string       `json:"model,omitempty"`
+	Options   *TaskOptions `json:"options,omitempty"`
 }
 
 type TaskOptions struct {

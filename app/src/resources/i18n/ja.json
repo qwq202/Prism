@@ -597,6 +597,8 @@
     "advanced": "詳細設定",
     "generateImage": "画像を生成",
     "generatedImage": "生成された画像",
+    "detailsTitle": "画像の詳細",
+    "openDetails": "画像の詳細を表示",
     "downloadImage": "画像をダウンロード",
     "addWorkspace": "ワークスペースを追加",
     "workspaceLimitReached": "ワークスペースの上限に達しました",

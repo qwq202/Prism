@@ -833,6 +833,8 @@
     "advanced": "高级参数",
     "generateImage": "生成图片",
     "generatedImage": "生成的图片",
+    "detailsTitle": "图片详情",
+    "openDetails": "查看图片详情",
     "downloadImage": "下载图片",
     "addWorkspace": "新增工作区",
     "workspaceLimitReached": "工作区数量已达上限",

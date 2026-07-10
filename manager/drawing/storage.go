@@ -868,12 +868,19 @@ func appendImagesToWorkspaceSnapshot(raw json.RawMessage, workspaceID string, mo
 			if seen["id:"+image.ID] || seen["src:"+image.Src] {
 				continue
 			}
-			existing = append(existing, map[string]interface{}{
+			storedImage := map[string]interface{}{
 				"id":        image.ID,
 				"src":       image.Src,
 				"prompt":    image.Prompt,
 				"createdAt": image.CreatedAt,
-			})
+			}
+			if strings.TrimSpace(image.Model) != "" {
+				storedImage["model"] = image.Model
+			}
+			if image.Options != nil {
+				storedImage["options"] = image.Options
+			}
+			existing = append(existing, storedImage)
 			seen["id:"+image.ID] = true
 			seen["src:"+image.Src] = true
 			changed = true

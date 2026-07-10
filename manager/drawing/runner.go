@@ -141,6 +141,11 @@ func executeTaskRequest(db *sql.DB, cache *redis.Client, user *auth.User, task *
 	if err != nil {
 		return nil, float64(buffer.GetRecordQuota()), err
 	}
+	imageOptions := task.Options
+	for index := range images {
+		images[index].Model = task.Model
+		images[index].Options = &imageOptions
+	}
 	if len(images) == 0 && strings.TrimSpace(content) != "" {
 		return nil, float64(buffer.GetRecordQuota()), errors.New(strings.TrimSpace(content))
 	}

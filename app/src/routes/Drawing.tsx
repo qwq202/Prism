@@ -23,7 +23,6 @@ import {
   Keyboard,
   RotateCcw,
   SlidersHorizontal,
-  ZoomIn,
   X,
 } from "lucide-react";
 import {
@@ -137,6 +136,42 @@ type DrawingOptionSelectProps<T extends string> = {
   onChange: (value: T) => void;
 };
 
+type GeneratedImageMetadata = {
+  model: string;
+  aspectRatio: string;
+  imageSize: string;
+  mimeType: string;
+  thinkingLevel: string;
+};
+
+function getGeneratedImageMetadata(
+  image: DrawingGeneratedImage,
+  fallbackModel: string,
+  fallbackOptions: DrawingOptions,
+): GeneratedImageMetadata {
+  const responseFormat = image.options?.response_format;
+  return {
+    model: image.model || fallbackModel,
+    aspectRatio:
+      responseFormat?.aspect_ratio || fallbackOptions.aspectRatio,
+    imageSize: responseFormat?.image_size || fallbackOptions.imageSize,
+    mimeType: responseFormat?.mime_type || fallbackOptions.mimeType,
+    thinkingLevel:
+      image.options?.thinking?.thinking_level || fallbackOptions.thinkingLevel,
+  };
+}
+
+function formatGeneratedImageDate(timestamp: number, locale: string) {
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(timestamp));
+  } catch {
+    return new Date(timestamp).toLocaleString();
+  }
+}
+
 function DrawingOptionSelect<T extends string>({
   icon: Icon,
   label,
@@ -171,7 +206,7 @@ function DrawingOptionSelect<T extends string>({
 }
 
 function Drawing() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const supportModels = useSelector(selectSupportModels);
   const [requestedDrawingModelId] = useState(getRequestedDrawingModelId);
   const handledRequestedDrawingModel = useRef(false);
@@ -232,6 +267,18 @@ function Drawing() {
     limit: referenceImageLimit,
   });
   const generatedImages = activeWorkspace?.images ?? [];
+  const previewMetadata = previewImage
+    ? getGeneratedImageMetadata(
+        previewImage,
+        activeWorkspace?.model || selectedDrawingModelId,
+        options,
+      )
+    : null;
+  const previewModelLabel = previewMetadata
+    ? drawingModels.find((model) => model.id === previewMetadata.model)?.name ||
+      previewMetadata.model ||
+      t("drawing.selectModel")
+    : "";
   const activeWorkspacePending =
     Boolean(activeWorkspace?.pending) ||
     isActiveDrawingTask(
@@ -1647,70 +1694,97 @@ function Drawing() {
                         {t("drawing.clearResults")}
                       </button>
                     </div>
-                    <div className="grid grid-cols-1 items-start gap-4 min-[480px]:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
                       {generatedImages.map((image, index) => {
                         const extension = getDrawingImageExtension(image.src);
+                        const metadata = getGeneratedImageMetadata(
+                          image,
+                          activeWorkspace?.model || selectedDrawingModelId,
+                          options,
+                        );
+                        const modelLabel =
+                          drawingModels.find(
+                            (model) => model.id === metadata.model,
+                          )?.name || metadata.model;
                         return (
                           <article
                             key={image.id}
-                            className="group relative overflow-hidden rounded-xl border border-border/60 bg-card"
+                            className="group relative grid min-h-40 grid-cols-[42%_minmax(0,1fr)] overflow-hidden rounded-xl border border-border/60 bg-card transition-colors duration-200 hover:border-border-hover sm:grid-cols-[11rem_minmax(0,1fr)]"
                           >
                             <button
                               type="button"
                               onClick={() => setPreviewImage(image)}
-                              className="relative flex w-full justify-center overflow-hidden bg-muted/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
-                              aria-label={t("drawing.generatedImage")}
-                            >
+                              className="absolute inset-0 z-10 rounded-[inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-inset"
+                              aria-label={t("drawing.openDetails")}
+                            />
+                            <div className="relative min-h-40 overflow-hidden bg-muted/25">
                               <img
                                 src={image.src}
                                 alt={t("drawing.generatedImage")}
                                 loading="lazy"
-                                className="block h-auto max-h-[34rem] w-auto max-w-full object-contain motion-safe:transition-transform motion-safe:duration-300 group-hover:scale-[1.01]"
+                                className="absolute inset-0 h-full w-full object-cover motion-safe:transition-transform motion-safe:duration-300 group-hover:scale-[1.02]"
                               />
-                              <span className="absolute bottom-2 left-2 flex h-10 w-10 items-center justify-center rounded-xl bg-background/90 text-muted-foreground opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
-                                <ZoomIn className="h-4 w-4" />
-                              </span>
-                            </button>
-                            <div className="absolute right-2 top-2 flex gap-1.5 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
-                              {canAcceptReferences && (
+                              <div className="absolute left-2 top-2 flex max-w-[calc(100%-1rem)] flex-wrap gap-1">
+                                <span className="rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                                  {metadata.aspectRatio}
+                                </span>
+                                <span className="rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                                  {metadata.imageSize}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex min-w-0 flex-col p-3">
+                              <p className="line-clamp-3 text-sm font-medium leading-relaxed text-foreground">
+                                {image.prompt || t("drawing.generatedImage")}
+                              </p>
+                              <div className="mt-2 flex min-w-0 flex-wrap gap-1.5">
+                                {modelLabel && (
+                                  <span className="max-w-full truncate rounded-md bg-muted/55 px-2 py-1 text-[10px] text-muted-foreground">
+                                    {modelLabel}
+                                  </span>
+                                )}
+                                <span className="rounded-md bg-muted/55 px-2 py-1 text-[10px] uppercase text-muted-foreground">
+                                  {metadata.mimeType.replace("image/", "")}
+                                </span>
+                              </div>
+                              <div className="relative z-20 mt-auto flex items-center justify-end gap-1 pt-3">
+                                {canAcceptReferences && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      addGeneratedImageAsReference(image)
+                                    }
+                                    aria-label={t("drawing.useAsReference")}
+                                    title={t("drawing.useAsReference")}
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                  >
+                                    <ImagePlus className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                                <a
+                                  href={image.src}
+                                  download={`drawing-${index + 1}.${extension}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  aria-label={t("drawing.downloadImage")}
+                                  title={t("drawing.downloadImage")}
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                </a>
                                 <button
                                   type="button"
                                   onClick={() =>
-                                    addGeneratedImageAsReference(image)
+                                    removeGeneratedImage(image.id)
                                   }
-                                  aria-label={t("drawing.useAsReference")}
-                                  title={t("drawing.useAsReference")}
-                                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-background/95 text-muted-foreground shadow-sm transition-colors hover:text-foreground"
+                                  aria-label={t("remove")}
+                                  title={t("remove")}
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                                 >
-                                  <ImagePlus className="h-4 w-4" />
+                                  <Trash2 className="h-3.5 w-3.5" />
                                 </button>
-                              )}
-                              <a
-                                href={image.src}
-                                download={`drawing-${index + 1}.${extension}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                aria-label={t("drawing.downloadImage")}
-                                title={t("drawing.downloadImage")}
-                                className="flex h-10 w-10 items-center justify-center rounded-xl bg-background/95 text-muted-foreground shadow-sm transition-colors hover:text-foreground"
-                              >
-                                <Download className="h-4 w-4" />
-                              </a>
-                              <button
-                                type="button"
-                                onClick={() => removeGeneratedImage(image.id)}
-                                aria-label={t("remove")}
-                                title={t("remove")}
-                                className="flex h-10 w-10 items-center justify-center rounded-xl bg-background/95 text-muted-foreground shadow-sm transition-colors hover:bg-destructive hover:text-destructive-foreground"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
+                              </div>
                             </div>
-                            {image.prompt && (
-                              <p className="line-clamp-2 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
-                                {image.prompt}
-                              </p>
-                            )}
                           </article>
                         );
                       })}
@@ -1991,36 +2065,119 @@ function Drawing() {
           if (!open) setPreviewImage(null);
         }}
       >
-        <DialogContent className="max-h-[94dvh] max-w-[96vw] overflow-hidden p-3 sm:p-4 md:max-w-5xl">
+        <DialogContent className="max-h-[92dvh] w-[calc(100vw-2rem)] max-w-6xl gap-0 overflow-hidden rounded-2xl p-0">
           <DialogHeader className="sr-only">
-            <DialogTitle>{t("drawing.generatedImage")}</DialogTitle>
+            <DialogTitle>{t("drawing.detailsTitle")}</DialogTitle>
             <DialogDescription>
               {previewImage?.prompt || t("drawing.generatedImage")}
             </DialogDescription>
           </DialogHeader>
-          {previewImage && (
-            <div className="flex min-h-0 flex-col gap-3">
-              <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto rounded-xl bg-muted/25">
+          {previewImage && previewMetadata && (
+            <div className="thin-scrollbar grid max-h-[92dvh] overflow-y-auto md:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)] md:overflow-hidden">
+              <div className="flex min-h-64 items-center justify-center bg-muted/30 p-4 md:min-h-0">
                 <img
                   src={previewImage.src}
                   alt={t("drawing.generatedImage")}
-                  className="max-h-[78dvh] max-w-full object-contain"
+                  className="max-h-[84dvh] max-w-full rounded-xl object-contain"
                 />
               </div>
-              <div className="flex items-center justify-between gap-3 px-1">
-                <p className="line-clamp-2 min-w-0 text-xs text-muted-foreground">
-                  {previewImage.prompt}
-                </p>
-                <a
-                  href={previewImage.src}
-                  download={`drawing.${getDrawingImageExtension(previewImage.src)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-foreground px-4 text-sm font-medium text-background transition-opacity hover:opacity-85"
-                >
-                  <Download className="h-4 w-4" />
-                  {t("drawing.downloadImage")}
-                </a>
+              <div className="thin-scrollbar flex min-h-0 flex-col overflow-y-auto p-5 sm:p-6">
+                <DialogHeader notTextCentered className="pr-8">
+                  <DialogTitle>{t("drawing.detailsTitle")}</DialogTitle>
+                  <DialogDescription>
+                    {formatGeneratedImageDate(
+                      previewImage.createdAt,
+                      i18n.language,
+                    )}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <section className="mt-6">
+                  <div className="text-xs font-medium text-muted-foreground">
+                    {t("drawing.promptLabel")}
+                  </div>
+                  <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
+                    {previewImage.prompt || t("drawing.generatedImage")}
+                  </p>
+                </section>
+
+                <section className="mt-6">
+                  <div className="text-xs font-medium text-muted-foreground">
+                    {t("drawing.options.title")}
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {[
+                      [t("drawing.model"), previewModelLabel],
+                      [
+                        t("drawing.options.aspectRatio"),
+                        previewMetadata.aspectRatio,
+                      ],
+                      [
+                        t("drawing.options.imageSize"),
+                        previewMetadata.imageSize,
+                      ],
+                      [
+                        t("drawing.options.mimeType"),
+                        previewMetadata.mimeType.replace("image/", ""),
+                      ],
+                      [
+                        t("drawing.options.thinkingLevel"),
+                        ["minimal", "high"].includes(
+                          previewMetadata.thinkingLevel,
+                        )
+                          ? t(
+                              `drawing.options.thinking.${previewMetadata.thinkingLevel}`,
+                            )
+                          : previewMetadata.thinkingLevel,
+                      ],
+                    ].map(([label, value]) => (
+                      <div
+                        key={label}
+                        className="min-w-0 rounded-xl bg-muted/40 px-3 py-2.5"
+                      >
+                        <div className="text-[11px] text-muted-foreground">
+                          {label}
+                        </div>
+                        <div className="mt-1 truncate text-xs font-medium text-foreground">
+                          {value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <div className="mt-8 flex flex-wrap justify-end gap-2 border-t border-border/60 pt-4 md:mt-auto">
+                  {canAcceptReferences && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        addGeneratedImageAsReference(previewImage)
+                      }
+                      className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                    >
+                      <ImagePlus className="h-4 w-4" />
+                      {t("drawing.useAsReference")}
+                    </button>
+                  )}
+                  <a
+                    href={previewImage.src}
+                    download={`drawing.${getDrawingImageExtension(previewImage.src)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex h-10 items-center gap-2 rounded-xl bg-foreground px-4 text-sm font-medium text-background transition-opacity hover:opacity-85"
+                  >
+                    <Download className="h-4 w-4" />
+                    {t("drawing.downloadImage")}
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => removeGeneratedImage(previewImage.id)}
+                    className="inline-flex h-10 items-center gap-2 rounded-xl bg-destructive/10 px-4 text-sm font-medium text-destructive transition-colors hover:bg-destructive hover:text-destructive-foreground"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {t("delete")}
+                  </button>
+                </div>
               </div>
             </div>
           )}

@@ -597,6 +597,8 @@
     "advanced": "Advanced settings",
     "generateImage": "Generate image",
     "generatedImage": "Generated image",
+    "detailsTitle": "Image details",
+    "openDetails": "View image details",
     "downloadImage": "Download image",
     "addWorkspace": "Add workspace",
     "workspaceLimitReached": "Workspace limit reached",

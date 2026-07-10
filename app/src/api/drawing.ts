@@ -15,12 +15,24 @@ export type DrawingTaskStatus =
   | "failed"
   | "canceled";
 
+export type DrawingTaskOptions = {
+  response_format?: {
+    aspect_ratio?: string;
+    image_size?: string;
+    mime_type?: string;
+  };
+  thinking?: {
+    thinking_level?: string;
+  };
+};
+
 export type DrawingTask<TImage = unknown> = {
   task_id: string;
   workspace_id: string;
   status: DrawingTaskStatus;
   model: string;
   prompt: string;
+  options?: DrawingTaskOptions;
   images?: TImage[];
   error?: string;
   quota?: number;
