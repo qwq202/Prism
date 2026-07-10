@@ -213,9 +213,10 @@ func normalizeGeminiInteractionMimeType(value string) string {
 type geminiInteractionImageModel string
 
 const (
-	geminiInteraction25FlashImage geminiInteractionImageModel = "gemini-2.5-flash-image"
-	geminiInteraction31FlashImage geminiInteractionImageModel = "gemini-3.1-flash-image"
-	geminiInteraction3ProImage    geminiInteractionImageModel = "gemini-3-pro-image"
+	geminiInteraction25FlashImage     geminiInteractionImageModel = "gemini-2.5-flash-image"
+	geminiInteraction31FlashLiteImage geminiInteractionImageModel = "gemini-3.1-flash-lite-image"
+	geminiInteraction31FlashImage     geminiInteractionImageModel = "gemini-3.1-flash-image"
+	geminiInteraction3ProImage        geminiInteractionImageModel = "gemini-3-pro-image"
 )
 
 var gemini25FlashInteractionAspectRatios = map[string]bool{
@@ -235,6 +236,10 @@ var gemini31FlashInteractionImageSizes = map[string]bool{
 	"512px": true, "1K": true, "2K": true, "4K": true,
 }
 
+var gemini31FlashLiteInteractionImageSizes = map[string]bool{
+	"1K": true,
+}
+
 var gemini3ProInteractionImageSizes = map[string]bool{
 	"1K": true, "2K": true, "4K": true,
 }
@@ -242,6 +247,8 @@ var gemini3ProInteractionImageSizes = map[string]bool{
 func getGeminiInteractionImageModel(model string) geminiInteractionImageModel {
 	normalized := strings.ToLower(strings.TrimSpace(model))
 	switch {
+	case normalized == globals.Gemini31FlashLiteImage || strings.Contains(normalized, globals.Gemini31FlashLiteImage):
+		return geminiInteraction31FlashLiteImage
 	case normalized == globals.Gemini31FlashImage || strings.Contains(normalized, globals.Gemini31FlashImage):
 		return geminiInteraction31FlashImage
 	case normalized == globals.Gemini3ProImage || strings.Contains(normalized, globals.Gemini3ProImage):
@@ -257,7 +264,7 @@ func geminiInteractionAspectRatiosForModel(model string) map[string]bool {
 	switch getGeminiInteractionImageModel(model) {
 	case geminiInteraction31FlashImage:
 		return gemini31FlashInteractionAspectRatios
-	case geminiInteraction3ProImage, geminiInteraction25FlashImage:
+	case geminiInteraction31FlashLiteImage, geminiInteraction3ProImage, geminiInteraction25FlashImage:
 		return gemini25FlashInteractionAspectRatios
 	default:
 		return gemini25FlashInteractionAspectRatios
@@ -281,6 +288,8 @@ func geminiInteractionImageSizesForModel(model string) map[string]bool {
 	switch getGeminiInteractionImageModel(model) {
 	case geminiInteraction31FlashImage:
 		return gemini31FlashInteractionImageSizes
+	case geminiInteraction31FlashLiteImage:
+		return gemini31FlashLiteInteractionImageSizes
 	case geminiInteraction3ProImage:
 		return gemini3ProInteractionImageSizes
 	default:
@@ -326,7 +335,8 @@ func normalizeGeminiInteractionThinkingLevel(value string) string {
 }
 
 func geminiInteractionSupportsThinkingLevel(model string) bool {
-	return getGeminiInteractionImageModel(model) == geminiInteraction31FlashImage
+	imageModel := getGeminiInteractionImageModel(model)
+	return imageModel == geminiInteraction31FlashLiteImage || imageModel == geminiInteraction31FlashImage
 }
 
 func getGeminiInteractionResponseFormat(props *adaptercommon.ChatProps) *GeminiInteractionResponseFormat {

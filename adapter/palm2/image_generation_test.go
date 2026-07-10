@@ -150,6 +150,32 @@ func TestGemini3ProImageInteractionOptionsAreModelScoped(t *testing.T) {
 	}
 }
 
+func TestGemini31FlashLiteImageInteractionOptionsAreModelScoped(t *testing.T) {
+	instance := NewChatInstance("https://generativelanguage.googleapis.com", "test-key")
+	body := instance.GetGeminiInteractionBody(&adaptercommon.ChatProps{
+		Model: globals.Gemini31FlashLiteImage,
+		ResponseFormat: map[string]interface{}{
+			"type":         "image",
+			"mime_type":    "image/jpeg",
+			"aspect_ratio": "16:9",
+			"image_size":   "4K",
+		},
+		Thinking: map[string]interface{}{
+			"thinking_level": "high",
+		},
+	})
+
+	if body.ResponseFormat == nil ||
+		body.ResponseFormat.AspectRatio != "16:9" ||
+		body.ResponseFormat.ImageSize != "1K" ||
+		body.ResponseFormat.MimeType != "image/jpeg" {
+		t.Fatalf("expected lite image model options to be normalized, got %#v", body.ResponseFormat)
+	}
+	if body.GenerationConfig == nil || body.GenerationConfig.ThinkingLevel != "high" {
+		t.Fatalf("expected lite image model thinking_level=high, got %#v", body.GenerationConfig)
+	}
+}
+
 func TestGeminiImageGenerationDowngradesUnsupportedInteractions(t *testing.T) {
 	paths := make([]string, 0, 2)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

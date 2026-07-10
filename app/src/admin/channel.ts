@@ -310,6 +310,7 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "gemini-3.1-pro-preview",
       "gemini-3.1-pro-preview-customtools",
       "gemini-3.1-flash-lite-preview",
+      "gemini-3.1-flash-lite-image",
       "gemini-3.1-flash-image",
     ],
     description:
@@ -338,6 +339,7 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "gemini-3.1-pro-preview",
       "gemini-3.1-pro-preview-customtools",
       "gemini-3.1-flash-lite-preview",
+      "gemini-3.1-flash-lite-image",
       "gemini-3.1-flash-image",
     ],
     description:

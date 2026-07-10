@@ -165,6 +165,7 @@ const (
 	Gemini35Flash                = "gemini-3.5-flash"
 	Gemini3Flash                 = "gemini-3-flash"
 	Gemini3ProPreview            = "gemini-3-pro-preview"
+	Gemini31FlashLiteImage       = "gemini-3.1-flash-lite-image"
 	Gemini31FlashImage           = "gemini-3.1-flash-image"
 	Gemini3ProImage              = "gemini-3-pro-image"
 	GeminiExp1206                = "gemini-exp-1206"
@@ -181,7 +182,7 @@ var OpenAIDalleModels = []string{
 }
 
 var GeminiImageGenerationModels = []string{
-	Gemini25FlashImage, Gemini31FlashImage, Gemini3ProImage,
+	Gemini25FlashImage, Gemini31FlashLiteImage, Gemini31FlashImage, Gemini3ProImage,
 }
 
 var VisionModels = []string{
@@ -189,7 +190,7 @@ var VisionModels = []string{
 	GeminiProVision, Gemini15Pro002, Gemini15Flash002, Gemini15ProLatest, Gemini15FlashLatest,
 	Gemini20Flash, Gemini20Flash001, Gemini20FlashLite,
 	Gemini25Flash, Gemini25Pro, Gemini25FlashLitePreview, "gemini-2.5-flash-lite", "gemini-2.5-flash-preview-09-2025",
-	Gemini25FlashImage, Gemini35Flash, Gemini3Flash, Gemini3ProPreview, Gemini31FlashImage, Gemini3ProImage, "gemini-3-flash-preview", "gemini-3.1-pro-preview", "gemini-3.1-pro-preview-customtools", "gemini-3.1-flash-lite-preview", // gemini
+	Gemini25FlashImage, Gemini35Flash, Gemini3Flash, Gemini3ProPreview, Gemini31FlashLiteImage, Gemini31FlashImage, Gemini3ProImage, "gemini-3-flash-preview", "gemini-3.1-pro-preview", "gemini-3.1-pro-preview-customtools", "gemini-3.1-flash-lite-preview", // gemini
 	Claude3,                                    // anthropic
 	MiMoV25, MiMoV25Pro, MiMoV2Omni, MiMoV2Pro, // xiaomi mimo
 }
@@ -358,6 +359,8 @@ func SupportGeminiThinkingLevel(model string) bool {
 		strings.HasPrefix(model, "gemini-3.1-pro-preview-") ||
 		model == "gemini-3.1-pro-preview-customtools" ||
 		strings.HasPrefix(model, "gemini-3.1-pro-preview-customtools-") ||
+		model == Gemini31FlashLiteImage ||
+		strings.HasPrefix(model, Gemini31FlashLiteImage+"-") ||
 		model == Gemini31FlashImage ||
 		strings.HasPrefix(model, Gemini31FlashImage+"-") ||
 		model == Gemini3ProImage ||

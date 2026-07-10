@@ -118,6 +118,7 @@ const GEMINI_31_FLASH_IMAGE_SIZES: readonly GeminiImageSize[] = [
   "2K",
   "4K",
 ];
+const GEMINI_31_FLASH_LITE_IMAGE_SIZES: readonly GeminiImageSize[] = ["1K"];
 const GEMINI_3_PRO_IMAGE_SIZES: readonly GeminiImageSize[] = ["1K", "2K", "4K"];
 const MIME_TYPE_OPTIONS: readonly GeminiImageMimeType[] = [
   "image/png",
@@ -129,6 +130,7 @@ const GEMINI_31_FLASH_THINKING_LEVELS: readonly GeminiImageThinkingLevel[] = [
 ];
 const GEMINI_25_FLASH_IMAGE_REFERENCE_LIMIT = 3;
 const GEMINI_31_FLASH_IMAGE_REFERENCE_LIMIT = 10;
+const GEMINI_31_FLASH_LITE_IMAGE_REFERENCE_LIMIT = 14;
 const GEMINI_3_PRO_IMAGE_REFERENCE_LIMIT = 14;
 const DEFAULT_DRAWING_MODEL_CAPABILITIES: DrawingModelCapabilities = {
   aspectRatios: GEMINI_25_FLASH_IMAGE_ASPECT_RATIOS,
@@ -232,6 +234,20 @@ export function getDrawingModelCapabilities(
     channelType === "" ||
     channelType === "palm" ||
     channelType === "gemini-enterprise-agent-platform";
+
+  if (
+    usesGeminiImageAPI &&
+    normalizedModelId.includes("gemini-3.1-flash-lite-image")
+  ) {
+    return {
+      aspectRatios: GEMINI_25_FLASH_IMAGE_ASPECT_RATIOS,
+      imageSizes: GEMINI_31_FLASH_LITE_IMAGE_SIZES,
+      mimeTypes: MIME_TYPE_OPTIONS,
+      thinkingLevels: GEMINI_31_FLASH_THINKING_LEVELS,
+      maxReferenceImages: GEMINI_31_FLASH_LITE_IMAGE_REFERENCE_LIMIT,
+      supportsEditing: true,
+    };
+  }
 
   if (
     usesGeminiImageAPI &&

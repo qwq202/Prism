@@ -65,6 +65,12 @@ func TestIsDrawingModelUsesInternalProviderAwareList(t *testing.T) {
 			want:        true,
 		},
 		{
+			name:        "gemini flash lite image generation",
+			channelType: PalmChannelType,
+			model:       Gemini31FlashLiteImage,
+			want:        true,
+		},
+		{
 			name:        "gemini image generation",
 			channelType: PalmChannelType,
 			model:       Gemini31FlashImage,

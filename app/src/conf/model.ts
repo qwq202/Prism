@@ -3,6 +3,7 @@ import { Model } from "@/api/types.tsx";
 const OPENAI_DRAWING_MODELS = ["dalle", "dall-e-2", "dall-e-3", "gpt-image-1"];
 const GEMINI_DRAWING_MODELS = [
   "gemini-2.5-flash-image",
+  "gemini-3.1-flash-lite-image",
   "gemini-3.1-flash-image",
   "gemini-3-pro-image",
 ];
