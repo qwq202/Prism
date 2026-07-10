@@ -103,9 +103,13 @@ export async function createDrawingTask<TImage>(
 
 export async function getDrawingTask<TImage>(
   taskId: string,
+  signal?: AbortSignal,
 ): Promise<DrawingTaskResponse<TImage>> {
   try {
-    const response = await axios.get(`/drawing/tasks/${taskId}`);
+    const response = await axios.get(`/drawing/tasks/${taskId}`, {
+      signal,
+      timeout: 15_000,
+    });
     return response.data as DrawingTaskResponse<TImage>;
   } catch (error) {
     return {
