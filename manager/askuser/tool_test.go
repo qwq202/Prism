@@ -125,7 +125,8 @@ func TestParseToolInputRejectsMoreThanMaximumQuestions(t *testing.T) {
 			{"id":"q1","question":"Q1?","type":"single","options":["A","B"]},
 			{"id":"q2","question":"Q2?","type":"single","options":["A","B"]},
 			{"id":"q3","question":"Q3?","type":"single","options":["A","B"]},
-			{"id":"q4","question":"Q4?","type":"single","options":["A","B"]}
+			{"id":"q4","question":"Q4?","type":"single","options":["A","B"]},
+			{"id":"q5","question":"Q5?","type":"single","options":["A","B"]}
 		]
 	}`)
 	if err == nil {

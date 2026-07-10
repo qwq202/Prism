@@ -14,7 +14,7 @@ import (
 const (
 	ToolName              = "ask_user"
 	AnswerType            = "ask_user_answer"
-	MaxQuestions          = 3
+	MaxQuestions          = 4
 	MaxOptionsPerQuestion = 3
 	MaxCustomAnswerRunes  = 1000
 )
@@ -88,7 +88,7 @@ func BuildToolDefinition() *globals.FunctionTools {
 			Type: "function",
 			Function: globals.ToolFunction{
 				Name:        ToolName,
-				Description: "Ask the user for information that is genuinely required before continuing. Call this tool by itself and do not also ask the questions in plain text. Provide 1 to 3 concise questions. For each question, choose single or multiple selection and provide 2 to 3 useful options. The interface automatically provides Other and Skip, so never add those options yourself.",
+				Description: "Ask the user for information that is genuinely required before continuing. Call this tool by itself and do not also ask the questions in plain text. Provide 1 to 4 concise questions. For each question, choose single or multiple selection and provide 2 to 3 useful options. The interface automatically provides Other and Skip, so never add those options yourself.",
 				Parameters: globals.ToolParameters{
 					Type: "object",
 					Properties: globals.ToolProperties{
