@@ -104,24 +104,28 @@
 
 .thin-scrollbar {
   scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.24) transparent;
   -ms-overflow-style: none;
 
   &::-webkit-scrollbar {
-    width: 6px;
+    width: 8px;
+    height: 8px;
   }
 
-  // update the scrollbar style
   &::-webkit-scrollbar-thumb {
-    background: hsl(var(--border));
-    border-radius: 6px;
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: hsl(var(--muted-foreground) / 0.24);
+    background-clip: content-box;
   }
 
   &::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--border-hover));
+    background: hsl(var(--muted-foreground) / 0.42);
+    background-clip: content-box;
   }
 
   &::-webkit-scrollbar-track {
-    background: hsl(var(--background));
+    background: transparent;
   }
 }
 
