@@ -19,9 +19,9 @@ import (
 	"github.com/go-redis/redis/v8"
 )
 
-const drawingTaskCanceledMessage = "drawing task canceled"
+const drawingTaskCancellationRequestedMessage = "interrupted: drawing task cancellation requested"
 
-var errDrawingTaskCanceled = errors.New(drawingTaskCanceledMessage)
+var errDrawingTaskCancellationRequested = errors.New(drawingTaskCancellationRequestedMessage)
 
 func StartTask(db *sql.DB, cache *redis.Client, userID int64, taskID string) {
 	go func() {
@@ -38,7 +38,9 @@ func StartTask(db *sql.DB, cache *redis.Client, userID int64, taskID string) {
 }
 
 func runTask(db *sql.DB, cache *redis.Client, userID int64, taskID string) {
-	if IsTaskCanceled(db, taskID) {
+	defer finalizeTaskCancellation(db, taskID)
+
+	if IsTaskCancellationRequested(db, taskID) {
 		return
 	}
 	if err := MarkTaskRunning(db, taskID); err != nil {
@@ -51,7 +53,7 @@ func runTask(db *sql.DB, cache *redis.Client, userID int64, taskID string) {
 		globals.Warn(fmt.Sprintf("[drawing] failed to load task: %s (task: %s)", err.Error(), taskID))
 		return
 	}
-	if task.Status == TaskStatusCanceled {
+	if task.Status == TaskStatusCanceling || task.Status == TaskStatusCanceled {
 		return
 	}
 
@@ -60,9 +62,12 @@ func runTask(db *sql.DB, cache *redis.Client, userID int64, taskID string) {
 		_ = MarkTaskFailed(db, taskID, fmt.Errorf("user not found"))
 		return
 	}
+	if IsTaskCancellationRequested(db, taskID) {
+		return
+	}
 
 	images, quota, err := executeTaskRequest(db, cache, user, task)
-	if errors.Is(err, errDrawingTaskCanceled) || IsTaskCanceled(db, taskID) {
+	if errors.Is(err, errDrawingTaskCancellationRequested) || IsTaskCancellationRequested(db, taskID) {
 		return
 	}
 	if err != nil {
@@ -74,14 +79,14 @@ func runTask(db *sql.DB, cache *redis.Client, userID int64, taskID string) {
 		return
 	}
 
-	if IsTaskCanceled(db, taskID) {
+	if IsTaskCancellationRequested(db, taskID) {
 		return
 	}
 	if err := AppendImagesToWorkspace(db, userID, task.WorkspaceID, task.Model, images, task.Prompt); err != nil {
 		_ = MarkTaskFailed(db, taskID, err)
 		return
 	}
-	if IsTaskCanceled(db, taskID) {
+	if IsTaskCancellationRequested(db, taskID) {
 		return
 	}
 	_ = MarkTaskSucceeded(db, taskID, images, quota)
@@ -110,29 +115,21 @@ func executeTaskRequest(db *sql.DB, cache *redis.Client, user *auth.User, task *
 	group := auth.GetGroup(db, user)
 	props := newDrawingChatProps(task.Model, messages, responseFormat, thinking, buffer)
 
-	err := channel.NewChatRequest(group, props, func(data *globals.Chunk) error {
-		if IsTaskCanceled(db, task.TaskID) {
-			return errDrawingTaskCanceled
-		}
-		buffer.WriteChunk(data)
-		return nil
-	})
+	err := channel.NewChatRequest(group, props, newDrawingTaskChunkHook(db, task.TaskID, buffer))
 
 	admin.AnalyseRequest(task.Model, buffer, err)
 	billing.RecordModelUsageMetric(db, task.Model, buffer, err)
-	if errors.Is(err, errDrawingTaskCanceled) {
-		if buffer.IsEmpty() {
-			auth.RevertSubscriptionUsage(db, cache, user, task.Model)
-		}
-		return nil, 0, err
-	}
 	if err != nil {
-		if buffer.HasVisiblePayload() {
-			collectTaskQuota(db, cache, user, buffer, plan, err)
-			createTaskBillingRecord(db, user, task.Model, buffer)
-		} else {
-			auth.RevertSubscriptionUsage(db, cache, user, task.Model)
-		}
+		settleDrawingTaskErrorUsage(
+			buffer,
+			func() {
+				collectTaskQuota(db, cache, user, buffer, plan, err)
+				createTaskBillingRecord(db, user, task.Model, buffer)
+			},
+			func() {
+				auth.RevertSubscriptionUsage(db, cache, user, task.Model)
+			},
+		)
 		return nil, 0, err
 	}
 
@@ -148,6 +145,39 @@ func executeTaskRequest(db *sql.DB, cache *redis.Client, user *auth.User, task *
 		return nil, float64(buffer.GetRecordQuota()), errors.New(strings.TrimSpace(content))
 	}
 	return images, float64(buffer.GetRecordQuota()), nil
+}
+
+func newDrawingTaskChunkHook(db *sql.DB, taskID string, buffer *utils.Buffer) globals.Hook {
+	return func(data *globals.Chunk) error {
+		cancellationRequested := IsTaskCancellationRequested(db, taskID)
+		buffer.WriteChunk(data)
+		if cancellationRequested {
+			return errDrawingTaskCancellationRequested
+		}
+		return nil
+	}
+}
+
+func settleDrawingTaskErrorUsage(
+	buffer *utils.Buffer,
+	chargeVisiblePayload func(),
+	revertEmptyRequest func(),
+) {
+	if buffer != nil && buffer.HasVisiblePayload() {
+		if chargeVisiblePayload != nil {
+			chargeVisiblePayload()
+		}
+		return
+	}
+	if revertEmptyRequest != nil {
+		revertEmptyRequest()
+	}
+}
+
+func finalizeTaskCancellation(db *sql.DB, taskID string) {
+	if err := FinalizeTaskCancellation(db, taskID); err != nil {
+		globals.Warn(fmt.Sprintf("[drawing] failed to finalize task cancellation: %s (task: %s)", err.Error(), taskID))
+	}
 }
 
 func newDrawingChatProps(

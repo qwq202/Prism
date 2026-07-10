@@ -5,6 +5,7 @@ import "encoding/json"
 const (
 	TaskStatusQueued    = "queued"
 	TaskStatusRunning   = "running"
+	TaskStatusCanceling = "canceling"
 	TaskStatusSucceeded = "succeeded"
 	TaskStatusFailed    = "failed"
 	TaskStatusCanceled  = "canceled"

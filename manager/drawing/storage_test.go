@@ -459,6 +459,124 @@ func TestCreateTaskLimitsConcurrentTasksPerUser(t *testing.T) {
 	}
 }
 
+func TestRequestTaskCancellationCancelsQueuedTaskImmediately(t *testing.T) {
+	db := openDrawingWorkspaceTestDB(t)
+	task, err := CreateTask(db, 7, validDrawingTaskForm("workspace-queued-cancel"))
+	if err != nil {
+		t.Fatalf("create queued task: %v", err)
+	}
+
+	canceled, err := RequestTaskCancellation(db, 7, task.TaskID)
+	if err != nil {
+		t.Fatalf("cancel queued task: %v", err)
+	}
+	if canceled.Status != TaskStatusCanceled || canceled.CompletedAt == "" {
+		t.Fatalf("expected queued task to cancel immediately, got %#v", canceled)
+	}
+	if active, err := HasActiveTask(db, 7, task.WorkspaceID); err != nil || active {
+		t.Fatalf("expected queued cancellation to release workspace, active=%v err=%v", active, err)
+	}
+	if _, err := CreateTask(db, 7, validDrawingTaskForm(task.WorkspaceID)); err != nil {
+		t.Fatalf("expected queued cancellation to release task slot: %v", err)
+	}
+}
+
+func TestRequestTaskCancellationKeepsRunningTaskActiveUntilFinalized(t *testing.T) {
+	db := openDrawingWorkspaceTestDB(t)
+	task, err := CreateTask(db, 7, validDrawingTaskForm("workspace-running-cancel"))
+	if err != nil {
+		t.Fatalf("create running task: %v", err)
+	}
+	if err := MarkTaskRunning(db, task.TaskID); err != nil {
+		t.Fatalf("mark task running: %v", err)
+	}
+
+	requested, err := RequestTaskCancellation(db, 7, task.TaskID)
+	if err != nil {
+		t.Fatalf("request cancellation: %v", err)
+	}
+	if requested.Status != TaskStatusCanceling || requested.CompletedAt != "" {
+		t.Fatalf("expected non-terminal canceling task, got %#v", requested)
+	}
+	if !IsTaskCancellationRequested(db, task.TaskID) {
+		t.Fatalf("expected runner cancellation checks to see cancel request")
+	}
+	if active, err := HasActiveTask(db, 7, task.WorkspaceID); err != nil || !active {
+		t.Fatalf("expected canceling task to keep workspace active, active=%v err=%v", active, err)
+	}
+	latest, err := LoadLatestWorkspaceTasks(db, 7)
+	if err != nil {
+		t.Fatalf("load canceling task for resume: %v", err)
+	}
+	if len(latest) != 1 || latest[0].TaskID != task.TaskID || latest[0].Status != TaskStatusCanceling {
+		t.Fatalf("expected canceling task to remain loadable as active, got %#v", latest)
+	}
+
+	if err := MarkTaskSucceeded(db, task.TaskID, []GeneratedImage{{ID: "late-image", Src: "/attachments/late.png"}}, 1); err != nil {
+		t.Fatalf("attempt late success transition: %v", err)
+	}
+	if err := MarkTaskFailed(db, task.TaskID, fmt.Errorf("late failure")); err != nil {
+		t.Fatalf("attempt late failure transition: %v", err)
+	}
+	stillCanceling, err := LoadTask(db, 7, task.TaskID)
+	if err != nil {
+		t.Fatalf("load canceling task: %v", err)
+	}
+	if stillCanceling.Status != TaskStatusCanceling || stillCanceling.CompletedAt != "" {
+		t.Fatalf("late worker transitions must not overwrite canceling, got %#v", stillCanceling)
+	}
+
+	if err := FinalizeTaskCancellation(db, task.TaskID); err != nil {
+		t.Fatalf("finalize cancellation: %v", err)
+	}
+	finalized, err := LoadTask(db, 7, task.TaskID)
+	if err != nil {
+		t.Fatalf("load finalized task: %v", err)
+	}
+	if finalized.Status != TaskStatusCanceled || finalized.CompletedAt == "" {
+		t.Fatalf("expected finalized canceled task, got %#v", finalized)
+	}
+	if active, err := HasActiveTask(db, 7, task.WorkspaceID); err != nil || active {
+		t.Fatalf("expected finalized cancellation to release workspace, active=%v err=%v", active, err)
+	}
+}
+
+func TestCancelingTasksRetainPerUserConcurrencySlots(t *testing.T) {
+	db := openDrawingWorkspaceTestDB(t)
+	taskIDs := make([]string, 0, maxDrawingActiveTasksPerUser)
+
+	for i := 0; i < maxDrawingActiveTasksPerUser; i++ {
+		task, err := CreateTask(db, 7, validDrawingTaskForm(fmt.Sprintf("workspace-canceling-%d", i)))
+		if err != nil {
+			t.Fatalf("create task %d: %v", i, err)
+		}
+		if err := MarkTaskRunning(db, task.TaskID); err != nil {
+			t.Fatalf("mark task %d running: %v", i, err)
+		}
+		requested, err := RequestTaskCancellation(db, 7, task.TaskID)
+		if err != nil {
+			t.Fatalf("request cancellation %d: %v", i, err)
+		}
+		if requested.Status != TaskStatusCanceling {
+			t.Fatalf("expected task %d to remain canceling, got %q", i, requested.Status)
+		}
+		taskIDs = append(taskIDs, task.TaskID)
+	}
+
+	if _, err := CreateTask(db, 7, validDrawingTaskForm("workspace-over-limit")); err == nil || err.Error() != "too many active drawing tasks" {
+		t.Fatalf("expected canceling tasks to retain all concurrency slots, got %v", err)
+	}
+
+	for _, taskID := range taskIDs {
+		if err := FinalizeTaskCancellation(db, taskID); err != nil {
+			t.Fatalf("finalize task %s: %v", taskID, err)
+		}
+	}
+	if _, err := CreateTask(db, 7, validDrawingTaskForm("workspace-after-finalize")); err != nil {
+		t.Fatalf("expected finalized tasks to release concurrency slots: %v", err)
+	}
+}
+
 func drawingTasksByWorkspace(tasks []Task) map[string]Task {
 	result := make(map[string]Task, len(tasks))
 	for _, task := range tasks {
@@ -501,7 +619,7 @@ func TestLoadLatestWorkspaceTasksReturnsOnlyNewestTaskPerWorkspace(t *testing.T)
 	if err != nil {
 		t.Fatalf("create new second task: %v", err)
 	}
-	if _, err := MarkTaskCanceled(db, 7, newSecond.TaskID); err != nil {
+	if _, err := RequestTaskCancellation(db, 7, newSecond.TaskID); err != nil {
 		t.Fatalf("cancel new second task: %v", err)
 	}
 
@@ -555,7 +673,7 @@ func TestLoadLatestWorkspaceTasksRecoversTerminalStates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create canceled task: %v", err)
 	}
-	if _, err := MarkTaskCanceled(db, 7, canceled.TaskID); err != nil {
+	if _, err := RequestTaskCancellation(db, 7, canceled.TaskID); err != nil {
 		t.Fatalf("mark task canceled: %v", err)
 	}
 

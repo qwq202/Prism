@@ -113,7 +113,7 @@ func CancelTaskAPI(c *gin.Context) {
 	}
 
 	db := utils.GetDBFromContext(c)
-	task, err := MarkTaskCanceled(db, user.GetID(db), c.Param("id"))
+	task, err := RequestTaskCancellation(db, user.GetID(db), c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status": false, "message": err.Error()})
 		return

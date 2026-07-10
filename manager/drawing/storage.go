@@ -239,7 +239,7 @@ func activeTaskWorkspaceIDs(raw json.RawMessage) map[string]bool {
 
 		taskStatus := normalizeOptionalText(workspace["taskStatus"])
 		pending, _ := workspace["pending"].(bool)
-		if pending || taskStatus == TaskStatusQueued || taskStatus == TaskStatusRunning {
+		if pending || taskStatus == TaskStatusQueued || taskStatus == TaskStatusRunning || taskStatus == TaskStatusCanceling {
 			ids[workspaceID] = true
 		}
 	}
@@ -536,8 +536,8 @@ func countActiveTasks(db *sql.DB, userID int64) (int, error) {
 	err := globals.QueryRowDb(db, `
 		SELECT COUNT(*)
 		FROM drawing_task
-		WHERE user_id = ? AND status IN (?, ?)
-	`, userID, TaskStatusQueued, TaskStatusRunning).Scan(&count)
+		WHERE user_id = ? AND status IN (?, ?, ?)
+	`, userID, TaskStatusQueued, TaskStatusRunning, TaskStatusCanceling).Scan(&count)
 	return count, err
 }
 
@@ -546,8 +546,8 @@ func HasActiveTask(db *sql.DB, userID int64, workspaceID string) (bool, error) {
 	err := globals.QueryRowDb(db, `
 		SELECT COUNT(*)
 		FROM drawing_task
-		WHERE user_id = ? AND workspace_id = ? AND status IN (?, ?)
-	`, userID, strings.TrimSpace(workspaceID), TaskStatusQueued, TaskStatusRunning).Scan(&count)
+		WHERE user_id = ? AND workspace_id = ? AND status IN (?, ?, ?)
+	`, userID, strings.TrimSpace(workspaceID), TaskStatusQueued, TaskStatusRunning, TaskStatusCanceling).Scan(&count)
 	return count > 0, err
 }
 
@@ -637,7 +637,7 @@ func LoadLatestWorkspaceTasks(db *sql.DB, userID int64) ([]Task, error) {
 	return tasks, rows.Err()
 }
 
-func IsTaskCanceled(db *sql.DB, taskID string) bool {
+func IsTaskCancellationRequested(db *sql.DB, taskID string) bool {
 	var status interface{}
 	err := globals.QueryRowDb(db, `
 		SELECT status
@@ -645,7 +645,11 @@ func IsTaskCanceled(db *sql.DB, taskID string) bool {
 		WHERE task_id = ?
 		LIMIT 1
 	`, strings.TrimSpace(taskID)).Scan(&status)
-	return err == nil && normalizeOptionalText(status) == TaskStatusCanceled
+	if err != nil {
+		return false
+	}
+	value := normalizeOptionalText(status)
+	return value == TaskStatusCanceling || value == TaskStatusCanceled
 }
 
 func MarkTaskRunning(db *sql.DB, taskID string) error {
@@ -662,8 +666,8 @@ func MarkTaskSucceeded(db *sql.DB, taskID string, images []GeneratedImage, quota
 		UPDATE drawing_task
 		SET status = ?, result_images = ?, error = '', quota = ?,
 		    completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-		WHERE task_id = ? AND status <> ?
-	`, TaskStatusSucceeded, generatedImagesToJSON(images), quota, strings.TrimSpace(taskID), TaskStatusCanceled)
+		WHERE task_id = ? AND status NOT IN (?, ?)
+	`, TaskStatusSucceeded, generatedImagesToJSON(images), quota, strings.TrimSpace(taskID), TaskStatusCanceled, TaskStatusCanceling)
 	return err
 }
 
@@ -675,25 +679,55 @@ func MarkTaskFailed(db *sql.DB, taskID string, err error) error {
 	_, execErr := globals.ExecDb(db, `
 		UPDATE drawing_task
 		SET status = ?, error = ?, completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-		WHERE task_id = ? AND status <> ?
-	`, TaskStatusFailed, message, strings.TrimSpace(taskID), TaskStatusCanceled)
+		WHERE task_id = ? AND status NOT IN (?, ?)
+	`, TaskStatusFailed, message, strings.TrimSpace(taskID), TaskStatusCanceled, TaskStatusCanceling)
 	return execErr
 }
 
-func MarkTaskCanceled(db *sql.DB, userID int64, taskID string) (*Task, error) {
+func RequestTaskCancellation(db *sql.DB, userID int64, taskID string) (*Task, error) {
+	if db == nil {
+		return nil, fmt.Errorf("database is not initialized")
+	}
 	taskID = strings.TrimSpace(taskID)
 	if taskID == "" {
 		return nil, fmt.Errorf("invalid task id")
 	}
-	_, err := globals.ExecDb(db, `
+
+	result, err := globals.ExecDb(db, `
 		UPDATE drawing_task
 		SET status = ?, completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-		WHERE user_id = ? AND task_id = ? AND status IN (?, ?)
-	`, TaskStatusCanceled, userID, taskID, TaskStatusQueued, TaskStatusRunning)
+		WHERE user_id = ? AND task_id = ? AND status = ?
+	`, TaskStatusCanceled, userID, taskID, TaskStatusQueued)
 	if err != nil {
 		return nil, err
 	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+	if rowsAffected == 0 {
+		_, err = globals.ExecDb(db, `
+			UPDATE drawing_task
+			SET status = ?, completed_at = NULL, updated_at = CURRENT_TIMESTAMP
+			WHERE user_id = ? AND task_id = ? AND status = ?
+		`, TaskStatusCanceling, userID, taskID, TaskStatusRunning)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return LoadTask(db, userID, taskID)
+}
+
+func FinalizeTaskCancellation(db *sql.DB, taskID string) error {
+	if db == nil {
+		return fmt.Errorf("database is not initialized")
+	}
+	_, err := globals.ExecDb(db, `
+		UPDATE drawing_task
+		SET status = ?, completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+		WHERE task_id = ? AND status = ?
+	`, TaskStatusCanceled, strings.TrimSpace(taskID), TaskStatusCanceling)
+	return err
 }
 
 func LoadWorkspaceState(db *sql.DB, userID int64) (*WorkspaceState, error) {
