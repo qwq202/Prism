@@ -491,6 +491,30 @@ function mergeGeneratedImages(
   return changed ? [...additions.reverse(), ...next] : current;
 }
 
+function reconcileGeneratedImagesForTask(
+  current: DrawingGeneratedImage[],
+  taskId: string,
+  incoming: DrawingGeneratedImage[],
+): DrawingGeneratedImage[] {
+  const taskImagePrefix = `${taskId}-`;
+  const incomingIds = new Set(incoming.map((image) => image.id));
+  const taskImages = current.filter((image) =>
+    image.id.startsWith(taskImagePrefix),
+  );
+  const hasLegacyImages =
+    taskImages.length !== incomingIds.size ||
+    taskImages.some((image) => !incomingIds.has(image.id));
+
+  if (!hasLegacyImages) {
+    return mergeGeneratedImages(current, incoming);
+  }
+
+  return mergeGeneratedImages(
+    current.filter((image) => !image.id.startsWith(taskImagePrefix)),
+    incoming,
+  );
+}
+
 export function isActiveDrawingTask(task?: Pick<DrawingTask, "status"> | null) {
   return (
     task?.status === "queued" ||
@@ -524,7 +548,11 @@ export function applyDrawingTaskToWorkspaces(
         model: image.model || task.model,
         options: image.options || task.options,
       }));
-      const images = mergeGeneratedImages(workspace.images, taskImages);
+      const images = reconcileGeneratedImagesForTask(
+        workspace.images,
+        task.task_id,
+        taskImages,
+      );
       if (
         !workspace.pending &&
         workspace.taskId === undefined &&

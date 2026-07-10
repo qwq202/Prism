@@ -426,6 +426,17 @@ func parseGeneratedImages(raw string) []GeneratedImage {
 	return images
 }
 
+func normalizeTaskResultImages(model string, images []GeneratedImage) []GeneratedImage {
+	if len(images) <= 1 || !globals.IsGeminiImageGenerationModel(strings.TrimSpace(model)) {
+		return images
+	}
+
+	// Older Gemini image responses could persist a thought image before the
+	// final image. Drawing requests currently ask for one output, so the last
+	// image is the final result and earlier images are legacy intermediates.
+	return []GeneratedImage{images[len(images)-1]}
+}
+
 func generatedImagesToJSON(images []GeneratedImage) string {
 	if len(images) == 0 {
 		return "[]"
@@ -451,7 +462,7 @@ func taskFromScan(
 	startedAt interface{},
 	completedAt interface{},
 ) *Task {
-	return &Task{
+	task := &Task{
 		ID:          id,
 		TaskID:      normalizeOptionalText(taskID),
 		UserID:      userID,
@@ -469,6 +480,26 @@ func taskFromScan(
 		StartedAt:   normalizeOptionalText(startedAt),
 		CompletedAt: normalizeOptionalText(completedAt),
 	}
+	return task
+}
+
+func compactLegacyTaskResultImages(db *sql.DB, task *Task) error {
+	if task == nil {
+		return nil
+	}
+
+	normalized := normalizeTaskResultImages(task.Model, task.Images)
+	if len(normalized) == len(task.Images) {
+		return nil
+	}
+	task.Images = normalized
+
+	_, err := globals.ExecDb(db, `
+		UPDATE drawing_task
+		SET result_images = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND user_id = ?
+	`, generatedImagesToJSON(normalized), task.ID, task.UserID)
+	return err
 }
 
 func CreateTask(db *sql.DB, userID int64, form createTaskForm) (*Task, error) {
@@ -595,12 +626,19 @@ func LoadTask(db *sql.DB, userID int64, taskID string) (*Task, error) {
 	if db == nil {
 		return nil, fmt.Errorf("database is not initialized")
 	}
-	return scanTask(globals.QueryRowDb(db, `
+	task, err := scanTask(globals.QueryRowDb(db, `
 		SELECT `+taskSelectColumns+`
 		FROM drawing_task
 		WHERE user_id = ? AND task_id = ?
 		LIMIT 1
 	`, userID, strings.TrimSpace(taskID)))
+	if err != nil {
+		return nil, err
+	}
+	if err := compactLegacyTaskResultImages(db, task); err != nil {
+		return nil, err
+	}
+	return task, nil
 }
 
 func LoadLatestWorkspaceTasks(db *sql.DB, userID int64) ([]Task, error) {
@@ -624,17 +662,28 @@ func LoadLatestWorkspaceTasks(db *sql.DB, userID int64) ([]Task, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
 	tasks := make([]Task, 0)
 	for rows.Next() {
 		task, err := scanTask(rows)
 		if err != nil {
+			_ = rows.Close()
 			return nil, err
 		}
 		tasks = append(tasks, *task)
 	}
-	return tasks, rows.Err()
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	for index := range tasks {
+		if err := compactLegacyTaskResultImages(db, &tasks[index]); err != nil {
+			return nil, err
+		}
+	}
+	return tasks, nil
 }
 
 func IsTaskCancellationRequested(db *sql.DB, taskID string) bool {

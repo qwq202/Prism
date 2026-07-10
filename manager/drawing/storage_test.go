@@ -735,3 +735,47 @@ func TestLoadLatestWorkspaceTasksUsesWorkspaceLimit(t *testing.T) {
 		t.Fatalf("expected newest workspace task to be included")
 	}
 }
+
+func TestLoadTaskKeepsOnlyFinalLegacyGeminiImage(t *testing.T) {
+	db := openDrawingWorkspaceTestDB(t)
+	task, err := CreateTask(db, 7, validDrawingTaskForm("workspace-legacy-images"))
+	if err != nil {
+		t.Fatalf("create task: %v", err)
+	}
+
+	images := []GeneratedImage{
+		{ID: task.TaskID + "-0", Src: "/attachments/thought.png"},
+		{ID: task.TaskID + "-1", Src: "/attachments/final.png"},
+	}
+	if err := MarkTaskSucceeded(db, task.TaskID, images, 1); err != nil {
+		t.Fatalf("mark task succeeded: %v", err)
+	}
+
+	loaded, err := LoadTask(db, 7, task.TaskID)
+	if err != nil {
+		t.Fatalf("load task: %v", err)
+	}
+	if len(loaded.Images) != 1 || loaded.Images[0].ID != task.TaskID+"-1" {
+		t.Fatalf("expected only final legacy Gemini image, got %#v", loaded.Images)
+	}
+
+	var storedImages string
+	if err := db.QueryRow(`SELECT result_images FROM drawing_task WHERE task_id = ?`, task.TaskID).Scan(&storedImages); err != nil {
+		t.Fatalf("load stored task images: %v", err)
+	}
+	if images := parseGeneratedImages(storedImages); len(images) != 1 || images[0].ID != task.TaskID+"-1" {
+		t.Fatalf("expected legacy task images to be compacted in storage, got %s", storedImages)
+	}
+}
+
+func TestNormalizeTaskResultImagesPreservesNonGeminiOutputs(t *testing.T) {
+	images := []GeneratedImage{
+		{ID: "task-1-0", Src: "/attachments/first.png"},
+		{ID: "task-1-1", Src: "/attachments/second.png"},
+	}
+
+	normalized := normalizeTaskResultImages("gpt-image-1", images)
+	if len(normalized) != len(images) {
+		t.Fatalf("expected non-Gemini outputs to remain unchanged, got %#v", normalized)
+	}
+}

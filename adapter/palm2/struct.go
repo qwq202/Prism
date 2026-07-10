@@ -6,11 +6,13 @@ import (
 )
 
 type ChatInstance struct {
-	Endpoint         string
-	ApiKey           string
-	VertexAIExpress  bool
-	isFirstReasoning bool
-	isReasonOver     bool
+	Endpoint                  string
+	ApiKey                    string
+	VertexAIExpress           bool
+	isFirstReasoning          bool
+	isReasonOver              bool
+	pendingThoughtImage       string
+	geminiStreamHasFinalImage bool
 }
 
 func (c *ChatInstance) GetApiKey() string {

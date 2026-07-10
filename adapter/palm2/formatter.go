@@ -623,6 +623,17 @@ func appendGeminiInlineImageMarkdown(builder *strings.Builder, markdown string) 
 	builder.WriteString(markdown)
 }
 
+func (c *ChatInstance) takeGeminiStreamFallbackImage() string {
+	if c.geminiStreamHasFinalImage {
+		c.pendingThoughtImage = ""
+		return ""
+	}
+
+	image := c.pendingThoughtImage
+	c.pendingThoughtImage = ""
+	return image
+}
+
 func getGeminiReasoningText(parts []GeminiChatPart) string {
 	builder := strings.Builder{}
 
@@ -638,16 +649,28 @@ func getGeminiReasoningText(parts []GeminiChatPart) string {
 
 func getGeminiAnswerText(parts []GeminiChatPart) string {
 	builder := strings.Builder{}
+	fallbackThoughtImage := ""
+	hasFinalImage := false
 
 	for _, part := range parts {
+		imageMarkdown := getGeminiInlineImageMarkdown(part.InlineData)
 		if part.Thought {
+			if imageMarkdown != "" {
+				fallbackThoughtImage = imageMarkdown
+			}
 			continue
 		}
 		if part.Text != nil {
 			builder.WriteString(*part.Text)
-			continue
 		}
-		appendGeminiInlineImageMarkdown(&builder, getGeminiInlineImageMarkdown(part.InlineData))
+		if imageMarkdown != "" {
+			hasFinalImage = true
+			appendGeminiInlineImageMarkdown(&builder, imageMarkdown)
+		}
+	}
+
+	if !hasFinalImage {
+		appendGeminiInlineImageMarkdown(&builder, fallbackThoughtImage)
 	}
 
 	return builder.String()
@@ -682,17 +705,19 @@ func (c *ChatInstance) GetGeminiStreamText(model string, parts []GeminiChatPart)
 		}
 
 		if part.Thought {
+			if imageMarkdown != "" {
+				c.pendingThoughtImage = imageMarkdown
+			}
 			if globals.IsGeminiNoThinkingModel(model) {
 				continue
 			}
-			if part.Text == nil || *part.Text == "" {
-				continue
+			if part.Text != nil && *part.Text != "" {
+				if c.isFirstReasoning {
+					c.isFirstReasoning = false
+					builder.WriteString("<think>\n")
+				}
+				builder.WriteString(*part.Text)
 			}
-			if c.isFirstReasoning {
-				c.isFirstReasoning = false
-				builder.WriteString("<think>\n")
-			}
-			builder.WriteString(*part.Text)
 			continue
 		}
 
@@ -703,9 +728,12 @@ func (c *ChatInstance) GetGeminiStreamText(model string, parts []GeminiChatPart)
 
 		if part.Text != nil {
 			builder.WriteString(*part.Text)
-			continue
 		}
-		appendGeminiInlineImageMarkdown(&builder, imageMarkdown)
+		if imageMarkdown != "" {
+			c.geminiStreamHasFinalImage = true
+			c.pendingThoughtImage = ""
+			appendGeminiInlineImageMarkdown(&builder, imageMarkdown)
+		}
 	}
 
 	return builder.String()

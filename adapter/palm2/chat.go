@@ -932,6 +932,8 @@ func (c *ChatInstance) CreateStreamChatRequest(props *adaptercommon.ChatProps, c
 	ticks := 0
 	c.isFirstReasoning = true
 	c.isReasonOver = false
+	c.pendingThoughtImage = ""
+	c.geminiStreamHasFinalImage = false
 	scanErr := utils.EventScanner(&utils.EventScannerProps{
 		Method: "POST",
 		Uri:    c.GetChatEndpoint(props.Model, true),
@@ -987,6 +989,11 @@ func (c *ChatInstance) CreateStreamChatRequest(props *adaptercommon.ChatProps, c
 
 	if !c.isFirstReasoning && !c.isReasonOver {
 		if err := callback(&globals.Chunk{Content: "\n</think>\n\n"}); err != nil {
+			return err
+		}
+	}
+	if fallbackImage := c.takeGeminiStreamFallbackImage(); fallbackImage != "" {
+		if err := callback(&globals.Chunk{Content: fallbackImage}); err != nil {
 			return err
 		}
 	}
