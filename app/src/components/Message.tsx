@@ -42,6 +42,12 @@ import { parseThinkContent } from "@/utils/thinking";
 import { showQuotaSelector } from "@/store/settings.ts";
 import { getVisibleToolCalls } from "@/api/tool-calls.ts";
 import { MarkdownFile } from "@/components/plugins/file.tsx";
+import {
+  type AskUserResult,
+  getAskUserToolCalls,
+  isAskUserToolCallName,
+} from "@/api/ask-user.ts";
+import { AskUserCard } from "@/components/AskUserCard.tsx";
 
 type MessageProps = {
   index: number;
@@ -50,6 +56,10 @@ type MessageProps = {
   username?: string;
   model?: string;
   onEvent?: (event: string, index?: number, message?: string) => void;
+  onAskUserAnswer?: (
+    toolCallId: string,
+    result: AskUserResult,
+  ) => boolean | Promise<boolean>;
   ref?: Ref<HTMLElement>;
   sharing?: boolean;
 
@@ -184,9 +194,7 @@ function MessageMenu({
 
   return (
     <DropdownMenu open={dropdown} onOpenChange={handleDropdownChange}>
-      <DropdownMenuTrigger asChild>
-        {children}
-      </DropdownMenuTrigger>
+      <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
       <DropdownMenuContent align={align}>
         {isAssistant && end ? (
           <DropdownMenuItem
@@ -316,6 +324,7 @@ function MessageContent({
   end,
   index,
   onEvent,
+  onAskUserAnswer,
   selected,
   username,
   model,
@@ -328,7 +337,12 @@ function MessageContent({
   const visibleToolCalls = isAssistant
     ? getVisibleToolCalls(message.tool_calls)
     : [];
-  const hasToolCalls = visibleToolCalls.length > 0;
+  const askUserToolCalls = getAskUserToolCalls(visibleToolCalls);
+  const standardToolCalls = visibleToolCalls.filter(
+    (toolCall) => !isAskUserToolCallName(toolCall.function.name),
+  );
+  const hasToolCalls =
+    askUserToolCalls.length > 0 || standardToolCalls.length > 0;
   const user = useSelector(selectUsername);
   const supportModels = useSelector(selectSupportModels);
 
@@ -343,9 +357,10 @@ function MessageContent({
   };
   const useModelAvatar = !isUser && !selected;
 
-  const parsedContent = isAssistant && message.content.length
-    ? parseThinkContent(message.content)
-    : null;
+  const parsedContent =
+    isAssistant && message.content.length
+      ? parseThinkContent(message.content)
+      : null;
 
   return (
     <div className={"content-wrapper"}>
@@ -429,7 +444,19 @@ function MessageContent({
           <Loader2 className={`h-5 w-5 m-1 animate-spin`} />
         ) : null}
 
-        {hasToolCalls && <ToolCallStatus toolCalls={visibleToolCalls} />}
+        {askUserToolCalls.map((toolCall) => (
+          <AskUserCard
+            key={toolCall.id}
+            toolCall={toolCall}
+            onSubmit={async (toolCallId, result) =>
+              (await onAskUserAnswer?.(toolCallId, result)) ?? false
+            }
+          />
+        ))}
+
+        {standardToolCalls.length > 0 && (
+          <ToolCallStatus toolCalls={standardToolCalls} />
+        )}
 
         {isAssistant && hasContent && isOutput && (
           <Loader2

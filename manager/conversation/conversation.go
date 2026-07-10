@@ -5,6 +5,7 @@ import (
 	"chat/globals"
 	"chat/utils"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"strings"
 )
@@ -87,6 +88,8 @@ type FormMessage struct {
 	CachedContent           string                 `json:"cachedContent,omitempty"`
 	CachedContentSnake      string                 `json:"cached_content,omitempty"`
 	Thinking                interface{}            `json:"thinking,omitempty"`
+	ToolCallID              string                 `json:"tool_call_id,omitempty"`
+	ToolResult              json.RawMessage        `json:"tool_result,omitempty"`
 
 	// request params
 	MaxTokens         *int     `json:"max_tokens,omitempty"`

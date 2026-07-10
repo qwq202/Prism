@@ -16,6 +16,8 @@ type ChatInputProps = {
   onValueChange: (value: string) => void;
   onEnterPressed: () => void;
   onLongTextPaste?: (text: string) => void;
+  disabled?: boolean;
+  placeholder?: string;
 };
 
 function ChatInput({
@@ -25,6 +27,8 @@ function ChatInput({
   onValueChange,
   onEnterPressed,
   onLongTextPaste,
+  disabled,
+  placeholder,
 }: ChatInputProps) {
   const { t } = useTranslation();
   const sender = useSelector(senderSelector);
@@ -40,6 +44,7 @@ function ChatInput({
       className={cn("input-box thin-scrollbar min-h-[60px]", className)}
       ref={target}
       value={value}
+      disabled={disabled}
       rows={rows}
       minRows={rows}
       maxRows={maxRows}
@@ -47,7 +52,7 @@ function ChatInput({
         onValueChange(e.target.value);
         setMemory("history", e.target.value);
       }}
-      placeholder={t("chat.placeholder")}
+      placeholder={placeholder ?? t("chat.placeholder")}
       onKeyDown={async (e) => {
         if (isEnter(e)) {
           if (sender) {

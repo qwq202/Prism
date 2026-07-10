@@ -22,6 +22,7 @@ import {
   selectSupportModels,
   useMessageActions,
   useMessages,
+  usePendingAskUser,
   useWorking,
 } from "@/store/chat.ts";
 import { formatMessage } from "@/utils/processor.ts";
@@ -65,7 +66,9 @@ function preloadChatInterface() {
 const ChatInterface = lazy(preloadChatInterface);
 
 function hasDraggedFiles(dataTransfer: DataTransfer | null): boolean {
-  return Boolean(dataTransfer && Array.from(dataTransfer.types).includes("Files"));
+  return Boolean(
+    dataTransfer && Array.from(dataTransfer.types).includes("Files"),
+  );
 }
 
 function getDroppedFiles(dataTransfer: DataTransfer | null): File[] {
@@ -167,6 +170,7 @@ function ChatWrapper() {
   const align = useSelector(alignSelector);
 
   const working = useWorking();
+  const pendingAskUser = usePendingAskUser();
   const supportModels = useSelector(selectSupportModels);
 
   const requireAuth = useMemo(
@@ -454,12 +458,17 @@ function ChatWrapper() {
                 onValueChange={setInput}
                 onEnterPressed={handleSend}
                 onLongTextPaste={handleLongTextPaste}
+                disabled={Boolean(pendingAskUser)}
+                placeholder={
+                  pendingAskUser ? t("ask-user.answer-first") : undefined
+                }
               />
             </div>
             <div className="flex items-center justify-end gap-2">
               <ActionCommand input={input} />
               <ActionButton
                 working={working}
+                disabled={Boolean(pendingAskUser) && !working}
                 onClick={() => (working ? handleCancel() : handleSend())}
               />
             </div>

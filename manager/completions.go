@@ -67,7 +67,7 @@ func NativeChatHandler(c *gin.Context, user *auth.User, model string, message []
 	var hit bool
 	var err error
 	webSearchToolEnabled := canUseTavilySearchTool(enableWeb, model, toolCallsSupported)
-	tools := buildAvailableToolDefinitions(false, false, webSearchToolEnabled)
+	tools := buildAvailableToolDefinitions(false, false, false, webSearchToolEnabled)
 	if tools != nil {
 		hit, err = createNativeToolChatTask(buffer, model, group, c.ClientIP(), segment, tools, memory.MaxToolRounds, limiter, buildProps)
 	} else {

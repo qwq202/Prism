@@ -23,7 +23,7 @@ const shouldRenderMessage = (message: Message): boolean => {
   if (message.role && message.role.startsWith("virtualRole::")) {
     return false;
   }
-  
+
   return true;
 };
 
@@ -53,8 +53,8 @@ function ChatInterface({ scrollable, setTarget }: ChatInterfaceProps) {
       <AnimatePresence>
         <motion.div className="chat-messages-wrapper">
           {renderableMessages.map((message) => {
-            const originalIndex = messages.findIndex(m => m === message);
-            
+            const originalIndex = messages.findIndex((m) => m === message);
+
             return (
               <motion.div
                 key={`message-${originalIndex}`}
@@ -76,9 +76,26 @@ function ChatInterface({ scrollable, setTarget }: ChatInterfaceProps) {
                   message={message}
                   model={message.model}
                   end={originalIndex === messages.length - 1}
-                  onEvent={(event: string, index?: number, message?: string) => {
-                    process({ id: current, event, index: index ?? originalIndex, message });
+                  onEvent={(
+                    event: string,
+                    index?: number,
+                    message?: string,
+                  ) => {
+                    process({
+                      id: current,
+                      event,
+                      index: index ?? originalIndex,
+                      message,
+                    });
                   }}
+                  onAskUserAnswer={(toolCallId, askUserResult) =>
+                    process({
+                      id: current,
+                      event: "answer-ask-user",
+                      toolCallId,
+                      askUserResult,
+                    }) ?? false
+                  }
                   index={originalIndex}
                   selected={selected === originalIndex}
                   onFocus={() => setSelected(originalIndex)}

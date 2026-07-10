@@ -500,6 +500,22 @@
     "max-count-reached": "現在のモデルの {{count}} 枚上限に達しました",
     "files-cleared-on-model-switch": "モデル切り替え後、送信する画像が自動的にクリアされました"
   },
+  "ask-user": {
+    "title": "回答が必要です",
+    "description": "{{count}} 件の質問に回答すると、アシスタントが生成を続けます",
+    "single": "単一選択",
+    "multiple": "複数選択",
+    "other-placeholder": "その他 — 回答を入力",
+    "skip-question": "この質問をスキップ",
+    "undo-skip": "スキップを取り消す",
+    "skip-all": "すべてスキップ",
+    "submit": "送信して続ける",
+    "skipped": "スキップ済み",
+    "answered": "回答済み",
+    "invalid": "質問を表示できません。回答を再生成してください。",
+    "submit-failed": "回答を送信できませんでした。もう一度お試しください。",
+    "answer-first": "続行する前に上の質問に回答してください"
+  },
   "drawing": {
     "model": "モデル",
     "manage": "管理",

@@ -44,6 +44,10 @@ import {
 } from "@/utils/conversation-cache.ts";
 import { logClientEvent } from "@/utils/client-logger.ts";
 import { isHiddenToolCallName } from "@/api/tool-calls.ts";
+import {
+  type AskUserResult,
+  isPendingAskUserToolCall,
+} from "@/api/ask-user.ts";
 import { CustomMask, Mask } from "@/masks/types.ts";
 import { listMasks } from "@/api/mask.ts";
 import { useDispatch, useSelector } from "react-redux";
@@ -129,6 +133,8 @@ export type ConnectionEvent = {
   event: string;
   index?: number;
   message?: string;
+  toolCallId?: string;
+  askUserResult?: AskUserResult;
 };
 
 type initialStateType = {
@@ -858,9 +864,25 @@ export function supportsGeminiThinkingBudgetControl(
 const toolStatusPriority: Record<string, number> = {
   start: 0,
   executing: 1,
-  success: 2,
-  error: 2,
+  pending: 2,
+  success: 3,
+  error: 3,
 };
+
+function findPendingAskUserToolCall(
+  messages?: Message[],
+): MessageToolCall | undefined {
+  if (!messages) return undefined;
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index];
+    if (message.role === "tool") continue;
+    if (message.role !== AssistantRole) return undefined;
+    const pending = message.tool_calls?.find(isPendingAskUserToolCall);
+    if (pending) return pending;
+    return undefined;
+  }
+  return undefined;
+}
 
 function normalizeToolArguments(argumentsText?: string): string {
   if (!argumentsText) return "";
@@ -1115,6 +1137,29 @@ const chatSlice = createSlice({
         conversation.model = model;
       }
 
+      conversation.messages.push({
+        role: AssistantRole,
+        content: "",
+        model,
+        end: false,
+      });
+    },
+    answerAskUserMessage: (state, action) => {
+      const { id, toolCallId, result, model } = action.payload as {
+        id: number;
+        toolCallId: string;
+        result: AskUserResult;
+        model?: string;
+      };
+      const conversation = state.conversations[id];
+      if (!conversation) return;
+
+      const pending = findPendingAskUserToolCall(conversation.messages);
+      if (!pending || pending.id !== toolCallId) return;
+
+      markConversationPending(conversation);
+      pending.result = JSON.stringify(result);
+      pending.status = "success";
       conversation.messages.push({
         role: AssistantRole,
         content: "",
@@ -1623,6 +1668,7 @@ export const {
   updateMessage,
   removeMessage,
   restartMessage,
+  answerAskUserMessage,
   editMessage,
   stopMessage,
   raiseConversation,
@@ -2049,6 +2095,16 @@ export function useMessageActions() {
         return false;
       }
 
+      if (findPendingAskUserToolCall(conversations[current]?.messages)) {
+        logClientEvent(
+          "chat.action",
+          "send-blocked-pending-question",
+          { current },
+          "warn",
+        );
+        return false;
+      }
+
       const conversationModel =
         current === -1 ? conversations[-1]?.model : undefined;
       const targetModel =
@@ -2365,6 +2421,123 @@ export function useMessageActions() {
       // remove the last message if it's from assistant and create a new message
       dispatch(restartMessage({ id: current, model }));
     },
+    answerAskUser: async (toolCallId: string, result: AskUserResult) => {
+      if (conversationLoading) {
+        logClientEvent(
+          "chat.action",
+          "ask-user-answer-blocked-loading",
+          { current, loading_conversation_id: conversationLoading },
+          "warn",
+        );
+        return false;
+      }
+
+      const pending = findPendingAskUserToolCall(
+        conversations[current]?.messages,
+      );
+      if (!pending || pending.id !== toolCallId) {
+        logClientEvent(
+          "chat.action",
+          "ask-user-answer-stale",
+          { current, tool_call_id: toolCallId },
+          "warn",
+        );
+        return false;
+      }
+
+      const answerModel = conversations[current]?.model || model;
+      const enableGeminiNativeWeb = isGeminiModelId(answerModel);
+      const enableXAINativeWeb = isXAIModelId(answerModel);
+      const enableDeepSeekThinkingControl = isDeepSeekV4ModelId(answerModel);
+      const openAIReasoningCapabilities = getOpenAIResponsesCapabilities(
+        support_models,
+        answerModel,
+      );
+      const enableOpenAINativeWeb = openAIReasoningCapabilities.nativeWeb;
+      const enableOpenAIReasoningControl =
+        openAIReasoningCapabilities.reasoningEfforts.length > 0;
+      const currentDeepSeekThinkingEnabled = getDeepSeekThinkingEnabledForModel(
+        deepseek_thinking_enabled_by_model,
+        answerModel,
+      );
+      const currentDeepSeekReasoningEffort = getDeepSeekReasoningEffortForModel(
+        deepseek_reasoning_effort_by_model,
+        answerModel,
+      );
+      const openAIReasoningEffortForRequest =
+        resolveOpenAIReasoningEffortForRequest(
+          support_models,
+          answerModel,
+          openai_reasoning_effort,
+          enableOpenAINativeWeb && openai_responses_web_search,
+        );
+
+      if (!stack.hasConnection(current)) stack.createConnection(current);
+      stack.sendToolResultEvent(current, t, toolCallId, result, {
+        message: "",
+        model: answerModel,
+        web: enableGeminiNativeWeb
+          ? gemini_google_search || gemini_url_context
+          : enableXAINativeWeb
+            ? xai_web_search || xai_x_search
+            : enableOpenAINativeWeb
+              ? openai_responses_web_search
+              : web,
+        web_search: enableGeminiNativeWeb
+          ? gemini_google_search
+          : enableXAINativeWeb
+            ? xai_web_search
+            : enableOpenAINativeWeb
+              ? openai_responses_web_search
+              : false,
+        url_context: enableGeminiNativeWeb ? gemini_url_context : false,
+        x_search: enableXAINativeWeb ? xai_x_search : false,
+        fetch: enableGeminiNativeWeb ? false : fetch,
+        learning_mode,
+        gemini_thinking_budget: supportsGeminiThinkingBudgetControl(answerModel)
+          ? gemini_thinking_budget
+          : undefined,
+        deepseek_thinking_enabled: enableDeepSeekThinkingControl
+          ? currentDeepSeekThinkingEnabled
+          : undefined,
+        deepseek_reasoning_effort:
+          enableDeepSeekThinkingControl && currentDeepSeekThinkingEnabled
+            ? currentDeepSeekReasoningEffort
+            : undefined,
+        openai_reasoning_effort: enableOpenAIReasoningControl
+          ? openAIReasoningEffortForRequest
+          : undefined,
+        openai_reasoning_summary: openAIReasoningCapabilities.reasoningSummary
+          ? openai_reasoning_summary
+          : undefined,
+        context: history,
+        ignore_context: !context,
+        custom_instruction: personalizationInstruction || undefined,
+        memory_enabled,
+        memory_history_enabled,
+        max_tokens: max_tokens > 0 ? max_tokens : undefined,
+        temperature,
+        top_p,
+        top_k,
+        presence_penalty,
+        frequency_penalty,
+        repetition_penalty,
+      });
+      dispatch(
+        answerAskUserMessage({
+          id: current,
+          toolCallId,
+          result,
+          model: answerModel,
+        }),
+      );
+      logClientEvent("chat.action", "ask-user-answer", {
+        current,
+        tool_call_id: toolCallId,
+        question_count: Object.keys(result.answers).length,
+      });
+      return true;
+    },
     remove: (idx: number) => {
       const conversation = conversations[current];
       if (!conversation || idx < 0 || idx >= conversation.messages.length) {
@@ -2473,6 +2646,9 @@ export function useListenMessageEvent() {
       case "edit":
         actions.edit(e.index ?? -1, e.message ?? "");
         break;
+      case "answer-ask-user":
+        if (!e.toolCallId || !e.askUserResult) return false;
+        return actions.answerAskUser(e.toolCallId, e.askUserResult);
     }
   };
 }
@@ -2501,6 +2677,11 @@ export function useWorking(): boolean {
     if (last.role !== AssistantRole || last.end === undefined) return false;
     return !last.end;
   }, [messages]);
+}
+
+export function usePendingAskUser(): MessageToolCall | undefined {
+  const messages = useMessages();
+  return useMemo(() => findPendingAskUserToolCall(messages), [messages]);
 }
 
 export const updateMasks = async (dispatch: AppDispatch) => {

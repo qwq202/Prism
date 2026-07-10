@@ -18,7 +18,7 @@ export type MessageToolCall = {
     name: string;
     arguments: string;
   };
-  status?: "start" | "executing" | "success" | "error";
+  status?: "start" | "executing" | "pending" | "success" | "error";
   result?: string;
   error?: string;
 };

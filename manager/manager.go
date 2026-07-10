@@ -130,11 +130,19 @@ func ChatAPI(c *gin.Context) {
 				if err := instance.AddMessageFromForm(form); err != nil {
 					return err
 				}
-				ChatHandler(buf, user, instance, false)
+				response := ChatHandler(buf, user, instance, false)
+				instance.SaveResponse(nil, response)
 				return nil
 			}
 
 			instance = refreshPersistedConversation(db, id, instance)
+			if hasPendingAskUserCall(instance) {
+				_ = buf.SendClient(globals.ChatSegmentResponse{
+					Message: "Answer or skip the pending question before sending a new message.",
+					End:     true,
+				})
+				break
+			}
 			if instance.HandleMessage(db, form) {
 				response := ChatHandler(buf, user, instance, false)
 				if instance.SaveResponse(db, response) {
@@ -175,6 +183,37 @@ func ChatAPI(c *gin.Context) {
 
 			instance.RemoveMessage(id)
 			instance.SaveConversation(db)
+		case ToolResultType:
+			instance = refreshPersistedConversation(db, id, instance)
+			toolMessage, answerErr := buildAskUserAnswerMessage(instance, form)
+			if answerErr != nil {
+				_ = buf.SendClient(globals.ChatSegmentResponse{
+					Message: answerErr.Error(),
+					End:     true,
+				})
+				break
+			}
+
+			instance.ApplyParam(form)
+			instance.AddMessage(toolMessage)
+			if !instance.IsTransient() && !instance.SaveConversation(db) {
+				_ = buf.SendClient(globals.ChatSegmentResponse{
+					Message: "Failed to save the answer. Please try again.",
+					End:     true,
+				})
+				break
+			}
+
+			response := ChatHandler(buf, user, instance, false)
+			responseDB := db
+			if instance.IsTransient() {
+				responseDB = nil
+			}
+			if instance.SaveResponse(responseDB, response) {
+				if hasVisibleAssistantText(response) {
+					maybeAutoTitle(buf, user, instance)
+				}
+			}
 		}
 
 		return nil

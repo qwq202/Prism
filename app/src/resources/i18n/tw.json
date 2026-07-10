@@ -588,6 +588,22 @@
     "max-count-reached": "已達到當前模型 {{count}} 張圖片上限",
     "files-cleared-on-model-switch": "模型切換後，待發送圖片已自動清空"
   },
+  "ask-user": {
+    "title": "需要你的回答",
+    "description": "回答 {{count}} 個問題後，助手會繼續生成",
+    "single": "單選",
+    "multiple": "多選",
+    "other-placeholder": "其他，請輸入你的回答",
+    "skip-question": "跳過此題",
+    "undo-skip": "取消跳過",
+    "skip-all": "全部跳過",
+    "submit": "提交並繼續",
+    "skipped": "已跳過",
+    "answered": "已回答",
+    "invalid": "這組問題無法顯示，請重新生成回覆。",
+    "submit-failed": "回答提交失敗，請重試",
+    "answer-first": "請先回答上方問題，助手隨後會繼續生成"
+  },
   "drawing": {
     "model": "模型",
     "manage": "管理",

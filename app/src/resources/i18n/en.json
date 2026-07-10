@@ -500,6 +500,22 @@
     "max-count-reached": "The current model limit of {{count}} images has been reached",
     "files-cleared-on-model-switch": "After the model switch, the image to be sent has been automatically cleared"
   },
+  "ask-user": {
+    "title": "Your input is needed",
+    "description": "Answer {{count}} questions and the assistant will continue",
+    "single": "Single choice",
+    "multiple": "Multiple choice",
+    "other-placeholder": "Other — type your answer",
+    "skip-question": "Skip this question",
+    "undo-skip": "Undo skip",
+    "skip-all": "Skip all",
+    "submit": "Submit and continue",
+    "skipped": "Skipped",
+    "answered": "Answered",
+    "invalid": "These questions cannot be displayed. Regenerate the response.",
+    "submit-failed": "Could not submit the answers. Try again.",
+    "answer-first": "Answer the questions above before continuing"
+  },
   "drawing": {
     "model": "Model",
     "manage": "Manage",

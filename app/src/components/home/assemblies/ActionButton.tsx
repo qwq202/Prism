@@ -16,9 +16,10 @@ import { motion, AnimatePresence } from "framer-motion";
 type SendButtonProps = {
   working: boolean;
   onClick: () => unknown;
+  disabled?: boolean;
 };
 
-function ActionButton({ onClick, working }: SendButtonProps) {
+function ActionButton({ onClick, working, disabled }: SendButtonProps) {
   const { t } = useTranslation();
   return (
     <motion.div
@@ -30,6 +31,7 @@ function ActionButton({ onClick, working }: SendButtonProps) {
       <Button
         className={`inline-flex flex-row items-center shrink-0 whitespace-nowrap`}
         onClick={onClick}
+        disabled={disabled}
         unClickable
       >
         <div className="translate-y-[1px]">

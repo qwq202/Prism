@@ -47,7 +47,7 @@ export type StreamMessage = {
     arguments?: string;
     result?: string;
     error?: string;
-    status: "start" | "executing" | "success" | "error";
+    status: "start" | "executing" | "pending" | "success" | "error";
   };
   response_type?: string;
 };
@@ -78,6 +78,8 @@ export type ChatProps = {
   custom_instruction?: string;
   memory_enabled?: boolean;
   memory_history_enabled?: boolean;
+  tool_call_id?: string;
+  tool_result?: unknown;
 
   // mcp related fields
   enable_mcp?: boolean;
@@ -138,6 +140,8 @@ function summarizeChatProps(data: ChatProps): Record<string, unknown> {
     ignore_context: data.ignore_context,
     memory_enabled: data.memory_enabled,
     memory_history_enabled: data.memory_history_enabled,
+    tool_call_id: data.tool_call_id,
+    has_tool_result: data.tool_result !== undefined,
     max_tokens: data.max_tokens,
     temperature: data.temperature,
     top_p: data.top_p,
@@ -485,6 +489,21 @@ export class Connection {
     this.sendEvent(t, "restart", undefined, data);
   }
 
+  public sendToolResultEvent(
+    t: TFunction | undefined,
+    toolCallId: string,
+    toolResult: unknown,
+    data: ChatProps,
+  ) {
+    this.sendWithRetry(t, {
+      ...data,
+      type: "tool_result",
+      message: "",
+      tool_call_id: toolCallId,
+      tool_result: toolResult,
+    });
+  }
+
   public sendMaskEvent(t: TFunction | undefined, mask: Mask) {
     this.sendEvent(t, "mask", JSON.stringify(mask.context));
   }
@@ -649,6 +668,17 @@ export class ConnectionStack {
   ) {
     const conn = this.getConnection(id);
     conn && conn.sendRestartEvent(t, data);
+  }
+
+  public sendToolResultEvent(
+    id: number,
+    t: TFunction | undefined,
+    toolCallId: string,
+    toolResult: unknown,
+    data: ChatProps,
+  ) {
+    const conn = this.getConnection(id);
+    conn && conn.sendToolResultEvent(t, toolCallId, toolResult, data);
   }
 
   public sendMaskEvent(id: number, t: TFunction | undefined, mask: Mask) {

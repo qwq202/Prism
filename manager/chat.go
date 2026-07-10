@@ -10,6 +10,7 @@ import (
 	"chat/billing"
 	"chat/channel"
 	"chat/globals"
+	"chat/manager/askuser"
 	"chat/manager/conversation"
 	"chat/manager/memory"
 	"chat/utils"
@@ -891,8 +892,11 @@ func canUseTavilySearchTool(enable bool, model string, toolCallsSupported bool) 
 	return web.CanUseSearchTool(enable, model, toolCallsSupported)
 }
 
-func buildAvailableToolDefinitions(fetchEnabled bool, memoryWritable bool, webSearchEnabled bool) *globals.FunctionTools {
+func buildAvailableToolDefinitions(askUserEnabled bool, fetchEnabled bool, memoryWritable bool, webSearchEnabled bool) *globals.FunctionTools {
 	tools := make(globals.FunctionTools, 0)
+	if askUserEnabled {
+		tools = appendFunctionTools(tools, askuser.BuildToolDefinition())
+	}
 	if memoryWritable {
 		tools = appendFunctionTools(tools, memory.BuildToolDefinition())
 	}
@@ -914,6 +918,26 @@ func buildAutoToolChoice() *interface{} {
 	return &choice
 }
 
+func containsDeclaredToolCall(calls *globals.ToolCalls, tools *globals.FunctionTools) bool {
+	if calls == nil || tools == nil {
+		return false
+	}
+
+	declared := make(map[string]struct{}, len(*tools))
+	for _, tool := range *tools {
+		name := strings.TrimSpace(tool.Function.Name)
+		if name != "" {
+			declared[name] = struct{}{}
+		}
+	}
+	for _, call := range *calls {
+		if _, ok := declared[strings.TrimSpace(call.Function.Name)]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 func unsupportedToolResult(call globals.ToolCall) globals.Message {
 	return globals.Message{
 		Role: globals.Tool,
@@ -928,6 +952,12 @@ func unsupportedToolResult(call globals.ToolCall) globals.Message {
 
 func executeAvailableToolCall(db *sql.DB, user *auth.User, call globals.ToolCall) globals.Message {
 	switch call.Function.Name {
+	case askuser.ToolName:
+		_, _, err := askuser.NormalizeToolCall(call)
+		if err == nil {
+			err = errors.New("ask_user requires an interactive user response")
+		}
+		return askuser.ErrorMessage(call, err)
 	case memory.MemoryToolName:
 		messages := memory.ExecuteToolCalls(db, user, &globals.ToolCalls{call})
 		if len(messages) > 0 {
@@ -1166,6 +1196,34 @@ func createToolChatTask(
 			model,
 			summarizeToolCalls(assistant.ToolCalls),
 		))
+
+		if pendingCall, ok := askuser.FirstToolCall(assistant.ToolCalls); ok {
+			normalizedCall, _, normalizeErr := askuser.NormalizeToolCall(pendingCall)
+			if normalizeErr == nil {
+				if len(*assistant.ToolCalls) > 1 {
+					globals.Warn(fmt.Sprintf(
+						"[tools] ask_user must be called alone; preserving only ask_user call_id=%s and dropping %d sibling calls",
+						normalizedCall.Id,
+						len(*assistant.ToolCalls)-1,
+					))
+				}
+
+				pendingCalls := globals.ToolCalls{normalizedCall}
+				liveBuffer.SetToolCalls(&pendingCalls)
+				if err := sendToolCallEvents(conn, &pendingCalls, "pending", realtimeQuotaForBuffer(liveBuffer), plan); err != nil {
+					return hit, err, true
+				}
+				return hit, nil, false
+			}
+		}
+
+		if !containsDeclaredToolCall(assistant.ToolCalls, tools) {
+			liveBuffer.SetToolCalls(assistant.ToolCalls)
+			if err := sendToolCallEvents(conn, assistant.ToolCalls, "start", realtimeQuotaForBuffer(liveBuffer), plan); err != nil {
+				return hit, err, true
+			}
+			return hit, nil, false
+		}
 
 		if err := sendToolCallEvents(conn, assistant.ToolCalls, "executing", realtimeQuotaForBuffer(liveBuffer), plan); err != nil {
 			return hit, err, true
@@ -1711,7 +1769,7 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 		memCtx := buildMemoryContext(db, user, instance, model, group)
 		fetchToolEnabled := instance.IsEnableFetch() && toolCallsSupported
 		webSearchToolEnabled := canUseTavilySearchTool(instance.IsEnableWebSearch(), model, toolCallsSupported)
-		tools := buildAvailableToolDefinitions(fetchToolEnabled, memCtx.Writable, webSearchToolEnabled)
+		tools := buildAvailableToolDefinitions(toolCallsSupported, fetchToolEnabled, memCtx.Writable, webSearchToolEnabled)
 		toolEnabled = tools != nil
 		if tools != nil {
 			maxToolRounds := memory.MaxToolRounds

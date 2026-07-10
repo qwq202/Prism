@@ -5,9 +5,11 @@ import (
 	"chat/channel"
 	"chat/connection"
 	"chat/globals"
+	"chat/manager/askuser"
 	"chat/manager/conversation"
 	"chat/middleware"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -121,6 +123,37 @@ func newSlowStreamingUpstream() (*httptest.Server, *int32) {
 	return server, &requests
 }
 
+func newAskUserUpstream() (*httptest.Server, *int32) {
+	var requests int32
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestNumber := atomic.AddInt32(&requests, 1)
+
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+			return
+		}
+
+		if requestNumber == 1 {
+			arguments := `{"questions":[{"id":"scope","header":"Scope","question":"Which scope should be implemented?","type":"single","options":[{"label":"Minimal","description":"Only the core flow."},{"label":"Complete","description":"Include recovery and tests."}]},{"id":"parts","header":"Parts","question":"Which parts should be included?","type":"multiple","options":[{"label":"UI","description":"Build the answer card."},{"label":"Tests","description":"Cover the continuation flow."}]}]}`
+			chunk := fmt.Sprintf(
+				`{"id":"chatcmpl-ask","object":"chat.completion.chunk","created":1,"model":"ws-test-model","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_ask_1","type":"function","function":{"name":"ask_user","arguments":%q}}]},"finish_reason":"tool_calls"}]}`,
+				arguments,
+			)
+			_, _ = fmt.Fprintf(w, "data: %s\n\n", chunk)
+		} else {
+			_, _ = fmt.Fprint(w, `data: {"id":"chatcmpl-final","object":"chat.completion.chunk","created":1,"model":"ws-test-model","choices":[{"index":0,"delta":{"content":"Continuing with the complete UI and tests."},"finish_reason":"stop"}]}`+"\n\n")
+		}
+		_, _ = fmt.Fprint(w, "data: [DONE]\n\n")
+		flusher.Flush()
+	}))
+
+	return server, &requests
+}
+
 func readWebsocketResponse(t *testing.T, conn *websocket.Conn) globals.ChatSegmentResponse {
 	t.Helper()
 
@@ -166,6 +199,12 @@ type websocketChatTestEnv struct {
 
 func newWebsocketChatTestEnv(t *testing.T) *websocketChatTestEnv {
 	t.Helper()
+	upstream, requestCount := newSlowStreamingUpstream()
+	return newWebsocketChatTestEnvWithUpstream(t, upstream, requestCount)
+}
+
+func newWebsocketChatTestEnvWithUpstream(t *testing.T, upstream *httptest.Server, requestCount *int32) *websocketChatTestEnv {
+	t.Helper()
 
 	gin.SetMode(gin.TestMode)
 
@@ -173,7 +212,6 @@ func newWebsocketChatTestEnv(t *testing.T) *websocketChatTestEnv {
 	_, cache := openWebsocketTestCache(t)
 	rootID, token := rootToken(t, db)
 
-	upstream, requestCount := newSlowStreamingUpstream()
 	t.Cleanup(upstream.Close)
 
 	previousConduit := channel.ConduitInstance
@@ -237,6 +275,97 @@ func newWebsocketChatTestEnv(t *testing.T) *websocketChatTestEnv {
 		token:        token,
 		server:       server,
 		requestCount: requestCount,
+	}
+}
+
+func TestChatAPIWebsocketAskUserAnswerContinuesGeneration(t *testing.T) {
+	upstream, requestCount := newAskUserUpstream()
+	env := newWebsocketChatTestEnvWithUpstream(t, upstream, requestCount)
+
+	conn := env.dial(t, -1)
+	defer conn.Close()
+
+	if err := conn.WriteJSON(conversation.FormMessage{
+		Type:    ChatType,
+		Message: "Build the feature, but ask me when a decision is required.",
+		Model:   websocketTestModel,
+	}); err != nil {
+		t.Fatalf("send chat message: %v", err)
+	}
+
+	var conversationID int64
+	var pendingEvent *globals.ChatSegmentToolCall
+	for {
+		response := readWebsocketResponse(t, conn)
+		if response.Conversation != 0 {
+			conversationID = response.Conversation
+		}
+		if response.ToolCall != nil && response.ToolCall.Name == askuser.ToolName {
+			pendingEvent = response.ToolCall
+		}
+		if response.End {
+			break
+		}
+	}
+	if conversationID == 0 {
+		t.Fatalf("expected conversation promotion")
+	}
+	if pendingEvent == nil || pendingEvent.Status != "pending" || pendingEvent.Id != "call_ask_1" {
+		t.Fatalf("unexpected pending ask_user event: %#v", pendingEvent)
+	}
+
+	pending := waitForConversationMessages(t, env.db, env.rootID, conversationID, 2)
+	pendingAssistant := pending.GetMessage()[1]
+	if pendingAssistant.ToolCalls == nil || len(*pendingAssistant.ToolCalls) != 1 {
+		t.Fatalf("expected pending tool call to be persisted: %#v", pendingAssistant)
+	}
+	if _, _, err := askuser.NormalizeToolCall((*pendingAssistant.ToolCalls)[0]); err != nil {
+		t.Fatalf("expected persisted tool arguments to be normalized: %v", err)
+	}
+	if err := conn.Close(); err != nil {
+		t.Fatalf("close pending websocket: %v", err)
+	}
+	conn = env.dial(t, conversationID)
+	defer conn.Close()
+
+	answer := json.RawMessage(`{
+		"type":"ask_user_answer",
+		"answers":{
+			"scope":{"type":"single","value":"Complete","custom":false,"skipped":false},
+			"parts":{"type":"multiple","value":["UI","Tests"],"custom":false,"skipped":false}
+		}
+	}`)
+	if err := conn.WriteJSON(conversation.FormMessage{
+		Type:       ToolResultType,
+		Model:      websocketTestModel,
+		ToolCallID: "call_ask_1",
+		ToolResult: answer,
+	}); err != nil {
+		t.Fatalf("send ask_user answer: %v", err)
+	}
+
+	var continued string
+	for {
+		response := readWebsocketResponse(t, conn)
+		continued += response.Message
+		if response.End {
+			break
+		}
+	}
+	if continued != "Continuing with the complete UI and tests." {
+		t.Fatalf("unexpected continued response %q", continued)
+	}
+
+	completed := waitForConversationMessages(t, env.db, env.rootID, conversationID, 4)
+	messages := completed.GetMessage()
+	if messages[2].Role != globals.Tool || messages[2].ToolCallId == nil || *messages[2].ToolCallId != "call_ask_1" {
+		t.Fatalf("expected persisted ask_user tool result, got %#v", messages[2])
+	}
+	if messages[3].Role != globals.Assistant || messages[3].Content != continued {
+		t.Fatalf("expected continued assistant response, got %#v", messages[3])
+	}
+	if got := atomic.LoadInt32(requestCount); got != 2 {
+		t.Fatalf("expected one question request and one continuation request, got %d", got)
 	}
 }
 

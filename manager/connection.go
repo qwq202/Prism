@@ -12,13 +12,14 @@ import (
 )
 
 const (
-	ChatType    = "chat"
-	StopType    = "stop"
-	RestartType = "restart"
-	ShareType   = "share"
-	MaskType    = "mask"
-	EditType    = "edit"
-	RemoveType  = "remove"
+	ChatType       = "chat"
+	StopType       = "stop"
+	RestartType    = "restart"
+	ShareType      = "share"
+	MaskType       = "mask"
+	EditType       = "edit"
+	RemoveType     = "remove"
+	ToolResultType = "tool_result"
 )
 
 type Stack chan *conversation.FormMessage
