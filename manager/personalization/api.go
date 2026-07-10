@@ -10,8 +10,8 @@ import (
 )
 
 type saveForm struct {
-	Settings     Settings `json:"settings" binding:"required"`
-	BaseRevision int64    `json:"base_revision"`
+	Settings     *Settings `json:"settings" binding:"required"`
+	BaseRevision int64     `json:"base_revision"`
 }
 
 func LoadAPI(c *gin.Context) {
@@ -44,7 +44,11 @@ func SaveAPI(c *gin.Context) {
 	}
 
 	db := utils.GetDBFromContext(c)
-	record, err := Save(db, user.GetID(db), form.Settings, form.BaseRevision)
+	if form.Settings == nil {
+		c.JSON(http.StatusOK, gin.H{"status": false, "message": "settings are required"})
+		return
+	}
+	record, err := Save(db, user.GetID(db), *form.Settings, form.BaseRevision)
 	if errors.Is(err, ErrRevisionConflict) {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  false,
