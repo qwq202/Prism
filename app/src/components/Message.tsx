@@ -343,6 +343,10 @@ function MessageContent({
   );
   const hasToolCalls =
     askUserToolCalls.length > 0 || standardToolCalls.length > 0;
+  const isAskUserOnlyMessage =
+    !hasContent &&
+    askUserToolCalls.length > 0 &&
+    standardToolCalls.length === 0;
   const user = useSelector(selectUsername);
   const supportModels = useSelector(selectSupportModels);
 
@@ -414,7 +418,12 @@ function MessageContent({
         )}
       </div>
       <div
-        className={`relative message-content dark:bg-muted/40 border dark:border-transparent hover:border-border`}
+        className={cn(
+          "relative message-content",
+          isAskUserOnlyMessage
+            ? "ask-user-only-message"
+            : "dark:bg-muted/40 border dark:border-transparent hover:border-border",
+        )}
       >
         {hasContent ? (
           <>

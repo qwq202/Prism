@@ -125,6 +125,16 @@
     padding: 8px 16px;
     border-radius: var(--radius);
     transition: 0.25s linear;
+
+    &.ask-user-only-message {
+      padding: 0;
+      border: 0;
+      background: transparent;
+
+      > section {
+        margin-top: 0;
+      }
+    }
   }
 
   .message-avatar-wrapper {
