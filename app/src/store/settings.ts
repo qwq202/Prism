@@ -9,10 +9,19 @@ import {
 } from "@/utils/memory.ts";
 import { RootState } from "@/store/index.ts";
 import { isMobile } from "@/utils/device.ts";
+import type {
+  PersonalizationRecord,
+  PersonalizationSyncStatus,
+  SyncedPersonalizationSettings,
+} from "@/types/personalization.ts";
 
 export const sendKeys = ["Ctrl + Enter", "Enter"];
 export const minHistoryContext = 5;
 export const maxHistoryContext = 25;
+const personalizationSyncOwnerKey = "personalization_sync_owner";
+const personalizationSyncDirtyKey = "personalization_sync_dirty";
+const personalizationSyncRevisionKey = "personalization_sync_revision";
+const personalizationSyncUpdatedAtKey = "personalization_sync_updated_at";
 export const initialSettings = {
   context: true,
   align: false,
@@ -43,6 +52,20 @@ export const initialSettings = {
   memory_history_enabled: false,
 };
 
+const defaultSyncedPersonalizationSettings: SyncedPersonalizationSettings = {
+  persona_style: initialSettings.persona_style,
+  persona_warmth: initialSettings.persona_warmth,
+  persona_enthusiasm: initialSettings.persona_enthusiasm,
+  persona_lists: initialSettings.persona_lists,
+  persona_emoji: initialSettings.persona_emoji,
+  persona_custom_instruction: initialSettings.persona_custom_instruction,
+  persona_nickname: initialSettings.persona_nickname,
+  persona_occupation: initialSettings.persona_occupation,
+  persona_about_user: initialSettings.persona_about_user,
+  memory_enabled: initialSettings.memory_enabled,
+  memory_history_enabled: initialSettings.memory_history_enabled,
+};
+
 const normalizeHistoryCount = (value: number): number => {
   if (!Number.isFinite(value)) return initialSettings.history;
 
@@ -64,13 +87,83 @@ export type PersonalizationSettings = {
   persona_about_user: string;
 };
 
+function readSyncedPersonalizationSettings(
+  state: SyncedPersonalizationSettings,
+): SyncedPersonalizationSettings {
+  return {
+    persona_style: state.persona_style,
+    persona_warmth: state.persona_warmth,
+    persona_enthusiasm: state.persona_enthusiasm,
+    persona_lists: state.persona_lists,
+    persona_emoji: state.persona_emoji,
+    persona_custom_instruction: state.persona_custom_instruction,
+    persona_nickname: state.persona_nickname,
+    persona_occupation: state.persona_occupation,
+    persona_about_user: state.persona_about_user,
+    memory_enabled: state.memory_enabled,
+    memory_history_enabled: state.memory_history_enabled,
+  };
+}
+
+function persistSyncedPersonalizationSettings(
+  value: SyncedPersonalizationSettings,
+) {
+  setMemory("persona_style", value.persona_style);
+  setMemory("persona_warmth", value.persona_warmth);
+  setMemory("persona_enthusiasm", value.persona_enthusiasm);
+  setMemory("persona_lists", value.persona_lists);
+  setMemory("persona_emoji", value.persona_emoji);
+  setMemory("persona_custom_instruction", value.persona_custom_instruction);
+  setMemory("persona_nickname", value.persona_nickname);
+  setMemory("persona_occupation", value.persona_occupation);
+  setMemory("persona_about_user", value.persona_about_user);
+  setBooleanMemory("memory_enabled", value.memory_enabled);
+  setBooleanMemory("memory_history_enabled", value.memory_history_enabled);
+}
+
+function assignSyncedPersonalizationSettings(
+  state: SyncedPersonalizationSettings,
+  value: SyncedPersonalizationSettings,
+) {
+  state.persona_style = value.persona_style;
+  state.persona_warmth = value.persona_warmth;
+  state.persona_enthusiasm = value.persona_enthusiasm;
+  state.persona_lists = value.persona_lists;
+  state.persona_emoji = value.persona_emoji;
+  state.persona_custom_instruction = value.persona_custom_instruction;
+  state.persona_nickname = value.persona_nickname;
+  state.persona_occupation = value.persona_occupation;
+  state.persona_about_user = value.persona_about_user;
+  state.memory_enabled = value.memory_enabled;
+  state.memory_history_enabled = value.memory_history_enabled;
+}
+
+function markPersonalizationDirty(state: {
+  personalization_sync_dirty: boolean;
+  personalization_sync_change_id: number;
+  personalization_sync_status: PersonalizationSyncStatus;
+  personalization_sync_error: string;
+}) {
+  state.personalization_sync_dirty = true;
+  state.personalization_sync_change_id += 1;
+  state.personalization_sync_status = "saving";
+  state.personalization_sync_error = "";
+  setBooleanMemory(personalizationSyncDirtyKey, true);
+}
+
 const stylePromptMap: Record<string, string> = {
-  professional: "Keep the response style polished, precise, and professional — refined and detail-oriented.",
-  friendly: "Keep the response style warm, approachable, and gently supportive.",
-  direct: "Keep the response style candid, frank, and optimistically straightforward.",
-  creative: "Keep the response style imaginative, playful, and wonderfully whimsical.",
-  efficient: "Keep the response style concise, practical, and straight to the point.",
-  sarcastic: "Feel free to be witty, sharp-tongued, and humorously sarcastic when fitting.",
+  professional:
+    "Keep the response style polished, precise, and professional — refined and detail-oriented.",
+  friendly:
+    "Keep the response style warm, approachable, and gently supportive.",
+  direct:
+    "Keep the response style candid, frank, and optimistically straightforward.",
+  creative:
+    "Keep the response style imaginative, playful, and wonderfully whimsical.",
+  efficient:
+    "Keep the response style concise, practical, and straight to the point.",
+  sarcastic:
+    "Feel free to be witty, sharp-tongued, and humorously sarcastic when fitting.",
 };
 
 const warmthPromptMap: Record<string, string> = {
@@ -86,9 +179,12 @@ const enthusiasmPromptMap: Record<string, string> = {
 };
 
 const listsPromptMap: Record<string, string> = {
-  minimal: "Prefer paragraphs over headings and lists unless structure clearly helps.",
-  balanced: "Use headings and lists when they improve clarity, but avoid over-structuring.",
-  structured: "Use clear headings and lists more proactively to organize answers.",
+  minimal:
+    "Prefer paragraphs over headings and lists unless structure clearly helps.",
+  balanced:
+    "Use headings and lists when they improve clarity, but avoid over-structuring.",
+  structured:
+    "Use clear headings and lists more proactively to organize answers.",
 };
 
 const emojiPromptMap: Record<string, string> = {
@@ -156,10 +252,7 @@ export const settingsSlice = createSlice({
       initialSettings.collapse_thinking,
     ), // collapse thinking content by default
     persona_style: getMemory("persona_style", initialSettings.persona_style),
-    persona_warmth: getMemory(
-      "persona_warmth",
-      initialSettings.persona_warmth,
-    ),
+    persona_warmth: getMemory("persona_warmth", initialSettings.persona_warmth),
     persona_enthusiasm: getMemory(
       "persona_enthusiasm",
       initialSettings.persona_enthusiasm,
@@ -190,6 +283,23 @@ export const settingsSlice = createSlice({
       "memory_history_enabled",
       initialSettings.memory_history_enabled,
     ),
+    personalization_sync_owner: getMemory(personalizationSyncOwnerKey, ""),
+    personalization_sync_dirty: getBooleanMemory(
+      personalizationSyncDirtyKey,
+      false,
+    ),
+    personalization_sync_revision: getNumberMemory(
+      personalizationSyncRevisionKey,
+      0,
+    ),
+    personalization_sync_updated_at: getMemory(
+      personalizationSyncUpdatedAtKey,
+      "",
+    ),
+    personalization_sync_status: "idle" as PersonalizationSyncStatus,
+    personalization_sync_error: "",
+    personalization_sync_request: 0,
+    personalization_sync_change_id: 0,
   },
   reducers: {
     toggleDialog: (state) => {
@@ -272,46 +382,143 @@ export const settingsSlice = createSlice({
     setPersonaStyle: (state, action) => {
       state.persona_style = action.payload as string;
       setMemory("persona_style", action.payload);
+      markPersonalizationDirty(state);
     },
     setPersonaWarmth: (state, action) => {
       state.persona_warmth = action.payload as string;
       setMemory("persona_warmth", action.payload);
+      markPersonalizationDirty(state);
     },
     setPersonaEnthusiasm: (state, action) => {
       state.persona_enthusiasm = action.payload as string;
       setMemory("persona_enthusiasm", action.payload);
+      markPersonalizationDirty(state);
     },
     setPersonaLists: (state, action) => {
       state.persona_lists = action.payload as string;
       setMemory("persona_lists", action.payload);
+      markPersonalizationDirty(state);
     },
     setPersonaEmoji: (state, action) => {
       state.persona_emoji = action.payload as string;
       setMemory("persona_emoji", action.payload);
+      markPersonalizationDirty(state);
     },
     setPersonaCustomInstruction: (state, action) => {
       state.persona_custom_instruction = action.payload as string;
       setMemory("persona_custom_instruction", action.payload);
+      markPersonalizationDirty(state);
     },
     setPersonaNickname: (state, action) => {
       state.persona_nickname = action.payload as string;
       setMemory("persona_nickname", action.payload);
+      markPersonalizationDirty(state);
     },
     setPersonaOccupation: (state, action) => {
       state.persona_occupation = action.payload as string;
       setMemory("persona_occupation", action.payload);
+      markPersonalizationDirty(state);
     },
     setPersonaAboutUser: (state, action) => {
       state.persona_about_user = action.payload as string;
       setMemory("persona_about_user", action.payload);
+      markPersonalizationDirty(state);
     },
     setMemoryEnabled: (state, action) => {
       state.memory_enabled = action.payload as boolean;
       setBooleanMemory("memory_enabled", action.payload);
+      markPersonalizationDirty(state);
     },
     setMemoryHistoryEnabled: (state, action) => {
       state.memory_history_enabled = action.payload as boolean;
       setBooleanMemory("memory_history_enabled", action.payload);
+      markPersonalizationDirty(state);
+    },
+    preparePersonalizationAccount: (state, action) => {
+      const owner = String(action.payload || "").trim();
+      if (!owner) return;
+
+      if (
+        state.personalization_sync_owner &&
+        state.personalization_sync_owner !== owner
+      ) {
+        assignSyncedPersonalizationSettings(
+          state,
+          defaultSyncedPersonalizationSettings,
+        );
+        persistSyncedPersonalizationSettings(
+          defaultSyncedPersonalizationSettings,
+        );
+        state.personalization_sync_dirty = false;
+        state.personalization_sync_revision = 0;
+        state.personalization_sync_updated_at = "";
+        state.personalization_sync_change_id += 1;
+        setBooleanMemory(personalizationSyncDirtyKey, false);
+        setNumberMemory(personalizationSyncRevisionKey, 0);
+        setMemory(personalizationSyncUpdatedAtKey, "");
+      }
+
+      state.personalization_sync_owner = owner;
+      state.personalization_sync_status = "loading";
+      state.personalization_sync_error = "";
+      setMemory(personalizationSyncOwnerKey, owner);
+    },
+    hydratePersonalization: (state, action) => {
+      const record = action.payload as PersonalizationRecord;
+      assignSyncedPersonalizationSettings(state, record.settings);
+      persistSyncedPersonalizationSettings(record.settings);
+      state.personalization_sync_dirty = false;
+      state.personalization_sync_revision = record.revision;
+      state.personalization_sync_updated_at = record.updated_at || "";
+      state.personalization_sync_status = "synced";
+      state.personalization_sync_error = "";
+      setBooleanMemory(personalizationSyncDirtyKey, false);
+      setNumberMemory(personalizationSyncRevisionKey, record.revision);
+      setMemory(personalizationSyncUpdatedAtKey, record.updated_at || "");
+    },
+    markPersonalizationSynced: (state, action) => {
+      const payload = action.payload as {
+        revision: number;
+        updated_at?: string;
+        change_id: number;
+      };
+      state.personalization_sync_revision = payload.revision;
+      state.personalization_sync_updated_at = payload.updated_at || "";
+      state.personalization_sync_error = "";
+      if (state.personalization_sync_change_id === payload.change_id) {
+        state.personalization_sync_dirty = false;
+        state.personalization_sync_status = "synced";
+        setBooleanMemory(personalizationSyncDirtyKey, false);
+      } else {
+        state.personalization_sync_status = "saving";
+      }
+      setNumberMemory(personalizationSyncRevisionKey, payload.revision);
+      setMemory(personalizationSyncUpdatedAtKey, payload.updated_at || "");
+    },
+    rebasePersonalizationSync: (state, action) => {
+      const payload = action.payload as {
+        revision: number;
+        updated_at?: string;
+      };
+      state.personalization_sync_revision = payload.revision;
+      state.personalization_sync_updated_at = payload.updated_at || "";
+      state.personalization_sync_dirty = true;
+      state.personalization_sync_status = "saving";
+      state.personalization_sync_error = "";
+      setNumberMemory(personalizationSyncRevisionKey, payload.revision);
+      setMemory(personalizationSyncUpdatedAtKey, payload.updated_at || "");
+      setBooleanMemory(personalizationSyncDirtyKey, true);
+    },
+    setPersonalizationSyncStatus: (state, action) => {
+      const payload = action.payload as {
+        status: PersonalizationSyncStatus;
+        error?: string;
+      };
+      state.personalization_sync_status = payload.status;
+      state.personalization_sync_error = payload.error || "";
+    },
+    requestPersonalizationSync: (state) => {
+      state.personalization_sync_request += 1;
     },
     resetSettings: (state) => {
       state.context = initialSettings.context;
@@ -376,6 +583,7 @@ export const settingsSlice = createSlice({
         "memory_history_enabled",
         initialSettings.memory_history_enabled,
       );
+      markPersonalizationDirty(state);
     },
   },
 });
@@ -413,6 +621,12 @@ export const {
   setPersonaAboutUser,
   setMemoryEnabled,
   setMemoryHistoryEnabled,
+  preparePersonalizationAccount,
+  hydratePersonalization,
+  markPersonalizationSynced,
+  rebasePersonalizationSync,
+  setPersonalizationSyncStatus,
+  requestPersonalizationSync,
 } = settingsSlice.actions;
 export default settingsSlice.reducer;
 
@@ -470,3 +684,25 @@ export const memoryEnabledSelector = (state: RootState): boolean =>
   state.settings.memory_enabled;
 export const memoryHistoryEnabledSelector = (state: RootState): boolean =>
   state.settings.memory_history_enabled;
+export const syncedPersonalizationSettingsSelector = (
+  state: RootState,
+): SyncedPersonalizationSettings =>
+  readSyncedPersonalizationSettings(state.settings);
+export const personalizationSyncOwnerSelector = (state: RootState): string =>
+  state.settings.personalization_sync_owner;
+export const personalizationSyncDirtySelector = (state: RootState): boolean =>
+  state.settings.personalization_sync_dirty;
+export const personalizationSyncRevisionSelector = (state: RootState): number =>
+  state.settings.personalization_sync_revision;
+export const personalizationSyncUpdatedAtSelector = (
+  state: RootState,
+): string => state.settings.personalization_sync_updated_at;
+export const personalizationSyncStatusSelector = (
+  state: RootState,
+): PersonalizationSyncStatus => state.settings.personalization_sync_status;
+export const personalizationSyncErrorSelector = (state: RootState): string =>
+  state.settings.personalization_sync_error;
+export const personalizationSyncRequestSelector = (state: RootState): number =>
+  state.settings.personalization_sync_request;
+export const personalizationSyncChangeIDSelector = (state: RootState): number =>
+  state.settings.personalization_sync_change_id;

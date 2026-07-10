@@ -46,9 +46,15 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
+  Cloud,
+  CloudOff,
+  CheckCircle2,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { PERSONALIZATION_TEXT_LIMITS } from "@/types/personalization.ts";
 
 type SelectOption = {
   value: string;
@@ -112,9 +118,12 @@ function MemoryDialog({
           id: item.id,
           content: item.content,
           date:
-            formatMemoryDate(item.updated_at || item.created_at, i18n.language) ||
-            t("settings.personalization.memory.just-now"),
-          source: item.source || t("settings.personalization.memory.source.chat"),
+            formatMemoryDate(
+              item.updated_at || item.created_at,
+              i18n.language,
+            ) || t("settings.personalization.memory.just-now"),
+          source:
+            item.source || t("settings.personalization.memory.source.chat"),
           category: item.category,
         })),
     [i18n.language, memories, search, t],
@@ -139,7 +148,11 @@ function MemoryDialog({
 
     setSaving(true);
     try {
-      const ok = await onUpdate(editingMemory.id, nextContent, editingMemory.category);
+      const ok = await onUpdate(
+        editingMemory.id,
+        nextContent,
+        editingMemory.category,
+      );
       if (ok) {
         closeEditor();
       }
@@ -168,7 +181,9 @@ function MemoryDialog({
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder={t("settings.personalization.memory.search-placeholder")}
+                placeholder={t(
+                  "settings.personalization.memory.search-placeholder",
+                )}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9 h-10 bg-muted/30 border-none rounded-full"
@@ -203,7 +218,9 @@ function MemoryDialog({
                           <button
                             type="button"
                             className="p-1.5 rounded-md transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            aria-label={t("settings.personalization.memory.more")}
+                            aria-label={t(
+                              "settings.personalization.memory.more",
+                            )}
                           >
                             <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
                           </button>
@@ -243,7 +260,10 @@ function MemoryDialog({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editingMemory} onOpenChange={(nextOpen) => !nextOpen && closeEditor()}>
+      <Dialog
+        open={!!editingMemory}
+        onOpenChange={(nextOpen) => !nextOpen && closeEditor()}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
@@ -312,15 +332,14 @@ function InlineSelectItem({
         </SelectTrigger>
         <SelectContent>
           {options.map((opt) => (
-            <SelectItem
-              key={opt.value}
-              value={opt.value}
-              textValue={opt.label}
-            >
+            <SelectItem key={opt.value} value={opt.value} textValue={opt.label}>
               {opt.desc ? (
                 <div className="flex flex-col gap-0.5 py-0.5">
                   <span className="text-sm">{opt.label}</span>
-                  <span data-desc className="text-xs text-muted-foreground hidden sm:inline-block">
+                  <span
+                    data-desc
+                    className="text-xs text-muted-foreground hidden sm:inline-block"
+                  >
                     {opt.desc}
                   </span>
                 </div>
@@ -384,7 +403,7 @@ function PersonalizationCard({
     <div
       className={cn(
         "flex flex-col bg-background rounded-lg shadow border overflow-hidden",
-        className
+        className,
       )}
     >
       <div className="select-none inline-flex flex-row items-center justify-between h-fit w-full border-b px-4 py-3 bg-muted/20">
@@ -411,9 +430,7 @@ function PersonalizationCard({
         </div>
         {headerAction}
       </div>
-      <div className="p-4 sm:p-5 flex flex-col gap-4">
-        {children}
-      </div>
+      <div className="p-4 sm:p-5 flex flex-col gap-4">{children}</div>
     </div>
   );
 }
@@ -435,6 +452,9 @@ function Personalization() {
   const personaAboutUser = useSelector(settings.personaAboutUserSelector);
   const memoryEnabled = useSelector(settings.memoryEnabledSelector);
   const historyEnabled = useSelector(settings.memoryHistoryEnabledSelector);
+  const syncStatus = useSelector(settings.personalizationSyncStatusSelector);
+  const syncDirty = useSelector(settings.personalizationSyncDirtySelector);
+  const syncError = useSelector(settings.personalizationSyncErrorSelector);
 
   const [memoryDialogOpen, setMemoryDialogOpen] = useState(false);
   const [memories, setMemories] = useState<MemoryRecord[]>([]);
@@ -459,7 +479,8 @@ function Personalization() {
     if (!resp.status) {
       toast.error(t("settings.personalization.memory.delete-failed"), {
         description:
-          resp.message || t("settings.personalization.memory.delete-failed-tip"),
+          resp.message ||
+          t("settings.personalization.memory.delete-failed-tip"),
       });
       return;
     }
@@ -626,6 +647,19 @@ function Personalization() {
     },
   };
 
+  const effectiveSyncStatus =
+    syncDirty && syncStatus === "synced" ? "saving" : syncStatus;
+  const SyncStatusIcon =
+    effectiveSyncStatus === "loading" || effectiveSyncStatus === "saving"
+      ? Loader2
+      : effectiveSyncStatus === "offline" || effectiveSyncStatus === "error"
+        ? CloudOff
+        : effectiveSyncStatus === "synced" || effectiveSyncStatus === "conflict"
+          ? CheckCircle2
+          : Cloud;
+  const syncRetryable =
+    effectiveSyncStatus === "offline" || effectiveSyncStatus === "error";
+
   return (
     <ScrollArea className="relative w-full h-full flex flex-col bg-background">
       <MemoryDialog
@@ -642,6 +676,46 @@ function Personalization() {
         initial="hidden"
         animate="visible"
       >
+        <motion.div
+          variants={cardVariants}
+          className="flex min-h-8 items-center justify-end"
+        >
+          <div
+            className={cn(
+              "inline-flex min-h-8 max-w-full items-center gap-2 rounded-full border border-border/70 bg-background px-3 text-xs text-muted-foreground",
+              effectiveSyncStatus === "error" &&
+                "border-destructive/30 text-destructive",
+              effectiveSyncStatus === "offline" &&
+                "border-amber-500/30 text-amber-700 dark:text-amber-300",
+            )}
+            role="status"
+            aria-live="polite"
+            title={syncError || undefined}
+          >
+            <SyncStatusIcon
+              className={cn(
+                "h-3.5 w-3.5",
+                (effectiveSyncStatus === "loading" ||
+                  effectiveSyncStatus === "saving") &&
+                  "animate-spin motion-reduce:animate-none",
+              )}
+            />
+            <span className="min-w-0 text-pretty">
+              {t(`settings.personalization.sync.${effectiveSyncStatus}`)}
+            </span>
+            {syncRetryable && (
+              <button
+                type="button"
+                onClick={() => dispatch(settings.requestPersonalizationSync())}
+                className="ml-1 inline-flex min-h-7 items-center gap-1 rounded-full px-2 font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <RefreshCw className="h-3 w-3" />
+                {t("settings.personalization.sync.retry")}
+              </button>
+            )}
+          </div>
+        </motion.div>
+
         <motion.div variants={cardVariants}>
           <PersonalizationCard
             icon={<Brain />}
@@ -730,13 +804,18 @@ function Personalization() {
           <PersonalizationCard
             icon={<Bot />}
             title={t("settings.personalization.custom-instruction")}
-            description={t("settings.personalization.custom-instruction-placeholder")}
+            description={t(
+              "settings.personalization.custom-instruction-placeholder",
+            )}
           >
             <div className="flex flex-col gap-2">
               <Textarea
                 rows={4}
                 value={personaCustomInstruction}
-                placeholder={t("settings.personalization.custom-instruction-placeholder")}
+                maxLength={PERSONALIZATION_TEXT_LIMITS.customInstruction}
+                placeholder={t(
+                  "settings.personalization.custom-instruction-placeholder",
+                )}
                 className="resize-y min-h-[100px] text-sm"
                 onChange={(e) =>
                   dispatch(settings.setPersonaCustomInstruction(e.target.value))
@@ -759,7 +838,10 @@ function Personalization() {
                 </span>
                 <Input
                   value={personaNickname}
-                  placeholder={t("settings.personalization.nickname-placeholder")}
+                  maxLength={PERSONALIZATION_TEXT_LIMITS.nickname}
+                  placeholder={t(
+                    "settings.personalization.nickname-placeholder",
+                  )}
                   className="h-9 text-sm"
                   onChange={(e) =>
                     dispatch(settings.setPersonaNickname(e.target.value))
@@ -772,7 +854,10 @@ function Personalization() {
                 </span>
                 <Input
                   value={personaOccupation}
-                  placeholder={t("settings.personalization.occupation-placeholder")}
+                  maxLength={PERSONALIZATION_TEXT_LIMITS.occupation}
+                  placeholder={t(
+                    "settings.personalization.occupation-placeholder",
+                  )}
                   className="h-9 text-sm"
                   onChange={(e) =>
                     dispatch(settings.setPersonaOccupation(e.target.value))
@@ -787,7 +872,10 @@ function Personalization() {
               <Textarea
                 rows={4}
                 value={personaAboutUser}
-                placeholder={t("settings.personalization.about-user-placeholder")}
+                maxLength={PERSONALIZATION_TEXT_LIMITS.aboutUser}
+                placeholder={t(
+                  "settings.personalization.about-user-placeholder",
+                )}
                 className="resize-y min-h-[100px] text-sm"
                 onChange={(e) =>
                   dispatch(settings.setPersonaAboutUser(e.target.value))

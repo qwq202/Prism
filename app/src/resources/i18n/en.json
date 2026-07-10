@@ -676,6 +676,16 @@
     "personalization": {
       "title": "Personalization",
       "description": "Set your default preferred style, tone, and how the assistant should address you. These preferences shape presentation, but they do not override your current request.",
+      "sync": {
+        "idle": "Personalization is saved locally",
+        "loading": "Loading cloud settings",
+        "saving": "Syncing personalization",
+        "synced": "Synced to your account",
+        "offline": "Offline — changes are saved locally",
+        "error": "Personalization sync failed",
+        "conflict": "Loaded the latest settings from another device",
+        "retry": "Retry"
+      },
       "base-style": "Base Style and Tone",
       "base-style-tip": "Choose the overall default direction for how the assistant should sound in everyday conversations.",
       "traits": "Traits",

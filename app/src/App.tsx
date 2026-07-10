@@ -6,11 +6,13 @@ import router from "./router.tsx";
 import { Toaster } from "@/components/ui/sonner";
 import Spinner from "@/spinner.tsx";
 import ReloadPrompt from "@/components/ReloadService.tsx";
+import PersonalizationSync from "@/components/app/PersonalizationSync.tsx";
 
 function App() {
   return (
     <Provider store={store}>
       <AppProvider>
+        <PersonalizationSync />
         <Toaster />
         <Spinner />
         <ReloadPrompt />
