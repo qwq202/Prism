@@ -2062,7 +2062,7 @@ function Drawing() {
           if (!open) setPreviewImage(null);
         }}
       >
-        <DialogContent className="h-[min(42rem,92dvh)] w-[calc(100vw-2rem)] max-w-5xl gap-0 overflow-hidden rounded-2xl p-0">
+        <DialogContent className="h-[min(680px,88dvh)] w-[calc(100vw-2rem)] max-w-[1080px] gap-0 overflow-hidden rounded-2xl p-0">
           <DialogHeader className="sr-only">
             <DialogTitle>{t("drawing.detailsTitle")}</DialogTitle>
             <DialogDescription>
@@ -2070,8 +2070,8 @@ function Drawing() {
             </DialogDescription>
           </DialogHeader>
           {previewImage && previewMetadata && (
-            <div className="thin-scrollbar grid h-full min-h-0 overflow-y-auto md:grid-cols-[minmax(0,1.2fr)_minmax(22rem,0.8fr)] md:overflow-hidden">
-              <div className="relative flex min-h-72 items-center justify-center overflow-hidden bg-muted/35 p-4 sm:p-6 md:min-h-0">
+            <div className="thin-scrollbar grid h-full min-h-0 overflow-y-auto md:grid-cols-2 md:overflow-hidden lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+              <div className="relative flex min-h-[280px] items-center justify-center overflow-hidden bg-muted/35 p-[16px] sm:p-[24px] md:min-h-0">
                 <img
                   src={previewImage.src}
                   alt={t("drawing.generatedImage")}
