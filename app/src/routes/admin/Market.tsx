@@ -1090,6 +1090,86 @@ function MarketAlert({
   );
 }
 
+type MarketUnavailableAlertProps = {
+  open: boolean;
+  models: Model[];
+  onRemove: (model: Model) => void;
+  onRemoveAll: () => void;
+};
+
+function MarketUnavailableAlert({
+  open,
+  models,
+  onRemove,
+  onRemoveAll,
+}: MarketUnavailableAlertProps) {
+  const { t } = useTranslation();
+  const visible = open && models.length > 0;
+
+  return (
+    <AnimatePresence initial={false}>
+      {visible && (
+        <motion.div
+          key="market-unavailable-alert"
+          layout
+          className="market-alert border-destructive/30 bg-destructive/5"
+          initial={{ height: 0, opacity: 0, marginBottom: 0 }}
+          animate={{ height: "auto", opacity: 1, marginBottom: 16 }}
+          exit={{ height: 0, opacity: 0, marginBottom: 0 }}
+          transition={{ duration: 0.22, ease: "easeOut" }}
+          style={{ overflow: "hidden" }}
+        >
+          <div className="mb-2 flex w-full flex-row items-center justify-between gap-3 select-none">
+            <div className="flex min-w-0 flex-row items-center text-destructive">
+              <AlertCircle className="mr-2 h-4 w-4 shrink-0 translate-y-[1px]" />
+              <span>{t("admin.market.unavailable-models")}</span>
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="whitespace-nowrap"
+              onClick={onRemoveAll}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              {t("admin.market.remove-all-unavailable")}
+            </Button>
+          </div>
+          <motion.div
+            className="market-alert-wrapper"
+            layout
+            transition={{ duration: 0.2, ease: "easeOut" }}
+          >
+            <AnimatePresence initial={false} mode="popLayout">
+              {models.map((model) => (
+                <motion.div
+                  key={model.seed}
+                  layout
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.96 }}
+                  transition={{ duration: 0.16, ease: "easeOut" }}
+                  style={{ overflow: "hidden" }}
+                >
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-destructive/30 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                    onClick={() => onRemove(model)}
+                    title={t("admin.market.remove-unavailable")}
+                  >
+                    <Trash2 className="mr-2 h-3.5 w-3.5" />
+                    {model.name || model.id}
+                  </Button>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 type GroupSectionProps = {
   groupName: string;
   models: Model[];
@@ -1289,6 +1369,14 @@ function Market() {
       unusedModels.filter((model) => !hiddenUnusedModels.has(model)),
     [hiddenUnusedModels, unusedModels],
   );
+
+  const unavailableModels = useMemo((): Model[] => {
+    const callableModels = new Set(allModels);
+    return form.filter((model) => {
+      const id = model.id.trim();
+      return id.length > 0 && !callableModels.has(id);
+    });
+  }, [allModels, form]);
 
   useEffect(() => {
     setHiddenUnusedModels((prev) => {
@@ -1491,6 +1579,30 @@ function Market() {
                   id: model,
                   name: getModelName(model),
                 })),
+              });
+            }}
+          />
+          <MarketUnavailableAlert
+            open={!loading}
+            models={unavailableModels}
+            onRemove={(model) => {
+              marketDispatch({
+                type: "remove",
+                payload: {
+                  seed: model.seed as string,
+                  id: model.id,
+                },
+              });
+            }}
+            onRemoveAll={() => {
+              unavailableModels.forEach((model) => {
+                marketDispatch({
+                  type: "remove",
+                  payload: {
+                    seed: model.seed as string,
+                    id: model.id,
+                  },
+                });
               });
             }}
           />
