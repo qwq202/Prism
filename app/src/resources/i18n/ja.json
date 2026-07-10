@@ -220,6 +220,7 @@
     "openai-reasoning-level-medium": "中",
     "openai-reasoning-level-high": "高い",
     "openai-reasoning-level-xhigh": "非常に高い",
+    "openai-reasoning-level-max": "最大",
     "openai-web-enable-tip": "OpenAIネイティブWeb検索を使用すると、追加のツールコール料金またはトークンが消費されます。",
     "fetch-tip": "有効にすると、メッセージ内のWebページリンクをアプリが取得し、AIが読めるように提供します。公開された http/https ページのみ対応します。",
     "openai-reasoning-tip": "{{model}}は思考強度と思考の要約設定に対応しています。要約をオフにすると、思考しても要約は表示されません。自動は現在のモデルで利用可能な最適な要約を使用します。",

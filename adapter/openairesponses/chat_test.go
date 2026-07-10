@@ -81,6 +81,29 @@ func TestGetChatBodyIncludesPromptCacheParams(t *testing.T) {
 	}
 }
 
+func TestGetChatBodyUsesGPT56PromptCacheOptions(t *testing.T) {
+	instance := &ChatInstance{}
+	cacheKey := "stable-prefix"
+	cacheRetention := "24h"
+	props := &adaptercommon.ChatProps{
+		Model:                "gpt-5.6",
+		PromptCacheKey:       &cacheKey,
+		PromptCacheRetention: &cacheRetention,
+		Message: []globals.Message{
+			{Role: globals.User, Content: "hello"},
+		},
+	}
+
+	body := instance.GetChatBody(props, false)
+	if body.PromptCacheRetention != nil {
+		t.Fatalf("expected gpt-5.6 to omit deprecated prompt_cache_retention, got %#v", body.PromptCacheRetention)
+	}
+	options, ok := body.PromptCacheOptions.(map[string]string)
+	if !ok || options["ttl"] != "30m" {
+		t.Fatalf("expected gpt-5.6 prompt cache options, got %#v", body.PromptCacheOptions)
+	}
+}
+
 func TestGetChatBodySkipsNativeWebToolForUnsupportedModel(t *testing.T) {
 	instance := &ChatInstance{}
 	props := &adaptercommon.ChatProps{

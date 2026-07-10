@@ -213,6 +213,7 @@
     "openai-reasoning-level-medium": "Medium",
     "openai-reasoning-level-high": "High",
     "openai-reasoning-level-xhigh": "XHigh",
+    "openai-reasoning-level-max": "Max",
     "openai-reasoning-summary-enable": "Show reasoning summary",
     "openai-reasoning-summary-detail": "Summary detail",
     "openai-reasoning-summary-level-concise": "Concise",

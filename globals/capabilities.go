@@ -155,6 +155,8 @@ func isXiaomiMiMoModel(model string) bool {
 
 func isOpenAIResponsesNativeWebModel(model string) bool {
 	switch {
+	case isOpenAIGPT56Model(model):
+		return true
 	case model == "gpt-5.5" || strings.HasPrefix(model, "gpt-5.5-"):
 		return true
 	case strings.HasPrefix(model, "gpt-5.4"):
@@ -177,6 +179,8 @@ func isOpenAIResponsesNativeWebModel(model string) bool {
 func openAIResponsesReasoningEfforts(model string) []string {
 	var efforts []string
 	switch {
+	case isOpenAIGPT56Model(model):
+		efforts = []string{"none", "low", "medium", "high", "xhigh", "max"}
 	case model == "gpt-5.5" || strings.HasPrefix(model, "gpt-5.5-"):
 		efforts = []string{"none", "low", "medium", "high", "xhigh"}
 	case strings.HasPrefix(model, "gpt-5.4-pro"):
@@ -216,6 +220,8 @@ func openAIResponsesReasoningEfforts(model string) []string {
 
 func openAIResponsesSamplingRestriction(model string) SamplingRestriction {
 	switch {
+	case isOpenAIGPT56Model(model):
+		return SamplingRestrictionAlways
 	case model == "gpt-5.5" || strings.HasPrefix(model, "gpt-5.5-"):
 		return SamplingRestrictionAlways
 	case strings.HasPrefix(model, "gpt-5.4"):
@@ -241,4 +247,8 @@ func openAIResponsesSamplingRestriction(model string) SamplingRestriction {
 
 func isOpenAIGPT54Model(model string) bool {
 	return strings.HasPrefix(model, "gpt-5.4") && !strings.Contains(model, "pro")
+}
+
+func isOpenAIGPT56Model(model string) bool {
+	return model == "gpt-5.6" || strings.HasPrefix(model, "gpt-5.6-")
 }

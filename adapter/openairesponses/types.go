@@ -30,6 +30,7 @@ type ResponseRequest struct {
 	Include              []string       `json:"include,omitempty"`
 	PreviousResponseID   *string        `json:"previous_response_id,omitempty"`
 	PromptCacheKey       *string        `json:"prompt_cache_key,omitempty"`
+	PromptCacheOptions   interface{}    `json:"prompt_cache_options,omitempty"`
 	PromptCacheRetention *string        `json:"prompt_cache_retention,omitempty"`
 	Store                *bool          `json:"store,omitempty"`
 	Stream               bool           `json:"stream,omitempty"`

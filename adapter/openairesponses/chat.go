@@ -226,7 +226,8 @@ func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps, stream bool) 
 		Include:              props.ResponseInclude,
 		PreviousResponseID:   props.PreviousResponseID,
 		PromptCacheKey:       normalizedStringPtr(props.PromptCacheKey),
-		PromptCacheRetention: normalizedStringPtr(props.PromptCacheRetention),
+		PromptCacheOptions:   getPromptCacheOptions(props.Model, props.PromptCacheRetention),
+		PromptCacheRetention: getPromptCacheRetention(props.Model, props.PromptCacheRetention),
 		Store:                props.ResponseStore,
 		Stream:               stream,
 	}
@@ -241,6 +242,22 @@ func normalizedStringPtr(value *string) *string {
 		return nil
 	}
 	return &text
+}
+
+func getPromptCacheOptions(model string, retention *string) interface{} {
+	if !globals.IsOpenAIGPT56Model(model) || normalizedStringPtr(retention) == nil {
+		return nil
+	}
+
+	return map[string]string{"ttl": "30m"}
+}
+
+func getPromptCacheRetention(model string, retention *string) *string {
+	if globals.IsOpenAIGPT56Model(model) {
+		return nil
+	}
+
+	return normalizedStringPtr(retention)
 }
 
 func buildResponseChunk(form *ResponseResponse) *globals.Chunk {

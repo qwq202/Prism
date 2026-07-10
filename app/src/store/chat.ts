@@ -611,6 +611,13 @@ export function getOpenAIResponsesCapabilities(
     return emptyOpenAIResponsesCapabilities();
   }
 
+  if (normalized === "gpt-5.6" || normalized.startsWith("gpt-5.6-")) {
+    return {
+      nativeWeb: true,
+      reasoningEfforts: ["none", "low", "medium", "high", "xhigh", "max"],
+      reasoningSummary: true,
+    };
+  }
   if (normalized === "gpt-5.5" || normalized.startsWith("gpt-5.5-")) {
     return {
       nativeWeb: true,

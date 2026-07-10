@@ -248,6 +248,10 @@ func IsOpenAIGPT54Model(model string) bool {
 	return isOpenAIGPT54Model(normalizeModelName(model))
 }
 
+func IsOpenAIGPT56Model(model string) bool {
+	return isOpenAIGPT56Model(normalizeModelName(model))
+}
+
 func GetOpenAIResponsesReasoningEfforts(model string) []string {
 	return CapabilitiesFor(OpenAIResponsesChannelType, model).ReasoningEfforts
 }

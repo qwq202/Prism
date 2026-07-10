@@ -299,6 +299,7 @@
     "openai-reasoning-level-medium": "中",
     "openai-reasoning-level-high": "高",
     "openai-reasoning-level-xhigh": "极高",
+    "openai-reasoning-level-max": "最大",
     "openai-reasoning-summary-enable": "显示思考摘要",
     "openai-reasoning-summary-detail": "摘要详细度",
     "openai-reasoning-summary-level-concise": "简洁",
