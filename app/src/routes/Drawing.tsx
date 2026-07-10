@@ -1487,7 +1487,7 @@ function Drawing() {
         )}
 
         {/* Canvas / Results */}
-        <div className="relative z-10 flex-1 min-h-0 overflow-y-auto">
+        <div className="thin-scrollbar relative z-10 flex-1 min-h-0 overflow-y-auto">
           <div
             className={cn(
               "mx-auto min-h-full w-full max-w-6xl px-4 sm:px-6",
@@ -1726,10 +1726,10 @@ function Drawing() {
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center px-3 pb-3 sm:px-6 sm:pb-6">
           <div
             className={cn(
-              "pointer-events-auto w-full max-w-2xl rounded-2xl border bg-background transition-colors duration-200",
+              "pointer-events-auto w-full max-w-2xl rounded-2xl border bg-background shadow-md transition-colors duration-200",
               focused
                 ? "border-border/70 ring-2 ring-primary/10"
-                : "border-border/70 shadow-sm",
+                : "border-border/70",
             )}
           >
             {/* Meta row */}
