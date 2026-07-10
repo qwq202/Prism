@@ -1725,7 +1725,7 @@ function Drawing() {
         <div className="relative z-20 flex shrink-0 justify-center px-3 pb-3 sm:px-6 sm:pb-6">
           <div
             className={cn(
-              "w-full max-w-2xl rounded-2xl border bg-background transition-colors duration-200",
+              "w-full max-w-2xl rounded-2xl border bg-transparent transition-colors duration-200",
               focused
                 ? "border-primary/55 ring-2 ring-primary/10"
                 : "border-border/70 shadow-sm",
