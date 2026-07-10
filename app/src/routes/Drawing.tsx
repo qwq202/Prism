@@ -152,8 +152,7 @@ function getGeneratedImageMetadata(
   const responseFormat = image.options?.response_format;
   return {
     model: image.model || fallbackModel,
-    aspectRatio:
-      responseFormat?.aspect_ratio || fallbackOptions.aspectRatio,
+    aspectRatio: responseFormat?.aspect_ratio || fallbackOptions.aspectRatio,
     imageSize: responseFormat?.image_size || fallbackOptions.imageSize,
     mimeType: responseFormat?.mime_type || fallbackOptions.mimeType,
     thinkingLevel:
@@ -1774,9 +1773,7 @@ function Drawing() {
                                 </a>
                                 <button
                                   type="button"
-                                  onClick={() =>
-                                    removeGeneratedImage(image.id)
-                                  }
+                                  onClick={() => removeGeneratedImage(image.id)}
                                   aria-label={t("remove")}
                                   title={t("remove")}
                                   className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
@@ -2065,7 +2062,7 @@ function Drawing() {
           if (!open) setPreviewImage(null);
         }}
       >
-        <DialogContent className="max-h-[92dvh] w-[calc(100vw-2rem)] max-w-6xl gap-0 overflow-hidden rounded-2xl p-0">
+        <DialogContent className="h-[min(42rem,92dvh)] w-[calc(100vw-2rem)] max-w-5xl gap-0 overflow-hidden rounded-2xl p-0">
           <DialogHeader className="sr-only">
             <DialogTitle>{t("drawing.detailsTitle")}</DialogTitle>
             <DialogDescription>
@@ -2073,15 +2070,15 @@ function Drawing() {
             </DialogDescription>
           </DialogHeader>
           {previewImage && previewMetadata && (
-            <div className="thin-scrollbar grid max-h-[92dvh] overflow-y-auto md:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)] md:overflow-hidden">
-              <div className="flex min-h-64 items-center justify-center bg-muted/30 p-4 md:min-h-0">
+            <div className="thin-scrollbar grid h-full min-h-0 overflow-y-auto md:grid-cols-[minmax(0,1.2fr)_minmax(22rem,0.8fr)] md:overflow-hidden">
+              <div className="relative flex min-h-72 items-center justify-center overflow-hidden bg-muted/35 p-4 sm:p-6 md:min-h-0">
                 <img
                   src={previewImage.src}
                   alt={t("drawing.generatedImage")}
-                  className="max-h-[84dvh] max-w-full rounded-xl object-contain"
+                  className="h-full w-full rounded-xl object-contain"
                 />
               </div>
-              <div className="thin-scrollbar flex min-h-0 flex-col overflow-y-auto p-5 sm:p-6">
+              <div className="thin-scrollbar flex min-h-0 flex-col p-5 sm:p-6 md:overflow-y-auto">
                 <DialogHeader notTextCentered className="pr-8">
                   <DialogTitle>{t("drawing.detailsTitle")}</DialogTitle>
                   <DialogDescription>
@@ -2146,17 +2143,24 @@ function Drawing() {
                   </div>
                 </section>
 
-                <div className="mt-8 flex flex-wrap justify-end gap-2 border-t border-border/60 pt-4 md:mt-auto">
+                <div
+                  className={cn(
+                    "mt-8 grid gap-2 border-t border-border/60 pt-4 md:mt-auto",
+                    canAcceptReferences
+                      ? "grid-cols-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+                      : "grid-cols-[minmax(0,1fr)_auto]",
+                  )}
+                >
                   {canAcceptReferences && (
                     <button
                       type="button"
-                      onClick={() =>
-                        addGeneratedImageAsReference(previewImage)
-                      }
-                      className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                      onClick={() => addGeneratedImageAsReference(previewImage)}
+                      className="inline-flex h-10 min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
                     >
-                      <ImagePlus className="h-4 w-4" />
-                      {t("drawing.useAsReference")}
+                      <ImagePlus className="h-4 w-4 shrink-0" />
+                      <span className="min-w-0 truncate">
+                        {t("drawing.useAsReference")}
+                      </span>
                     </button>
                   )}
                   <a
@@ -2164,18 +2168,23 @@ function Drawing() {
                     download={`drawing.${getDrawingImageExtension(previewImage.src)}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex h-10 items-center gap-2 rounded-xl bg-foreground px-4 text-sm font-medium text-background transition-opacity hover:opacity-85"
+                    className="inline-flex h-10 min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-foreground px-3 text-sm font-medium text-background transition-opacity hover:opacity-85"
                   >
-                    <Download className="h-4 w-4" />
-                    {t("drawing.downloadImage")}
+                    <Download className="h-4 w-4 shrink-0" />
+                    <span className="min-w-0 truncate">
+                      {t("drawing.downloadImage")}
+                    </span>
                   </a>
                   <button
                     type="button"
                     onClick={() => removeGeneratedImage(previewImage.id)}
-                    className="inline-flex h-10 items-center gap-2 rounded-xl bg-destructive/10 px-4 text-sm font-medium text-destructive transition-colors hover:bg-destructive hover:text-destructive-foreground"
+                    className={cn(
+                      "inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-destructive/10 px-3 text-sm font-medium text-destructive transition-colors hover:bg-destructive hover:text-destructive-foreground",
+                      canAcceptReferences && "col-span-2 sm:col-span-1",
+                    )}
                   >
-                    <Trash2 className="h-4 w-4" />
-                    {t("delete")}
+                    <Trash2 className="h-4 w-4 shrink-0" />
+                    <span className="min-w-0 truncate">{t("delete")}</span>
                   </button>
                 </div>
               </div>
