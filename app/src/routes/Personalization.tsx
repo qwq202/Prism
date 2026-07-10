@@ -46,11 +46,6 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
-  Cloud,
-  CloudOff,
-  CheckCircle2,
-  Loader2,
-  RefreshCw,
 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -452,9 +447,6 @@ function Personalization() {
   const personaAboutUser = useSelector(settings.personaAboutUserSelector);
   const memoryEnabled = useSelector(settings.memoryEnabledSelector);
   const historyEnabled = useSelector(settings.memoryHistoryEnabledSelector);
-  const syncStatus = useSelector(settings.personalizationSyncStatusSelector);
-  const syncDirty = useSelector(settings.personalizationSyncDirtySelector);
-  const syncError = useSelector(settings.personalizationSyncErrorSelector);
 
   const [memoryDialogOpen, setMemoryDialogOpen] = useState(false);
   const [memories, setMemories] = useState<MemoryRecord[]>([]);
@@ -647,19 +639,6 @@ function Personalization() {
     },
   };
 
-  const effectiveSyncStatus =
-    syncDirty && syncStatus === "synced" ? "saving" : syncStatus;
-  const SyncStatusIcon =
-    effectiveSyncStatus === "loading" || effectiveSyncStatus === "saving"
-      ? Loader2
-      : effectiveSyncStatus === "offline" || effectiveSyncStatus === "error"
-        ? CloudOff
-        : effectiveSyncStatus === "synced" || effectiveSyncStatus === "conflict"
-          ? CheckCircle2
-          : Cloud;
-  const syncRetryable =
-    effectiveSyncStatus === "offline" || effectiveSyncStatus === "error";
-
   return (
     <ScrollArea className="relative w-full h-full flex flex-col bg-background">
       <MemoryDialog
@@ -676,46 +655,6 @@ function Personalization() {
         initial="hidden"
         animate="visible"
       >
-        <motion.div
-          variants={cardVariants}
-          className="flex min-h-8 items-center justify-end"
-        >
-          <div
-            className={cn(
-              "inline-flex min-h-8 max-w-full items-center gap-2 rounded-full border border-border/70 bg-background px-3 text-xs text-muted-foreground",
-              effectiveSyncStatus === "error" &&
-                "border-destructive/30 text-destructive",
-              effectiveSyncStatus === "offline" &&
-                "border-amber-500/30 text-amber-700 dark:text-amber-300",
-            )}
-            role="status"
-            aria-live="polite"
-            title={syncError || undefined}
-          >
-            <SyncStatusIcon
-              className={cn(
-                "h-3.5 w-3.5",
-                (effectiveSyncStatus === "loading" ||
-                  effectiveSyncStatus === "saving") &&
-                  "animate-spin motion-reduce:animate-none",
-              )}
-            />
-            <span className="min-w-0 text-pretty">
-              {t(`settings.personalization.sync.${effectiveSyncStatus}`)}
-            </span>
-            {syncRetryable && (
-              <button
-                type="button"
-                onClick={() => dispatch(settings.requestPersonalizationSync())}
-                className="ml-1 inline-flex min-h-7 items-center gap-1 rounded-full px-2 font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <RefreshCw className="h-3 w-3" />
-                {t("settings.personalization.sync.retry")}
-              </button>
-            )}
-          </div>
-        </motion.div>
-
         <motion.div variants={cardVariants}>
           <PersonalizationCard
             icon={<Brain />}
