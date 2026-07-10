@@ -6,6 +6,7 @@ import (
 	"chat/globals"
 	"chat/utils"
 	"database/sql"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -310,6 +311,30 @@ func TestUseQuotaDeductsQuotaAndUsedAtomically(t *testing.T) {
 	}
 	if got := user.GetUsedQuota(db); got != 3 {
 		t.Fatalf("expected failed usage to keep used quota 3, got %f", got)
+	}
+}
+
+func TestRefundQuotaUsageRestoresReservedQuotaAndUsedAmount(t *testing.T) {
+	db := openAuthSecurityTestDB(t)
+	user := GetUserByName(db, "root")
+	if user == nil {
+		t.Fatalf("expected root user")
+	}
+	if !user.SetQuota(db, 10) || !user.SetUsedQuota(db, 2) {
+		t.Fatalf("seed quota")
+	}
+	if !user.UseQuota(db, 4) {
+		t.Fatalf("reserve quota")
+	}
+	if !user.RefundQuotaUsage(db, 1.5) {
+		t.Fatalf("refund quota")
+	}
+
+	if got := user.GetQuota(db); math.Abs(float64(got-7.5)) > 0.001 {
+		t.Fatalf("expected quota 7.5 after partial refund, got %f", got)
+	}
+	if got := user.GetUsedQuota(db); math.Abs(float64(got-4.5)) > 0.001 {
+		t.Fatalf("expected used quota 4.5 after partial refund, got %f", got)
 	}
 }
 

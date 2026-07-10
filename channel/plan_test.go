@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -310,6 +311,55 @@ func TestPlanPointAndWeeklyPoolsCanResetIndependently(t *testing.T) {
 	}
 	if got := plan.GetWeeklyPointUsage(user, cache); got != 0 {
 		t.Fatalf("expected weekly usage 0 after reset, got %f", got)
+	}
+}
+
+func TestPlanRefundPointPoolRestoresBothWindows(t *testing.T) {
+	_, cache := openPlanTestCache(t)
+	user := planTestUser{id: 101}
+	plan := Plan{
+		Level:       1,
+		Quota:       10,
+		WeeklyQuota: 20,
+		Items: []PlanItem{
+			{Id: "all-models", Models: []string{"gpt-5.1"}},
+		},
+	}
+
+	if !plan.ConsumePointPool(user, cache, "gpt-5.1", 6) {
+		t.Fatalf("expected point reservation to succeed")
+	}
+	if !plan.RefundPointPool(user, cache, "gpt-5.1", 2.5) {
+		t.Fatalf("expected point refund to succeed")
+	}
+
+	if got := plan.GetPointUsage(user, cache); math.Abs(float64(got-3.5)) > 0.001 {
+		t.Fatalf("expected point usage 3.5 after refund, got %f", got)
+	}
+	if got := plan.GetWeeklyPointUsage(user, cache); math.Abs(float64(got-3.5)) > 0.001 {
+		t.Fatalf("expected weekly usage 3.5 after refund, got %f", got)
+	}
+}
+
+func TestPlanRefundPointPoolClampsUsageAtZero(t *testing.T) {
+	_, cache := openPlanTestCache(t)
+	user := planTestUser{id: 102}
+	plan := Plan{
+		Level: 1,
+		Quota: 10,
+		Items: []PlanItem{
+			{Id: "all-models", Models: []string{"gpt-5.1"}},
+		},
+	}
+
+	if !plan.ConsumePointPool(user, cache, "gpt-5.1", 1) {
+		t.Fatalf("expected point reservation to succeed")
+	}
+	if !plan.RefundPointPool(user, cache, "gpt-5.1", 4) {
+		t.Fatalf("expected oversized refund to succeed")
+	}
+	if got := plan.GetPointUsage(user, cache); got != 0 {
+		t.Fatalf("expected point usage to clamp at zero, got %f", got)
 	}
 }
 

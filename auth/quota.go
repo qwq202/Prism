@@ -151,6 +151,29 @@ func (u *User) UseQuota(db *sql.DB, quota float32) bool {
 	return err == nil && affected > 0
 }
 
+func (u *User) RefundQuotaUsage(db *sql.DB, quota float32) bool {
+	if quota <= 0 {
+		return true
+	}
+	if u == nil || db == nil {
+		return false
+	}
+
+	result, err := globals.ExecDb(db, `
+		UPDATE quota
+		SET quota = quota + ?,
+			used = CASE WHEN used >= ? THEN used - ? ELSE 0 END,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE user_id = ?
+	`, quota, quota, quota, u.GetID(db))
+	if err != nil {
+		return false
+	}
+
+	affected, err := result.RowsAffected()
+	return err == nil && affected > 0
+}
+
 func (u *User) ForceUseQuota(db *sql.DB, quota float32) bool {
 	if quota <= 0 {
 		return true

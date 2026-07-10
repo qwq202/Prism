@@ -42,6 +42,12 @@ func NativeChatHandler(c *gin.Context, user *auth.User, model string, message []
 
 	buffer := utils.NewBuffer(model, segment, channel.ChargeInstance.GetCharge(model))
 	limiter := newRealtimeQuotaLimiter(db, cache, user, model, plan)
+	billingSession, billingErr := newRequestBillingSession(db, cache, user, model, buffer, plan, nil)
+	if billingErr != nil {
+		return billingErr.Error(), 0
+	}
+	defer billingSession.Refund()
+	plan = billingSession.UsesPlan()
 	buildProps := func(
 		segment []globals.Message,
 		requestBuffer *utils.Buffer,
@@ -89,17 +95,16 @@ func NativeChatHandler(c *gin.Context, user *auth.User, model string, message []
 	billing.RecordModelUsageMetric(db, model, buffer, err)
 	if err != nil {
 		if isRealtimeQuotaLimitError(err) && buffer.HasVisiblePayload() {
-			CollectQuota(c, user, buffer, plan, err)
+			billingSession.SettleBuffer(buffer, err)
 			createChatBillingRecord(db, user, model, buffer)
 			return buffer.ReadWithDefault(defaultMessage), buffer.GetRecordQuota()
 		}
 
-		auth.RevertSubscriptionUsage(db, cache, user, model)
 		return err.Error(), 0
 	}
 
 	if !hit {
-		CollectQuota(c, user, buffer, plan, err)
+		billingSession.SettleBuffer(buffer, err)
 		createChatBillingRecord(db, user, model, buffer)
 	}
 

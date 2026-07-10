@@ -2,6 +2,7 @@ package utils
 
 import (
 	"chat/globals"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -34,31 +35,52 @@ type TokenCacheCharge interface {
 }
 
 type Buffer struct {
-	Model                string                        `json:"model"`
-	Quota                float32                       `json:"quota"`
-	Data                 string                        `json:"data"`
-	Latest               string                        `json:"latest"`
-	Cursor               int                           `json:"cursor"`
-	Times                int                           `json:"times"`
-	InputTokens          int                           `json:"input_tokens"`
-	Images               Images                        `json:"images"`
-	ToolCalls            *globals.ToolCalls            `json:"tool_calls"`
-	ToolCallsCursor      int                           `json:"tool_calls_cursor"`
-	FunctionCall         *globals.FunctionCall         `json:"function_call"`
-	ReasoningContent     string                        `json:"reasoning_content,omitempty"`
-	Usage                *globals.TokenUsage           `json:"usage,omitempty"`
-	PromptCache          *globals.PromptCacheDetail    `json:"prompt_cache,omitempty"`
-	GeminiHiddenMetadata *globals.GeminiHiddenMetadata `json:"gemini_hidden_metadata,omitempty"`
-	ClaudeHiddenMetadata *globals.ClaudeHiddenMetadata `json:"claude_hidden_metadata,omitempty"`
-	StartTime            *time.Time                    `json:"-"`
-	Prompts              string                        `json:"prompts"`
-	TokenName            string                        `json:"-"`
-	ChannelId            int                           `json:"-"`
-	ChannelName          string                        `json:"-"`
-	Charge               Charge                        `json:"-"`
-	ResponseFormat       interface{}                   `json:"-"`
-	ReferenceImages      int                           `json:"-"`
-	VisionRecall         bool                          `json:"-"`
+	Model                 string                        `json:"model"`
+	Quota                 float32                       `json:"quota"`
+	Data                  string                        `json:"data"`
+	Latest                string                        `json:"latest"`
+	Cursor                int                           `json:"cursor"`
+	Times                 int                           `json:"times"`
+	InputTokens           int                           `json:"input_tokens"`
+	Images                Images                        `json:"images"`
+	ToolCalls             *globals.ToolCalls            `json:"tool_calls"`
+	ToolCallsCursor       int                           `json:"tool_calls_cursor"`
+	FunctionCall          *globals.FunctionCall         `json:"function_call"`
+	ReasoningContent      string                        `json:"reasoning_content,omitempty"`
+	Usage                 *globals.TokenUsage           `json:"usage,omitempty"`
+	PromptCache           *globals.PromptCacheDetail    `json:"prompt_cache,omitempty"`
+	GeminiHiddenMetadata  *globals.GeminiHiddenMetadata `json:"gemini_hidden_metadata,omitempty"`
+	ClaudeHiddenMetadata  *globals.ClaudeHiddenMetadata `json:"claude_hidden_metadata,omitempty"`
+	StartTime             *time.Time                    `json:"-"`
+	Prompts               string                        `json:"prompts"`
+	TokenName             string                        `json:"-"`
+	ChannelId             int                           `json:"-"`
+	ChannelName           string                        `json:"-"`
+	Charge                Charge                        `json:"-"`
+	ResponseFormat        interface{}                   `json:"-"`
+	ReferenceImages       int                           `json:"-"`
+	VisionRecall          bool                          `json:"-"`
+	dataBuilder           strings.Builder               `json:"-"`
+	outputTokenCache      int                           `json:"-"`
+	outputTokenCacheValid bool                          `json:"-"`
+}
+
+// MarshalJSON flushes the streaming builder into the existing Data field so
+// cached Buffer payloads stay backward compatible without updating Data on
+// every streamed chunk.
+func (b *Buffer) MarshalJSON() ([]byte, error) {
+	if b == nil {
+		return []byte("null"), nil
+	}
+
+	type bufferAlias Buffer
+	return json.Marshal(&struct {
+		Data string `json:"data"`
+		*bufferAlias
+	}{
+		Data:        b.Read(),
+		bufferAlias: (*bufferAlias)(b),
+	})
 }
 
 func initInputToken(model string, history []globals.Message) int {
@@ -139,7 +161,15 @@ func (b *Buffer) GetRecordQuota() float32 {
 }
 
 func (b *Buffer) Write(data string) string {
-	b.Data += data
+	if data != "" {
+		if b.dataBuilder.Len() == 0 && b.Data != "" {
+			b.dataBuilder.Grow(len(b.Data) + len(data))
+			b.dataBuilder.WriteString(b.Data)
+			b.Data = ""
+		}
+		b.dataBuilder.WriteString(data)
+		b.outputTokenCacheValid = false
+	}
 	b.Cursor += len(data)
 	b.Times++
 	b.Latest = data
@@ -492,18 +522,22 @@ func (b *Buffer) SetPrompts(prompts interface{}) {
 }
 
 func (b *Buffer) Read() string {
+	if b.dataBuilder.Len() > 0 {
+		return b.dataBuilder.String()
+	}
 	return b.Data
 }
 
 func (b *Buffer) ReadBytes() []byte {
-	return []byte(b.Data)
+	return []byte(b.Read())
 }
 
 func (b *Buffer) ReadWithDefault(_default string) string {
-	if b.IsEmpty() || (len(strings.TrimSpace(b.Data)) == 0 && !b.IsFunctionCalling()) {
+	data := b.Read()
+	if b.IsEmpty() || (len(strings.TrimSpace(data)) == 0 && !b.IsFunctionCalling()) {
 		return _default
 	}
-	return b.Data
+	return data
 }
 
 func (b *Buffer) ReadTimes() int {
@@ -543,34 +577,38 @@ func (b *Buffer) CountOutputToken(running bool) int {
 		return b.Times
 	}
 
-	return NumTokensFromResponse(b.Read(), b.Model)
+	if b.outputTokenCacheValid {
+		return b.outputTokenCache
+	}
+
+	b.outputTokenCache = NumTokensFromResponse(b.Read(), b.Model)
+	b.outputTokenCacheValid = true
+	return b.outputTokenCache
 }
 
 func (b *Buffer) CountRecordOutputToken() int {
-	tokens := b.CountOutputToken(false)
-	if b.Usage.IsEmpty() {
-		return tokens
+	if !b.Usage.IsEmpty() {
+		usageTokens := b.Usage.CompletionTokens
+		promptTokens := b.Usage.PromptTokens
+		if usageTokens == 0 {
+			if promptTokens == 0 {
+				promptTokens = b.Usage.PromptCacheHitTokens +
+					b.Usage.PromptCacheMissTokens +
+					b.Usage.PromptCacheWriteTokens
+			}
+			if b.Usage.TotalTokens > promptTokens {
+				usageTokens = b.Usage.TotalTokens - promptTokens
+			}
+		}
+		if reasoningTokens := b.Usage.CompletionTokensDetails.ReasoningTokens; reasoningTokens > usageTokens {
+			usageTokens = reasoningTokens
+		}
+		if usageTokens > 0 || strings.TrimSpace(b.Read()) == "" {
+			return usageTokens
+		}
 	}
 
-	usageTokens := b.Usage.CompletionTokens
-	if usageTokens == 0 {
-		promptTokens := b.Usage.PromptTokens
-		if promptTokens == 0 {
-			promptTokens = b.Usage.PromptCacheHitTokens +
-				b.Usage.PromptCacheMissTokens +
-				b.Usage.PromptCacheWriteTokens
-		}
-		if b.Usage.TotalTokens > promptTokens {
-			usageTokens = b.Usage.TotalTokens - promptTokens
-		}
-	}
-	if reasoningTokens := b.Usage.CompletionTokensDetails.ReasoningTokens; reasoningTokens > usageTokens {
-		usageTokens = reasoningTokens
-	}
-	if usageTokens > tokens {
-		return usageTokens
-	}
-	return tokens
+	return b.CountOutputToken(false)
 }
 
 func (b *Buffer) CountRecordOutputImages() int {

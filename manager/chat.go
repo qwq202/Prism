@@ -303,15 +303,44 @@ func realtimeQuotaForBuffer(buffer *utils.Buffer) float32 {
 	if buffer == nil {
 		return 0
 	}
-	if !buffer.GetUsage().IsEmpty() {
-		return buffer.GetRecordQuota()
+	if usage := buffer.GetUsage(); !usage.IsEmpty() {
+		return realtimeQuotaForUsage(buffer, usage)
 	}
 	return buffer.GetQuota()
+}
+
+func realtimeQuotaForUsage(buffer *utils.Buffer, usage *globals.TokenUsage) float32 {
+	if buffer == nil || usage.IsEmpty() {
+		return 0
+	}
+
+	charge := buffer.GetCharge()
+	if charge == nil || !charge.IsBillingType(globals.TokenBilling) {
+		return buffer.GetQuota()
+	}
+
+	promptTokens := usage.PromptTokens
+	if promptTokens == 0 {
+		promptTokens = usage.PromptCacheHitTokens + usage.PromptCacheMissTokens + usage.PromptCacheWriteTokens
+	}
+	completionTokens := usage.CompletionTokens
+	if completionTokens == 0 && usage.TotalTokens > promptTokens {
+		completionTokens = usage.TotalTokens - promptTokens
+	}
+	if reasoningTokens := usage.CompletionTokensDetails.ReasoningTokens; reasoningTokens > completionTokens {
+		completionTokens = reasoningTokens
+	}
+
+	return utils.CountRecordInputQuota(charge, buffer.CountInputToken(), usage) +
+		utils.CountOutputToken(charge, completionTokens)
 }
 
 func preciseRealtimeQuotaForBuffer(buffer *utils.Buffer) float32 {
 	if buffer == nil {
 		return 0
+	}
+	if usage := buffer.GetUsage(); !usage.IsEmpty() {
+		return realtimeQuotaForUsage(buffer, usage)
 	}
 	return buffer.GetRecordQuota()
 }
@@ -369,26 +398,41 @@ func (l realtimeQuotaLimiter) allowsProjectedChunk(buffer *utils.Buffer, chunk *
 		return true
 	}
 
-	preview := *buffer
-	preview.WriteChunk(chunk)
-	quota := realtimeQuotaForBuffer(&preview)
+	quota := projectedRealtimeQuotaForChunk(buffer, chunk, false)
 	if !l.shouldUsePreciseQuotaCheck(quota) {
 		return l.allows(quota)
 	}
-	return l.allows(preciseRealtimeQuotaForBuffer(&preview))
+	return l.allows(projectedRealtimeQuotaForChunk(buffer, chunk, true))
 }
 
 func projectedRealtimeQuotaForChunk(buffer *utils.Buffer, chunk *globals.Chunk, precise bool) float32 {
 	if buffer == nil {
 		return 0
 	}
-
-	preview := *buffer
-	preview.WriteChunk(chunk)
-	if precise {
-		return preciseRealtimeQuotaForBuffer(&preview)
+	if chunk != nil && !chunk.Usage.IsEmpty() {
+		return realtimeQuotaForUsage(buffer, chunk.Usage)
 	}
-	return realtimeQuotaForBuffer(&preview)
+	if chunk == nil {
+		if precise {
+			return preciseRealtimeQuotaForBuffer(buffer)
+		}
+		return realtimeQuotaForBuffer(buffer)
+	}
+
+	charge := buffer.GetCharge()
+	if charge == nil {
+		return 0
+	}
+	if precise && charge.IsBillingType(globals.TokenBilling) {
+		outputTokens := utils.NumTokensFromResponse(buffer.Read()+chunk.Content, buffer.GetModel())
+		return utils.CountInputQuota(charge, buffer.CountInputToken()) +
+			utils.CountOutputToken(charge, outputTokens)
+	}
+	if !charge.IsBillingType(globals.TokenBilling) {
+		return realtimeQuotaForBuffer(buffer)
+	}
+
+	return realtimeQuotaForBuffer(buffer) + utils.CountOutputToken(charge, 1)
 }
 
 func (l realtimeQuotaLimiter) projectedSplitChunkQuota(streamBuffer *utils.Buffer, captureBuffer *utils.Buffer, chunk *globals.Chunk, precise bool) float32 {
@@ -1758,6 +1802,25 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 
 	buffer := utils.NewBuffer(model, segment, channel.ChargeInstance.GetCharge(model))
 	limiter := newRealtimeQuotaLimiter(db, cache, user, model, plan)
+	billingSession, billingErr := newRequestBillingSession(
+		db,
+		cache,
+		user,
+		model,
+		buffer,
+		plan,
+		instance.GetMaxTokens(),
+	)
+	if billingErr != nil {
+		conn.Send(globals.ChatSegmentResponse{
+			Message: billingErr.Error(),
+			Quota:   0,
+			End:     true,
+		})
+		return globals.Message{Role: globals.Assistant, Content: billingErr.Error()}
+	}
+	defer billingSession.Refund()
+	plan = billingSession.UsesPlan()
 	recordBuiltinToolRequest(buffer, instance, model)
 	var hit bool
 	var err error
@@ -1789,15 +1852,13 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 		globals.Warn(fmt.Sprintf("%s (model: %s, client: %s)", err, model, conn.GetCtx().ClientIP()))
 
 		if !hit && buffer.HasVisiblePayload() {
-			CollectQuota(conn.GetCtx(), user, buffer, plan, err)
+			billingSession.SettleBuffer(buffer, err)
 			createChatBillingRecord(db, user, model, buffer)
 			conn.Send(globals.ChatSegmentResponse{
 				Message: err.Error(),
 				End:     true,
 			})
 			return extractAssistantMessageFromBuffer(buffer, true, plan)
-		} else {
-			auth.RevertSubscriptionUsage(db, cache, user, model)
 		}
 		conn.Send(globals.ChatSegmentResponse{
 			Message: err.Error(),
@@ -1810,7 +1871,7 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 	}
 
 	if !hit {
-		CollectQuota(conn.GetCtx(), user, buffer, plan, err)
+		billingSession.SettleBuffer(buffer, err)
 	}
 
 	if !adapter.IsAvailableError(err) {

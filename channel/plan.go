@@ -405,6 +405,66 @@ func consumeAvailableSubscriptionPointUsageWindows(cache *redis.Client, windows 
 	return 0
 }
 
+func refundSubscriptionPointUsageWindows(cache *redis.Client, windows []subscriptionPointUsageWindow, amount float32) bool {
+	if amount <= 0 || len(windows) == 0 {
+		return true
+	}
+
+	ctx := context.Background()
+	keys := make([]string, 0, len(windows))
+	for _, window := range windows {
+		keys = append(keys, window.key)
+	}
+
+	for attempts := 0; attempts < 32; attempts++ {
+		err := cache.Watch(ctx, func(tx *redis.Tx) error {
+			offsets := make([]time.Time, len(windows))
+			usages := make([]float32, len(windows))
+
+			for i, window := range windows {
+				value, err := tx.Get(ctx, window.key).Result()
+				if err != nil && !errors.Is(err, redis.Nil) {
+					return err
+				}
+				if errors.Is(err, redis.Nil) {
+					value = ""
+				}
+
+				used, offset := parseSubscriptionPointUsageValue(value, window.resetInterval, time.Now())
+				used -= amount
+				if used < 0 {
+					used = 0
+				}
+				offsets[i] = offset
+				usages[i] = used
+			}
+
+			_, err := tx.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+				for i, window := range windows {
+					pipe.Set(
+						ctx,
+						window.key,
+						getFloatOffsetFormat(offsets[i], usages[i]),
+						time.Duration(planExp)*time.Second,
+					)
+				}
+				return nil
+			})
+			return err
+		}, keys...)
+
+		if err == nil {
+			return true
+		}
+		if errors.Is(err, redis.TxFailedErr) {
+			continue
+		}
+		return false
+	}
+
+	return false
+}
+
 func GetSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string) (usage int64, offset time.Time) {
 	return getSubscriptionUsage(cache, user, t, 0)
 }
@@ -642,6 +702,33 @@ func (p *Plan) ConsumeAvailablePointPool(user globals.AuthLike, cache *redis.Cli
 	}
 
 	return consumeAvailableSubscriptionPointUsageWindows(cache, windows, quota)
+}
+
+func (p *Plan) RefundPointPool(user globals.AuthLike, cache *redis.Client, model string, quota float32) bool {
+	if !p.HasPointPool() || !p.IncludesModel(model) {
+		return false
+	}
+	if quota <= 0 {
+		return true
+	}
+
+	windows := make([]subscriptionPointUsageWindow, 0, 2)
+	if !p.IsPointPoolInfinity() {
+		windows = append(windows, subscriptionPointUsageWindow{
+			key:           globals.GetSubscriptionLimitFormat(p.pointUsageKey(), user.HitID()),
+			limit:         p.Quota,
+			resetInterval: p.pointResetInterval(),
+		})
+	}
+	if p.HasWeeklyPool() && !p.IsWeeklyPoolInfinity() {
+		windows = append(windows, subscriptionPointUsageWindow{
+			key:           globals.GetSubscriptionLimitFormat(p.weeklyUsageKey(), user.HitID()),
+			limit:         p.WeeklyQuota,
+			resetInterval: weeklyResetInterval,
+		})
+	}
+
+	return refundSubscriptionPointUsageWindows(cache, windows, quota)
 }
 
 func increaseSubscriptionUsage(cache *redis.Client, user globals.AuthLike, t string, limit int64, resetInterval int64, amount int64) bool {
