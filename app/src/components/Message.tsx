@@ -438,7 +438,7 @@ function MessageContent({
               />
             )}
           </>
-        ) : message.end === true ? (
+        ) : message.end === true && !hasToolCalls ? (
           <CircleSlash className={`h-5 w-5 m-1`} />
         ) : !hasToolCalls ? (
           <Loader2 className={`h-5 w-5 m-1 animate-spin`} />
