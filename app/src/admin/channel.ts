@@ -157,6 +157,10 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "gpt-4.1",
       "gpt-4.1-mini",
       "gpt-4.1-nano",
+      "gpt-5.6",
+      "gpt-5.6-sol",
+      "gpt-5.6-terra",
+      "gpt-5.6-luna",
       "gpt-5.5",
       "gpt-5.4",
       "gpt-5.4-pro",
@@ -182,6 +186,7 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
     endpoint: "https://api.x.ai",
     format: "<api-key>",
     models: [
+      "grok-4.5",
       "grok-4.20-reasoning",
       "grok-4.20-mini",
       "grok-4-1-fast-reasoning",
@@ -191,7 +196,7 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "> xAI 渠道基于 **OpenAI Responses API** 兼容格式，请将接入点填写为 `https://api.x.ai` 或其反代地址，系统会自动请求 `/v1/responses`。 \n" +
       "> 系统已按 xAI 当前文档改为将 **system prompt** 保留在 `input` 中，而不是使用 xAI 暂不支持的 `instructions` 字段。 \n" +
       "> 已内置适配 xAI 原生 **Web Search** 与 **X Search** 两个独立开关，并会按官方方式自动开启 **view_image / view_x_video** 所需的图像与视频理解能力。 \n" +
-      "> 常用模型可填写如 **grok-4.20-reasoning**、**grok-4-1-fast-reasoning**、**grok-4-1-fast** 等 Grok 模型。\n",
+      "> 常用模型可填写如 **grok-4.5**、**grok-4.20-reasoning**、**grok-4-1-fast-reasoning** 等 Grok 模型。\n",
   },
   azure: {
     endpoint: "2023-12-01-preview",

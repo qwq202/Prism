@@ -6,6 +6,10 @@ import (
 )
 
 func TestIsOpenAIResponsesNativeWebModel(t *testing.T) {
+	if !IsOpenAIResponsesNativeWebModel("gpt-5.6-terra") {
+		t.Fatalf("expected gpt-5.6-terra to support native web")
+	}
+
 	if !IsOpenAIResponsesNativeWebModel("gpt-5.5") {
 		t.Fatalf("expected gpt-5.5 to support native web")
 	}
@@ -108,6 +112,10 @@ func TestIsDrawingModelUsesInternalProviderAwareList(t *testing.T) {
 }
 
 func TestNormalizeOpenAIResponsesReasoningEffort(t *testing.T) {
+	if got := NormalizeOpenAIResponsesReasoningEffort("gpt-5.6", "max", false); got != "max" {
+		t.Fatalf("expected max for gpt-5.6, got %q", got)
+	}
+
 	if got := NormalizeOpenAIResponsesReasoningEffort("gpt-5.2", "xhigh", false); got != "xhigh" {
 		t.Fatalf("expected xhigh for gpt-5.2, got %q", got)
 	}
@@ -167,6 +175,13 @@ func TestCapabilitiesForOpenAIResponsesModels(t *testing.T) {
 		reasoningEfforts    []string
 		samplingRestriction SamplingRestriction
 	}{
+		{
+			name:                "gpt 5.6 reasoning model",
+			model:               "gpt-5.6-terra",
+			nativeWebSearch:     true,
+			reasoningEfforts:    []string{"none", "low", "medium", "high", "xhigh", "max"},
+			samplingRestriction: SamplingRestrictionAlways,
+		},
 		{
 			name:                "gpt 5.5 reasoning model",
 			model:               "gpt-5.5",
@@ -245,7 +260,7 @@ func TestCapabilitiesForOpenAIResponsesModels(t *testing.T) {
 }
 
 func TestCapabilitiesForXAIModels(t *testing.T) {
-	capabilities := CapabilitiesFor(XAIChannelType, "grok-4-1-fast-reasoning")
+	capabilities := CapabilitiesFor(XAIChannelType, "grok-4.5")
 	if !capabilities.NativeWebSearch {
 		t.Fatalf("expected grok to support native web search")
 	}
