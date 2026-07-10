@@ -267,10 +267,10 @@ export function AskUserCard({ toolCall, onSubmit }: AskUserCardProps) {
       <fieldset
         key={currentQuestion.id}
         disabled={submitting}
-        className="thin-scrollbar min-h-0 min-w-0 flex-1 animate-fade-in overflow-x-hidden overflow-y-auto border-0 px-3 pb-3 sm:px-5 sm:pb-4"
+        className="thin-scrollbar min-h-0 min-w-0 flex-1 animate-fade-in overflow-x-hidden overflow-y-auto border-0 px-3 pb-2 sm:px-5 sm:pb-2"
       >
         <legend className="sr-only">{currentQuestion.question}</legend>
-        <div className={cn("space-y-1.5", skipped && "opacity-45")}>
+        <div className={cn("space-y-1", skipped && "opacity-45")}>
           {currentQuestion.options.map((option, optionIndex) => {
             const selected =
               currentQuestion.type === "multiple"
