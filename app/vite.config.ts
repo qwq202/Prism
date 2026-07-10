@@ -43,6 +43,11 @@ export default defineConfig({
       "/v1": {
         target: "http://localhost:8094",
         changeOrigin: true,
+      },
+      "/attachments": {
+        target: "http://localhost:8094",
+        changeOrigin: true,
+        rewrite: (path) => `/api${path}`,
       }
     }
   }
