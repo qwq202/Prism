@@ -7,6 +7,8 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -414,6 +416,61 @@ func TestStoreAttachmentDataRejectsIncompleteRemoteStorage(t *testing.T) {
 	}
 	if _, err := os.Stat(AttachmentLocalPath(name)); !os.IsNotExist(err) {
 		t.Fatalf("expected incomplete remote upload not to write a local fallback, got %v", err)
+	}
+}
+
+func TestPersistImageSourceStoresRemoteImageWhenImageStoreDisabled(t *testing.T) {
+	withStorageGlobals(t)
+
+	previousAcceptImageStore := globals.AcceptImageStore
+	globals.AcceptImageStore = false
+	t.Cleanup(func() {
+		globals.AcceptImageStore = previousAcceptImageStore
+	})
+
+	previousWorkingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working dir: %v", err)
+	}
+	workingDir := t.TempDir()
+	if err := os.Chdir(workingDir); err != nil {
+		t.Fatalf("chdir temp dir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(previousWorkingDir)
+	})
+
+	pixel := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	pixel.Set(0, 0, color.RGBA{R: 64, G: 128, B: 255, A: 255})
+	var imageData bytes.Buffer
+	if err := png.Encode(&imageData, pixel); err != nil {
+		t.Fatalf("encode png fixture: %v", err)
+	}
+
+	header := make(http.Header)
+	header.Set("Content-Type", "image/png")
+	withRemoteImageResponse(t, &http.Response{
+		StatusCode:    http.StatusOK,
+		Header:        header,
+		ContentLength: int64(imageData.Len()),
+		Body:          io.NopCloser(bytes.NewReader(imageData.Bytes())),
+	})
+
+	storedURL, err := PersistImageSource("https://93.184.216.34/provider-result.png")
+	if err != nil {
+		t.Fatalf("persist safe remote image source: %v", err)
+	}
+	names := ExtractAttachmentNames(storedURL)
+	if len(names) != 1 {
+		t.Fatalf("expected durable attachment url, got %q", storedURL)
+	}
+
+	storedData, err := os.ReadFile(filepath.Join(workingDir, AttachmentLocalPath(names[0])))
+	if err != nil {
+		t.Fatalf("read durable attachment: %v", err)
+	}
+	if !bytes.Equal(storedData, imageData.Bytes()) {
+		t.Fatalf("stored attachment did not match remote image")
 	}
 }
 

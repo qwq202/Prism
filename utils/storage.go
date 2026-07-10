@@ -617,6 +617,34 @@ func StoreImage(source string) string {
 	return AttachmentPublicURL(name)
 }
 
+// PersistImageSource ingests an image source into configured attachment storage.
+// Unlike StoreImage, it always persists the source and returns any fetch or storage error.
+func PersistImageSource(source string) (string, error) {
+	source = strings.TrimSpace(source)
+	if source == "" {
+		return "", fmt.Errorf("image source is empty")
+	}
+
+	data, contentType, err := readStoredImageSource(source)
+	if err != nil {
+		return "", fmt.Errorf("load image source: %w", err)
+	}
+
+	filename := "image"
+	if instance, parseErr := neturl.Parse(source); parseErr == nil {
+		candidate := path.Base(instance.Path)
+		if candidate != "" && candidate != "." && candidate != "/" {
+			filename = candidate
+		}
+	}
+
+	stored, err := StoreAttachmentData(filename, data, contentType)
+	if err != nil {
+		return "", fmt.Errorf("store image source: %w", err)
+	}
+	return stored, nil
+}
+
 func StoreAttachmentData(filename string, data []byte, contentType string) (string, error) {
 	if len(data) == 0 {
 		return "", fmt.Errorf("attachment data is empty")

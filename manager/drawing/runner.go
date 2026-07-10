@@ -223,7 +223,7 @@ func generatedImagesFromContent(content string, prompt string, taskID string) ([
 		if source == "" {
 			continue
 		}
-		stored, _, err := storeDrawingDataURL(source)
+		stored, err := persistGeneratedImageSource(source)
 		if err != nil {
 			return nil, err
 		}
