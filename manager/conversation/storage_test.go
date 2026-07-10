@@ -62,6 +62,8 @@ func openOrphanAttachmentCleanupDB(t *testing.T) *sql.DB {
 	})
 
 	connection.CreateConversationTable(db)
+	connection.CreateDrawingWorkspaceTable(db)
+	connection.CreateDrawingTaskTable(db)
 	return db
 }
 
@@ -106,6 +108,110 @@ func TestCleanupOrphanStoredAttachmentsKeepsReferencedAndDeletesOrphan(t *testin
 	}
 	if _, err := os.Stat(filepath.Join(workingDir, utils.AttachmentLocalPath(orphan))); !os.IsNotExist(err) {
 		t.Fatalf("expected orphan attachment to be deleted, got %v", err)
+	}
+}
+
+func TestCleanupOrphanStoredAttachmentsTracksDrawingReferences(t *testing.T) {
+	tests := []struct {
+		name      string
+		insertRef func(t *testing.T, db *sql.DB, attachmentName string)
+		deleteRef func(t *testing.T, db *sql.DB)
+	}{
+		{
+			name: "workspace data",
+			insertRef: func(t *testing.T, db *sql.DB, attachmentName string) {
+				t.Helper()
+				if _, err := globals.ExecDb(
+					db,
+					"INSERT INTO drawing_workspace (user_id, active_workspace_id, data) VALUES (?, ?, ?)",
+					1,
+					"workspace-1",
+					`[{"id":"workspace-1","images":[{"src":"/attachments/`+attachmentName+`"}]}]`,
+				); err != nil {
+					t.Fatalf("insert drawing workspace reference: %v", err)
+				}
+			},
+			deleteRef: func(t *testing.T, db *sql.DB) {
+				t.Helper()
+				if _, err := globals.ExecDb(db, "DELETE FROM drawing_workspace"); err != nil {
+					t.Fatalf("delete drawing workspace reference: %v", err)
+				}
+			},
+		},
+		{
+			name: "task message",
+			insertRef: func(t *testing.T, db *sql.DB, attachmentName string) {
+				t.Helper()
+				if _, err := globals.ExecDb(
+					db,
+					`INSERT INTO drawing_task (
+						task_id, user_id, workspace_id, status, model, message, result_images
+					) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+					"task-1",
+					1,
+					"workspace-1",
+					"running",
+					"image-model",
+					"```file\n[[reference.png]]\n/attachments/"+attachmentName+"\n```",
+					"[]",
+				); err != nil {
+					t.Fatalf("insert drawing task message reference: %v", err)
+				}
+			},
+			deleteRef: func(t *testing.T, db *sql.DB) {
+				t.Helper()
+				if _, err := globals.ExecDb(db, "DELETE FROM drawing_task"); err != nil {
+					t.Fatalf("delete drawing task message reference: %v", err)
+				}
+			},
+		},
+		{
+			name: "task result images",
+			insertRef: func(t *testing.T, db *sql.DB, attachmentName string) {
+				t.Helper()
+				if _, err := globals.ExecDb(
+					db,
+					`INSERT INTO drawing_task (
+						task_id, user_id, workspace_id, status, model, message, result_images
+					) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+					"task-1",
+					1,
+					"workspace-1",
+					"succeeded",
+					"image-model",
+					"draw a cat",
+					`[{"src":"/attachments/`+attachmentName+`"}]`,
+				); err != nil {
+					t.Fatalf("insert drawing task result reference: %v", err)
+				}
+			},
+			deleteRef: func(t *testing.T, db *sql.DB) {
+				t.Helper()
+				if _, err := globals.ExecDb(db, "DELETE FROM drawing_task"); err != nil {
+					t.Fatalf("delete drawing task result reference: %v", err)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			workingDir, attachmentName := setupOrphanAttachmentCleanupTest(t)
+			db := openOrphanAttachmentCleanupDB(t)
+			attachmentPath := filepath.Join(workingDir, utils.AttachmentLocalPath(attachmentName))
+
+			tt.insertRef(t, db, attachmentName)
+			cleanupOrphanStoredAttachments(db)
+			if _, err := os.Stat(attachmentPath); err != nil {
+				t.Fatalf("expected drawing-only attachment to remain: %v", err)
+			}
+
+			tt.deleteRef(t, db)
+			cleanupOrphanStoredAttachments(db)
+			if _, err := os.Stat(attachmentPath); !os.IsNotExist(err) {
+				t.Fatalf("expected unreferenced drawing attachment to be deleted, got %v", err)
+			}
+		})
 	}
 }
 

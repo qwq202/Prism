@@ -74,12 +74,20 @@ func isDuplicateConversationIDError(err error) bool {
 		strings.Contains(lower, "unique constraint failed")
 }
 
-func loadGlobalConversationAttachmentNames(db *sql.DB) (map[string]struct{}, error) {
+func loadGlobalAttachmentNames(db *sql.DB) (map[string]struct{}, error) {
 	if db == nil {
 		return nil, fmt.Errorf("database is not initialized")
 	}
 
-	rows, err := globals.QueryDb(db, `SELECT data FROM conversation`)
+	rows, err := globals.QueryDb(db, `
+		SELECT data FROM conversation
+		UNION ALL
+		SELECT data FROM drawing_workspace
+		UNION ALL
+		SELECT message FROM drawing_task
+		UNION ALL
+		SELECT result_images FROM drawing_task
+	`)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +117,7 @@ func loadGlobalConversationAttachmentNames(db *sql.DB) (map[string]struct{}, err
 }
 
 func cleanupOrphanStoredAttachments(db *sql.DB) {
-	referenced, err := loadGlobalConversationAttachmentNames(db)
+	referenced, err := loadGlobalAttachmentNames(db)
 	if err != nil {
 		globals.Warn(fmt.Sprintf("[conversation] load attachment references error: %s", err.Error()))
 		return
