@@ -54,6 +54,7 @@ func Register(app *gin.RouterGroup) {
 
 	app.GET("/admin/attachment/list", ListAttachmentAPI)
 	app.POST("/admin/attachment/delete", DeleteAttachmentAPI)
+	app.POST("/admin/attachment/clean-orphans", CleanOrphanAttachmentsAPI)
 
 	app.GET("/admin/logger/list", ListLoggerAPI)
 	app.GET("/admin/logger/download", DownloadLoggerAPI)

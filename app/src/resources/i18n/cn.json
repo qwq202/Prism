@@ -1109,7 +1109,10 @@
       "orphan": "孤儿附件",
       "referenced-count": "已引用 {{count}} 次",
       "delete-confirm": "确定删除附件 {{name}} 吗？",
-      "delete-referenced-confirm": "附件 {{name}} 仍被 {{count}} 条对话引用，删除后相关图片将失效，确定继续吗？"
+      "delete-referenced-confirm": "附件 {{name}} 仍被 {{count}} 条对话引用，删除后相关图片将失效，确定继续吗？",
+      "clean-orphans": "一键清理",
+      "clean-orphans-confirm": "确定删除全部 {{count}} 个孤儿附件吗？已引用的附件不会被删除。",
+      "clean-orphans-success": "已删除 {{count}} 个孤儿附件"
     },
     "exit": "退出后台",
     "billing": "收入",

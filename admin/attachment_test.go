@@ -124,6 +124,59 @@ func TestDeleteAttachmentAllowsReferencedWithForce(t *testing.T) {
 	}
 }
 
+func TestDeleteOrphanAttachmentsKeepsReferencedFiles(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	workingDir, referenced := setupAttachmentDeleteTest(t)
+	db := openAdminUserTestDB(t)
+	if _, err := globals.ExecDb(
+		db,
+		"INSERT INTO conversation (user_id, conversation_id, conversation_name, data, model) VALUES (?, ?, ?, ?, ?)",
+		1,
+		1,
+		"chat",
+		`[{"type":"image","image_url":{"url":"/attachments/`+referenced+`"}}]`,
+		"gpt-4o-mini",
+	); err != nil {
+		t.Fatalf("insert referenced conversation: %v", err)
+	}
+
+	orphan := "fedcba9876543210fedcba9876543210.png"
+	if err := os.WriteFile(utils.AttachmentLocalPath(orphan), []byte("orphan"), 0o644); err != nil {
+		t.Fatalf("write orphan attachment: %v", err)
+	}
+	drawingReferenced := "00112233445566778899aabbccddeeff.png"
+	if err := os.WriteFile(utils.AttachmentLocalPath(drawingReferenced), []byte("drawing"), 0o644); err != nil {
+		t.Fatalf("write drawing attachment: %v", err)
+	}
+	if _, err := globals.ExecDb(
+		db,
+		"INSERT INTO drawing_workspace (user_id, active_workspace_id, data) VALUES (?, ?, ?)",
+		1,
+		"workspace-1",
+		`[{"id":"workspace-1","images":[{"src":"/attachments/`+drawingReferenced+`"}]}]`,
+	); err != nil {
+		t.Fatalf("insert drawing workspace: %v", err)
+	}
+
+	deleted, err := DeleteOrphanAttachments(db)
+	if err != nil {
+		t.Fatalf("delete orphan attachments: %v", err)
+	}
+	if deleted != 1 {
+		t.Fatalf("expected one deleted attachment, got %d", deleted)
+	}
+	if _, err := os.Stat(filepath.Join(workingDir, utils.AttachmentLocalPath(referenced))); err != nil {
+		t.Fatalf("expected referenced attachment to remain: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workingDir, utils.AttachmentLocalPath(drawingReferenced))); err != nil {
+		t.Fatalf("expected drawing attachment to remain: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workingDir, utils.AttachmentLocalPath(orphan))); !os.IsNotExist(err) {
+		t.Fatalf("expected orphan attachment to be deleted, got %v", err)
+	}
+}
+
 func TestListAttachmentsReturnsRFC3339UpdatedAt(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

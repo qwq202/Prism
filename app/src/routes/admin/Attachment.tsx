@@ -5,11 +5,12 @@ import {
   CardTitle,
 } from "@/components/ui/card.tsx";
 import { useTranslation } from "react-i18next";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useEffectAsync } from "@/utils/hook.ts";
 import {
   Attachment,
   deleteAttachment,
+  deleteOrphanAttachments,
   listAttachments,
 } from "@/admin/api/attachment.ts";
 import { getSizeUnit } from "@/utils/base.ts";
@@ -33,16 +34,25 @@ function AdminAttachment() {
   const [data, setData] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
 
+  const orphanAttachmentCount = useMemo(
+    () => data.filter((item) => !item.referenced).length,
+    [data],
+  );
+
+  const loadAttachments = async () => {
+    const res = await listAttachments();
+    if (res.status) {
+      setData(res.data);
+    } else {
+      withNotify(t, res);
+    }
+  };
+
   const sync = async () => {
     if (loading) return;
     setLoading(true);
     try {
-      const res = await listAttachments();
-      if (res.status) {
-        setData(res.data);
-      } else {
-        withNotify(t, res);
-      }
+      await loadAttachments();
     } finally {
       setLoading(false);
     }
@@ -68,6 +78,33 @@ function AdminAttachment() {
     if (res.status) await sync();
   };
 
+  const onCleanOrphans = async () => {
+    if (loading || orphanAttachmentCount === 0) return;
+
+    const confirmed = window.confirm(
+      t("admin.attachment.clean-orphans-confirm", {
+        count: orphanAttachmentCount,
+      }),
+    );
+    if (!confirmed) return;
+
+    setLoading(true);
+    try {
+      const res = await deleteOrphanAttachments();
+      withNotify(
+        t,
+        res,
+        true,
+        t("admin.attachment.clean-orphans-success", {
+          count: res.deleted ?? 0,
+        }),
+      );
+      await loadAttachments();
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className={cn("user-interface", mobile && "mobile")}>
       <Card className="admin-card">
@@ -75,6 +112,17 @@ function AdminAttachment() {
           <div className="flex items-center gap-2">
             <CardTitle>{t("admin.attachment.title")}</CardTitle>
             <div className="grow" />
+            <Button
+              onClick={onCleanOrphans}
+              variant="destructive"
+              size="sm"
+              loading
+              disabled={loading || orphanAttachmentCount === 0}
+              title={t("admin.attachment.clean-orphans")}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              {t("admin.attachment.clean-orphans")}
+            </Button>
             <Button onClick={sync} variant="outline" size="icon">
               <RotateCw className={cn("w-4 h-4", loading && "animate-spin")} />
             </Button>
@@ -92,7 +140,9 @@ function AdminAttachment() {
                   <TableHead>{t("admin.attachment.file-name")}</TableHead>
                   <TableHead>{t("admin.attachment.storage-mode")}</TableHead>
                   <TableHead>{t("admin.attachment.file-size")}</TableHead>
-                  <TableHead>{t("admin.attachment.reference-status")}</TableHead>
+                  <TableHead>
+                    {t("admin.attachment.reference-status")}
+                  </TableHead>
                   <TableHead>{t("admin.attachment.updated-at")}</TableHead>
                   <TableHead>{t("admin.attachment.action")}</TableHead>
                 </TableRow>

@@ -4,6 +4,7 @@ import (
 	"chat/globals"
 	"chat/utils"
 	"database/sql"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -27,7 +28,15 @@ func attachmentDeleteForced(c *gin.Context) bool {
 }
 
 func loadAttachmentReferenceCount(db *sql.DB) map[string]int64 {
-	rows, err := globals.QueryDb(db, `SELECT data FROM conversation`)
+	rows, err := globals.QueryDb(db, `
+		SELECT data FROM conversation
+		UNION ALL
+		SELECT data FROM drawing_workspace
+		UNION ALL
+		SELECT message FROM drawing_task
+		UNION ALL
+		SELECT result_images FROM drawing_task
+	`)
 	if err != nil {
 		return map[string]int64{}
 	}
@@ -48,6 +57,34 @@ func loadAttachmentReferenceCount(db *sql.DB) map[string]int64 {
 	}
 
 	return references
+}
+
+func DeleteOrphanAttachments(db *sql.DB) (int, error) {
+	items, err := utils.ListConfiguredStoredAttachments()
+	if err != nil {
+		return 0, err
+	}
+
+	references := loadAttachmentReferenceCount(db)
+	deleted := 0
+	failed := make([]string, 0)
+	for _, item := range items {
+		if references[item.Name] > 0 {
+			continue
+		}
+
+		if err := utils.DeleteConfiguredStoredAttachment(item.Name); err != nil {
+			failed = append(failed, item.Name)
+			continue
+		}
+		deleted++
+	}
+
+	if len(failed) > 0 {
+		return deleted, fmt.Errorf("failed to delete %d orphan attachment(s)", len(failed))
+	}
+
+	return deleted, nil
 }
 
 func ListAttachments(db *sql.DB) ([]AttachmentFile, error) {
@@ -118,5 +155,22 @@ func DeleteAttachmentAPI(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"status": true,
+	})
+}
+
+func CleanOrphanAttachmentsAPI(c *gin.Context) {
+	deleted, err := DeleteOrphanAttachments(utils.GetDBFromContext(c))
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  false,
+			"error":   err.Error(),
+			"deleted": deleted,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  true,
+		"deleted": deleted,
 	})
 }

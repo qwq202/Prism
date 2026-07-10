@@ -16,6 +16,10 @@ export type AttachmentListResponse = CommonResponse & {
   data: Attachment[];
 };
 
+export type CleanOrphanAttachmentsResponse = CommonResponse & {
+  deleted?: number;
+};
+
 export async function listAttachments(): Promise<AttachmentListResponse> {
   try {
     const response = await axios.get("/admin/attachment/list");
@@ -46,6 +50,16 @@ export async function deleteAttachment(
       params: { name, force },
     });
     return response.data as CommonResponse;
+  } catch (e) {
+    console.warn(e);
+    return { status: false, error: getErrorMessage(e) };
+  }
+}
+
+export async function deleteOrphanAttachments(): Promise<CleanOrphanAttachmentsResponse> {
+  try {
+    const response = await axios.post("/admin/attachment/clean-orphans");
+    return response.data as CleanOrphanAttachmentsResponse;
   } catch (e) {
     console.warn(e);
     return { status: false, error: getErrorMessage(e) };
