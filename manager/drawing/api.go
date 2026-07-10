@@ -56,7 +56,7 @@ func ListTasksAPI(c *gin.Context) {
 	}
 
 	db := utils.GetDBFromContext(c)
-	tasks, err := LoadActiveTasks(db, user.GetID(db))
+	tasks, err := LoadLatestWorkspaceTasks(db, user.GetID(db))
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status": false, "message": err.Error()})
 		return

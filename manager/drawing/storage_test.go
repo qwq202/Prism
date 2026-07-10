@@ -458,3 +458,153 @@ func TestCreateTaskLimitsConcurrentTasksPerUser(t *testing.T) {
 		t.Fatalf("expected another user to have an independent task limit: %v", err)
 	}
 }
+
+func drawingTasksByWorkspace(tasks []Task) map[string]Task {
+	result := make(map[string]Task, len(tasks))
+	for _, task := range tasks {
+		result[task.WorkspaceID] = task
+	}
+	return result
+}
+
+func TestLoadLatestWorkspaceTasksReturnsOnlyNewestTaskPerWorkspace(t *testing.T) {
+	db := openDrawingWorkspaceTestDB(t)
+
+	oldFirst, err := CreateTask(db, 7, validDrawingTaskForm("workspace-first"))
+	if err != nil {
+		t.Fatalf("create old first task: %v", err)
+	}
+	if err := MarkTaskFailed(db, oldFirst.TaskID, fmt.Errorf("old failure")); err != nil {
+		t.Fatalf("fail old first task: %v", err)
+	}
+	newFirst, err := CreateTask(db, 7, validDrawingTaskForm("workspace-first"))
+	if err != nil {
+		t.Fatalf("create new first task: %v", err)
+	}
+	if err := MarkTaskRunning(db, newFirst.TaskID); err != nil {
+		t.Fatalf("run new first task: %v", err)
+	}
+
+	oldSecond, err := CreateTask(db, 7, validDrawingTaskForm("workspace-second"))
+	if err != nil {
+		t.Fatalf("create old second task: %v", err)
+	}
+	if err := MarkTaskSucceeded(db, oldSecond.TaskID, []GeneratedImage{{
+		ID:        "old-image",
+		Src:       "/attachments/old.png",
+		Prompt:    "old prompt",
+		CreatedAt: 1,
+	}}, 1); err != nil {
+		t.Fatalf("succeed old second task: %v", err)
+	}
+	newSecond, err := CreateTask(db, 7, validDrawingTaskForm("workspace-second"))
+	if err != nil {
+		t.Fatalf("create new second task: %v", err)
+	}
+	if _, err := MarkTaskCanceled(db, 7, newSecond.TaskID); err != nil {
+		t.Fatalf("cancel new second task: %v", err)
+	}
+
+	tasks, err := LoadLatestWorkspaceTasks(db, 7)
+	if err != nil {
+		t.Fatalf("load latest workspace tasks: %v", err)
+	}
+	if len(tasks) != 2 {
+		t.Fatalf("expected one task per workspace, got %#v", tasks)
+	}
+
+	byWorkspace := drawingTasksByWorkspace(tasks)
+	if got := byWorkspace["workspace-first"]; got.TaskID != newFirst.TaskID || got.Status != TaskStatusRunning {
+		t.Fatalf("expected newest running task for first workspace, got %#v", got)
+	}
+	if got := byWorkspace["workspace-second"]; got.TaskID != newSecond.TaskID || got.Status != TaskStatusCanceled {
+		t.Fatalf("expected newest canceled task for second workspace, got %#v", got)
+	}
+	for _, task := range tasks {
+		if task.TaskID == oldFirst.TaskID || task.TaskID == oldSecond.TaskID {
+			t.Fatalf("older task must not be returned: %#v", task)
+		}
+	}
+}
+
+func TestLoadLatestWorkspaceTasksRecoversTerminalStates(t *testing.T) {
+	db := openDrawingWorkspaceTestDB(t)
+
+	succeeded, err := CreateTask(db, 7, validDrawingTaskForm("workspace-succeeded"))
+	if err != nil {
+		t.Fatalf("create succeeded task: %v", err)
+	}
+	if err := MarkTaskSucceeded(db, succeeded.TaskID, []GeneratedImage{{
+		ID:        "generated-image",
+		Src:       "/attachments/generated.png",
+		Prompt:    "draw a pig",
+		CreatedAt: 10,
+	}}, 2.5); err != nil {
+		t.Fatalf("mark task succeeded: %v", err)
+	}
+
+	failed, err := CreateTask(db, 7, validDrawingTaskForm("workspace-failed"))
+	if err != nil {
+		t.Fatalf("create failed task: %v", err)
+	}
+	if err := MarkTaskFailed(db, failed.TaskID, fmt.Errorf("provider rejected prompt")); err != nil {
+		t.Fatalf("mark task failed: %v", err)
+	}
+
+	canceled, err := CreateTask(db, 7, validDrawingTaskForm("workspace-canceled"))
+	if err != nil {
+		t.Fatalf("create canceled task: %v", err)
+	}
+	if _, err := MarkTaskCanceled(db, 7, canceled.TaskID); err != nil {
+		t.Fatalf("mark task canceled: %v", err)
+	}
+
+	tasks, err := LoadLatestWorkspaceTasks(db, 7)
+	if err != nil {
+		t.Fatalf("load latest workspace tasks: %v", err)
+	}
+	if len(tasks) != 3 {
+		t.Fatalf("expected all terminal workspace tasks, got %#v", tasks)
+	}
+
+	byWorkspace := drawingTasksByWorkspace(tasks)
+	if got := byWorkspace["workspace-succeeded"]; got.Status != TaskStatusSucceeded || len(got.Images) != 1 || got.Images[0].ID != "generated-image" {
+		t.Fatalf("expected succeeded task and image to be recovered, got %#v", got)
+	}
+	if got := byWorkspace["workspace-failed"]; got.Status != TaskStatusFailed || got.Error != "provider rejected prompt" {
+		t.Fatalf("expected failed task error to be recovered, got %#v", got)
+	}
+	if got := byWorkspace["workspace-canceled"]; got.Status != TaskStatusCanceled {
+		t.Fatalf("expected canceled task to be recovered, got %#v", got)
+	}
+}
+
+func TestLoadLatestWorkspaceTasksUsesWorkspaceLimit(t *testing.T) {
+	db := openDrawingWorkspaceTestDB(t)
+
+	for i := 0; i <= maxDrawingWorkspaceCount; i++ {
+		workspaceID := fmt.Sprintf("workspace-%03d", i)
+		task, err := CreateTask(db, 7, validDrawingTaskForm(workspaceID))
+		if err != nil {
+			t.Fatalf("create task %d: %v", i, err)
+		}
+		if err := MarkTaskFailed(db, task.TaskID, fmt.Errorf("failure %d", i)); err != nil {
+			t.Fatalf("fail task %d: %v", i, err)
+		}
+	}
+
+	tasks, err := LoadLatestWorkspaceTasks(db, 7)
+	if err != nil {
+		t.Fatalf("load latest workspace tasks: %v", err)
+	}
+	if len(tasks) != maxDrawingWorkspaceCount {
+		t.Fatalf("expected task list to use workspace limit %d, got %d", maxDrawingWorkspaceCount, len(tasks))
+	}
+	byWorkspace := drawingTasksByWorkspace(tasks)
+	if _, ok := byWorkspace["workspace-000"]; ok {
+		t.Fatalf("expected oldest workspace task to be excluded by limit")
+	}
+	if _, ok := byWorkspace[fmt.Sprintf("workspace-%03d", maxDrawingWorkspaceCount)]; !ok {
+		t.Fatalf("expected newest workspace task to be included")
+	}
+}

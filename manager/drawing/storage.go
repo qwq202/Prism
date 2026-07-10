@@ -18,7 +18,6 @@ const (
 	emptyWorkspaceArray              = "[]"
 	maxDrawingWorkspaceCount         = 64
 	maxDrawingImageBytes             = 100 * 1024 * 1024
-	maxDrawingTaskListCount          = 20
 	maxDrawingActiveTasksPerUser     = 4
 	maxDrawingTaskWorkspaceIDBytes   = 128
 	maxDrawingTaskModelBytes         = 255
@@ -604,7 +603,7 @@ func LoadTask(db *sql.DB, userID int64, taskID string) (*Task, error) {
 	`, userID, strings.TrimSpace(taskID)))
 }
 
-func LoadActiveTasks(db *sql.DB, userID int64) ([]Task, error) {
+func LoadLatestWorkspaceTasks(db *sql.DB, userID int64) ([]Task, error) {
 	if db == nil {
 		return nil, fmt.Errorf("database is not initialized")
 	}
@@ -613,10 +612,15 @@ func LoadActiveTasks(db *sql.DB, userID int64) ([]Task, error) {
 		SELECT `+taskSelectColumns+`
 		FROM drawing_task
 		WHERE user_id = ?
-		  AND status IN (?, ?)
+		  AND id IN (
+			SELECT MAX(id)
+			FROM drawing_task
+			WHERE user_id = ?
+			GROUP BY workspace_id
+		  )
 		ORDER BY id DESC
 		LIMIT ?
-	`, userID, TaskStatusQueued, TaskStatusRunning, maxDrawingTaskListCount)
+	`, userID, userID, maxDrawingWorkspaceCount)
 	if err != nil {
 		return nil, err
 	}
