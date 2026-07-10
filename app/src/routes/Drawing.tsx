@@ -249,8 +249,7 @@ function Drawing() {
     selectedDrawingModelId &&
     cloudSyncReady &&
     !requestInFlight &&
-    !referenceUploadPending &&
-    (mode !== "edit" || files.length > 0),
+    !referenceUploadPending,
   );
   const generateDisabledReason = !selectedDrawingModelId
     ? t("drawing.needModel")
@@ -260,11 +259,9 @@ function Drawing() {
         ? t("drawing.needPrompt")
         : referenceUploadPending
           ? t("drawing.uploadProcessing")
-          : mode === "edit" && files.length === 0
-            ? t("drawing.editRequiresReference")
-            : requestInFlight
-              ? t("drawing.generating")
-              : "";
+          : requestInFlight
+            ? t("drawing.generating")
+            : "";
   const activeTaskIds = useMemo(
     () =>
       workspaces
@@ -904,7 +901,7 @@ function Drawing() {
       return;
     }
     if (mode === "edit" && files.length === 0) {
-      toast.info(t("drawing.editRequiresReference"));
+      toast.warning(t("drawing.editRequiresReference"));
       return;
     }
     if (!canUseReferencesWithModel(selectedDrawingModelId)) {
@@ -1692,15 +1689,12 @@ function Drawing() {
               placeholder={t("drawing.promptPlaceholder")}
             />
 
-            {(referenceUploadPending ||
-              (mode === "edit" && files.length === 0)) && (
+            {referenceUploadPending && (
               <div
                 className="px-4 pb-2 text-xs text-muted-foreground"
                 role="status"
               >
-                {referenceUploadPending
-                  ? t("drawing.uploadProcessing")
-                  : t("drawing.editRequiresReference")}
+                {t("drawing.uploadProcessing")}
               </div>
             )}
 
