@@ -118,6 +118,7 @@ func ConnectDatabase() *sql.DB {
 	CreateModelUsageMetricsTable(db)
 	CreatePaymentOrdersTable(db)
 	CreateMemoryTable(db)
+	CreatePersonalizationSettingsTable(db)
 
 	migrateDatabaseOrPanic(db)
 
@@ -297,6 +298,19 @@ func CreateMemoryTable(db *sql.DB) {
 		  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		  is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+		  FOREIGN KEY (user_id) REFERENCES auth(id)
+		);
+	`)
+}
+
+func CreatePersonalizationSettingsTable(db *sql.DB) {
+	mustCreateTable(db, "personalization_settings", `
+		CREATE TABLE IF NOT EXISTS personalization_settings (
+		  user_id INT PRIMARY KEY,
+		  data MEDIUMTEXT NOT NULL,
+		  revision BIGINT NOT NULL DEFAULT 1,
+		  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		  FOREIGN KEY (user_id) REFERENCES auth(id)
 		);
 	`)

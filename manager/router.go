@@ -3,6 +3,7 @@ package manager
 import (
 	"chat/manager/broadcast"
 	"chat/manager/drawing"
+	"chat/manager/personalization"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,4 +22,5 @@ func Register(app *gin.RouterGroup) {
 
 	broadcast.Register(app)
 	drawing.Register(app)
+	personalization.Register(app)
 }
