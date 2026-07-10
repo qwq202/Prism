@@ -118,6 +118,7 @@ type FileProviderProps = {
   modelId?: string;
   forceImageUpload?: boolean;
   maxFiles?: number;
+  onUploadingChange?: (uploading: boolean) => void;
   trigger?: (props: {
     disabled: boolean;
     filesCount: number;
@@ -131,6 +132,7 @@ function FileProvider({
   modelId,
   forceImageUpload = false,
   maxFiles,
+  onUploadingChange,
   trigger,
 }: FileProviderProps) {
   const { t } = useTranslation();
@@ -143,6 +145,18 @@ function FileProvider({
   const [tasks, taskDispatch] = useReducer(fileTaskReducer, {
     tasks: [],
   } as FileTaskState);
+  const uploading = tasks.tasks.length > 0;
+
+  useEffect(() => {
+    onUploadingChange?.(uploading);
+  }, [onUploadingChange, uploading]);
+
+  useEffect(
+    () => () => {
+      onUploadingChange?.(false);
+    },
+    [onUploadingChange],
+  );
 
   const supportModels = useSelector(selectSupportModels);
   const currentModelInfo = useMemo(
