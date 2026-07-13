@@ -1,7 +1,7 @@
 .claude-range-slider {
   --claude-slider-purple: #8e6bd9;
-  --claude-slider-handle-width: 28px;
-  --claude-slider-handle-height: 28px;
+  --claude-slider-handle-width: 24px;
+  --claude-slider-handle-height: 28.5px;
   display: flex;
   width: 100%;
   flex-direction: column;
@@ -42,7 +42,7 @@
     height: 28px;
     flex-grow: 1;
     overflow: hidden;
-    border-radius: 10px;
+    border-radius: 6px;
     background: hsl(var(--muted));
     box-shadow: inset 0 0 0 1px hsl(var(--border) / 0.24);
     container-type: inline-size;
@@ -113,6 +113,7 @@
   }
 
   &__dot[data-current],
+  &[data-dragging] &__dot,
   &[data-top-stop]:not([data-dragging]) &__dot {
     opacity: 0;
   }
@@ -123,7 +124,7 @@
     display: block;
     width: var(--claude-slider-handle-width);
     height: var(--claude-slider-handle-height);
-    border-radius: 10px;
+    border-radius: 6px;
     background: #fff;
     box-shadow:
       0 1px 2px rgb(0 0 0 / 12%),
@@ -134,10 +135,6 @@
       background-color 300ms ease,
       box-shadow 300ms ease,
       transform 140ms ease;
-  }
-
-  &__thumb:active {
-    transform: scale(0.94);
   }
 
   &__thumb:focus-visible {
