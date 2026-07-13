@@ -76,10 +76,12 @@
     inset: 0;
     width: 100cqw;
     pointer-events: none;
-    opacity: var(--claude-slider-energy-opacity);
-    mask-image: linear-gradient(to right, transparent 0%, black 45%);
-    mask-repeat: no-repeat;
+    opacity: 0;
     transition: opacity 300ms ease;
+  }
+
+  &[data-top-stop] &__energy {
+    opacity: 1;
   }
 
   &__energy canvas {

@@ -19,15 +19,9 @@ type ClaudeRangeSliderProps = {
 
 function useEnergyCanvas(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
-  progress: number,
+  active: boolean,
   disabled: boolean,
-  activityKey: number,
-  dragging: boolean,
 ) {
-  const progressRef = React.useRef(progress);
-  progressRef.current = progress;
-  const energyActive = !disabled && progress > 25;
-
   React.useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -35,8 +29,13 @@ function useEnergyCanvas(
     const context = canvas.getContext("2d");
     if (!context) return;
 
+    if (disabled || !active) {
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      return;
+    }
+
     let animationFrame = 0;
-    let frame = 0;
+    let running = false;
     let width = 0;
     let height = 0;
     const reducedMotion = window.matchMedia(
@@ -53,68 +52,124 @@ function useEnergyCanvas(
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
     };
 
-    const draw = () => {
+    const draw = (time: number) => {
       context.clearRect(0, 0, width, height);
-      const currentProgress = progressRef.current;
-      const energy = Math.max(0, Math.min((currentProgress - 25) / 75, 1));
-      if (disabled || energy <= 0) return;
 
-      const time = frame / 60;
-      const fillWidth = width * (currentProgress / 100);
-      const glow = context.createLinearGradient(0, 0, fillWidth, 0);
-      glow.addColorStop(0, "rgba(142, 107, 217, 0)");
-      glow.addColorStop(0.5, `rgba(142, 107, 217, ${0.12 * energy})`);
-      glow.addColorStop(1, `rgba(172, 142, 246, ${0.58 * energy})`);
-      context.fillStyle = glow;
-      context.fillRect(0, 0, fillWidth, height);
+      const baseGlow = context.createLinearGradient(0, 0, width, 0);
+      baseGlow.addColorStop(0, "rgba(105, 78, 178, 0.08)");
+      baseGlow.addColorStop(0.48, "rgba(129, 91, 224, 0.24)");
+      baseGlow.addColorStop(0.82, "rgba(160, 116, 246, 0.42)");
+      baseGlow.addColorStop(1, "rgba(205, 177, 255, 0.68)");
+      context.fillStyle = baseGlow;
+      context.fillRect(0, 0, width, height);
 
       context.save();
       context.globalCompositeOperation = "lighter";
-      for (let particle = 0; particle < 18; particle += 1) {
-        const phase = particle * 1.813 + time * (0.45 + (particle % 5) * 0.08);
-        const travel = (Math.sin(phase * 0.73) + 1) / 2;
-        const x = fillWidth * (0.28 + travel * 0.72);
+
+      for (let band = 0; band < 3; band += 1) {
+        const bandGlow = context.createLinearGradient(0, 0, width, 0);
+        bandGlow.addColorStop(0, "rgba(142, 107, 217, 0)");
+        bandGlow.addColorStop(
+          0.55,
+          `rgba(169, 130, 249, ${0.08 + band * 0.03})`,
+        );
+        bandGlow.addColorStop(1, `rgba(232, 218, 255, ${0.3 - band * 0.05})`);
+        context.beginPath();
+        for (let x = 0; x <= width + 4; x += 4) {
+          const y =
+            height * (0.36 + band * 0.15) +
+            Math.sin(x * (0.035 + band * 0.007) - time * (1.25 + band * 0.24)) *
+              (2.2 + band * 0.65) +
+            Math.cos(x * 0.018 + time * 0.72) * 1.4;
+          if (x === 0) context.moveTo(x, y);
+          else context.lineTo(x, y);
+        }
+        context.strokeStyle = bandGlow;
+        context.lineWidth = 3.2 + band * 1.3;
+        context.stroke();
+      }
+
+      for (let particle = 0; particle < 24; particle += 1) {
+        const seed =
+          Math.sin((particle + 1) * 91.345) * 47453.5453 -
+          Math.floor(Math.sin((particle + 1) * 91.345) * 47453.5453);
+        const travel = (seed + time * (0.035 + (particle % 6) * 0.006)) % 1;
+        const x = width * (0.12 + travel * 0.88);
         const y =
-          height / 2 +
-          Math.sin(phase * 1.9) * height * 0.26 * energy +
-          Math.cos(phase * 0.6) * 1.4;
-        const radius = 0.45 + ((particle * 7) % 5) * 0.18;
-        const alpha = (0.12 + ((Math.sin(phase * 2.4) + 1) / 2) * 0.5) * energy;
-        const spark = context.createRadialGradient(x, y, 0, x, y, radius * 4);
-        spark.addColorStop(0, `rgba(244, 237, 255, ${alpha})`);
-        spark.addColorStop(0.32, `rgba(178, 144, 255, ${alpha * 0.72})`);
+          height * (0.18 + ((particle * 37) % 61) / 95) +
+          Math.sin(time * (1.3 + (particle % 4) * 0.16) + particle * 1.7) * 2.5;
+        const pulse = (Math.sin(time * 3.1 + particle * 2.31) + 1) / 2;
+        const radius = 1.4 + (particle % 4) * 0.42 + pulse * 0.8;
+        const alpha = 0.18 + pulse * 0.56;
+        const spark = context.createRadialGradient(x, y, 0, x, y, radius * 3.4);
+        spark.addColorStop(0, `rgba(252, 249, 255, ${alpha})`);
+        spark.addColorStop(0.28, `rgba(191, 160, 255, ${alpha * 0.78})`);
         spark.addColorStop(1, "rgba(142, 107, 217, 0)");
         context.fillStyle = spark;
         context.beginPath();
-        context.arc(x, y, radius * 4, 0, Math.PI * 2);
+        context.arc(x, y, radius * 3.4, 0, Math.PI * 2);
         context.fill();
       }
+
+      const edgeGlow = context.createRadialGradient(
+        width,
+        height / 2,
+        0,
+        width,
+        height / 2,
+        Math.max(28, width * 0.22),
+      );
+      edgeGlow.addColorStop(0, "rgba(255, 252, 255, 0.8)");
+      edgeGlow.addColorStop(0.18, "rgba(209, 180, 255, 0.46)");
+      edgeGlow.addColorStop(1, "rgba(142, 107, 217, 0)");
+      context.fillStyle = edgeGlow;
+      context.fillRect(0, 0, width, height);
       context.restore();
     };
 
-    const animate = () => {
-      draw();
-      frame += 1;
-      if (!reducedMotion && frame < 180 && energyActive) {
+    const animate = (timestamp: number) => {
+      draw(timestamp / 1000);
+      if (!document.hidden) {
         animationFrame = window.requestAnimationFrame(animate);
+      } else {
+        running = false;
       }
     };
 
+    const start = () => {
+      if (running || reducedMotion || document.hidden) return;
+      running = true;
+      animationFrame = window.requestAnimationFrame(animate);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        window.cancelAnimationFrame(animationFrame);
+        running = false;
+        return;
+      }
+      draw(performance.now() / 1000);
+      start();
+    };
+
     resize();
-    animate();
+    draw(0);
+    start();
 
     const observer = new ResizeObserver(() => {
       resize();
-      draw();
+      draw(performance.now() / 1000);
     });
     observer.observe(canvas);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       window.cancelAnimationFrame(animationFrame);
       observer.disconnect();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       context.clearRect(0, 0, width, height);
     };
-  }, [activityKey, canvasRef, disabled, dragging, energyActive]);
+  }, [active, canvasRef, disabled]);
 }
 
 function getProgressForIndex(index: number, total: number): number {
@@ -148,10 +203,9 @@ export function ClaudeRangeSlider({
   const [dragProgress, setDragProgress] = React.useState(restingProgress);
   const lastNotifiedIndexRef = React.useRef(safeIndex);
   const progress = dragging ? dragProgress : restingProgress;
-  const visualIndex = getIndexForProgress(progress, total);
   const atTopStop = total > 1 && progress >= 99.5;
 
-  useEnergyCanvas(canvasRef, progress, disabled, visualIndex, dragging);
+  useEnergyCanvas(canvasRef, atTopStop, disabled);
 
   const notifyIndexChange = (nextIndex: number) => {
     if (lastNotifiedIndexRef.current === nextIndex) return;
@@ -212,15 +266,6 @@ export function ClaudeRangeSlider({
       data-disabled={disabled || undefined}
       data-dragging={dragging || undefined}
       data-top-stop={atTopStop || undefined}
-      style={
-        {
-          "--claude-slider-progress": `${progress}%`,
-          "--claude-slider-energy-opacity": Math.max(
-            0,
-            Math.min((progress - 25) / 75, 1),
-          ),
-        } as React.CSSProperties
-      }
     >
       <div className="claude-range-slider__labels" aria-hidden="true">
         <span>{fasterLabel}</span>
