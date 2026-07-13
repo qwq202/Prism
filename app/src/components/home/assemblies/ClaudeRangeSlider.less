@@ -109,8 +109,12 @@
     outline: none;
     transition:
       background-color 300ms ease,
-      box-shadow 300ms ease,
-      transform 140ms ease;
+      box-shadow 300ms ease;
+  }
+
+  &[data-dragging] &__thumb,
+  &[data-dragging] &__fill {
+    transition: none;
   }
 
   &__thumb:focus-visible {

@@ -46,30 +46,62 @@ export function ClaudeRangeSlider({
   const restingProgress = getProgressForIndex(safeIndex, total);
   const [dragProgress, setDragProgress] = React.useState(restingProgress);
   const lastNotifiedIndexRef = React.useRef(safeIndex);
+  const pendingProgressRef = React.useRef(restingProgress);
+  const animationFrameRef = React.useRef<number | null>(null);
+  const onIndexChangeRef = React.useRef(onIndexChange);
   const progress = dragging ? dragProgress : restingProgress;
   const atTopStop = total > 1 && progress >= 99.5;
 
-  const notifyIndexChange = (nextIndex: number) => {
+  React.useEffect(() => {
+    onIndexChangeRef.current = onIndexChange;
+  }, [onIndexChange]);
+
+  const notifyIndexChange = React.useCallback((nextIndex: number) => {
     if (lastNotifiedIndexRef.current === nextIndex) return;
     lastNotifiedIndexRef.current = nextIndex;
-    onIndexChange(nextIndex);
-  };
+    onIndexChangeRef.current(nextIndex);
+  }, []);
+
+  const cancelScheduledProgress = React.useCallback(() => {
+    if (animationFrameRef.current === null) return;
+    cancelAnimationFrame(animationFrameRef.current);
+    animationFrameRef.current = null;
+  }, []);
+
+  React.useEffect(
+    () => () => {
+      cancelScheduledProgress();
+    },
+    [cancelScheduledProgress],
+  );
 
   const handleValueChange = (value: number[]) => {
     const nextProgress = Math.min(100, Math.max(0, value[0] ?? 0));
-    setDragProgress(nextProgress);
-    notifyIndexChange(getIndexForProgress(nextProgress, total));
+    pendingProgressRef.current = nextProgress;
+
+    if (animationFrameRef.current !== null) return;
+    animationFrameRef.current = requestAnimationFrame(() => {
+      animationFrameRef.current = null;
+      const latestProgress = pendingProgressRef.current;
+      setDragProgress(latestProgress);
+      notifyIndexChange(getIndexForProgress(latestProgress, total));
+    });
   };
 
-  const handleValueCommit = (value: number[]) => {
-    const nextIndex = getIndexForProgress(value[0] ?? dragProgress, total);
+  const handleValueCommit = () => {
+    cancelScheduledProgress();
+    const nextIndex = getIndexForProgress(pendingProgressRef.current, total);
     notifyIndexChange(nextIndex);
-    setDragProgress(getProgressForIndex(nextIndex, total));
+    const nextProgress = getProgressForIndex(nextIndex, total);
+    pendingProgressRef.current = nextProgress;
+    setDragProgress(nextProgress);
     setDragging(false);
   };
 
   const cancelDragging = () => {
+    cancelScheduledProgress();
     lastNotifiedIndexRef.current = safeIndex;
+    pendingProgressRef.current = restingProgress;
     setDragProgress(restingProgress);
     setDragging(false);
   };
@@ -98,8 +130,10 @@ export function ClaudeRangeSlider({
 
     event.preventDefault();
     lastNotifiedIndexRef.current = nextIndex;
-    setDragProgress(getProgressForIndex(nextIndex, total));
-    onIndexChange(nextIndex);
+    const nextProgress = getProgressForIndex(nextIndex, total);
+    pendingProgressRef.current = nextProgress;
+    setDragProgress(nextProgress);
+    onIndexChangeRef.current(nextIndex);
   };
 
   return (
@@ -126,6 +160,7 @@ export function ClaudeRangeSlider({
         onValueCommit={handleValueCommit}
         onPointerDown={() => {
           lastNotifiedIndexRef.current = safeIndex;
+          pendingProgressRef.current = restingProgress;
           setDragProgress(restingProgress);
           setDragging(true);
         }}
