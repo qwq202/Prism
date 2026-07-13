@@ -50,6 +50,11 @@ import { subscriptionDataSelector } from "@/store/globals.ts";
 import { getResolvedModelTags, isDrawingModel } from "@/conf/model.ts";
 import {
   ChargeBaseProps,
+  ImageChargeConfig,
+  imageBilling,
+  imageBillingModeMatrix,
+  imageBillingModeOfficialUsage,
+  imageBillingModePerImage,
   nonBilling,
   timesBilling,
   tokenBilling,
@@ -226,6 +231,7 @@ function PriceColumn({
   type,
   input,
   output,
+  image,
   pro,
   show1mPricing,
 }: PriceColumnProps) {
@@ -306,7 +312,285 @@ function PriceColumn({
         </div>
       );
     }
+    case imageBilling: {
+      const formatQuota = (value: number) =>
+        String(parseFloat(value.toPrecision(8)));
+      const requestPrice = Math.max(0, Number(image?.request) || 0);
+      const referencePrice = Math.max(0, Number(image?.reference) || 0);
+      const outputCount = Math.max(1, Number(image?.output_count) || 1);
+      const mode = image?.mode;
+      let label = t("admin.charge.image-default");
+      let unit = "IMAGE";
+      let prices: number[];
+      let hasAdditions = requestPrice > 0 || referencePrice > 0;
+
+      if (mode === imageBillingModeOfficialUsage) {
+        label = t("admin.charge.image-billing-mode-official_usage");
+        unit = unitName;
+        prices = Object.values(image?.usage ?? {})
+          .map((value) => Math.max(0, Number(value) || 0) * unitValue)
+          .filter((value) => value > 0);
+        if (prices.length === 0) prices = [Math.max(0, output)];
+        hasAdditions = hasAdditions || prices.length > 1;
+      } else if (mode === imageBillingModeMatrix) {
+        label = t("admin.charge.image-billing-mode-matrix");
+        prices = (image?.rules ?? [])
+          .map(
+            (rule) =>
+              requestPrice + Math.max(0, Number(rule.quota) || 0) * outputCount,
+          )
+          .filter((value) => value > 0);
+        if (prices.length === 0) {
+          prices = [
+            requestPrice +
+              Math.max(0, Number(image?.default ?? output) || 0) * outputCount,
+          ];
+        }
+        hasAdditions = referencePrice > 0 || prices.length > 1;
+      } else {
+        prices = [Math.max(0, Number(image?.default ?? output) || 0)];
+        hasAdditions =
+          hasAdditions ||
+          Object.values(image?.size ?? {}).some((value) => Number(value) > 0) ||
+          Object.values(image?.quality ?? {}).some(
+            (value) => Number(value) > 0,
+          );
+      }
+
+      const minPrice = Math.min(...prices);
+      const maxPrice = Math.max(...prices);
+      const price =
+        minPrice === maxPrice
+          ? formatQuota(minPrice)
+          : `${formatQuota(minPrice)}–${formatQuota(maxPrice)}`;
+
+      return (
+        <motion.div
+          className={cn(className, "bg-secondary/5 hover:bg-secondary/10")}
+          whileHover={{ scale: 1.02 }}
+          transition={{ type: "spring", stiffness: 300 }}
+        >
+          <Image className={iconClassName} />
+          <span className="min-w-0 flex-grow truncate">{label}</span>
+          <span className="ml-1 whitespace-nowrap font-medium">
+            {price}
+            {hasAdditions ? "+" : ""}
+          </span>
+          <span className="text-2xs ml-1 rounded-sm bg-input/40 px-1.5 select-none">
+            {unit}
+          </span>
+        </motion.div>
+      );
+    }
   }
+}
+
+function formatQuotaValue(value: unknown): string {
+  const normalized = Math.max(0, Number(value) || 0);
+  return String(parseFloat(normalized.toPrecision(8)));
+}
+
+type ImagePricingDetailsProps = {
+  image?: ImageChargeConfig;
+  fallbackOutput: number;
+};
+
+function ImagePricingDetails({
+  image,
+  fallbackOutput,
+}: ImagePricingDetailsProps) {
+  const { t } = useTranslation();
+  const mode = image?.mode || imageBillingModePerImage;
+  const outputCount = Math.max(1, Number(image?.output_count) || 1);
+  const defaultPrice = Math.max(
+    0,
+    Number(image?.default ?? fallbackOutput) || 0,
+  );
+  const sizePrices = Object.entries(image?.size ?? {}).filter(
+    ([, price]) => Number(price) > 0,
+  );
+  const qualityPrices = Object.entries(image?.quality ?? {}).filter(
+    ([, price]) => Number(price) > 0,
+  );
+  const rules = image?.rules ?? [];
+  const usage = image?.usage ?? {};
+  const requestAndReferenceStats = [
+    {
+      label: t("admin.charge.image-request"),
+      value: formatQuotaValue(image?.request),
+      unit: t("quota"),
+    },
+    {
+      label: t("admin.charge.image-reference"),
+      value: formatQuotaValue(image?.reference),
+      unit: `${t("quota")} / IMAGE`,
+    },
+  ];
+  const stats =
+    mode === imageBillingModeOfficialUsage
+      ? requestAndReferenceStats
+      : [
+          {
+            label: t("admin.charge.image-default"),
+            value: formatQuotaValue(defaultPrice),
+            unit: `${t("quota")} / IMAGE`,
+          },
+          {
+            label: t("admin.charge.image-output-count"),
+            value: String(outputCount),
+            unit: "IMAGE",
+          },
+          ...requestAndReferenceStats,
+        ];
+
+  return (
+    <motion.div
+      className="space-y-3 rounded-xl border bg-muted/20 p-3.5"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.16, duration: 0.18 }}
+    >
+      <div className="flex flex-wrap items-start gap-2">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
+          <Image className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold">
+            {t("admin.charge.image-billing-title")}
+          </p>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+            {t("admin.charge.image-billing-desc")}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <span className="rounded-md border bg-background px-2 py-1 text-xs font-medium">
+            {t(`admin.charge.image-billing-mode-${mode}`)}
+          </span>
+          {image?.missing_price_policy && (
+            <span className="rounded-md border bg-background px-2 py-1 text-xs text-muted-foreground">
+              {t(
+                `admin.charge.image-missing-policy-${image.missing_price_policy}`,
+              )}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        {stats.map((stat) => (
+          <div key={stat.label} className="rounded-lg border bg-background p-3">
+            <p className="text-xs text-muted-foreground">{stat.label}</p>
+            <div className="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+              <span className="text-xl font-bold tabular-nums">
+                {stat.value}
+              </span>
+              <span className="text-2xs text-muted-foreground">
+                {stat.unit}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {mode === imageBillingModeOfficialUsage && (
+        <div className="rounded-lg border bg-background p-3">
+          <p className="mb-2 text-xs font-medium text-muted-foreground">
+            {t("admin.charge.image-usage-prices")}
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {(["input", "output", "image"] as const).map((key) => (
+              <div key={key} className="rounded-md bg-muted/40 px-2.5 py-2">
+                <p className="text-xs text-muted-foreground">
+                  {t(`admin.charge.image-usage-${key}`)}
+                </p>
+                <p className="mt-1 font-semibold tabular-nums">
+                  {formatQuotaValue(usage[key])}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {mode === imageBillingModeMatrix && (
+        <div className="rounded-lg border bg-background p-3">
+          <p className="mb-2 text-xs font-medium text-muted-foreground">
+            {t("admin.charge.image-matrix-rules")}
+          </p>
+          {rules.length > 0 ? (
+            <div className="space-y-1.5">
+              {rules.map((rule, index) => {
+                const conditions = [
+                  rule.size,
+                  rule.quality,
+                  rule.mime_type?.toUpperCase(),
+                  rule.aspect_ratio,
+                ].filter(Boolean);
+                return (
+                  <div
+                    key={`${conditions.join("-")}-${index}`}
+                    className="flex items-center gap-2 rounded-md bg-muted/40 px-2.5 py-2 text-xs"
+                  >
+                    <span className="min-w-0 flex-1 truncate font-medium">
+                      {conditions.join(" · ") ||
+                        t("admin.charge.image-default")}
+                    </span>
+                    <span className="shrink-0 tabular-nums">
+                      {formatQuotaValue(rule.quota)} {t("quota")} / IMAGE
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {t("admin.charge.image-empty-matrix-rules")}
+            </p>
+          )}
+        </div>
+      )}
+
+      {(sizePrices.length > 0 || qualityPrices.length > 0) && (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {sizePrices.length > 0 && (
+            <div className="rounded-lg border bg-background p-3">
+              <p className="mb-2 text-xs font-medium text-muted-foreground">
+                {t("admin.charge.image-size-prices")}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {sizePrices.map(([size, price]) => (
+                  <span
+                    key={size}
+                    className="rounded-md bg-muted/50 px-2 py-1 text-xs tabular-nums"
+                  >
+                    {size}: {formatQuotaValue(price)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {qualityPrices.length > 0 && (
+            <div className="rounded-lg border bg-background p-3">
+              <p className="mb-2 text-xs font-medium text-muted-foreground">
+                {t("admin.charge.image-quality-prices")}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {qualityPrices.map(([quality, price]) => (
+                  <span
+                    key={quality}
+                    className="rounded-md bg-muted/50 px-2 py-1 text-xs tabular-nums"
+                  >
+                    {t(`admin.charge.image-quality-${quality}`, quality)}: +
+                    {formatQuotaValue(price)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </motion.div>
+  );
 }
 
 function formatCardLatency(
@@ -545,6 +829,7 @@ function ModelItem({
             type={model.price.type}
             input={model.price.input}
             output={model.price.output}
+            image={model.price.image}
             pro={pro}
             show1mPricing={show1mPricing}
             anonymous={true}
@@ -1221,25 +1506,79 @@ function ModelDetailPanel({
                     {t("quota")} / {unitLabel} tokens
                   </p>
                 </div>
+                {(Number(model.price.cache_hit) > 0 ||
+                  Number(model.price.cache_miss) > 0) && (
+                  <>
+                    {Number(model.price.cache_hit) > 0 && (
+                      <div className="rounded-xl border bg-muted/30 p-3.5">
+                        <div className="mb-2 flex items-center gap-1.5 text-muted-foreground">
+                          <Clock3 className="h-3.5 w-3.5" />
+                          <span className="text-xs font-medium">
+                            {t("admin.charge.cache-hit-count")}
+                          </span>
+                        </div>
+                        <p className="text-2xl font-bold leading-none text-foreground">
+                          {parseFloat(
+                            (
+                              (model.price.cache_hit ?? 0) * unitValue
+                            ).toPrecision(8),
+                          )}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {t("quota")} / {unitLabel} tokens
+                        </p>
+                      </div>
+                    )}
+                    {Number(model.price.cache_miss) > 0 && (
+                      <div className="rounded-xl border bg-muted/30 p-3.5">
+                        <div className="mb-2 flex items-center gap-1.5 text-muted-foreground">
+                          <Clock3 className="h-3.5 w-3.5" />
+                          <span className="text-xs font-medium">
+                            {t("admin.charge.cache-miss-count")}
+                          </span>
+                        </div>
+                        <p className="text-2xl font-bold leading-none text-foreground">
+                          {parseFloat(
+                            (
+                              (model.price.cache_miss ?? 0) * unitValue
+                            ).toPrecision(8),
+                          )}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {t("quota")} / {unitLabel} tokens
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
               </motion.div>
             )}
 
-            {model.price && model.price.type !== "token-billing" && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.16, duration: quickEnter }}
-              >
-                <PriceColumn
-                  type={model.price.type}
-                  input={model.price.input}
-                  output={model.price.output}
-                  pro={pro}
-                  show1mPricing={show1mPricing}
-                  anonymous
-                />
-              </motion.div>
+            {model.price && model.price.type === imageBilling && (
+              <ImagePricingDetails
+                image={model.price.image}
+                fallbackOutput={model.price.output}
+              />
             )}
+
+            {model.price &&
+              model.price.type !== tokenBilling &&
+              model.price.type !== imageBilling && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.16, duration: quickEnter }}
+                >
+                  <PriceColumn
+                    type={model.price.type}
+                    input={model.price.input}
+                    output={model.price.output}
+                    pro={pro}
+                    show1mPricing={show1mPricing}
+                    anonymous
+                  />
+                </motion.div>
+              )}
           </div>
         </ScrollArea>
 
