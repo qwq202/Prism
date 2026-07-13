@@ -312,6 +312,63 @@ func TestCapabilitiesForXiaomiMiMoModels(t *testing.T) {
 	}
 }
 
+func TestCapabilitiesForCustomReasoningModel(t *testing.T) {
+	SetCustomReasoningEfforts(map[string][]string{
+		"future-reasoner": {"MAX", "low", "low", "invalid", "none"},
+	})
+	t.Cleanup(func() {
+		SetCustomReasoningEfforts(nil)
+	})
+
+	capabilities := CapabilitiesFor(OpenAIResponsesChannelType, "future-reasoner")
+	want := []string{"none", "low", "max"}
+	if !reflect.DeepEqual(capabilities.ReasoningEfforts, want) {
+		t.Fatalf("unexpected custom reasoning efforts: got %#v want %#v", capabilities.ReasoningEfforts, want)
+	}
+	if !capabilities.ReasoningControl {
+		t.Fatalf("expected custom reasoning model to expose reasoning control")
+	}
+	if capabilities.SamplingRestriction != SamplingRestrictionWithReasoning {
+		t.Fatalf("expected custom reasoning to restrict sampling only while enabled, got %q", capabilities.SamplingRestriction)
+	}
+}
+
+func TestCustomReasoningCannotOverrideMaintainedModel(t *testing.T) {
+	SetCustomReasoningEfforts(map[string][]string{
+		"gpt-5.6": {"minimal"},
+	})
+	t.Cleanup(func() {
+		SetCustomReasoningEfforts(nil)
+	})
+
+	capabilities := CapabilitiesFor(OpenAIResponsesChannelType, "gpt-5.6")
+	want := []string{"none", "low", "medium", "high", "xhigh", "max"}
+	if !reflect.DeepEqual(capabilities.ReasoningEfforts, want) {
+		t.Fatalf("expected maintained capabilities to win: got %#v want %#v", capabilities.ReasoningEfforts, want)
+	}
+}
+
+func TestHasManagedReasoningCapabilities(t *testing.T) {
+	tests := []struct {
+		model string
+		want  bool
+	}{
+		{model: "gpt-5.6-terra", want: true},
+		{model: "gemini-3.1-pro-preview", want: true},
+		{model: "deepseek-v4-pro", want: true},
+		{model: "xiaomi/mimo-v2.5-pro", want: true},
+		{model: "future-reasoner", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.model, func(t *testing.T) {
+			if got := HasManagedReasoningCapabilities("", tt.model); got != tt.want {
+				t.Fatalf("expected managed=%v for %q, got %v", tt.want, tt.model, got)
+			}
+		})
+	}
+}
+
 func TestReasoningEffortNormalizationUsesCapabilities(t *testing.T) {
 	capabilities := CapabilitiesFor(OpenAIResponsesChannelType, "gpt-5.2-pro")
 	if got := NormalizeReasoningEffort(capabilities, "XHIGH"); got != "xhigh" {

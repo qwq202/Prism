@@ -11,31 +11,36 @@ import (
 
 type ModelTag []string
 type MarketModel struct {
-	Id           string   `json:"id" mapstructure:"id" required:"true"`
-	Name         string   `json:"name" mapstructure:"name" required:"true"`
-	Description  string   `json:"description" mapstructure:"description"`
-	Default      bool     `json:"default" mapstructure:"default"`
-	HighContext  bool     `json:"high_context" mapstructure:"highcontext"`
-	VisionModel  bool     `json:"vision_model" mapstructure:"visionmodel"`
-	OCRModel     bool     `json:"ocr_model" mapstructure:"ocrmodel"`
-	ReverseModel bool     `json:"reverse_model" mapstructure:"reversemodel"`
-	Avatar       string   `json:"avatar" mapstructure:"avatar"`
-	Tag          ModelTag `json:"tag" mapstructure:"tag"`
+	Id               string   `json:"id" mapstructure:"id" required:"true"`
+	Name             string   `json:"name" mapstructure:"name" required:"true"`
+	Description      string   `json:"description" mapstructure:"description"`
+	Default          bool     `json:"default" mapstructure:"default"`
+	HighContext      bool     `json:"high_context" mapstructure:"highcontext"`
+	VisionModel      bool     `json:"vision_model" mapstructure:"visionmodel"`
+	OCRModel         bool     `json:"ocr_model" mapstructure:"ocrmodel"`
+	ReverseModel     bool     `json:"reverse_model" mapstructure:"reversemodel"`
+	ReasoningModel   bool     `json:"reasoning_model" mapstructure:"reasoning_model"`
+	ReasoningEfforts []string `json:"reasoning_efforts,omitempty" mapstructure:"reasoning_efforts"`
+	Avatar           string   `json:"avatar" mapstructure:"avatar"`
+	Tag              ModelTag `json:"tag" mapstructure:"tag"`
 }
 
 type MarketModelView struct {
-	Id           string   `json:"id"`
-	Name         string   `json:"name"`
-	Description  string   `json:"description"`
-	Default      bool     `json:"default"`
-	HighContext  bool     `json:"high_context"`
-	VisionModel  bool     `json:"vision_model"`
-	DrawingModel bool     `json:"drawing_model"`
-	OCRModel     bool     `json:"ocr_model"`
-	ReverseModel bool     `json:"reverse_model"`
-	Avatar       string   `json:"avatar"`
-	Tag          ModelTag `json:"tag"`
-	ChannelType  string   `json:"channel_type,omitempty"`
+	Id                    string   `json:"id"`
+	Name                  string   `json:"name"`
+	Description           string   `json:"description"`
+	Default               bool     `json:"default"`
+	HighContext           bool     `json:"high_context"`
+	VisionModel           bool     `json:"vision_model"`
+	DrawingModel          bool     `json:"drawing_model"`
+	OCRModel              bool     `json:"ocr_model"`
+	ReverseModel          bool     `json:"reverse_model"`
+	ReasoningModel        bool     `json:"reasoning_model"`
+	ReasoningEfforts      []string `json:"reasoning_efforts,omitempty"`
+	ReasoningConfigurable bool     `json:"reasoning_configurable"`
+	Avatar                string   `json:"avatar"`
+	Tag                   ModelTag `json:"tag"`
+	ChannelType           string   `json:"channel_type,omitempty"`
 }
 type MarketModelList []MarketModel
 
@@ -44,6 +49,9 @@ type Market struct {
 }
 
 const imageGenerationTag = "image-generation"
+const reasoningTag = "reasoning"
+
+var defaultCustomReasoningEfforts = []string{"low", "medium", "high"}
 
 var saveMarketConfig = func(models MarketModelList) error {
 	return utils.SaveConfig("market", models)
@@ -62,12 +70,53 @@ func ensureDrawingMarketTag(tags ModelTag, drawingModel bool) ModelTag {
 	return append(next, imageGenerationTag)
 }
 
+func ensureReasoningMarketTag(tags ModelTag, reasoningModel bool) ModelTag {
+	if !reasoningModel {
+		return tags
+	}
+	for _, tag := range tags {
+		if tag == reasoningTag {
+			return tags
+		}
+	}
+	next := append(ModelTag{}, tags...)
+	return append(next, reasoningTag)
+}
+
+func normalizeMarketModels(models MarketModelList) MarketModelList {
+	normalized := make(MarketModelList, len(models))
+	for index, model := range models {
+		model.ReasoningEfforts = globals.NormalizeCustomReasoningEfforts(model.ReasoningEfforts)
+		if model.ReasoningModel {
+			if len(model.ReasoningEfforts) == 0 {
+				model.ReasoningEfforts = append([]string(nil), defaultCustomReasoningEfforts...)
+			}
+		} else {
+			model.ReasoningEfforts = nil
+		}
+		normalized[index] = model
+	}
+	return normalized
+}
+
+func syncCustomReasoningCapabilities(models MarketModelList) {
+	config := make(map[string][]string)
+	for _, model := range models {
+		if model.ReasoningModel {
+			config[model.Id] = model.ReasoningEfforts
+		}
+	}
+	globals.SetCustomReasoningEfforts(config)
+}
+
 func NewMarket() *Market {
 	var models MarketModelList
 	if err := viper.UnmarshalKey("market", &models); err != nil {
 		globals.Warn(fmt.Sprintf("[market] read config error: %s, use default config", err.Error()))
 		models = MarketModelList{}
 	}
+	models = normalizeMarketModels(models)
+	syncCustomReasoningCapabilities(models)
 
 	return &Market{
 		Models: models,
@@ -90,20 +139,31 @@ func (m *Market) GetViewModels() []MarketModelView {
 		}
 
 		drawingModel := globals.IsDrawingModel(channelType, model.Id)
+		reasoningConfigurable := !globals.HasManagedReasoningCapabilities(channelType, model.Id)
+		reasoningModel := reasoningConfigurable && model.ReasoningModel
+		reasoningEfforts := []string(nil)
+		if reasoningModel {
+			reasoningEfforts = append(reasoningEfforts, model.ReasoningEfforts...)
+		}
+		tags := ensureDrawingMarketTag(model.Tag, drawingModel)
+		tags = ensureReasoningMarketTag(tags, reasoningModel)
 
 		items = append(items, MarketModelView{
-			Id:           model.Id,
-			Name:         model.Name,
-			Description:  model.Description,
-			Default:      model.Default,
-			HighContext:  model.HighContext,
-			VisionModel:  model.VisionModel,
-			DrawingModel: drawingModel,
-			OCRModel:     model.OCRModel,
-			ReverseModel: model.ReverseModel,
-			Avatar:       model.Avatar,
-			Tag:          ensureDrawingMarketTag(model.Tag, drawingModel),
-			ChannelType:  channelType,
+			Id:                    model.Id,
+			Name:                  model.Name,
+			Description:           model.Description,
+			Default:               model.Default,
+			HighContext:           model.HighContext,
+			VisionModel:           model.VisionModel,
+			DrawingModel:          drawingModel,
+			OCRModel:              model.OCRModel,
+			ReverseModel:          model.ReverseModel,
+			ReasoningModel:        reasoningModel,
+			ReasoningEfforts:      reasoningEfforts,
+			ReasoningConfigurable: reasoningConfigurable,
+			Avatar:                model.Avatar,
+			Tag:                   tags,
+			ChannelType:           channelType,
 		})
 	}
 
@@ -124,9 +184,11 @@ func (m *Market) SaveConfig() error {
 }
 
 func (m *Market) SetModels(models MarketModelList) error {
+	models = normalizeMarketModels(models)
 	if err := saveMarketConfig(models); err != nil {
 		return err
 	}
 	m.Models = models
+	syncCustomReasoningCapabilities(models)
 	return nil
 }

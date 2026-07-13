@@ -13,12 +13,12 @@ import React, {
   useReducer,
   useState,
 } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { Model as RawModel } from "@/api/types.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import {
   Activity,
   AlertCircle,
+  Brain,
   ChevronDown,
   ChevronRight,
   ChevronUp,
@@ -73,6 +73,12 @@ import { Label } from "@/components/ui/label.tsx";
 import { uploadResource } from "@/admin/api/system.ts";
 import { withNotify } from "@/api/common.ts";
 import { DRAWING_MODEL_TAG, isDrawingModel } from "@/conf/model.ts";
+import {
+  DEFAULT_REASONING_EFFORTS,
+  isMaintainedReasoningModel,
+  normalizeConfiguredReasoningEfforts,
+  REASONING_EFFORT_DISPLAY_LEVELS,
+} from "@/conf/reasoning.ts";
 
 type Model = RawModel & {
   seed?: string;
@@ -83,6 +89,10 @@ type MarketTemplatePayload = { id: string; name: string };
 type MarketIndexedPayload = { idx: number };
 type MarketRemovePayload = { seed: string; id?: string };
 type MarketFlagPayload = MarketIndexedPayload & { default: boolean };
+type MarketReasoningEffortPayload = MarketIndexedPayload & {
+  effort: string;
+  enabled: boolean;
+};
 type MarketAction =
   | { type: "set"; payload: RawModel[] }
   | { type: "add"; payload: RawModel }
@@ -98,10 +108,18 @@ type MarketAction =
       type: "update-description";
       payload: MarketIndexedPayload & { description: string };
     }
-  | { type: "update-context"; payload: MarketIndexedPayload & { context: boolean } }
+  | {
+      type: "update-context";
+      payload: MarketIndexedPayload & { context: boolean };
+    }
   | { type: "update-default"; payload: MarketFlagPayload }
   | { type: "update-vision-model"; payload: MarketFlagPayload }
   | { type: "update-reverse-model"; payload: MarketFlagPayload }
+  | { type: "update-reasoning-model"; payload: MarketFlagPayload }
+  | {
+      type: "update-reasoning-effort";
+      payload: MarketReasoningEffortPayload;
+    }
   | { type: "update-tags"; payload: MarketIndexedPayload & { tags: string[] } }
   | { type: "add-tag"; payload: MarketIndexedPayload & { tag: string } }
   | { type: "remove-tag"; payload: MarketIndexedPayload & { tag: string } }
@@ -122,6 +140,12 @@ function normalizeMarketModel(model: Model): Model {
   const tags = Array.from(new Set(next.tag || []));
   const isMultimodal = !!next.vision_model;
   const isDrawing = isDrawingModel(next);
+  const reasoningConfigurable =
+    next.reasoning_configurable ?? !isMaintainedReasoningModel(next.id);
+  const isCustomReasoning = reasoningConfigurable && !!next.reasoning_model;
+  const configuredReasoningEfforts = normalizeConfiguredReasoningEfforts(
+    next.reasoning_efforts,
+  );
 
   const resolvedTags = isMultimodal
     ? tags.includes("multi-modal")
@@ -129,11 +153,23 @@ function normalizeMarketModel(model: Model): Model {
       : [...tags, "multi-modal"]
     : tags.filter((tag) => tag !== "multi-modal");
 
-  next.drawing_model = isDrawing;
-  next.tag =
+  let normalizedTags =
     isDrawing && !resolvedTags.includes(DRAWING_MODEL_TAG)
       ? [...resolvedTags, DRAWING_MODEL_TAG]
       : resolvedTags;
+  if (isCustomReasoning && !normalizedTags.includes("reasoning")) {
+    normalizedTags = [...normalizedTags, "reasoning"];
+  }
+
+  next.drawing_model = isDrawing;
+  next.reasoning_configurable = reasoningConfigurable;
+  next.reasoning_model = isCustomReasoning;
+  next.reasoning_efforts = isCustomReasoning
+    ? configuredReasoningEfforts.length > 0
+      ? configuredReasoningEfforts
+      : [...DEFAULT_REASONING_EFFORTS]
+    : [];
+  next.tag = normalizedTags;
 
   return next;
 }
@@ -243,10 +279,20 @@ function reducer(state: MarketForm, action: MarketAction): MarketForm {
       return [
         ...state.map((model, idx) => {
           if (idx === action.payload.idx) {
+            const reasoningConfigurable = !isMaintainedReasoningModel(
+              action.payload.id,
+            );
             return normalizeMarketModel({
               ...model,
               id: action.payload.id,
               drawing_model: isDrawingModel(action.payload.id),
+              reasoning_configurable: reasoningConfigurable,
+              reasoning_model: reasoningConfigurable
+                ? model.reasoning_model
+                : false,
+              reasoning_efforts: reasoningConfigurable
+                ? model.reasoning_efforts
+                : [],
             });
           }
           return model;
@@ -312,6 +358,55 @@ function reducer(state: MarketForm, action: MarketAction): MarketForm {
           return model;
         }),
       ];
+    case "update-reasoning-model":
+      return state.map((model, idx) => {
+        if (
+          idx !== action.payload.idx ||
+          model.reasoning_configurable === false
+        ) {
+          return model;
+        }
+
+        return normalizeMarketModel({
+          ...model,
+          reasoning_model: action.payload.default,
+          reasoning_efforts: action.payload.default
+            ? normalizeConfiguredReasoningEfforts(model.reasoning_efforts)
+                .length > 0
+              ? model.reasoning_efforts
+              : [...DEFAULT_REASONING_EFFORTS]
+            : [],
+          tag: action.payload.default
+            ? model.tag
+            : (model.tag || []).filter((tag) => tag !== "reasoning"),
+        });
+      });
+    case "update-reasoning-effort":
+      return state.map((model, idx) => {
+        if (
+          idx !== action.payload.idx ||
+          !model.reasoning_model ||
+          model.reasoning_configurable === false
+        ) {
+          return model;
+        }
+
+        const current = normalizeConfiguredReasoningEfforts(
+          model.reasoning_efforts,
+        );
+        const next = action.payload.enabled
+          ? [...current, action.payload.effort]
+          : current.filter((effort) => effort !== action.payload.effort);
+        const normalized = normalizeConfiguredReasoningEfforts(next);
+        if (normalized.length === 0) {
+          return model;
+        }
+
+        return normalizeMarketModel({
+          ...model,
+          reasoning_efforts: normalized,
+        });
+      });
     case "update-tags":
       return [
         ...state.map((model, idx) => {
@@ -553,41 +648,48 @@ function CustomMarketImage({ image, idx, dispatch }: MarketImageProps) {
 
 type MarketItemProps = {
   model: Model;
-  form: MarketForm;
   dispatch: MarketDispatch;
   index: number;
+  isFirst: boolean;
+  isLast: boolean;
   stacked: boolean;
   channelModels: string[];
   draggableProps?: DraggableProvidedDraggableProps;
   dragHandleProps?: DraggableProvidedDragHandleProps | null;
-  isDragging?: boolean;
   forwardRef?: React.Ref<HTMLDivElement>;
 };
 
-function MarketItem({
+const MarketItem = React.memo(function MarketItem({
   model,
-  form,
   stacked,
   dispatch,
   index,
+  isFirst,
+  isLast,
   channelModels,
   draggableProps,
   dragHandleProps,
-  isDragging,
   forwardRef,
 }: MarketItemProps) {
   const { t } = useTranslation();
   const { style, ...itemProps } = draggableProps ?? {};
 
-  const [stackedFilled, setStackedFilled] = useState<boolean>(false);
+  const [stackedFilled, setStackedFilled] = useState<boolean>(stacked);
 
   const checked = useMemo(
     (): boolean => model.id.trim().length > 0 && model.name.trim().length > 0,
     [model],
   );
   const lockedTags = useMemo(
-    () => (isDrawingModel(model) ? [DRAWING_MODEL_TAG] : []),
+    () => [
+      ...(isDrawingModel(model) ? [DRAWING_MODEL_TAG] : []),
+      ...(model.reasoning_model ? ["reasoning"] : []),
+    ],
     [model],
+  );
+  const reasoningEfforts = useMemo(
+    () => normalizeConfiguredReasoningEfforts(model.reasoning_efforts),
+    [model.reasoning_efforts],
   );
 
   useEffect(() => {
@@ -620,7 +722,7 @@ function MarketItem({
               payload: { idx: index },
             })
           }
-          disabled={index === 0}
+          disabled={isFirst}
         >
           <ChevronUp className={`h-4 w-4`} />
         </Button>
@@ -636,7 +738,7 @@ function MarketItem({
               payload: { idx: index },
             })
           }
-          disabled={index === form.length - 1}
+          disabled={isLast}
         >
           <ChevronDown className={`h-4 w-4`} />
         </Button>
@@ -672,11 +774,8 @@ function MarketItem({
   );
 
   return stackedFilled ? (
-    <motion.div
+    <div
       className={cn("market-item", !checked && "error")}
-      layout={isDragging ? false : "position"}
-      initial={false}
-      transition={{ duration: 0.22, ease: "easeOut" }}
       style={style}
       {...itemProps}
       ref={forwardRef}
@@ -793,6 +892,62 @@ function MarketItem({
               }}
             />
           </div>
+          {model.reasoning_configurable !== false && (
+            <>
+              <div className={`market-row`}>
+                <span>
+                  {t("admin.market.thinking-model")}
+                  <Tips content={t("admin.market.thinking-model-tip")} />
+                </span>
+                <Switch
+                  className={`ml-auto`}
+                  checked={model.reasoning_model || false}
+                  onCheckedChange={(state) => {
+                    dispatch({
+                      type: "update-reasoning-model",
+                      payload: {
+                        idx: index,
+                        default: state,
+                      },
+                    });
+                  }}
+                />
+              </div>
+              {model.reasoning_model && (
+                <div className="market-row border-t pt-3 md:col-span-2">
+                  <span className="self-start pt-1">
+                    <Brain className="mr-1.5 h-4 w-4 text-muted-foreground" />
+                    {t("chat.openai-reasoning-depth")}
+                  </span>
+                  <div className="flex min-w-0 flex-1 flex-wrap gap-2">
+                    {REASONING_EFFORT_DISPLAY_LEVELS.map((effort) => {
+                      const pressed = reasoningEfforts.includes(effort);
+                      const isLastEnabledEffort =
+                        pressed && reasoningEfforts.length === 1;
+
+                      return (
+                        <Toggle
+                          key={effort}
+                          variant="outline"
+                          size="sm"
+                          pressed={pressed}
+                          disabled={isLastEnabledEffort}
+                          onPressedChange={(enabled) => {
+                            dispatch({
+                              type: "update-reasoning-effort",
+                              payload: { idx: index, effort, enabled },
+                            });
+                          }}
+                        >
+                          {t(`chat.openai-reasoning-level-${effort}`)}
+                        </Toggle>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
           <CustomMarketImage
             image={model.avatar}
             idx={index}
@@ -810,13 +965,10 @@ function MarketItem({
         </div>
         <Actions />
       </div>
-    </motion.div>
+    </div>
   ) : (
-    <motion.div
+    <div
       className={cn("market-item stacked", !checked && "error")}
-      layout={isDragging ? false : "position"}
-      initial={false}
-      transition={{ duration: 0.22, ease: "easeOut" }}
       style={style}
       {...itemProps}
       ref={forwardRef}
@@ -842,9 +994,9 @@ function MarketItem({
         }}
       />
       <Actions stacked={true} />
-    </motion.div>
+    </div>
   );
-}
+});
 
 type MarketGroupProps = {
   form: MarketForm;
@@ -853,6 +1005,32 @@ type MarketGroupProps = {
   channelModels: string[];
 };
 
+type DraggableMarketItemProps = Omit<
+  MarketItemProps,
+  "draggableProps" | "dragHandleProps" | "forwardRef"
+>;
+
+const DraggableMarketItem = React.memo(function DraggableMarketItem({
+  model,
+  index,
+  ...props
+}: DraggableMarketItemProps) {
+  return (
+    <Draggable draggableId={model.seed as string} index={index}>
+      {(provided) => (
+        <MarketItem
+          {...props}
+          model={model}
+          index={index}
+          forwardRef={provided.innerRef}
+          draggableProps={provided.draggableProps}
+          dragHandleProps={provided.dragHandleProps}
+        />
+      )}
+    </Draggable>
+  );
+});
+
 function MarketGroup({
   form,
   dispatch,
@@ -860,26 +1038,16 @@ function MarketGroup({
   channelModels,
 }: MarketGroupProps) {
   return form.map((model, index) => (
-    <Draggable
+    <DraggableMarketItem
       key={model.seed as string}
-      draggableId={model.seed as string}
+      model={model}
       index={index}
-    >
-      {(provided, snapshot) => (
-        <MarketItem
-          model={model}
-          form={form}
-          stacked={stacked}
-          dispatch={dispatch}
-          index={index}
-          channelModels={channelModels}
-          isDragging={snapshot.isDragging}
-          forwardRef={provided.innerRef}
-          draggableProps={provided.draggableProps}
-          dragHandleProps={provided.dragHandleProps}
-        />
-      )}
-    </Draggable>
+      isFirst={index === 0}
+      isLast={index === form.length - 1}
+      stacked={stacked}
+      dispatch={dispatch}
+      channelModels={channelModels}
+    />
   ));
 }
 
@@ -1026,67 +1194,39 @@ function MarketAlert({
   const { t } = useTranslation();
   const visible = open && models.length > 0;
 
+  if (!visible) return null;
+
   return (
-    <AnimatePresence initial={false}>
-      {visible && (
-        <motion.div
-          key="market-alert"
-          layout
-          className={`market-alert`}
-          initial={{ height: 0, opacity: 0, marginBottom: 0 }}
-          animate={{ height: "auto", opacity: 1, marginBottom: 16 }}
-          exit={{ height: 0, opacity: 0, marginBottom: 0 }}
-          transition={{ duration: 0.22, ease: "easeOut" }}
-          style={{ overflow: "hidden" }}
+    <div className="market-alert">
+      <div className="mb-2 flex w-full flex-row items-center justify-between gap-3 select-none">
+        <div className="flex flex-row items-center whitespace-nowrap">
+          <AlertCircle className="mr-2 h-4 w-4 translate-y-[1px]" />
+          <span>{t("admin.market.not-use")}</span>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="whitespace-nowrap"
+          onClick={onImportAll}
         >
-          <div
-            className={`flex w-full flex-row items-center justify-between gap-3 mb-2 select-none`}
+          <Import className="mr-2 h-4 w-4" />
+          {t("admin.market.import-all")}
+        </Button>
+      </div>
+      <div className="market-alert-wrapper">
+        {models.map((model) => (
+          <Button
+            key={model}
+            variant="outline"
+            size="sm"
+            className="text-sm"
+            onClick={() => onImport(model)}
           >
-            <div className={`flex flex-row items-center whitespace-nowrap`}>
-              <AlertCircle className={`h-4 w-4 mr-2 translate-y-[1px]`} />
-              <span>{t("admin.market.not-use")}</span>
-            </div>
-            <Button
-              variant={`outline`}
-              size={`sm`}
-              className={`whitespace-nowrap`}
-              onClick={onImportAll}
-            >
-              <Import className={`h-4 w-4 mr-2`} />
-              {t("admin.market.import-all")}
-            </Button>
-          </div>
-          <motion.div
-            className={`market-alert-wrapper`}
-            layout
-            transition={{ duration: 0.2, ease: "easeOut" }}
-          >
-            <AnimatePresence initial={false} mode="popLayout">
-              {models.map((model) => (
-                <motion.div
-                  key={model}
-                  layout
-                  initial={{ opacity: 0, scale: 0.96 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.96 }}
-                  transition={{ duration: 0.16, ease: "easeOut" }}
-                  style={{ overflow: "hidden" }}
-                >
-                  <Button
-                    variant={`outline`}
-                    size={`sm`}
-                    className={`text-sm`}
-                    onClick={() => onImport(model)}
-                  >
-                    {model}
-                  </Button>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+            {model}
+          </Button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -1106,67 +1246,41 @@ function MarketUnavailableAlert({
   const { t } = useTranslation();
   const visible = open && models.length > 0;
 
+  if (!visible) return null;
+
   return (
-    <AnimatePresence initial={false}>
-      {visible && (
-        <motion.div
-          key="market-unavailable-alert"
-          layout
-          className="market-alert border-destructive/30 bg-destructive/5"
-          initial={{ height: 0, opacity: 0, marginBottom: 0 }}
-          animate={{ height: "auto", opacity: 1, marginBottom: 16 }}
-          exit={{ height: 0, opacity: 0, marginBottom: 0 }}
-          transition={{ duration: 0.22, ease: "easeOut" }}
-          style={{ overflow: "hidden" }}
+    <div className="market-alert border-destructive/30 bg-destructive/5">
+      <div className="mb-2 flex w-full flex-row items-center justify-between gap-3 select-none">
+        <div className="flex min-w-0 flex-row items-center text-destructive">
+          <AlertCircle className="mr-2 h-4 w-4 shrink-0 translate-y-[1px]" />
+          <span>{t("admin.market.unavailable-models")}</span>
+        </div>
+        <Button
+          variant="destructive"
+          size="sm"
+          className="whitespace-nowrap"
+          onClick={onRemoveAll}
         >
-          <div className="mb-2 flex w-full flex-row items-center justify-between gap-3 select-none">
-            <div className="flex min-w-0 flex-row items-center text-destructive">
-              <AlertCircle className="mr-2 h-4 w-4 shrink-0 translate-y-[1px]" />
-              <span>{t("admin.market.unavailable-models")}</span>
-            </div>
-            <Button
-              variant="destructive"
-              size="sm"
-              className="whitespace-nowrap"
-              onClick={onRemoveAll}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              {t("admin.market.remove-all-unavailable")}
-            </Button>
-          </div>
-          <motion.div
-            className="market-alert-wrapper"
-            layout
-            transition={{ duration: 0.2, ease: "easeOut" }}
+          <Trash2 className="mr-2 h-4 w-4" />
+          {t("admin.market.remove-all-unavailable")}
+        </Button>
+      </div>
+      <div className="market-alert-wrapper">
+        {models.map((model) => (
+          <Button
+            key={model.seed}
+            variant="outline"
+            size="sm"
+            className="border-destructive/30 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+            onClick={() => onRemove(model)}
+            title={t("admin.market.remove-unavailable")}
           >
-            <AnimatePresence initial={false} mode="popLayout">
-              {models.map((model) => (
-                <motion.div
-                  key={model.seed}
-                  layout
-                  initial={{ opacity: 0, scale: 0.96 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.96 }}
-                  transition={{ duration: 0.16, ease: "easeOut" }}
-                  style={{ overflow: "hidden" }}
-                >
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-destructive/30 text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                    onClick={() => onRemove(model)}
-                    title={t("admin.market.remove-unavailable")}
-                  >
-                    <Trash2 className="mr-2 h-3.5 w-3.5" />
-                    {model.name || model.id}
-                  </Button>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+            <Trash2 className="mr-2 h-3.5 w-3.5" />
+            {model.name || model.id}
+          </Button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -1174,7 +1288,7 @@ type GroupSectionProps = {
   groupName: string;
   models: Model[];
   allIndices: Map<string, number>;
-  form: MarketForm;
+  totalCount: number;
   dispatch: MarketDispatch;
   stacked: boolean;
   channelModels: string[];
@@ -1184,7 +1298,7 @@ function GroupSection({
   groupName,
   models,
   allIndices,
-  form,
+  totalCount,
   dispatch,
   stacked,
   channelModels,
@@ -1248,10 +1362,11 @@ function GroupSection({
               <MarketItem
                 key={model.seed as string}
                 model={model}
-                form={form}
                 stacked={stacked}
                 dispatch={dispatch}
                 index={globalIndex}
+                isFirst={globalIndex === 0}
+                isLast={globalIndex === totalCount - 1}
                 channelModels={channelModels}
               />
             );
@@ -1311,7 +1426,7 @@ function GroupedMarketView({
           groupName={groupKey}
           models={groups.get(groupKey)!}
           allIndices={allIndices}
-          form={form}
+          totalCount={form.length}
           dispatch={dispatch}
           stacked={stacked}
           channelModels={channelModels}

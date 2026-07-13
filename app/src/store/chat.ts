@@ -23,6 +23,7 @@ import {
   setOfflineModels,
 } from "@/conf/storage.ts";
 import { isDrawingModel } from "@/conf/model.ts";
+import { normalizeConfiguredReasoningEfforts } from "@/conf/reasoning.ts";
 import {
   deleteConversation as doDeleteConversation,
   deleteAllConversations as doDeleteAllConversations,
@@ -605,6 +606,19 @@ export function getOpenAIResponsesCapabilities(
           reasoningSummary: false,
         }
       : emptyOpenAIResponsesCapabilities();
+  }
+
+  if (current.reasoning_model) {
+    const reasoningEfforts = normalizeConfiguredReasoningEfforts(
+      current.reasoning_efforts,
+    );
+    if (reasoningEfforts.length > 0) {
+      return {
+        nativeWeb: false,
+        reasoningEfforts,
+        reasoningSummary: false,
+      };
+    }
   }
 
   if (channelType !== "openai-responses") {

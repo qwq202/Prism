@@ -216,6 +216,7 @@
     "openai-reasoning-enable": "{{model}}思考を有効にする",
     "openai-reasoning-depth": "思考レベル",
     "openai-reasoning-level-none": "オフ",
+    "openai-reasoning-level-minimal": "最小",
     "openai-reasoning-level-low": "低",
     "openai-reasoning-level-medium": "中",
     "openai-reasoning-level-high": "高い",
@@ -1449,8 +1450,8 @@
       "ocr-model-tip": "モデル自体が画像入力をサポートしていない場合、OCRテキスト認識をオンにして、モデルのビジュアル機能をある程度補完することができます（ヒント：ファイル解析サービスはOCRサービスをサポートする必要があります）",
       "reverse-model": "リバースモデル",
       "reverse-model-tip": "リバースエンジニアリングモデルがURLによる完全なファイル解析（ PDF、Wordなど）をサポートしている場合、このオプションをオンにすることができ、すべての種類のファイル解析がアップストリームによって提供され、トークンの消費が削減されます。デフォルトでオンになっていない場合、このプロジェクトによって解決されます。これはほとんどのモデルに適用されます。ファイル解析サービスが外部URLストレージスキーム（ S 3/R 2/MinIOなど）を構成しており、外部URL解析ファイルがモデルの上流でサポートされていることを確認してください。",
-      "thinking-model": "思考モデル",
-      "thinking-model-tip": "モデルがディープシンキングをサポートしているかどうか（ディープシンキングモデルは、クロード3.7ソネットなどのコンテンツを出力する際に一連の思考を出力します）"
+      "thinking-model": "推論モデル",
+      "thinking-model-tip": "システムで能力が管理されていないモデルにのみ表示されます。有効にすると、ユーザーが選択できる推論レベルを設定できます。管理済みモデルは組み込み設定を使用します。"
     },
     "model-chart-tip": "トークンの使用状況",
     "subscription": "サブスクリプション管理",

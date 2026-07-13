@@ -87,6 +87,9 @@ export type Model = {
   vision_model?: boolean;
   ocr_model?: boolean;
   reverse_model?: boolean;
+  reasoning_model?: boolean;
+  reasoning_efforts?: string[];
+  reasoning_configurable?: boolean;
   avatar: string;
   tag?: string[];
 

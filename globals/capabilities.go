@@ -1,6 +1,9 @@
 package globals
 
-import "strings"
+import (
+	"strings"
+	"sync"
+)
 
 type SamplingRestriction string
 
@@ -33,6 +36,64 @@ type ProviderCapabilities struct {
 	Search          bool
 }
 
+var reasoningEffortOrder = []string{
+	"none",
+	"minimal",
+	"low",
+	"medium",
+	"high",
+	"xhigh",
+	"max",
+}
+
+var customReasoningCapabilities = struct {
+	sync.RWMutex
+	efforts map[string][]string
+}{
+	efforts: make(map[string][]string),
+}
+
+func NormalizeCustomReasoningEfforts(efforts []string) []string {
+	selected := make(map[string]bool, len(efforts))
+	for _, effort := range efforts {
+		normalized := strings.TrimSpace(strings.ToLower(effort))
+		if normalized != "" {
+			selected[normalized] = true
+		}
+	}
+
+	normalized := make([]string, 0, len(selected))
+	for _, effort := range reasoningEffortOrder {
+		if selected[effort] {
+			normalized = append(normalized, effort)
+		}
+	}
+	return normalized
+}
+
+func SetCustomReasoningEfforts(config map[string][]string) {
+	next := make(map[string][]string, len(config))
+	for model, efforts := range config {
+		model = normalizeModelName(model)
+		normalized := NormalizeCustomReasoningEfforts(efforts)
+		if model == "" || len(normalized) == 0 {
+			continue
+		}
+		next[model] = normalized
+	}
+
+	customReasoningCapabilities.Lock()
+	customReasoningCapabilities.efforts = next
+	customReasoningCapabilities.Unlock()
+}
+
+func customReasoningEfforts(model string) []string {
+	customReasoningCapabilities.RLock()
+	efforts := customReasoningCapabilities.efforts[normalizeModelName(model)]
+	customReasoningCapabilities.RUnlock()
+	return append([]string(nil), efforts...)
+}
+
 func CapabilitiesFor(channelType string, model string) ModelCapabilities {
 	normalizedChannel := strings.TrimSpace(strings.ToLower(channelType))
 	normalizedModel := normalizeModelName(model)
@@ -52,10 +113,33 @@ func CapabilitiesFor(channelType string, model string) ModelCapabilities {
 		applyXiaomiTokenPlanCapabilities(&capabilities, normalizedModel)
 	}
 
+	if !HasManagedReasoningCapabilities(normalizedChannel, normalizedModel) {
+		if efforts := customReasoningEfforts(normalizedModel); len(efforts) > 0 {
+			capabilities.ReasoningEfforts = efforts
+			capabilities.SamplingRestriction = SamplingRestrictionWithReasoning
+		}
+	}
+
 	capabilities.Search = capabilities.NativeWebSearch || capabilities.XSearch
 	capabilities.ReasoningControl = len(capabilities.ReasoningEfforts) > 0
 
 	return capabilities
+}
+
+func HasManagedReasoningCapabilities(_ string, model string) bool {
+	normalizedModel := normalizeModelName(model)
+	if normalizedModel == "" {
+		return false
+	}
+
+	if IsDeepseekV4Model(normalizedModel) ||
+		SupportGeminiThinkingLevel(normalizedModel) ||
+		SupportGeminiThinkingBudget(normalizedModel) ||
+		isManagedOpenAIResponsesReasoningModel(normalizedModel) ||
+		isXiaomiMiMoModel(normalizedModel) {
+		return true
+	}
+	return false
 }
 
 func ProviderCapabilitiesFor(channelType string) ProviderCapabilities {
@@ -216,6 +300,35 @@ func openAIResponsesReasoningEfforts(model string) []string {
 	}
 
 	return append([]string(nil), efforts...)
+}
+
+func isManagedOpenAIResponsesReasoningModel(model string) bool {
+	switch {
+	case isOpenAIGPT56Model(model):
+		return true
+	case model == "gpt-5.5" || strings.HasPrefix(model, "gpt-5.5-"):
+		return true
+	case strings.HasPrefix(model, "gpt-5.4"):
+		return true
+	case model == "gpt-5.3-chat-latest":
+		return true
+	case strings.HasPrefix(model, "gpt-5.2"):
+		return true
+	case strings.HasPrefix(model, "gpt-5.1"):
+		return true
+	case model == "gpt-5" || strings.HasPrefix(model, "gpt-5-"):
+		return true
+	case model == "o1" || strings.HasPrefix(model, "o1-"):
+		return true
+	case model == "o3" || strings.HasPrefix(model, "o3-"):
+		return true
+	case model == "o4-mini" || strings.HasPrefix(model, "o4-mini-"):
+		return true
+	case model == "gpt-4.5" || strings.HasPrefix(model, "gpt-4.5-"):
+		return true
+	default:
+		return false
+	}
 }
 
 func openAIResponsesSamplingRestriction(model string) SamplingRestriction {
