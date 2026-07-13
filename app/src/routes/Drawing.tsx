@@ -1335,9 +1335,7 @@ function Drawing() {
                   {index + 1}
                 </span>
                 {workspacePending ? (
-                  <span className="absolute right-1 top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full bg-background/90 text-primary">
-                    <Loader2 className="h-2.5 w-2.5 animate-spin motion-reduce:animate-none" />
-                  </span>
+                  <span className="absolute right-1 top-1 z-10 h-2 w-2 rounded-full bg-primary ring-2 ring-background" />
                 ) : workspace.taskStatus === "failed" ? (
                   <span className="absolute right-1 top-1 z-10 h-2 w-2 rounded-full bg-destructive ring-2 ring-background" />
                 ) : null}
@@ -1543,16 +1541,7 @@ function Drawing() {
                 : "pt-6",
             )}
           >
-            {!cloudSyncReady ? (
-              <div
-                className="flex min-h-[24rem] flex-col items-center justify-center gap-3 text-sm text-muted-foreground"
-                role="status"
-                aria-live="polite"
-              >
-                <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" />
-                {t("drawing.loadingWorkspace")}
-              </div>
-            ) : (
+            {cloudSyncReady && (
               <>
                 {cloudSyncError && (
                   <div
@@ -1576,7 +1565,7 @@ function Drawing() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                        <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" />
+                        <Sparkles className="h-5 w-5" />
                       </div>
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-foreground">
