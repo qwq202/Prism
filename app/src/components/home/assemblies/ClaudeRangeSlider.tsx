@@ -21,7 +21,13 @@ function useEnergyCanvas(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
   progress: number,
   disabled: boolean,
+  activityKey: number,
+  dragging: boolean,
 ) {
+  const progressRef = React.useRef(progress);
+  progressRef.current = progress;
+  const energyActive = !disabled && progress > 25;
+
   React.useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -33,7 +39,6 @@ function useEnergyCanvas(
     let frame = 0;
     let width = 0;
     let height = 0;
-    const energy = Math.max(0, Math.min((progress - 25) / 75, 1));
     const reducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
@@ -50,10 +55,12 @@ function useEnergyCanvas(
 
     const draw = () => {
       context.clearRect(0, 0, width, height);
+      const currentProgress = progressRef.current;
+      const energy = Math.max(0, Math.min((currentProgress - 25) / 75, 1));
       if (disabled || energy <= 0) return;
 
       const time = frame / 60;
-      const fillWidth = width * (progress / 100);
+      const fillWidth = width * (currentProgress / 100);
       const glow = context.createLinearGradient(0, 0, fillWidth, 0);
       glow.addColorStop(0, "rgba(142, 107, 217, 0)");
       glow.addColorStop(0.5, `rgba(142, 107, 217, ${0.12 * energy})`);
@@ -88,7 +95,7 @@ function useEnergyCanvas(
     const animate = () => {
       draw();
       frame += 1;
-      if (!reducedMotion && frame < 180 && energy > 0 && !disabled) {
+      if (!reducedMotion && frame < 180 && energyActive) {
         animationFrame = window.requestAnimationFrame(animate);
       }
     };
@@ -107,7 +114,19 @@ function useEnergyCanvas(
       observer.disconnect();
       context.clearRect(0, 0, width, height);
     };
-  }, [canvasRef, disabled, progress]);
+  }, [activityKey, canvasRef, disabled, dragging, energyActive]);
+}
+
+function getProgressForIndex(index: number, total: number): number {
+  return total <= 1 ? 0 : (index / (total - 1)) * 100;
+}
+
+function getIndexForProgress(progress: number, total: number): number {
+  if (total <= 1) return 0;
+  return Math.min(
+    total - 1,
+    Math.max(0, Math.round((progress / 100) * (total - 1))),
+  );
 }
 
 export function ClaudeRangeSlider({
@@ -125,10 +144,67 @@ export function ClaudeRangeSlider({
   const [dragging, setDragging] = React.useState(false);
   const total = Math.max(levels.length, 1);
   const safeIndex = Math.min(Math.max(index, 0), total - 1);
-  const progress = total <= 1 ? 0 : (safeIndex / (total - 1)) * 100;
-  const atTopStop = total > 1 && safeIndex === total - 1;
+  const restingProgress = getProgressForIndex(safeIndex, total);
+  const [dragProgress, setDragProgress] = React.useState(restingProgress);
+  const lastNotifiedIndexRef = React.useRef(safeIndex);
+  const progress = dragging ? dragProgress : restingProgress;
+  const visualIndex = getIndexForProgress(progress, total);
+  const atTopStop = total > 1 && progress >= 99.5;
 
-  useEnergyCanvas(canvasRef, progress, disabled);
+  useEnergyCanvas(canvasRef, progress, disabled, visualIndex, dragging);
+
+  const notifyIndexChange = (nextIndex: number) => {
+    if (lastNotifiedIndexRef.current === nextIndex) return;
+    lastNotifiedIndexRef.current = nextIndex;
+    onIndexChange(nextIndex);
+  };
+
+  const handleValueChange = (value: number[]) => {
+    const nextProgress = Math.min(100, Math.max(0, value[0] ?? 0));
+    setDragProgress(nextProgress);
+    notifyIndexChange(getIndexForProgress(nextProgress, total));
+  };
+
+  const handleValueCommit = (value: number[]) => {
+    const nextIndex = getIndexForProgress(value[0] ?? dragProgress, total);
+    notifyIndexChange(nextIndex);
+    setDragProgress(getProgressForIndex(nextIndex, total));
+    setDragging(false);
+  };
+
+  const cancelDragging = () => {
+    lastNotifiedIndexRef.current = safeIndex;
+    setDragProgress(restingProgress);
+    setDragging(false);
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLSpanElement>) => {
+    let nextIndex = safeIndex;
+
+    switch (event.key) {
+      case "ArrowLeft":
+      case "ArrowDown":
+        nextIndex = Math.max(0, safeIndex - 1);
+        break;
+      case "ArrowRight":
+      case "ArrowUp":
+        nextIndex = Math.min(total - 1, safeIndex + 1);
+        break;
+      case "Home":
+        nextIndex = 0;
+        break;
+      case "End":
+        nextIndex = total - 1;
+        break;
+      default:
+        return;
+    }
+
+    event.preventDefault();
+    lastNotifiedIndexRef.current = nextIndex;
+    setDragProgress(getProgressForIndex(nextIndex, total));
+    onIndexChange(nextIndex);
+  };
 
   return (
     <div
@@ -154,17 +230,20 @@ export function ClaudeRangeSlider({
       <SliderPrimitive.Root
         className="claude-range-slider__root"
         disabled={disabled}
-        value={[safeIndex]}
+        value={[progress]}
         min={0}
-        max={Math.max(total - 1, 0)}
-        step={1}
+        max={100}
+        step={0.1}
         aria-label={ariaLabel}
-        onValueChange={(value) => onIndexChange(value[0] ?? 0)}
-        onValueCommit={() => setDragging(false)}
-        onPointerDown={() => setDragging(true)}
-        onPointerUp={() => setDragging(false)}
-        onPointerCancel={() => setDragging(false)}
-        onBlur={() => setDragging(false)}
+        onValueChange={handleValueChange}
+        onValueCommit={handleValueCommit}
+        onPointerDown={() => {
+          lastNotifiedIndexRef.current = safeIndex;
+          setDragProgress(restingProgress);
+          setDragging(true);
+        }}
+        onPointerCancel={cancelDragging}
+        onKeyDown={handleKeyDown}
       >
         <SliderPrimitive.Track className="claude-range-slider__track">
           <SliderPrimitive.Range className="claude-range-slider__fill">
@@ -179,7 +258,6 @@ export function ClaudeRangeSlider({
             <span
               key={level}
               className="claude-range-slider__dot"
-              data-current={step === safeIndex || undefined}
               data-last={step === total - 1 || undefined}
               style={
                 {
