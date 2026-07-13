@@ -288,12 +288,12 @@ func NormalizeXiaomiTokenPlanThinkingEffort(model string, effort string) string 
 func NormalizeOpenAIResponsesReasoningSummary(summary string) string {
 	normalized := strings.TrimSpace(strings.ToLower(summary))
 	switch normalized {
-	case "", "auto":
-		return "auto"
-	case "none", "concise", "detailed":
+	case "":
+		return "detailed"
+	case "none", "concise", "auto", "detailed":
 		return normalized
 	default:
-		return "auto"
+		return "detailed"
 	}
 }
 

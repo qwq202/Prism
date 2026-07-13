@@ -156,8 +156,8 @@ func TestNormalizeOpenAIResponsesReasoningEffort(t *testing.T) {
 }
 
 func TestNormalizeOpenAIResponsesReasoningSummary(t *testing.T) {
-	if got := NormalizeOpenAIResponsesReasoningSummary(""); got != "auto" {
-		t.Fatalf("expected empty summary to default to auto, got %q", got)
+	if got := NormalizeOpenAIResponsesReasoningSummary(""); got != "detailed" {
+		t.Fatalf("expected empty summary to default to detailed, got %q", got)
 	}
 
 	if got := NormalizeOpenAIResponsesReasoningSummary(" DETAILED "); got != "detailed" {
@@ -168,8 +168,8 @@ func TestNormalizeOpenAIResponsesReasoningSummary(t *testing.T) {
 		t.Fatalf("expected none summary, got %q", got)
 	}
 
-	if got := NormalizeOpenAIResponsesReasoningSummary("verbose"); got != "auto" {
-		t.Fatalf("expected invalid summary to default to auto, got %q", got)
+	if got := NormalizeOpenAIResponsesReasoningSummary("verbose"); got != "detailed" {
+		t.Fatalf("expected invalid summary to default to detailed, got %q", got)
 	}
 }
 

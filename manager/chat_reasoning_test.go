@@ -23,7 +23,7 @@ func TestBuildThinkingConfigRequestsReasoningSummary(t *testing.T) {
 	}
 }
 
-func TestBuildThinkingConfigDefaultsReasoningSummaryToAuto(t *testing.T) {
+func TestBuildThinkingConfigDefaultsReasoningSummaryToDetailed(t *testing.T) {
 	instance := &conversation.Conversation{}
 	instance.SetOpenAIReasoningEffort("medium")
 
@@ -32,8 +32,8 @@ func TestBuildThinkingConfigDefaultsReasoningSummaryToAuto(t *testing.T) {
 		t.Fatalf("expected reasoning config map, got %#v", config)
 	}
 
-	if config["summary"] != "auto" {
-		t.Fatalf("expected default reasoning summary auto, got %#v", config["summary"])
+	if config["summary"] != "detailed" {
+		t.Fatalf("expected default reasoning summary detailed, got %#v", config["summary"])
 	}
 }
 

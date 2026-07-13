@@ -155,7 +155,6 @@ type initialStateType = {
   deepseek_thinking_enabled_by_model: Record<string, boolean>;
   deepseek_reasoning_effort_by_model: Record<string, string>;
   openai_reasoning_effort: string;
-  openai_reasoning_summary: string;
   current: number;
   model_list: string[];
   market: boolean;
@@ -761,15 +760,6 @@ export function normalizeOpenAIResponsesReasoningEffort(
     : undefined;
 }
 
-export function normalizeOpenAIResponsesReasoningSummary(
-  summary: string | undefined | null,
-): string {
-  const normalized = (summary || "").trim().toLowerCase();
-  return ["none", "concise", "auto", "detailed"].includes(normalized)
-    ? normalized
-    : "auto";
-}
-
 export function normalizeDeepSeekReasoningEffort(
   effort: string | undefined | null,
 ): string {
@@ -1041,9 +1031,6 @@ const chatSlice = createSlice({
     deepseek_reasoning_effort_by_model:
       getInitialDeepSeekReasoningEffortByModel(initialModel),
     openai_reasoning_effort: getMemory("openai_reasoning_effort") || "none",
-    openai_reasoning_summary: normalizeOpenAIResponsesReasoningSummary(
-      getMemory("openai_reasoning_summary"),
-    ),
     current: -1,
     loadingConversationId: null,
     model: initialModel,
@@ -1525,13 +1512,6 @@ const chatSlice = createSlice({
       setMemory("openai_reasoning_effort", action.payload as string);
       state.openai_reasoning_effort = action.payload as string;
     },
-    setOpenAIReasoningSummary: (state, action) => {
-      const summary = normalizeOpenAIResponsesReasoningSummary(
-        action.payload as string,
-      );
-      setMemory("openai_reasoning_summary", summary);
-      state.openai_reasoning_summary = summary;
-    },
     setCurrent: (state, action) => {
       const current = action.payload as number;
       state.current = current;
@@ -1675,7 +1655,6 @@ export const {
   setDeepSeekThinkingEnabled,
   setDeepSeekReasoningEffort,
   setOpenAIReasoningEffort,
-  setOpenAIReasoningSummary,
   setModelList,
   addModelList,
   removeModelList,
@@ -1741,8 +1720,6 @@ export const selectDeepSeekReasoningEffortByModel = (
 ): Record<string, string> => state.chat.deepseek_reasoning_effort_by_model;
 export const selectOpenAIReasoningEffort = (state: RootState): string =>
   state.chat.openai_reasoning_effort;
-export const selectOpenAIReasoningSummary = (state: RootState): string =>
-  state.chat.openai_reasoning_summary;
 export const selectCurrent = (state: RootState): number => state.chat.current;
 export const selectConversationLoading = (state: RootState): boolean =>
   state.chat.loadingConversationId === state.chat.current;
@@ -2059,7 +2036,6 @@ export function useMessageActions() {
     selectDeepSeekReasoningEffortByModel,
   );
   const openai_reasoning_effort = useSelector(selectOpenAIReasoningEffort);
-  const openai_reasoning_summary = useSelector(selectOpenAIReasoningSummary);
   const support_models = useSelector(selectSupportModels);
   const chat_support_models = useSelector(selectChatSupportModels);
   const history = useSelector(historySelector);
@@ -2211,7 +2187,7 @@ export function useMessageActions() {
           ? openAIReasoningEffortForRequest
           : undefined,
         openai_reasoning_summary: openAIReasoningCapabilities.reasoningSummary
-          ? openai_reasoning_summary
+          ? "detailed"
           : undefined,
         has_response_format: Boolean(requestOptions?.response_format),
         has_thinking: Boolean(requestOptions?.thinking),
@@ -2263,7 +2239,7 @@ export function useMessageActions() {
           ? openAIReasoningEffortForRequest
           : undefined,
         openai_reasoning_summary: openAIReasoningCapabilities.reasoningSummary
-          ? openai_reasoning_summary
+          ? "detailed"
           : undefined,
         response_format: requestOptions?.response_format,
         thinking: requestOptions?.thinking,
@@ -2421,7 +2397,7 @@ export function useMessageActions() {
           ? openAIReasoningEffortForRequest
           : undefined,
         openai_reasoning_summary: openAIReasoningCapabilities.reasoningSummary
-          ? openai_reasoning_summary
+          ? "detailed"
           : undefined,
         model,
         context: history,
@@ -2529,7 +2505,7 @@ export function useMessageActions() {
           ? openAIReasoningEffortForRequest
           : undefined,
         openai_reasoning_summary: openAIReasoningCapabilities.reasoningSummary
-          ? openai_reasoning_summary
+          ? "detailed"
           : undefined,
         context: history,
         ignore_context: !context,

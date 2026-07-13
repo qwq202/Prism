@@ -9,7 +9,6 @@ import {
   selectDeepSeekReasoningEffort,
   selectDeepSeekThinkingEnabled,
   selectOpenAIReasoningEffort,
-  selectOpenAIReasoningSummary,
   selectOpenAIResponsesWebSearch,
   selectGeminiThinkingBudget,
   selectGeminiGoogleSearch,
@@ -20,7 +19,6 @@ import {
   selectXAIWebSearch,
   selectXAIXSearch,
   setOpenAIReasoningEffort,
-  setOpenAIReasoningSummary,
   setOpenAIResponsesWebSearch,
   setFetch,
   setLearningMode,
@@ -93,7 +91,6 @@ const geminiThinkingPresets = [
   { label: "high", budget: 8192 },
 ];
 
-const openAIReasoningSummaryLevels = ["concise", "auto", "detailed"];
 const deepSeekReasoningEfforts = ["high", "max"];
 const deepSeekProMaxWarningMemoryKey =
   "deepseek_v4_pro_max_reasoning_warning_dismissed";
@@ -885,7 +882,6 @@ export function OpenAIReasoningAction() {
   const model = useSelector(selectModel);
   const supportModels = useSelector(selectSupportModels);
   const openAIReasoningEffort = useSelector(selectOpenAIReasoningEffort);
-  const openAIReasoningSummary = useSelector(selectOpenAIReasoningSummary);
   const openAIResponsesWebSearch = useSelector(selectOpenAIResponsesWebSearch);
   const capabilities = getOpenAIResponsesCapabilities(supportModels, model);
 
@@ -901,13 +897,6 @@ export function OpenAIReasoningAction() {
       : capabilities.reasoningEfforts.filter((item) => item !== "none");
   const enabled =
     openAIReasoningEffort !== "none" && availableEfforts.length > 0;
-  const supportsReasoningSummary = capabilities.reasoningSummary;
-  const summaryEnabled = openAIReasoningSummary !== "none";
-  const currentSummary = summaryEnabled ? openAIReasoningSummary : "auto";
-  const currentSummaryIndex = Math.max(
-    0,
-    openAIReasoningSummaryLevels.indexOf(currentSummary),
-  );
   const modelLabel = formatModelLabel(model);
   const fallbackEffort = availableEfforts.includes("medium")
     ? "medium"
@@ -921,12 +910,9 @@ export function OpenAIReasoningAction() {
   const currentEffortLabel = enabled
     ? t(`chat.openai-reasoning-level-${currentEffort}`)
     : t("chat.openai-reasoning-level-none");
-  const tipText = t(
-    supportsReasoningSummary
-      ? "chat.openai-reasoning-tip"
-      : "chat.openai-reasoning-switch-tip",
-    { model: modelLabel },
-  );
+  const tipText = t("chat.openai-reasoning-switch-tip", {
+    model: modelLabel,
+  });
 
   return (
     <Popover>
@@ -980,83 +966,6 @@ export function OpenAIReasoningAction() {
                 next && dispatch(setOpenAIReasoningEffort(next));
               }}
             />
-          )}
-
-          {supportsReasoningSummary && (
-            <div
-              className={cn(
-                "flex flex-col gap-3 border-t border-border/60 pt-3",
-                !enabled && "opacity-45",
-              )}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <Label
-                  htmlFor="openai-reasoning-summary-toggle"
-                  className="text-xs text-muted-foreground"
-                >
-                  {t("chat.openai-reasoning-summary-enable")}
-                </Label>
-                <Switch
-                  id="openai-reasoning-summary-toggle"
-                  disabled={!enabled}
-                  checked={summaryEnabled}
-                  onCheckedChange={(state) => {
-                    dispatch(
-                      setOpenAIReasoningSummary(
-                        state ? currentSummary : "none",
-                      ),
-                    );
-                  }}
-                />
-              </div>
-
-              <div
-                className={cn(
-                  "space-y-2",
-                  (!enabled || !summaryEnabled) && "opacity-45",
-                )}
-              >
-                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                  <span>{t("chat.openai-reasoning-summary-detail")}</span>
-                  <span className="font-medium text-foreground">
-                    {t(`chat.openai-reasoning-summary-level-${currentSummary}`)}
-                  </span>
-                </div>
-
-                <div className="relative grid grid-cols-3 gap-1 overflow-hidden rounded-lg border border-border/70 bg-muted/30 p-1">
-                  <span
-                    className="absolute inset-y-1 left-1 rounded-md bg-foreground transition-transform duration-300 ease-out"
-                    style={{
-                      width: "calc((100% - 1rem) / 3)",
-                      transform:
-                        currentSummaryIndex === 0
-                          ? "translateX(0)"
-                          : `translateX(calc(${currentSummaryIndex * 100}% + ${
-                              currentSummaryIndex * 0.25
-                            }rem))`,
-                    }}
-                  />
-                  {openAIReasoningSummaryLevels.map((summary) => (
-                    <button
-                      key={summary}
-                      type="button"
-                      disabled={!enabled || !summaryEnabled}
-                      onClick={() =>
-                        dispatch(setOpenAIReasoningSummary(summary))
-                      }
-                      className={cn(
-                        "relative z-10 h-8 rounded-md text-xs font-medium transition-colors duration-200 disabled:cursor-not-allowed",
-                        currentSummary === summary
-                          ? "text-background"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      {t(`chat.openai-reasoning-summary-level-${summary}`)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
           )}
         </div>
       </PopoverContent>
