@@ -54,6 +54,7 @@ import React from "react";
 import { cn } from "@/components/ui/lib/utils.ts";
 import { toast } from "sonner";
 import Icon from "@/components/utils/Icon.tsx";
+import Tips from "@/components/Tips.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import {
@@ -80,10 +81,10 @@ import {
 } from "@/components/ui/popover.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { Label } from "@/components/ui/label.tsx";
-import { Slider } from "@/components/ui/slider.tsx";
 import { ButtonProps } from "@/components/ui/button.tsx";
 import { getBooleanMemory, setMemory } from "@/utils/memory.ts";
 import { useMobile } from "@/utils/device.ts";
+import { ClaudeRangeSlider } from "./ClaudeRangeSlider.tsx";
 
 const geminiThinkingPresets = [
   { label: "off", budget: 0 },
@@ -101,9 +102,35 @@ function formatModelLabel(model: string): string {
   return model.trim().toUpperCase();
 }
 
-function getStepPosition(index: number, total: number): string {
-  if (total <= 1) return "0%";
-  return `${(index / (total - 1)) * 100}%`;
+type EffortPopoverHeaderProps = {
+  levelLabel: string;
+  tip: string;
+};
+
+function EffortPopoverHeader({ levelLabel, tip }: EffortPopoverHeaderProps) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <div className="flex min-w-0 items-center gap-2 text-sm">
+        <h2 className="shrink-0 font-medium text-muted-foreground">
+          {t("chat.effort-label")}
+        </h2>
+        <span
+          key={levelLabel}
+          className="min-w-0 truncate font-medium text-foreground animate-in fade-in duration-200"
+        >
+          {levelLabel}
+        </span>
+      </div>
+      <Tips
+        content={tip}
+        side="top"
+        className="h-[15px] w-[15px] text-muted-foreground hover:text-foreground"
+        classNamePopup="max-w-64 text-left leading-relaxed"
+      />
+    </div>
+  );
 }
 
 type ChatActionProps = {
@@ -578,6 +605,11 @@ export function GeminiThinkingAction() {
       (item) => item.budget === geminiThinkingBudget,
     ),
   );
+  const activeLevels = geminiThinkingPresets.slice(1);
+  const sliderIndex = Math.max(0, levelIndex - 1);
+  const currentLabel = enabled
+    ? t(`chat.gemini-thinking-level-${geminiThinkingPresets[levelIndex].label}`)
+    : t("chat.gemini-thinking-level-off");
 
   return (
     <Popover>
@@ -588,11 +620,23 @@ export function GeminiThinkingAction() {
           </ChatAction>
         </div>
       </PopoverTrigger>
-      <PopoverContent className="w-72 p-3" side="top" align="start">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="gemini-thinking-toggle" className="text-sm">
-              {t("chat.gemini-thinking-enable")}
+      <PopoverContent
+        className="w-[220px] border-border/60 p-4 shadow-lg"
+        side="top"
+        align="start"
+      >
+        <div className="flex flex-col gap-4">
+          <EffortPopoverHeader
+            levelLabel={currentLabel}
+            tip={t("chat.gemini-thinking-tip")}
+          />
+
+          <div className="flex items-center justify-between gap-2">
+            <Label
+              htmlFor="gemini-thinking-toggle"
+              className="min-w-0 truncate text-xs text-muted-foreground"
+            >
+              {t("chat.openai-reasoning-enable-short")}
             </Label>
             <Switch
               id="gemini-thinking-toggle"
@@ -607,43 +651,19 @@ export function GeminiThinkingAction() {
             />
           </div>
 
-          <div className={cn("space-y-2", !enabled && "opacity-50")}>
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{t("chat.gemini-thinking-depth")}</span>
-              <span>
-                {enabled
-                  ? t(
-                      `chat.gemini-thinking-level-${geminiThinkingPresets[levelIndex].label}`,
-                    )
-                  : t("chat.gemini-thinking-level-off")}
-              </span>
-            </div>
-
-            <Slider
-              disabled={!enabled}
-              value={[levelIndex]}
-              min={1}
-              max={3}
-              step={1}
-              onValueChange={(value) => {
-                const next = geminiThinkingPresets[value[0]];
-                next && dispatch(setGeminiThinkingBudget(next.budget));
-              }}
-            />
-
-            <div className="flex justify-between text-[11px] text-muted-foreground">
-              <span>{t("chat.gemini-thinking-level-low")}</span>
-              <span>{t("chat.gemini-thinking-level-medium")}</span>
-              <span>{t("chat.gemini-thinking-level-high")}</span>
-            </div>
-          </div>
-
-          <div className="rounded-md bg-muted p-2 text-xs">
-            <div className="flex items-start">
-              <Icon icon={<Info />} className="h-3 w-3 mr-1 mt-0.5 shrink-0" />
-              {t("chat.gemini-thinking-tip")}
-            </div>
-          </div>
+          <ClaudeRangeSlider
+            levels={activeLevels.map((item) => item.label)}
+            index={sliderIndex}
+            disabled={!enabled}
+            fasterLabel={t("chat.effort-faster")}
+            smarterLabel={t("chat.effort-smarter")}
+            ariaLabel={t("chat.effort-label")}
+            ariaValueText={currentLabel}
+            onIndexChange={(nextIndex) => {
+              const next = activeLevels[nextIndex];
+              next && dispatch(setGeminiThinkingBudget(next.budget));
+            }}
+          />
         </div>
       </PopoverContent>
     </Popover>
@@ -898,6 +918,15 @@ export function OpenAIReasoningAction() {
       : fallbackEffort
     : "none";
   const levelIndex = Math.max(0, availableEfforts.indexOf(currentEffort));
+  const currentEffortLabel = enabled
+    ? t(`chat.openai-reasoning-level-${currentEffort}`)
+    : t("chat.openai-reasoning-level-none");
+  const tipText = t(
+    supportsReasoningSummary
+      ? "chat.openai-reasoning-tip"
+      : "chat.openai-reasoning-switch-tip",
+    { model: modelLabel },
+  );
 
   return (
     <Popover>
@@ -911,11 +940,20 @@ export function OpenAIReasoningAction() {
           </ChatAction>
         </div>
       </PopoverTrigger>
-      <PopoverContent className="w-72 p-3" side="top" align="start">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="openai-reasoning-toggle" className="text-sm">
-              {t("chat.openai-reasoning-enable", { model: modelLabel })}
+      <PopoverContent
+        className="w-[220px] border-border/60 p-4 shadow-lg"
+        side="top"
+        align="start"
+      >
+        <div className="flex flex-col gap-4">
+          <EffortPopoverHeader levelLabel={currentEffortLabel} tip={tipText} />
+
+          <div className="flex items-center justify-between gap-2">
+            <Label
+              htmlFor="openai-reasoning-toggle"
+              className="min-w-0 truncate text-xs text-muted-foreground"
+            >
+              {t("chat.openai-reasoning-enable-short")}
             </Label>
             <Switch
               id="openai-reasoning-toggle"
@@ -929,50 +967,32 @@ export function OpenAIReasoningAction() {
           </div>
 
           {availableEfforts.length > 1 && (
-            <div className={cn("space-y-2", !enabled && "opacity-50")}>
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{t("chat.openai-reasoning-depth")}</span>
-                <span>
-                  {enabled
-                    ? t(`chat.openai-reasoning-level-${currentEffort}`)
-                    : t("chat.openai-reasoning-level-none")}
-                </span>
-              </div>
-
-              <Slider
-                disabled={!enabled}
-                value={[levelIndex]}
-                min={0}
-                max={Math.max(availableEfforts.length - 1, 0)}
-                step={1}
-                onValueChange={(value) => {
-                  const next = availableEfforts[value[0]];
-                  next && dispatch(setOpenAIReasoningEffort(next));
-                }}
-              />
-
-              <div className="relative h-4 text-[11px] text-muted-foreground">
-                {availableEfforts.map((effort, index) => (
-                  <span
-                    key={effort}
-                    className="absolute top-0 -translate-x-1/2 whitespace-nowrap"
-                    style={{
-                      left: getStepPosition(index, availableEfforts.length),
-                    }}
-                  >
-                    {t(`chat.openai-reasoning-level-${effort}`)}
-                  </span>
-                ))}
-              </div>
-            </div>
+            <ClaudeRangeSlider
+              levels={availableEfforts}
+              index={levelIndex}
+              disabled={!enabled}
+              fasterLabel={t("chat.effort-faster")}
+              smarterLabel={t("chat.effort-smarter")}
+              ariaLabel={t("chat.effort-label")}
+              ariaValueText={currentEffortLabel}
+              onIndexChange={(nextIndex) => {
+                const next = availableEfforts[nextIndex];
+                next && dispatch(setOpenAIReasoningEffort(next));
+              }}
+            />
           )}
 
           {supportsReasoningSummary && (
-            <div className={cn("space-y-2", !enabled && "opacity-50")}>
-              <div className="flex items-center justify-between">
+            <div
+              className={cn(
+                "flex flex-col gap-3 border-t border-border/60 pt-3",
+                !enabled && "opacity-45",
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
                 <Label
                   htmlFor="openai-reasoning-summary-toggle"
-                  className="text-sm"
+                  className="text-xs text-muted-foreground"
                 >
                   {t("chat.openai-reasoning-summary-enable")}
                 </Label>
@@ -993,19 +1013,19 @@ export function OpenAIReasoningAction() {
               <div
                 className={cn(
                   "space-y-2",
-                  (!enabled || !summaryEnabled) && "opacity-50",
+                  (!enabled || !summaryEnabled) && "opacity-45",
                 )}
               >
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                   <span>{t("chat.openai-reasoning-summary-detail")}</span>
-                  <span>
+                  <span className="font-medium text-foreground">
                     {t(`chat.openai-reasoning-summary-level-${currentSummary}`)}
                   </span>
                 </div>
 
-                <div className="relative grid grid-cols-3 gap-1 overflow-hidden rounded-md border border-black/10 bg-white p-1 dark:border-white/15 dark:bg-black">
+                <div className="relative grid grid-cols-3 gap-1 overflow-hidden rounded-lg border border-border/70 bg-muted/30 p-1">
                   <span
-                    className="absolute inset-y-1 left-1 rounded-sm bg-black transition-transform duration-300 ease-out dark:bg-white"
+                    className="absolute inset-y-1 left-1 rounded-md bg-foreground transition-transform duration-300 ease-out"
                     style={{
                       width: "calc((100% - 1rem) / 3)",
                       transform:
@@ -1025,10 +1045,10 @@ export function OpenAIReasoningAction() {
                         dispatch(setOpenAIReasoningSummary(summary))
                       }
                       className={cn(
-                        "relative z-10 h-8 rounded-sm text-xs font-medium transition-colors duration-200 disabled:cursor-not-allowed",
+                        "relative z-10 h-8 rounded-md text-xs font-medium transition-colors duration-200 disabled:cursor-not-allowed",
                         currentSummary === summary
-                          ? "text-white dark:text-black"
-                          : "text-black/70 hover:text-black dark:text-white/70 dark:hover:text-white",
+                          ? "text-background"
+                          : "text-muted-foreground hover:text-foreground",
                       )}
                     >
                       {t(`chat.openai-reasoning-summary-level-${summary}`)}
@@ -1038,18 +1058,6 @@ export function OpenAIReasoningAction() {
               </div>
             </div>
           )}
-
-          <div className="rounded-md bg-muted p-2 text-xs">
-            <div className="flex items-start">
-              <Icon icon={<Info />} className="h-3 w-3 mr-1 mt-0.5 shrink-0" />
-              {t(
-                supportsReasoningSummary
-                  ? "chat.openai-reasoning-tip"
-                  : "chat.openai-reasoning-switch-tip",
-                { model: modelLabel },
-              )}
-            </div>
-          </div>
         </div>
       </PopoverContent>
     </Popover>
