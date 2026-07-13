@@ -49,6 +49,7 @@ import {
 import { useDispatch, useSelector } from "react-redux";
 import { useTranslation } from "react-i18next";
 import React from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/components/ui/lib/utils.ts";
 import { toast } from "sonner";
 import Icon from "@/components/utils/Icon.tsx";
@@ -106,6 +107,7 @@ type EffortPopoverHeaderProps = {
 
 function EffortPopoverHeader({ levelLabel, tip }: EffortPopoverHeaderProps) {
   const { t } = useTranslation();
+  const reduceMotion = useReducedMotion();
 
   return (
     <div className="flex items-center justify-between gap-2">
@@ -113,11 +115,34 @@ function EffortPopoverHeader({ levelLabel, tip }: EffortPopoverHeaderProps) {
         <h2 className="shrink-0 font-medium text-muted-foreground">
           {t("chat.effort-label")}
         </h2>
-        <span
-          key={levelLabel}
-          className="min-w-0 truncate font-medium text-foreground animate-in fade-in duration-200"
-        >
-          {levelLabel}
+        <span className="relative min-w-0">
+          <span className="sr-only">{levelLabel}</span>
+          <AnimatePresence initial={false} mode="popLayout">
+            <motion.span
+              key={levelLabel}
+              layout={!reduceMotion}
+              initial={
+                reduceMotion
+                  ? false
+                  : { opacity: 0, filter: "blur(3px)", scale: 0.96 }
+              }
+              animate={{ opacity: 1, filter: "blur(0px)", scale: 1 }}
+              exit={
+                reduceMotion
+                  ? { opacity: 0 }
+                  : { opacity: 0, filter: "blur(3px)", scale: 0.96 }
+              }
+              transition={
+                reduceMotion
+                  ? { duration: 0 }
+                  : { duration: 0.2, ease: [0.32, 0.72, 0, 1] }
+              }
+              aria-hidden="true"
+              className="block min-w-0 origin-center truncate font-medium text-foreground will-change-[transform,opacity,filter]"
+            >
+              {levelLabel}
+            </motion.span>
+          </AnimatePresence>
         </span>
       </div>
       <Tips
