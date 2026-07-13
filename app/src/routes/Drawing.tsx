@@ -1350,14 +1350,14 @@ function Drawing() {
                     requestDeleteWorkspace(workspace.id);
                   }}
                   disabled={workspacePending}
-                  className="group/workspace-delete pointer-events-none absolute -right-4 -top-4 z-20 flex h-11 w-11 items-center justify-center text-muted-foreground opacity-0 focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
+                  className="group/workspace-delete pointer-events-none absolute -right-2 -top-2 z-20 flex h-6 w-6 items-center justify-center text-muted-foreground opacity-0 focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
                   aria-label={deleteLabel}
                   title={
                     workspacePending ? t("drawing.generating") : deleteLabel
                   }
                 >
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background transition-colors group-hover/workspace-delete:border-destructive/50 group-hover/workspace-delete:bg-destructive group-hover/workspace-delete:text-destructive-foreground group-focus-visible/workspace-delete:ring-2 group-focus-visible/workspace-delete:ring-ring group-focus-visible/workspace-delete:ring-offset-1">
-                    <X className="h-3 w-3" />
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full border border-border bg-background transition-colors group-hover/workspace-delete:border-destructive/50 group-hover/workspace-delete:bg-destructive group-hover/workspace-delete:text-destructive-foreground group-focus-visible/workspace-delete:ring-2 group-focus-visible/workspace-delete:ring-ring group-focus-visible/workspace-delete:ring-offset-1">
+                    <X className="h-2.5 w-2.5" />
                   </span>
                 </button>
               )}
