@@ -32,6 +32,10 @@
     touch-action: none;
   }
 
+  &__root > span:has(> &__thumb) {
+    z-index: 2;
+  }
+
   &[data-dragging] &__root {
     cursor: ew-resize;
   }
@@ -114,7 +118,6 @@
 
   &__thumb {
     position: relative;
-    z-index: 2;
     display: block;
     width: var(--claude-slider-handle-width);
     height: var(--claude-slider-handle-height);
