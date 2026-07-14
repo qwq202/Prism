@@ -52,6 +52,7 @@ func (m *GeminiHiddenMetadata) UnmarshalJSON(data []byte) error {
 type Message struct {
 	Role                 string                 `json:"role"`
 	Content              string                 `json:"content"`
+	RequestID            string                 `json:"request_id,omitempty"` // client idempotency key; stripped before model requests
 	CacheControl         map[string]interface{} `json:"cache_control,omitempty"`
 	Model                string                 `json:"model,omitempty"`
 	Name                 *string                `json:"name,omitempty"`
@@ -170,14 +171,18 @@ type ChatSegmentToolCall struct {
 }
 
 type ChatSegmentResponse struct {
-	Conversation int64                `json:"conversation"`
-	Quota        float32              `json:"quota"`
-	Keyword      string               `json:"keyword"`
-	Message      string               `json:"message"`
-	Title        string               `json:"title,omitempty"`
-	ToolCall     *ChatSegmentToolCall `json:"tool_call,omitempty"`
-	End          bool                 `json:"end"`
-	Plan         bool                 `json:"plan"`
+	Conversation  int64                `json:"conversation"`
+	RequestID     string               `json:"request_id,omitempty"`
+	RequestStatus string               `json:"request_status,omitempty"`
+	Accepted      bool                 `json:"accepted,omitempty"`
+	Retryable     bool                 `json:"retryable,omitempty"`
+	Quota         float32              `json:"quota"`
+	Keyword       string               `json:"keyword"`
+	Message       string               `json:"message"`
+	Title         string               `json:"title,omitempty"`
+	ToolCall      *ChatSegmentToolCall `json:"tool_call,omitempty"`
+	End           bool                 `json:"end"`
+	Plan          bool                 `json:"plan"`
 }
 
 type ListModels struct {

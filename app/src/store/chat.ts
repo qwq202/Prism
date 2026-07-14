@@ -44,6 +44,13 @@ import {
   setCachedConversation,
 } from "@/utils/conversation-cache.ts";
 import { logClientEvent } from "@/utils/client-logger.ts";
+import {
+  clearPendingChatRequests,
+  clearPendingChatRequestsForConversation,
+  createChatRequestID,
+  enqueuePendingChatRequest,
+  getPendingChatRequests,
+} from "@/utils/chat-outbox.ts";
 import { isHiddenToolCallName } from "@/api/tool-calls.ts";
 import {
   type AskUserResult,
@@ -1920,6 +1927,7 @@ export function useConversationActions() {
     remove: async (id: number) => {
       const state = await doDeleteConversation(id);
       if (state) {
+        await clearPendingChatRequestsForConversation(id);
         await clearCachedConversation(id);
         await removeCachedConversationFromList(id);
         dispatch(deleteConversation(id));
@@ -1930,6 +1938,7 @@ export function useConversationActions() {
     removeAll: async () => {
       const state = await doDeleteAllConversations();
       if (state) {
+        await clearPendingChatRequests();
         await clearCachedConversations();
         dispatch(deleteAllConversation());
       }
@@ -2199,13 +2208,10 @@ export function useMessageActions() {
         stack.createConnection(current);
       }
 
-      if (current === -1 && mask && mask.context.length > 0) {
-        stack.sendMaskEvent(current, t, mask);
-        dispatch(fillMaskItem());
-      }
-
-      const state = stack.send(current, t, {
+      const requestID = createChatRequestID();
+      const chatProps: ChatProps = {
         type: "chat",
+        request_id: requestID,
         message,
         web: enableGeminiNativeWeb
           ? gemini_google_search || gemini_url_context
@@ -2256,7 +2262,35 @@ export function useMessageActions() {
         presence_penalty,
         frequency_penalty,
         repetition_penalty,
-      });
+      };
+
+      try {
+        await enqueuePendingChatRequest({
+          requestId: requestID,
+          conversationId: current,
+          props: chatProps,
+          createdAt: Date.now(),
+        });
+      } catch (error) {
+        logClientEvent(
+          "chat.action",
+          "outbox-persist-failed",
+          {
+            ...requestSummary,
+            request_id: requestID,
+            error: String(error),
+          },
+          "error",
+        );
+        return false;
+      }
+
+      if (current === -1 && mask && mask.context.length > 0) {
+        stack.sendMaskEvent(current, t, mask);
+        dispatch(fillMaskItem());
+      }
+
+      const state = stack.send(current, t, chatProps);
       if (!state) {
         logClientEvent(
           "chat.action",
@@ -2298,6 +2332,22 @@ export function useMessageActions() {
         target_model: targetModel,
       });
       return true;
+    },
+    resumePending: async () => {
+      const pending = await getPendingChatRequests();
+      for (const request of pending) {
+        if (!stack.hasConnection(request.conversationId)) {
+          stack.createConnection(request.conversationId);
+        }
+        stack.send(request.conversationId, t, request.props);
+      }
+      if (pending.length > 0) {
+        logClientEvent("chat.action", "outbox-resumed", {
+          count: pending.length,
+          request_ids: pending.map((item) => item.requestId),
+        });
+      }
+      return pending.length;
     },
     stop: () => {
       if (!stack.hasConnection(current)) {
@@ -2608,8 +2658,17 @@ export function useMessageActions() {
         dispatch(renameHistory({ id, name: message.title }));
       }
 
-      // raise conversation if it is -1
-      if (id === -1 && message.conversation) {
+      if (id !== -1 && message.request_id && message.accepted) {
+        await refresh({ useCache: false });
+      }
+
+      // Request-state frames carry conversation metadata but no assistant payload.
+      // Only an accepted request may promote a newly created conversation.
+      if (
+        id === -1 &&
+        message.conversation &&
+        (!message.request_id || message.accepted)
+      ) {
         const target: number = message.conversation;
         logClientEvent("chat.action", "raise-conversation", {
           from: id,

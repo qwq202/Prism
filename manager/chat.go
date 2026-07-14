@@ -1768,6 +1768,10 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 	group := auth.GetGroup(db, user)
 	toolCallsSupported := memory.CanUseToolCalls(model, group)
 	segment := conversation.CopyMessage(instance.GetChatMessage(restart))
+	for index := range segment {
+		// Request IDs are persistence metadata and must never be forwarded to model providers.
+		segment[index].RequestID = ""
+	}
 	if web.ShouldUseFallbackSearch(instance.IsEnableWebSearch(), model, toolCallsSupported) {
 		segment = web.ToFallbackSearched(segment, group, cache)
 	}

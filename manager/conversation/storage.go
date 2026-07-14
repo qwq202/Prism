@@ -350,8 +350,19 @@ func LoadConversationList(db *sql.DB, userId int64) []Conversation {
 }
 
 func (c *Conversation) DeleteConversation(db *sql.DB) bool {
-	_, err := globals.ExecDb(db, "DELETE FROM conversation WHERE user_id = ? AND conversation_id = ?", c.UserID, c.Id)
-	return err == nil
+	tx, err := db.Begin()
+	if err != nil {
+		return false
+	}
+	if _, err = globals.ExecTx(tx, "DELETE FROM chat_request WHERE user_id = ? AND conversation_id = ?", c.UserID, c.Id); err != nil {
+		_ = tx.Rollback()
+		return false
+	}
+	if _, err = globals.ExecTx(tx, "DELETE FROM conversation WHERE user_id = ? AND conversation_id = ?", c.UserID, c.Id); err != nil {
+		_ = tx.Rollback()
+		return false
+	}
+	return tx.Commit() == nil
 }
 
 func (c *Conversation) RenameConversation(db *sql.DB, name string) bool {
@@ -373,6 +384,17 @@ func (c *Conversation) SetFavorite(db *sql.DB, favorite bool) bool {
 
 func DeleteAllConversations(db *sql.DB, user auth.User) error {
 	userID := user.GetID(db)
-	_, err := globals.ExecDb(db, "DELETE FROM conversation WHERE user_id = ?", userID)
-	return err
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	if _, err = globals.ExecTx(tx, "DELETE FROM chat_request WHERE user_id = ?", userID); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if _, err = globals.ExecTx(tx, "DELETE FROM conversation WHERE user_id = ?", userID); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return tx.Commit()
 }

@@ -49,6 +49,7 @@ func openWebsocketTestDB(t *testing.T) *sql.DB {
 
 	connection.CreateUserTable(db)
 	connection.CreateConversationTable(db)
+	connection.CreateChatRequestTable(db)
 	connection.CreateQuotaTable(db)
 	connection.CreateSubscriptionTable(db)
 	connection.CreateBillingTable(db)
@@ -576,5 +577,66 @@ func TestChatAPIWebsocketCloseContinuesAndPersistsFullResponse(t *testing.T) {
 
 	if got := atomic.LoadInt32(env.requestCount); got != 1 {
 		t.Fatalf("expected close to keep the original upstream request only, got %d", got)
+	}
+}
+
+func TestChatAPIWebsocketDuplicateRequestIDDoesNotRegenerate(t *testing.T) {
+	env := newWebsocketChatTestEnv(t)
+
+	const requestID = "ws-request-once"
+	conn := env.dial(t, -1)
+	if err := conn.WriteJSON(conversation.FormMessage{
+		Type:      ChatType,
+		Message:   "send this once",
+		Model:     websocketTestModel,
+		RequestID: requestID,
+	}); err != nil {
+		t.Fatalf("send chat message: %v", err)
+	}
+
+	var conversationID int64
+	var accepted bool
+	for {
+		response := readWebsocketResponse(t, conn)
+		if response.RequestID == requestID && response.Accepted {
+			accepted = true
+		}
+		if response.Conversation != 0 {
+			conversationID = response.Conversation
+		}
+		if response.End {
+			break
+		}
+	}
+	if !accepted || conversationID == 0 {
+		t.Fatalf("expected durable request acknowledgement, accepted=%v conversation=%d", accepted, conversationID)
+	}
+	_ = conn.Close()
+
+	persisted := waitForConversationMessages(t, env.db, env.rootID, conversationID, 2)
+	if persisted.GetMessage()[0].RequestID != requestID {
+		t.Fatalf("expected request id on persisted user message, got %#v", persisted.GetMessage()[0])
+	}
+
+	replay := env.dial(t, conversationID)
+	defer replay.Close()
+	if err := replay.WriteJSON(conversation.FormMessage{
+		Type:      ChatType,
+		Message:   "send this once",
+		Model:     websocketTestModel,
+		RequestID: requestID,
+	}); err != nil {
+		t.Fatalf("replay chat message: %v", err)
+	}
+
+	response := readWebsocketResponse(t, replay)
+	if response.RequestID != requestID || response.RequestStatus != conversation.ChatRequestCompleted || !response.Accepted || !response.End {
+		t.Fatalf("unexpected replay acknowledgement: %#v", response)
+	}
+	if got := atomic.LoadInt32(env.requestCount); got != 1 {
+		t.Fatalf("expected replay to avoid a second upstream request, got %d", got)
+	}
+	if got := waitForConversationMessages(t, env.db, env.rootID, conversationID, 2).GetMessageLength(); got != 2 {
+		t.Fatalf("expected replay to preserve exactly two messages, got %d", got)
 	}
 }

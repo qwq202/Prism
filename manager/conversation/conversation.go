@@ -63,6 +63,7 @@ type Conversation struct {
 type FormMessage struct {
 	Type                    string                 `json:"type"`
 	Message                 string                 `json:"message"`
+	RequestID               string                 `json:"request_id,omitempty"`
 	Transient               bool                   `json:"transient,omitempty"`
 	Web                     bool                   `json:"web"`
 	WebSearch               bool                   `json:"web_search"`
@@ -455,6 +456,19 @@ func (c *Conversation) HasMessageId(id int) bool {
 	return id >= 0 && id < len(c.Message)
 }
 
+func (c *Conversation) HasRequestID(requestID string) bool {
+	requestID = strings.TrimSpace(requestID)
+	if requestID == "" {
+		return false
+	}
+	for _, message := range c.Message {
+		if message.RequestID == requestID {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *Conversation) GetMessageById(id int) globals.Message {
 	if !c.HasMessageId(id) {
 		return globals.Message{}
@@ -684,6 +698,7 @@ func (c *Conversation) AddMessageFromForm(form *FormMessage) error {
 	message := globals.Message{
 		Role:           globals.User,
 		Content:        form.Message,
+		RequestID:      strings.TrimSpace(form.RequestID),
 		ContextCleared: form.IgnoreContext,
 	}
 	c.AddMessage(message)
@@ -694,14 +709,22 @@ func (c *Conversation) AddMessageFromForm(form *FormMessage) error {
 
 func (c *Conversation) HandleMessage(db *sql.DB, form *FormMessage) bool {
 	head := len(c.Message) == 0 || c.Name == defaultConversationName
+	previousName := c.Name
+	previousLength := len(c.Message)
 	if err := c.AddMessageFromForm(form); err != nil {
 		return false
 	}
 	if head {
-		c.SetName(db, form.Message)
+		c.Name = utils.Extract(form.Message, 50, "...")
 	}
-	c.SaveConversation(db)
-	return true
+	if c.SaveConversation(db) {
+		return true
+	}
+
+	// Keep the in-memory snapshot retry-safe when persistence fails.
+	c.Message = c.Message[:previousLength]
+	c.Name = previousName
+	return false
 }
 
 func (c *Conversation) HandleMessageFromByte(db *sql.DB, data []byte) bool {

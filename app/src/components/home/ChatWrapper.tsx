@@ -157,7 +157,7 @@ function fileReducer(state: FileArray, action: FileProviderAction): FileArray {
 
 function ChatWrapper() {
   const { t } = useTranslation();
-  const { send: sendAction } = useMessageActions();
+  const { send: sendAction, resumePending } = useMessageActions();
   const process = listenMessageEvent();
   const [files, fileDispatch] = useReducer(fileReducer, []);
   const [input, setInput] = useState("");
@@ -167,6 +167,7 @@ function ChatWrapper() {
   const auth = useSelector(selectAuthenticated);
   const model = useSelector(selectModel);
   const target = useRef<HTMLTextAreaElement>(null);
+  const resumePendingRef = useRef(resumePending);
   const align = useSelector(alignSelector);
 
   const working = useWorking();
@@ -183,6 +184,21 @@ function ChatWrapper() {
   useEffect(() => {
     void preloadChatInterface();
   }, []);
+
+  useEffect(() => {
+    resumePendingRef.current = resumePending;
+  }, [resumePending]);
+
+  useEffect(() => {
+    if (!init) return;
+
+    const resume = () => {
+      void resumePendingRef.current();
+    };
+    resume();
+    window.addEventListener("online", resume);
+    return () => window.removeEventListener("online", resume);
+  }, [init]);
 
   useEffect(() => {
     const openFilePanel = (event: DragEvent) => {

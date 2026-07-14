@@ -619,6 +619,7 @@ func deleteUser(db *sql.DB, cache *redis.Client, id int64) error {
 		"DELETE FROM package WHERE user_id = ?",
 		"DELETE FROM quota WHERE user_id = ?",
 		"DELETE FROM sharing WHERE user_id = ?",
+		"DELETE FROM chat_request WHERE user_id = ?",
 		"DELETE FROM conversation WHERE user_id = ?",
 		"DELETE FROM drawing_task WHERE user_id = ?",
 		"DELETE FROM drawing_workspace WHERE user_id = ?",

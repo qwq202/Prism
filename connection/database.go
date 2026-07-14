@@ -103,6 +103,7 @@ func ConnectDatabase() *sql.DB {
 
 	CreateUserTable(db)
 	CreateConversationTable(db)
+	CreateChatRequestTable(db)
 	CreateDrawingWorkspaceTable(db)
 	CreateDrawingTaskTable(db)
 	CreateMaskTable(db)
@@ -240,6 +241,20 @@ func CreateConversationTable(db *sql.DB) {
 		  favorite BOOLEAN DEFAULT FALSE,
 		  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		  UNIQUE KEY (user_id, conversation_id)
+		);
+	`)
+}
+
+func CreateChatRequestTable(db *sql.DB) {
+	mustCreateTable(db, "chat_request", `
+		CREATE TABLE IF NOT EXISTS chat_request (
+		  user_id INT,
+		  request_id VARCHAR(128),
+		  conversation_id INT,
+		  status VARCHAR(24) NOT NULL DEFAULT 'reserved',
+		  reserved_at BIGINT NOT NULL,
+		  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		  PRIMARY KEY (user_id, request_id)
 		);
 	`)
 }

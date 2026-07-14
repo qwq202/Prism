@@ -95,6 +95,21 @@ func hasVisibleAssistantText(message globals.Message) bool {
 	return strings.TrimSpace(message.Content) != ""
 }
 
+func sendChatRequestState(conn *Connection, requestID string, conversationID int64, status string, accepted bool, retryable bool, message string, end bool) {
+	if strings.TrimSpace(requestID) == "" {
+		return
+	}
+	_ = conn.SendClient(globals.ChatSegmentResponse{
+		Conversation:  conversationID,
+		RequestID:     requestID,
+		RequestStatus: status,
+		Accepted:      accepted,
+		Retryable:     retryable,
+		Message:       message,
+		End:           end,
+	})
+}
+
 func ChatAPI(c *gin.Context) {
 	var conn *utils.WebSocket
 	if conn = utils.NewWebsocket(c, false); conn == nil {
@@ -104,17 +119,17 @@ func ChatAPI(c *gin.Context) {
 
 	db := utils.GetDBFromContext(c)
 
-	form, err := utils.ReadForm[WebsocketAuthForm](conn)
+	authForm, err := utils.ReadForm[WebsocketAuthForm](conn)
 	if err != nil {
 		return
 	}
 
-	user := ParseAuth(c, form.Token)
+	user := ParseAuth(c, authForm.Token)
 	authenticated := user != nil
 
 	id := auth.GetId(db, user)
 
-	instance := conversation.ExtractConversation(db, user, form.Id, form.Ref)
+	instance := conversation.ExtractConversation(db, user, authForm.Id, authForm.Ref)
 	hash := fmt.Sprintf(":chatthread:%s", utils.Md5Encrypt(utils.Multi(
 		authenticated,
 		strconv.FormatInt(id, 10),
@@ -125,31 +140,64 @@ func ChatAPI(c *gin.Context) {
 	buf.Handle(func(form *conversation.FormMessage) error {
 		switch form.Type {
 		case ChatType:
+			requestID := strings.TrimSpace(form.RequestID)
 			if form.Transient {
 				instance.SetTransient(true)
 				if err := instance.AddMessageFromForm(form); err != nil {
 					return err
 				}
+				sendChatRequestState(buf, requestID, instance.GetId(), conversation.ChatRequestAccepted, true, false, "", false)
 				response := ChatHandler(buf, user, instance, false)
 				instance.SaveResponse(nil, response)
 				return nil
 			}
 
 			instance = refreshPersistedConversation(db, id, instance)
+			record, owner, reserveErr := conversation.ReserveChatRequest(db, id, requestID, instance.GetId())
+			if reserveErr != nil {
+				sendChatRequestState(buf, requestID, instance.GetId(), conversation.ChatRequestReserved, false, true, "", false)
+				break
+			}
+			if !owner {
+				accepted := record != nil && record.Status != conversation.ChatRequestReserved
+				conversationID := instance.GetId()
+				status := conversation.ChatRequestReserved
+				if record != nil {
+					conversationID = record.ConversationID
+					status = record.Status
+				}
+				sendChatRequestState(buf, requestID, conversationID, status, accepted, !accepted, "", status == conversation.ChatRequestCompleted)
+				break
+			}
 			if hasPendingAskUserCall(instance) {
-				_ = buf.SendClient(globals.ChatSegmentResponse{
-					Message: "Answer or skip the pending question before sending a new message.",
-					End:     true,
-				})
+				_ = conversation.ReleaseChatRequest(db, id, requestID)
+				sendChatRequestState(buf, requestID, instance.GetId(), "rejected", false, false, "Answer or skip the pending question before sending a new message.", true)
+				if requestID == "" {
+					_ = buf.SendClient(globals.ChatSegmentResponse{
+						Message: "Answer or skip the pending question before sending a new message.",
+						End:     true,
+					})
+				}
 				break
 			}
 			if instance.HandleMessage(db, form) {
+				if requestID != "" {
+					_ = conversation.MarkChatRequestStatus(db, id, requestID, instance.GetId(), conversation.ChatRequestAccepted)
+					sendChatRequestState(buf, requestID, instance.GetId(), conversation.ChatRequestAccepted, true, false, "", false)
+				}
 				response := ChatHandler(buf, user, instance, false)
-				if instance.SaveResponse(db, response) {
+				responseSaved := instance.SaveResponse(db, response)
+				if responseSaved {
 					if hasVisibleAssistantText(response) {
 						maybeAutoTitle(buf, user, instance)
 					}
 				}
+				if requestID != "" && responseSaved {
+					_ = conversation.MarkChatRequestStatus(db, id, requestID, instance.GetId(), conversation.ChatRequestCompleted)
+				}
+			} else if requestID != "" {
+				_ = conversation.ReleaseChatRequest(db, id, requestID)
+				sendChatRequestState(buf, requestID, instance.GetId(), conversation.ChatRequestReserved, false, true, "", false)
 			}
 		case StopType:
 			break

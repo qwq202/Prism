@@ -4,15 +4,21 @@ import { getErrorMessage } from "@/utils/base.ts";
 import { Mask } from "@/masks/types.ts";
 import type { TFunction } from "i18next";
 import { logClientEvent } from "@/utils/client-logger.ts";
+import { acknowledgePendingChatRequest } from "@/utils/chat-outbox.ts";
 
 export const endpoint = `${websocketEndpoint}/chat`;
 export const maxRetry = 60; // 30s max websocket retry
 export const maxConnection = 5;
 const staleConnectionMs = 45_000;
 const connectingTimeoutMs = 10_000;
+const requestAckRetryMs = 3_000;
 
 export type StreamMessage = {
   conversation?: number;
+  request_id?: string;
+  request_status?: "reserved" | "accepted" | "completed" | "rejected";
+  accepted?: boolean;
+  retryable?: boolean;
   keyword?: string;
   quota?: number;
   message: string;
@@ -54,6 +60,7 @@ export type StreamMessage = {
 
 export type ChatProps = {
   type?: string;
+  request_id?: string;
   message: string;
   model: string;
   transient?: boolean;
@@ -95,6 +102,12 @@ export type ChatProps = {
 };
 
 type StreamCallback = (id: number, message: StreamMessage) => void;
+
+type PendingRequest = {
+  t: TFunction | undefined;
+  data: ChatProps;
+  timer?: ReturnType<typeof setTimeout>;
+};
 
 const connectionStacks = new Set<ConnectionStack>();
 let lifecycleListenersAttached = false;
@@ -201,12 +214,14 @@ export class Connection {
     startedAt: number;
   };
   protected disposed: boolean;
+  protected pendingRequests: Map<string, PendingRequest>;
   public id: number;
   public state: boolean;
 
   public constructor(id: number, callback?: StreamCallback) {
     this.state = false;
     this.disposed = false;
+    this.pendingRequests = new Map();
     this.id = id;
     this.lastActivityAt = Date.now();
     this.streamStats = {
@@ -245,6 +260,7 @@ export class Connection {
         token: getMemory(tokenField) || "anonymous",
         id: this.id,
       });
+      this.retryPendingRequests();
     };
     socket.onclose = (event) => {
       if (socket !== this.connection) return;
@@ -297,6 +313,7 @@ export class Connection {
       this.lastActivityAt = Date.now();
       try {
         const message = JSON.parse(event.data);
+        this.handleRequestState(message as StreamMessage);
         this.triggerCallback(message as StreamMessage);
       } catch (e) {
         console.warn(
@@ -404,6 +421,18 @@ export class Connection {
     data: ChatProps,
     times?: number,
   ): void {
+    const requestID = data.request_id?.trim();
+    if (requestID && (data.type ?? "chat") === "chat") {
+      const current = this.pendingRequests.get(requestID);
+      this.pendingRequests.set(requestID, {
+        t,
+        data,
+        timer: current?.timer,
+      });
+      this.flushPendingRequest(requestID);
+      return;
+    }
+
     try {
       if (!times || times < maxRetry) {
         if (!this.send(data)) {
@@ -467,6 +496,89 @@ export class Connection {
       });
   }
 
+  protected flushPendingRequest(requestID: string): void {
+    const pending = this.pendingRequests.get(requestID);
+    if (!pending || this.disposed) return;
+    if (pending.timer) clearTimeout(pending.timer);
+
+    let sent = false;
+    try {
+      sent = this.send(pending.data);
+    } catch (error) {
+      logClientEvent(
+        "chat.request",
+        "send-error",
+        {
+          id: this.id,
+          request_id: requestID,
+          error: getErrorMessage(error),
+        },
+        "warn",
+      );
+    }
+    pending.timer = setTimeout(
+      () => this.flushPendingRequest(requestID),
+      sent ? requestAckRetryMs : 500,
+    );
+    this.pendingRequests.set(requestID, pending);
+  }
+
+  public hasPendingRequests(): boolean {
+    return this.pendingRequests.size > 0;
+  }
+
+  protected retryPendingRequests(): void {
+    this.pendingRequests.forEach((_pending, requestID) => {
+      this.flushPendingRequest(requestID);
+    });
+  }
+
+  protected handleRequestState(message: StreamMessage): void {
+    const requestID = message.request_id?.trim();
+    if (!requestID) return;
+
+    logClientEvent("chat.request", "state", {
+      id: this.id,
+      request_id: requestID,
+      request_status: message.request_status,
+      accepted: message.accepted,
+      retryable: message.retryable,
+      conversation: message.conversation,
+    });
+
+    if (
+      message.accepted ||
+      message.request_status === "rejected" ||
+      message.retryable === false
+    ) {
+      const pending = this.pendingRequests.get(requestID);
+      if (pending?.timer) clearTimeout(pending.timer);
+      this.pendingRequests.delete(requestID);
+      void acknowledgePendingChatRequest(requestID).catch((error) => {
+        logClientEvent(
+          "chat.request",
+          "outbox-ack-failed",
+          {
+            id: this.id,
+            request_id: requestID,
+            error: getErrorMessage(error),
+          },
+          "warn",
+        );
+      });
+      return;
+    }
+
+    const pending = this.pendingRequests.get(requestID);
+    if (!pending) return;
+    if (pending.timer) clearTimeout(pending.timer);
+    pending.timer = setTimeout(
+      () => this.flushPendingRequest(requestID),
+      requestAckRetryMs,
+    );
+    this.pendingRequests.set(requestID, pending);
+  }
+
   public sendEvent(
     t: TFunction | undefined,
     event: string,
@@ -526,6 +638,10 @@ export class Connection {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = undefined;
     }
+    this.pendingRequests.forEach((pending) => {
+      if (pending.timer) clearTimeout(pending.timer);
+    });
+    this.pendingRequests.clear();
     if (!this.connection) return;
     logClientEvent("chat.websocket", "close-requested", {
       id: this.id,
@@ -618,7 +734,13 @@ export class ConnectionStack {
 
     // max connection garbage collection
     if (this.connections.length > maxConnection) {
-      const garbage = this.connections.shift();
+      const garbageIndex = this.connections.findIndex(
+        (item) => item !== conn && !item.hasPendingRequests(),
+      );
+      const garbage =
+        garbageIndex >= 0
+          ? this.connections.splice(garbageIndex, 1)[0]
+          : undefined;
       if (garbage) {
         logClientEvent("chat.connection-stack", "garbage-collect", {
           id: garbage.id,
