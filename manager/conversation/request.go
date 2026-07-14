@@ -2,17 +2,19 @@ package conversation
 
 import (
 	"chat/globals"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"strings"
 	"time"
 )
 
 const (
-	ChatRequestReserved   = "reserved"
-	ChatRequestAccepted   = "accepted"
-	ChatRequestCompleted  = "completed"
-	chatRequestStaleAfter = 30 * time.Second
+	ChatRequestReserved      = "reserved"
+	ChatRequestAccepted      = "accepted"
+	ChatRequestCompleted     = "completed"
+	chatRequestLeaseDuration = 2 * time.Minute
 )
 
 type ChatRequestRecord struct {
@@ -20,6 +22,21 @@ type ChatRequestRecord struct {
 	ConversationID int64
 	Status         string
 	ReservedAt     int64
+	OwnerToken     string
+	LeaseExpiresAt int64
+	Recovered      bool
+}
+
+func ChatRequestLeaseHeartbeatInterval() time.Duration {
+	return chatRequestLeaseDuration / 4
+}
+
+func newChatRequestOwnerToken() (string, error) {
+	buffer := make([]byte, 16)
+	if _, err := rand.Read(buffer); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buffer), nil
 }
 
 func normalizeChatRequestID(requestID string) (string, error) {
@@ -50,10 +67,16 @@ func LookupChatRequest(db *sql.DB, userID int64, requestID string) (*ChatRequest
 
 	record := &ChatRequestRecord{RequestID: requestID}
 	err = globals.QueryRowDb(db, `
-		SELECT conversation_id, status, reserved_at
+		SELECT conversation_id, status, reserved_at, owner_token, lease_expires_at
 		FROM chat_request
 		WHERE user_id = ? AND request_id = ?
-	`, userID, requestID).Scan(&record.ConversationID, &record.Status, &record.ReservedAt)
+	`, userID, requestID).Scan(
+		&record.ConversationID,
+		&record.Status,
+		&record.ReservedAt,
+		&record.OwnerToken,
+		&record.LeaseExpiresAt,
+	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -72,15 +95,24 @@ func ReserveChatRequest(db *sql.DB, userID int64, requestID string, conversation
 		return &ChatRequestRecord{RequestID: requestID, ConversationID: conversationID}, true, nil
 	}
 
+	ownerToken, tokenErr := newChatRequestOwnerToken()
+	if tokenErr != nil {
+		return nil, false, tokenErr
+	}
 	now := time.Now().UnixMilli()
+	leaseExpiresAt := now + chatRequestLeaseDuration.Milliseconds()
 	_, err = globals.ExecDb(db, `
-		INSERT INTO chat_request (user_id, request_id, conversation_id, status, reserved_at)
-		VALUES (?, ?, ?, ?, ?)
-	`, userID, requestID, conversationID, ChatRequestReserved, now)
+		INSERT INTO chat_request (
+			user_id, request_id, conversation_id, status, reserved_at,
+			owner_token, lease_expires_at
+		)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, userID, requestID, conversationID, ChatRequestReserved, now, ownerToken, leaseExpiresAt)
 	if err == nil {
 		return &ChatRequestRecord{
 			RequestID: requestID, ConversationID: conversationID,
 			Status: ChatRequestReserved, ReservedAt: now,
+			OwnerToken: ownerToken, LeaseExpiresAt: leaseExpiresAt,
 		}, true, nil
 	}
 	if !isDuplicateChatRequestError(err) {
@@ -91,32 +123,112 @@ func ReserveChatRequest(db *sql.DB, userID int64, requestID string, conversation
 	if lookupErr != nil || record == nil {
 		return record, false, lookupErr
 	}
-	if record.Status != ChatRequestReserved {
+	persisted := LoadConversation(db, userID, record.ConversationID)
+	if persisted != nil && persisted.HasCompletedRequestID(requestID) {
+		if err := MarkChatRequestStatus(db, userID, requestID, record.ConversationID, ChatRequestCompleted); err != nil {
+			return nil, false, err
+		}
+		record.Status = ChatRequestCompleted
 		return record, false, nil
 	}
 
-	if persisted := LoadConversation(db, userID, record.ConversationID); persisted != nil && persisted.HasRequestID(requestID) {
-		_ = MarkChatRequestStatus(db, userID, requestID, record.ConversationID, ChatRequestAccepted)
-		record.Status = ChatRequestAccepted
+	if record.Status == ChatRequestCompleted {
+		return record, false, nil
+	}
+	if record.LeaseExpiresAt > now {
 		return record, false, nil
 	}
 
-	if time.Since(time.UnixMilli(record.ReservedAt)) <= chatRequestStaleAfter {
-		return record, false, nil
+	targetStatus := ChatRequestReserved
+	targetConversationID := conversationID
+	recovered := false
+	if persisted != nil && persisted.HasRequestID(requestID) {
+		targetStatus = ChatRequestAccepted
+		targetConversationID = record.ConversationID
+		recovered = true
 	}
 
 	result, deleteErr := globals.ExecDb(db, `
-		DELETE FROM chat_request
-		WHERE user_id = ? AND request_id = ? AND status = ? AND reserved_at = ?
-	`, userID, requestID, ChatRequestReserved, record.ReservedAt)
+		UPDATE chat_request
+		SET conversation_id = ?, status = ?, owner_token = ?, reserved_at = ?, lease_expires_at = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE user_id = ? AND request_id = ? AND status = ?
+			AND owner_token = ? AND lease_expires_at = ?
+	`, targetConversationID, targetStatus, ownerToken, now, leaseExpiresAt,
+		userID, requestID, record.Status, record.OwnerToken, record.LeaseExpiresAt)
 	if deleteErr != nil {
 		return nil, false, deleteErr
 	}
-	removed, rowsErr := result.RowsAffected()
-	if rowsErr != nil || removed == 0 {
+	updated, rowsErr := result.RowsAffected()
+	if rowsErr != nil || updated == 0 {
 		return record, false, rowsErr
 	}
-	return ReserveChatRequest(db, userID, requestID, conversationID)
+	record.Status = targetStatus
+	record.ConversationID = targetConversationID
+	record.ReservedAt = now
+	record.OwnerToken = ownerToken
+	record.LeaseExpiresAt = leaseExpiresAt
+	record.Recovered = recovered
+	return record, true, nil
+}
+
+func MarkChatRequestStatusOwned(
+	db *sql.DB,
+	userID int64,
+	requestID string,
+	conversationID int64,
+	ownerToken string,
+	status string,
+) (bool, error) {
+	requestID, err := normalizeChatRequestID(requestID)
+	ownerToken = strings.TrimSpace(ownerToken)
+	if err != nil || requestID == "" || ownerToken == "" || db == nil || userID < 0 {
+		return false, err
+	}
+	leaseExpiresAt := time.Now().Add(chatRequestLeaseDuration).UnixMilli()
+	result, err := globals.ExecDb(db, `
+		UPDATE chat_request
+		SET conversation_id = ?, status = ?, lease_expires_at = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE user_id = ? AND request_id = ? AND owner_token = ?
+			AND status <> ?
+	`, conversationID, status, leaseExpiresAt, userID, requestID, ownerToken, ChatRequestCompleted)
+	if err != nil {
+		return false, err
+	}
+	updated, err := result.RowsAffected()
+	return updated == 1, err
+}
+
+func RenewChatRequestLease(db *sql.DB, userID int64, requestID string, ownerToken string) (bool, error) {
+	requestID, err := normalizeChatRequestID(requestID)
+	ownerToken = strings.TrimSpace(ownerToken)
+	if err != nil || requestID == "" || ownerToken == "" || db == nil || userID < 0 {
+		return false, err
+	}
+	leaseExpiresAt := time.Now().Add(chatRequestLeaseDuration).UnixMilli()
+	result, err := globals.ExecDb(db, `
+		UPDATE chat_request
+		SET lease_expires_at = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE user_id = ? AND request_id = ? AND owner_token = ?
+			AND status <> ?
+	`, leaseExpiresAt, userID, requestID, ownerToken, ChatRequestCompleted)
+	if err != nil {
+		return false, err
+	}
+	updated, err := result.RowsAffected()
+	return updated == 1, err
+}
+
+func ReleaseChatRequestOwned(db *sql.DB, userID int64, requestID string, ownerToken string) error {
+	requestID, err := normalizeChatRequestID(requestID)
+	ownerToken = strings.TrimSpace(ownerToken)
+	if err != nil || requestID == "" || ownerToken == "" || db == nil || userID < 0 {
+		return err
+	}
+	_, err = globals.ExecDb(db, `
+		DELETE FROM chat_request
+		WHERE user_id = ? AND request_id = ? AND owner_token = ? AND status = ?
+	`, userID, requestID, ownerToken, ChatRequestReserved)
+	return err
 }
 
 func MarkChatRequestStatus(db *sql.DB, userID int64, requestID string, conversationID int64, status string) error {

@@ -11,7 +11,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"strconv"
 	"strings"
+	"sync/atomic"
+	"time"
 )
+
+const chatRequestAckCapability = "chat_request_ack_v1"
 
 type WebsocketAuthForm struct {
 	Token string `json:"token" binding:"required"`
@@ -110,6 +114,57 @@ func sendChatRequestState(conn *Connection, requestID string, conversationID int
 	})
 }
 
+type chatRequestLeaseGuard struct {
+	db         *sql.DB
+	userID     int64
+	requestID  string
+	ownerToken string
+	stop       chan struct{}
+	done       chan struct{}
+	lost       atomic.Bool
+}
+
+func startChatRequestLeaseGuard(db *sql.DB, userID int64, requestID string, ownerToken string) (*chatRequestLeaseGuard, bool) {
+	guard := &chatRequestLeaseGuard{
+		db: db, userID: userID, requestID: requestID, ownerToken: ownerToken,
+		stop: make(chan struct{}), done: make(chan struct{}),
+	}
+	if !guard.renew() {
+		return guard, false
+	}
+	go func() {
+		defer close(guard.done)
+		ticker := time.NewTicker(conversation.ChatRequestLeaseHeartbeatInterval())
+		defer ticker.Stop()
+		for {
+			select {
+			case <-guard.stop:
+				return
+			case <-ticker.C:
+				if !guard.renew() {
+					guard.lost.Store(true)
+					return
+				}
+			}
+		}
+	}()
+	return guard, true
+}
+
+func (g *chatRequestLeaseGuard) renew() bool {
+	owned, err := conversation.RenewChatRequestLease(g.db, g.userID, g.requestID, g.ownerToken)
+	return err == nil && owned
+}
+
+func (g *chatRequestLeaseGuard) stillOwns() bool {
+	return !g.lost.Load() && g.renew()
+}
+
+func (g *chatRequestLeaseGuard) close() {
+	close(g.stop)
+	<-g.done
+}
+
 func ChatAPI(c *gin.Context) {
 	var conn *utils.WebSocket
 	if conn = utils.NewWebsocket(c, false); conn == nil {
@@ -139,6 +194,11 @@ func ChatAPI(c *gin.Context) {
 	buf := NewConnection(conn, authenticated, hash, 10)
 	buf.Handle(func(form *conversation.FormMessage) error {
 		switch form.Type {
+		case CapabilitiesType:
+			_ = buf.SendClient(globals.ChatSegmentResponse{
+				ResponseType: "capabilities",
+				Capabilities: []string{chatRequestAckCapability},
+			})
 		case ChatType:
 			requestID := strings.TrimSpace(form.RequestID)
 			if form.Transient {
@@ -166,11 +226,14 @@ func ChatAPI(c *gin.Context) {
 					conversationID = record.ConversationID
 					status = record.Status
 				}
-				sendChatRequestState(buf, requestID, conversationID, status, accepted, !accepted, "", status == conversation.ChatRequestCompleted)
+				sendChatRequestState(buf, requestID, conversationID, status, accepted, !accepted, "", false)
 				break
 			}
+			messagePersisted := false
 			if hasPendingAskUserCall(instance) {
-				_ = conversation.ReleaseChatRequest(db, id, requestID)
+				if record != nil {
+					_ = conversation.ReleaseChatRequestOwned(db, id, requestID, record.OwnerToken)
+				}
 				sendChatRequestState(buf, requestID, instance.GetId(), "rejected", false, false, "Answer or skip the pending question before sending a new message.", true)
 				if requestID == "" {
 					_ = buf.SendClient(globals.ChatSegmentResponse{
@@ -179,24 +242,66 @@ func ChatAPI(c *gin.Context) {
 					})
 				}
 				break
+			} else if record != nil && record.Recovered {
+				instance = conversation.LoadConversation(db, id, record.ConversationID)
+				messagePersisted = instance != nil && instance.HasRequestID(requestID)
+			} else if requestID != "" && record != nil && !instance.Persisted {
+				messagePersisted = instance.HandleNewMessageWithRequest(db, form, record.OwnerToken)
+			} else {
+				messagePersisted = instance.HandleMessage(db, form)
 			}
-			if instance.HandleMessage(db, form) {
+			if messagePersisted {
 				if requestID != "" {
-					_ = conversation.MarkChatRequestStatus(db, id, requestID, instance.GetId(), conversation.ChatRequestAccepted)
+					owned := false
+					var err error
+					if record != nil {
+						owned, err = conversation.MarkChatRequestStatusOwned(
+							db, id, requestID, instance.GetId(), record.OwnerToken, conversation.ChatRequestAccepted,
+						)
+					}
+					if err != nil {
+						owned = false
+					}
+					if !owned {
+						sendChatRequestState(buf, requestID, instance.GetId(), conversation.ChatRequestReserved, false, true, "", false)
+						break
+					}
 					sendChatRequestState(buf, requestID, instance.GetId(), conversation.ChatRequestAccepted, true, false, "", false)
 				}
+
+				var lease *chatRequestLeaseGuard
+				if requestID != "" && record != nil {
+					var leaseOwned bool
+					lease, leaseOwned = startChatRequestLeaseGuard(db, id, requestID, record.OwnerToken)
+					if !leaseOwned {
+						sendChatRequestState(buf, requestID, instance.GetId(), conversation.ChatRequestReserved, false, true, "", false)
+						break
+					}
+				}
 				response := ChatHandler(buf, user, instance, false)
-				responseSaved := instance.SaveResponse(db, response)
+				response.RequestID = requestID
+				leaseOwned := lease == nil || lease.stillOwns()
+				responseSaved := leaseOwned && instance.SaveResponse(db, response)
 				if responseSaved {
 					if hasVisibleAssistantText(response) {
 						maybeAutoTitle(buf, user, instance)
 					}
 				}
 				if requestID != "" && responseSaved {
-					_ = conversation.MarkChatRequestStatus(db, id, requestID, instance.GetId(), conversation.ChatRequestCompleted)
+					completed, err := conversation.MarkChatRequestStatusOwned(
+						db, id, requestID, instance.GetId(), record.OwnerToken, conversation.ChatRequestCompleted,
+					)
+					if err == nil && completed {
+						sendChatRequestState(buf, requestID, instance.GetId(), conversation.ChatRequestCompleted, true, false, "", false)
+					}
+				}
+				if lease != nil {
+					lease.close()
 				}
 			} else if requestID != "" {
-				_ = conversation.ReleaseChatRequest(db, id, requestID)
+				if record != nil {
+					_ = conversation.ReleaseChatRequestOwned(db, id, requestID, record.OwnerToken)
+				}
 				sendChatRequestState(buf, requestID, instance.GetId(), conversation.ChatRequestReserved, false, true, "", false)
 			}
 		case StopType:

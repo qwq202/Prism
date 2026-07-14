@@ -89,6 +89,7 @@ type FormMessage struct {
 	CachedContent           string                 `json:"cachedContent,omitempty"`
 	CachedContentSnake      string                 `json:"cached_content,omitempty"`
 	Thinking                interface{}            `json:"thinking,omitempty"`
+	MaskContext             []globals.Message      `json:"mask_context,omitempty"`
 	ToolCallID              string                 `json:"tool_call_id,omitempty"`
 	ToolResult              json.RawMessage        `json:"tool_result,omitempty"`
 
@@ -469,6 +470,19 @@ func (c *Conversation) HasRequestID(requestID string) bool {
 	return false
 }
 
+func (c *Conversation) HasCompletedRequestID(requestID string) bool {
+	requestID = strings.TrimSpace(requestID)
+	if requestID == "" {
+		return false
+	}
+	for _, message := range c.Message {
+		if message.Role == globals.Assistant && message.RequestID == requestID {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *Conversation) GetMessageById(id int) globals.Message {
 	if !c.HasMessageId(id) {
 		return globals.Message{}
@@ -695,6 +709,16 @@ func (c *Conversation) AddMessageFromForm(form *FormMessage) error {
 		return errors.New("message is empty")
 	}
 
+	if len(c.Message) == 0 && len(form.MaskContext) > 0 {
+		for _, contextMessage := range form.MaskContext {
+			if strings.TrimSpace(contextMessage.Content) == "" {
+				continue
+			}
+			contextMessage.RequestID = ""
+			c.AddMessage(contextMessage)
+		}
+	}
+
 	message := globals.Message{
 		Role:           globals.User,
 		Content:        form.Message,
@@ -708,6 +732,10 @@ func (c *Conversation) AddMessageFromForm(form *FormMessage) error {
 }
 
 func (c *Conversation) HandleMessage(db *sql.DB, form *FormMessage) bool {
+	if c.Persisted && c.UserID != -1 && db != nil {
+		return c.appendPersistedFormMessage(db, form)
+	}
+
 	head := len(c.Message) == 0 || c.Name == defaultConversationName
 	previousName := c.Name
 	previousLength := len(c.Message)
@@ -724,6 +752,51 @@ func (c *Conversation) HandleMessage(db *sql.DB, form *FormMessage) bool {
 	// Keep the in-memory snapshot retry-safe when persistence fails.
 	c.Message = c.Message[:previousLength]
 	c.Name = previousName
+	return false
+}
+
+func (c *Conversation) appendPersistedFormMessage(db *sql.DB, form *FormMessage) bool {
+	for attempt := 0; attempt < 8; attempt++ {
+		stored := LoadConversation(db, c.UserID, c.Id)
+		if stored == nil {
+			return false
+		}
+		if stored.HasRequestID(form.RequestID) {
+			*c = *stored
+			return true
+		}
+
+		expectedData := utils.ToJson(stored.Message)
+		head := len(stored.Message) == 0 || stored.Name == defaultConversationName
+		if err := stored.AddMessageFromForm(form); err != nil {
+			return false
+		}
+		if head {
+			stored.Name = utils.Extract(form.Message, 50, "...")
+		}
+
+		var taskID sql.NullString
+		if stored.TaskID != "" {
+			taskID = sql.NullString{String: stored.TaskID, Valid: true}
+		}
+		result, err := globals.ExecDb(db, `
+			UPDATE conversation
+			SET conversation_name = ?, data = ?, model = ?, task_id = ?, updated_at = CURRENT_TIMESTAMP
+			WHERE user_id = ? AND conversation_id = ? AND data = ?
+		`, stored.Name, utils.ToJson(stored.Message), stored.Model, taskID, stored.UserID, stored.Id, expectedData)
+		if err != nil {
+			return false
+		}
+		updated, err := result.RowsAffected()
+		if err != nil {
+			return false
+		}
+		if updated == 1 {
+			*c = *stored
+			return true
+		}
+	}
+
 	return false
 }
 
@@ -766,7 +839,8 @@ func (c *Conversation) SaveResponse(db *sql.DB, message globals.Message) bool {
 
 	merged, ok := c.mergeResponseIntoStoredConversation(db, baseMessages, message)
 	if !ok {
-		return c.SaveConversation(db)
+		c.Message = baseMessages
+		return false
 	}
 
 	c.Message = merged
@@ -857,40 +931,51 @@ func mergeAssistantResponseMessages(existing []globals.Message, base []globals.M
 }
 
 func (c *Conversation) mergeResponseIntoStoredConversation(db *sql.DB, base []globals.Message, response globals.Message) ([]globals.Message, bool) {
-	stored := LoadConversation(db, c.UserID, c.Id)
-	if stored == nil {
-		return nil, false
+	for attempt := 0; attempt < 8; attempt++ {
+		stored := LoadConversation(db, c.UserID, c.Id)
+		if stored == nil {
+			return nil, false
+		}
+
+		expectedData := utils.ToJson(stored.GetMessage())
+		merged := mergeAssistantResponseMessages(stored.GetMessage(), base, response)
+		data := utils.ToJson(merged)
+		var taskID sql.NullString
+		if c.TaskID != "" {
+			taskID = sql.NullString{String: c.TaskID, Valid: true}
+		} else if stored.TaskID != "" {
+			taskID = sql.NullString{String: stored.TaskID, Valid: true}
+		}
+
+		name := stored.Name
+		if strings.TrimSpace(name) == "" || name == defaultConversationName {
+			name = c.Name
+		}
+		model := stored.Model
+		if strings.TrimSpace(model) == "" {
+			model = c.Model
+		}
+
+		result, err := globals.ExecDb(db, `
+			UPDATE conversation
+			SET conversation_name = ?, data = ?, model = ?, task_id = ?, updated_at = CURRENT_TIMESTAMP
+			WHERE user_id = ? AND conversation_id = ? AND data = ?
+		`, name, data, model, taskID, c.UserID, c.Id, expectedData)
+		if err != nil {
+			globals.Warn("failed to merge assistant response into stored conversation: " + err.Error())
+			return nil, false
+		}
+		updated, err := result.RowsAffected()
+		if err != nil {
+			return nil, false
+		}
+		if updated == 1 {
+			return merged, true
+		}
 	}
 
-	merged := mergeAssistantResponseMessages(stored.GetMessage(), base, response)
-	data := utils.ToJson(merged)
-	var taskID sql.NullString
-	if c.TaskID != "" {
-		taskID = sql.NullString{String: c.TaskID, Valid: true}
-	} else if stored.TaskID != "" {
-		taskID = sql.NullString{String: stored.TaskID, Valid: true}
-	}
-
-	name := stored.Name
-	if strings.TrimSpace(name) == "" || name == defaultConversationName {
-		name = c.Name
-	}
-	model := stored.Model
-	if strings.TrimSpace(model) == "" {
-		model = c.Model
-	}
-
-	_, err := globals.ExecDb(db, `
-		UPDATE conversation
-		SET conversation_name = ?, data = ?, model = ?, task_id = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE user_id = ? AND conversation_id = ?
-	`, name, data, model, taskID, c.UserID, c.Id)
-	if err != nil {
-		globals.Warn("failed to merge assistant response into stored conversation: " + err.Error())
-		return nil, false
-	}
-
-	return merged, true
+	globals.Warn("failed to merge assistant response after concurrent conversation updates")
+	return nil, false
 }
 
 func (c *Conversation) CountMessagesByRole(role string) int {

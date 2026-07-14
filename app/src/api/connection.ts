@@ -4,7 +4,11 @@ import { getErrorMessage } from "@/utils/base.ts";
 import { Mask } from "@/masks/types.ts";
 import type { TFunction } from "i18next";
 import { logClientEvent } from "@/utils/client-logger.ts";
-import { acknowledgePendingChatRequest } from "@/utils/chat-outbox.ts";
+import {
+  acknowledgePendingChatRequest,
+  getChatOutboxScope,
+  updatePendingChatRequestConversation,
+} from "@/utils/chat-outbox.ts";
 
 export const endpoint = `${websocketEndpoint}/chat`;
 export const maxRetry = 60; // 30s max websocket retry
@@ -12,6 +16,8 @@ export const maxConnection = 5;
 const staleConnectionMs = 45_000;
 const connectingTimeoutMs = 10_000;
 const requestAckRetryMs = 3_000;
+const requestCapabilityRetryMs = 5_000;
+const requestAckCapability = "chat_request_ack_v1";
 
 export type StreamMessage = {
   conversation?: number;
@@ -56,6 +62,7 @@ export type StreamMessage = {
     status: "start" | "executing" | "pending" | "success" | "error";
   };
   response_type?: string;
+  capabilities?: string[];
 };
 
 export type ChatProps = {
@@ -77,6 +84,7 @@ export type ChatProps = {
   openai_reasoning_summary?: string;
   response_format?: unknown;
   thinking?: unknown;
+  mask_context?: Array<{ role: string; content: string }>;
   web_search_mode?: "quick" | "detailed";
   web_page_summary?: boolean;
   think?: boolean;
@@ -106,7 +114,14 @@ type StreamCallback = (id: number, message: StreamMessage) => void;
 type PendingRequest = {
   t: TFunction | undefined;
   data: ChatProps;
+  scope: string;
+  pollAfterAccepted: boolean;
   timer?: ReturnType<typeof setTimeout>;
+};
+
+type PendingRequestOptions = {
+  scope?: string;
+  resumed?: boolean;
 };
 
 const connectionStacks = new Set<ConnectionStack>();
@@ -169,6 +184,7 @@ function summarizeChatProps(data: ChatProps): Record<string, unknown> {
     openai_reasoning_summary: data.openai_reasoning_summary,
     has_response_format: Boolean(data.response_format),
     has_thinking: Boolean(data.thinking),
+    mask_context_count: data.mask_context?.length,
     enable_mcp: data.enable_mcp,
     mcp_plugin_id: data.mcp_plugin_id,
   };
@@ -215,6 +231,9 @@ export class Connection {
   };
   protected disposed: boolean;
   protected pendingRequests: Map<string, PendingRequest>;
+  protected requestAckSupported?: boolean;
+  protected requestCapabilityTimer?: ReturnType<typeof setTimeout>;
+  protected incomingQueue: Promise<void>;
   public id: number;
   public state: boolean;
 
@@ -222,6 +241,8 @@ export class Connection {
     this.state = false;
     this.disposed = false;
     this.pendingRequests = new Map();
+    this.requestAckSupported = undefined;
+    this.incomingQueue = Promise.resolve();
     this.id = id;
     this.lastActivityAt = Date.now();
     this.streamStats = {
@@ -235,10 +256,21 @@ export class Connection {
 
   public init(): void {
     if (this.disposed) return;
+    const reconnecting = this.connection !== undefined;
+    if (reconnecting) {
+      this.pendingRequests.forEach((pending) => {
+        pending.pollAfterAccepted = true;
+      });
+    }
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = undefined;
     }
+    if (this.requestCapabilityTimer) {
+      clearTimeout(this.requestCapabilityTimer);
+      this.requestCapabilityTimer = undefined;
+    }
+    this.requestAckSupported = undefined;
     this.closeCurrentSocket();
 
     const socket = new WebSocket(endpoint);
@@ -260,12 +292,16 @@ export class Connection {
         token: getMemory(tokenField) || "anonymous",
         id: this.id,
       });
-      this.retryPendingRequests();
+      this.beginRequestCapabilityNegotiation();
     };
     socket.onclose = (event) => {
       if (socket !== this.connection) return;
       this.state = false;
       this.lastActivityAt = Date.now();
+      if (this.requestCapabilityTimer) {
+        clearTimeout(this.requestCapabilityTimer);
+        this.requestCapabilityTimer = undefined;
+      }
       if (this.disposed) return;
 
       this.stack = {
@@ -309,28 +345,31 @@ export class Connection {
       );
     };
     socket.onmessage = (event) => {
-      if (socket !== this.connection || this.disposed) return;
-      this.lastActivityAt = Date.now();
-      try {
-        const message = JSON.parse(event.data);
-        this.handleRequestState(message as StreamMessage);
-        this.triggerCallback(message as StreamMessage);
-      } catch (e) {
-        console.warn(
-          `[connection] failed to parse websocket message: ${getErrorMessage(e)}`,
-        );
-        logClientEvent(
-          "chat.websocket",
-          "parse-error",
-          {
-            id: this.id,
-            error: getErrorMessage(e),
-            raw_length:
-              typeof event.data === "string" ? event.data.length : undefined,
-          },
-          "warn",
-        );
-      }
+      this.incomingQueue = this.incomingQueue.then(async () => {
+        if (socket !== this.connection || this.disposed) return;
+        this.lastActivityAt = Date.now();
+        try {
+          const message = JSON.parse(event.data) as StreamMessage;
+          if (this.handleCapabilities(message)) return;
+          await this.handleRequestState(message);
+          this.triggerCallback(message);
+        } catch (e) {
+          console.warn(
+            `[connection] failed to parse websocket message: ${getErrorMessage(e)}`,
+          );
+          logClientEvent(
+            "chat.websocket",
+            "parse-error",
+            {
+              id: this.id,
+              error: getErrorMessage(e),
+              raw_length:
+                typeof event.data === "string" ? event.data.length : undefined,
+            },
+            "warn",
+          );
+        }
+      });
     };
   }
 
@@ -349,6 +388,7 @@ export class Connection {
     ) {
       socket.close();
     }
+    if (socket === this.connection) this.connection = undefined;
   }
 
   public reconnect(reason = "manual"): void {
@@ -420,6 +460,7 @@ export class Connection {
     t: TFunction | undefined,
     data: ChatProps,
     times?: number,
+    options?: PendingRequestOptions,
   ): void {
     const requestID = data.request_id?.trim();
     if (requestID && (data.type ?? "chat") === "chat") {
@@ -427,6 +468,9 @@ export class Connection {
       this.pendingRequests.set(requestID, {
         t,
         data,
+        scope: options?.scope ?? current?.scope ?? getChatOutboxScope(),
+        pollAfterAccepted:
+          options?.resumed ?? current?.pollAfterAccepted ?? false,
         timer: current?.timer,
       });
       this.flushPendingRequest(requestID);
@@ -501,6 +545,22 @@ export class Connection {
     if (!pending || this.disposed) return;
     if (pending.timer) clearTimeout(pending.timer);
 
+    if (pending.scope !== getChatOutboxScope()) {
+      this.pendingRequests.delete(requestID);
+      return;
+    }
+
+    if (
+      !this.connection ||
+      this.connection.readyState === WebSocket.CLOSED
+    ) {
+      this.init();
+    }
+
+    if (this.requestAckSupported !== true) {
+      return;
+    }
+
     let sent = false;
     try {
       sent = this.send(pending.data);
@@ -527,13 +587,52 @@ export class Connection {
     return this.pendingRequests.size > 0;
   }
 
-  protected retryPendingRequests(): void {
+  protected retryPendingRequests(resumed = false): void {
     this.pendingRequests.forEach((_pending, requestID) => {
+      if (resumed) {
+        const pending = this.pendingRequests.get(requestID);
+        if (pending) pending.pollAfterAccepted = true;
+      }
       this.flushPendingRequest(requestID);
     });
   }
 
-  protected handleRequestState(message: StreamMessage): void {
+  protected beginRequestCapabilityNegotiation(): void {
+    if (this.requestCapabilityTimer) {
+      clearTimeout(this.requestCapabilityTimer);
+    }
+    this.send({
+      type: "capabilities",
+      capabilities: [requestAckCapability],
+    });
+    this.requestCapabilityTimer = setTimeout(() => {
+      this.requestCapabilityTimer = undefined;
+      if (this.requestAckSupported !== undefined) return;
+      logClientEvent("chat.request", "capability-waiting", { id: this.id });
+      this.beginRequestCapabilityNegotiation();
+    }, requestCapabilityRetryMs);
+  }
+
+  protected handleCapabilities(message: StreamMessage): boolean {
+    if (message.response_type !== "capabilities") return false;
+    if (this.requestCapabilityTimer) {
+      clearTimeout(this.requestCapabilityTimer);
+      this.requestCapabilityTimer = undefined;
+    }
+    this.requestAckSupported = Boolean(
+      message.capabilities?.includes(requestAckCapability),
+    );
+    if (this.requestAckSupported) {
+      this.retryPendingRequests();
+    } else {
+      logClientEvent("chat.request", "capability-unsupported", {
+        id: this.id,
+      });
+    }
+    return true;
+  }
+
+  protected async handleRequestState(message: StreamMessage): Promise<void> {
     const requestID = message.request_id?.trim();
     if (!requestID) return;
 
@@ -546,15 +645,21 @@ export class Connection {
       conversation: message.conversation,
     });
 
-    if (
-      message.accepted ||
-      message.request_status === "rejected" ||
-      message.retryable === false
-    ) {
+    const pending = this.pendingRequests.get(requestID);
+    const scope = pending?.scope ?? getChatOutboxScope();
+
+    if (message.request_status === "completed") {
+      if (pending?.timer) clearTimeout(pending.timer);
+      this.pendingRequests.delete(requestID);
+      await acknowledgePendingChatRequest(requestID, scope);
+      return;
+    }
+
+    if (message.request_status === "rejected" || message.retryable === false) {
       const pending = this.pendingRequests.get(requestID);
       if (pending?.timer) clearTimeout(pending.timer);
       this.pendingRequests.delete(requestID);
-      void acknowledgePendingChatRequest(requestID).catch((error) => {
+      await acknowledgePendingChatRequest(requestID, scope).catch((error) => {
         logClientEvent(
           "chat.request",
           "outbox-ack-failed",
@@ -569,13 +674,23 @@ export class Connection {
       return;
     }
 
-    const pending = this.pendingRequests.get(requestID);
+    if (message.accepted && message.conversation && message.conversation > 0) {
+      await updatePendingChatRequestConversation(
+        requestID,
+        message.conversation,
+        scope,
+      );
+    }
+
     if (!pending) return;
     if (pending.timer) clearTimeout(pending.timer);
-    pending.timer = setTimeout(
-      () => this.flushPendingRequest(requestID),
-      requestAckRetryMs,
-    );
+    pending.timer =
+      !message.accepted || pending.pollAfterAccepted
+        ? setTimeout(
+            () => this.flushPendingRequest(requestID),
+            requestAckRetryMs,
+          )
+        : undefined;
     this.pendingRequests.set(requestID, pending);
   }
 
@@ -638,6 +753,10 @@ export class Connection {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = undefined;
     }
+    if (this.requestCapabilityTimer) {
+      clearTimeout(this.requestCapabilityTimer);
+      this.requestCapabilityTimer = undefined;
+    }
     this.pendingRequests.forEach((pending) => {
       if (pending.timer) clearTimeout(pending.timer);
     });
@@ -647,7 +766,7 @@ export class Connection {
       id: this.id,
       ready_state: this.connection.readyState,
     });
-    this.connection.close();
+    this.closeCurrentSocket();
   }
 
   public setCallback(callback?: StreamCallback): void {
@@ -709,10 +828,12 @@ export class Connection {
 export class ConnectionStack {
   protected connections: Connection[];
   protected callback?: StreamCallback;
+  protected authScope: string;
 
   public constructor(callback?: StreamCallback) {
     this.connections = [];
     this.callback = callback;
+    this.authScope = getChatOutboxScope();
     connectionStacks.add(this);
     attachConnectionLifecycleListeners();
   }
@@ -752,11 +873,23 @@ export class ConnectionStack {
     return conn;
   }
 
-  public send(id: number, t: TFunction | undefined, props: ChatProps) {
-    const conn = this.getConnection(id);
-    if (!conn) return false;
+  public bindAuthScope(scope = getChatOutboxScope()): void {
+    if (scope === this.authScope) return;
+    this.closeAll();
+    this.authScope = scope;
+  }
 
-    conn.sendWithRetry(t, props);
+  public send(
+    id: number,
+    t: TFunction | undefined,
+    props: ChatProps,
+    options?: PendingRequestOptions,
+  ) {
+    const scope = options?.scope ?? getChatOutboxScope();
+    this.bindAuthScope(scope);
+    const conn = this.getConnection(id) ?? this.createConnection(id);
+
+    conn.sendWithRetry(t, props, undefined, { ...options, scope });
     return true;
   }
 

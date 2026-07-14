@@ -183,6 +183,8 @@ type ChatSegmentResponse struct {
 	ToolCall      *ChatSegmentToolCall `json:"tool_call,omitempty"`
 	End           bool                 `json:"end"`
 	Plan          bool                 `json:"plan"`
+	ResponseType  string               `json:"response_type,omitempty"`
+	Capabilities  []string             `json:"capabilities,omitempty"`
 }
 
 type ListModels struct {

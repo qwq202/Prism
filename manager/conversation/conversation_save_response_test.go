@@ -28,6 +28,7 @@ func openConversationTestDB(t *testing.T, filename string) *sql.DB {
 		_ = db.Close()
 	})
 	connection.CreateConversationTable(db)
+	connection.CreateChatRequestTable(db)
 	return db
 }
 
@@ -269,6 +270,123 @@ func TestSaveResponseDoesNotDuplicateMergedAssistantResponse(t *testing.T) {
 		t.Fatalf("expected conversation to load")
 	}
 	assertMessageContents(t, loaded.GetMessage(), []string{"hello", "world"})
+}
+
+func TestHandleMessageMergesConcurrentPersistedSnapshots(t *testing.T) {
+	db := openConversationTestDB(t, "concurrent-user-message.db")
+	seed := &Conversation{
+		UserID:  1,
+		Id:      1,
+		Name:    "chat",
+		Model:   globals.GPT3Turbo,
+		Message: []globals.Message{{Role: globals.User, Content: "seed"}},
+	}
+	if !seed.SaveConversation(db) {
+		t.Fatalf("save seed conversation")
+	}
+
+	first := LoadConversation(db, 1, 1)
+	second := LoadConversation(db, 1, 1)
+	if first == nil || second == nil {
+		t.Fatalf("load concurrent snapshots")
+	}
+	if !first.HandleMessage(db, &FormMessage{Message: "first", Model: globals.GPT3Turbo, RequestID: "request-first"}) {
+		t.Fatalf("append first concurrent message")
+	}
+	if !second.HandleMessage(db, &FormMessage{Message: "second", Model: globals.GPT3Turbo, RequestID: "request-second"}) {
+		t.Fatalf("append second concurrent message")
+	}
+
+	loaded := LoadConversation(db, 1, 1)
+	if loaded == nil {
+		t.Fatalf("load merged conversation")
+	}
+	assertMessageContents(t, loaded.GetMessage(), []string{"seed", "first", "second"})
+}
+
+func TestHandleMessagePersistsMaskContextWithDurableRequest(t *testing.T) {
+	db := openConversationTestDB(t, "durable-mask-context.db")
+	instance := NewConversation(db, 1)
+	if !instance.HandleMessage(db, &FormMessage{
+		Message:   "hello",
+		Model:     globals.GPT3Turbo,
+		RequestID: "request-with-mask",
+		MaskContext: []globals.Message{
+			{Role: globals.System, Content: "follow the mask"},
+			{Role: globals.User, Content: "mask example"},
+		},
+	}) {
+		t.Fatalf("persist masked request")
+	}
+
+	loaded := LoadConversation(db, 1, instance.GetId())
+	if loaded == nil {
+		t.Fatalf("load masked request")
+	}
+	assertMessageContents(t, loaded.GetMessage(), []string{"follow the mask", "mask example", "hello"})
+	if loaded.GetLastMessage().RequestID != "request-with-mask" {
+		t.Fatalf("expected request metadata on user message, got %#v", loaded.GetLastMessage())
+	}
+}
+
+func TestHandleNewMessageBindsFinalConversationIDAtomically(t *testing.T) {
+	db := openConversationTestDB(t, "atomic-new-request.db")
+	instance := NewConversation(db, 1)
+	record, owner, err := ReserveChatRequest(db, 1, "atomic-request", instance.GetId())
+	if err != nil || !owner {
+		t.Fatalf("reserve new request: owner=%v record=%#v err=%v", owner, record, err)
+	}
+
+	collision := &Conversation{
+		UserID: 1, Id: instance.GetId(), Name: "collision", Model: globals.GPT3Turbo,
+		Message: []globals.Message{{Role: globals.User, Content: "existing"}},
+	}
+	if !collision.SaveConversation(db) {
+		t.Fatalf("create conversation id collision")
+	}
+	if !instance.HandleNewMessageWithRequest(db, &FormMessage{
+		Message: "atomic message", Model: globals.GPT3Turbo, RequestID: "atomic-request",
+	}, record.OwnerToken) {
+		t.Fatalf("persist and bind new request")
+	}
+	if instance.GetId() == collision.GetId() {
+		t.Fatalf("expected collision retry to allocate a final conversation id")
+	}
+
+	bound, err := LookupChatRequest(db, 1, "atomic-request")
+	if err != nil || bound == nil {
+		t.Fatalf("load bound request: %#v err=%v", bound, err)
+	}
+	if bound.ConversationID != instance.GetId() || bound.Status != ChatRequestAccepted {
+		t.Fatalf("expected request mapping to commit with conversation, got %#v", bound)
+	}
+	loaded := LoadConversation(db, 1, instance.GetId())
+	if loaded == nil || loaded.GetLastMessage().RequestID != "atomic-request" {
+		t.Fatalf("expected the atomic user message in the final conversation, got %#v", loaded)
+	}
+}
+
+func TestSaveResponseDoesNotRecreateDeletedConversation(t *testing.T) {
+	db := openConversationTestDB(t, "deleted-response.db")
+	instance := &Conversation{
+		UserID:  1,
+		Id:      1,
+		Name:    "chat",
+		Model:   globals.GPT3Turbo,
+		Message: []globals.Message{{Role: globals.User, Content: "delete me"}},
+	}
+	if !instance.SaveConversation(db) {
+		t.Fatalf("save conversation")
+	}
+	if !instance.DeleteConversation(db) {
+		t.Fatalf("delete conversation")
+	}
+	if instance.SaveResponse(db, globals.Message{Content: "late response"}) {
+		t.Fatalf("late response must not recreate a deleted conversation")
+	}
+	if loaded := LoadConversation(db, 1, 1); loaded != nil {
+		t.Fatalf("expected deleted conversation to stay deleted, got %#v", loaded)
+	}
 }
 
 func TestSaveConversationQueryUpdatesModelColumn(t *testing.T) {

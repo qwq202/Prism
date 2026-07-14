@@ -239,6 +239,72 @@ func (c *Conversation) SaveConversation(db *sql.DB) bool {
 	return true
 }
 
+// HandleNewMessageWithRequest atomically persists the first user message and
+// binds the idempotency record to the final conversation id. This closes the
+// allocation race where insertNewConversation may have to change c.Id after a
+// duplicate-key conflict.
+func (c *Conversation) HandleNewMessageWithRequest(db *sql.DB, form *FormMessage, ownerToken string) bool {
+	if db == nil || c.UserID < 0 || c.Persisted || strings.TrimSpace(form.RequestID) == "" || strings.TrimSpace(ownerToken) == "" {
+		return false
+	}
+
+	previousName := c.Name
+	previousLength := len(c.Message)
+	if err := c.AddMessageFromForm(form); err != nil {
+		return false
+	}
+	if previousLength == 0 || c.Name == defaultConversationName {
+		c.Name = utils.Extract(form.Message, 50, "...")
+	}
+	data := utils.ToJson(c.GetMessage())
+	var taskID sql.NullString
+	if c.TaskID != "" {
+		taskID = sql.NullString{String: c.TaskID, Valid: true}
+	}
+
+	for attempt := 0; attempt < 5; attempt++ {
+		tx, err := db.Begin()
+		if err != nil {
+			break
+		}
+		if _, err = globals.ExecTx(tx, insertConversationQuery, c.UserID, c.Id, c.Name, data, c.Model, taskID); err != nil {
+			_ = tx.Rollback()
+			if !isDuplicateConversationIDError(err) {
+				break
+			}
+			c.Id = GetConversationLengthByUserID(db, c.UserID) + 1
+			continue
+		}
+
+		leaseExpiresAt := time.Now().Add(chatRequestLeaseDuration).UnixMilli()
+		result, err := globals.ExecTx(tx, `
+			UPDATE chat_request
+			SET conversation_id = ?, status = ?, lease_expires_at = ?, updated_at = CURRENT_TIMESTAMP
+			WHERE user_id = ? AND request_id = ? AND owner_token = ? AND status = ?
+		`, c.Id, ChatRequestAccepted, leaseExpiresAt,
+			c.UserID, strings.TrimSpace(form.RequestID), strings.TrimSpace(ownerToken), ChatRequestReserved)
+		if err != nil {
+			_ = tx.Rollback()
+			break
+		}
+		updated, err := result.RowsAffected()
+		if err != nil || updated != 1 {
+			_ = tx.Rollback()
+			break
+		}
+		if err := tx.Commit(); err != nil {
+			break
+		}
+
+		c.Persisted = true
+		return true
+	}
+
+	c.Message = c.Message[:previousLength]
+	c.Name = previousName
+	return false
+}
+
 func (c *Conversation) insertNewConversation(db *sql.DB, data string, taskID sql.NullString) bool {
 	for attempt := 0; attempt < 5; attempt++ {
 		stmt, err := globals.PrepareDb(db, insertConversationQuery)

@@ -416,6 +416,55 @@ export async function removeClientCache(key: string): Promise<void> {
   writeCacheUpdateSignal(storageKey);
 }
 
+export type ClientCacheEntry<T> = {
+  key: string;
+  data: T;
+};
+
+export async function listClientCachesByPrefix<T>(
+  keyPrefix: string,
+): Promise<ClientCacheEntry<T>[]> {
+  if (!isBrowser()) return [];
+
+  const storagePrefix = getCacheKey(keyPrefix);
+  const logicalKeys = new Set<string>();
+  const store = getCacheStore();
+
+  if (store) {
+    try {
+      const keys = await store.keys();
+      keys
+        .filter(
+          (key) =>
+            key.startsWith(storagePrefix) &&
+            !key.endsWith(cacheUpdateSignalSuffix),
+        )
+        .forEach((key) => logicalKeys.add(key.slice(cachePrefix.length)));
+    } catch (error) {
+      console.debug(
+        "[client-cache] failed to list IndexedDB cache prefix",
+        keyPrefix,
+        error,
+      );
+    }
+  }
+
+  listLegacyCacheStorageKeys()
+    .filter(
+      (key) =>
+        key.startsWith(storagePrefix) &&
+        !key.endsWith(cacheUpdateSignalSuffix),
+    )
+    .forEach((key) => logicalKeys.add(key.slice(cachePrefix.length)));
+
+  const entries: ClientCacheEntry<T>[] = [];
+  for (const key of logicalKeys) {
+    const data = await getClientCache<T>(key);
+    if (data !== undefined) entries.push({ key, data });
+  }
+  return entries;
+}
+
 export async function removeClientCachesByPrefix(
   keyPrefix: string,
 ): Promise<void> {

@@ -158,14 +158,19 @@ func newAskUserUpstream() (*httptest.Server, *int32) {
 func readWebsocketResponse(t *testing.T, conn *websocket.Conn) globals.ChatSegmentResponse {
 	t.Helper()
 
-	_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	for {
+		_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 
-	var response globals.ChatSegmentResponse
-	if err := conn.ReadJSON(&response); err != nil {
-		t.Fatalf("read websocket response: %v", err)
+		var response globals.ChatSegmentResponse
+		if err := conn.ReadJSON(&response); err != nil {
+			t.Fatalf("read websocket response: %v", err)
+		}
+		if response.ResponseType == "capabilities" {
+			continue
+		}
+
+		return response
 	}
-
-	return response
 }
 
 func waitForConversationMessages(t *testing.T, db *sql.DB, userID int64, conversationID int64, count int) *conversation.Conversation {
@@ -604,7 +609,7 @@ func TestChatAPIWebsocketDuplicateRequestIDDoesNotRegenerate(t *testing.T) {
 		if response.Conversation != 0 {
 			conversationID = response.Conversation
 		}
-		if response.End {
+		if response.RequestID == requestID && response.RequestStatus == conversation.ChatRequestCompleted {
 			break
 		}
 	}
@@ -616,6 +621,9 @@ func TestChatAPIWebsocketDuplicateRequestIDDoesNotRegenerate(t *testing.T) {
 	persisted := waitForConversationMessages(t, env.db, env.rootID, conversationID, 2)
 	if persisted.GetMessage()[0].RequestID != requestID {
 		t.Fatalf("expected request id on persisted user message, got %#v", persisted.GetMessage()[0])
+	}
+	if persisted.GetMessage()[1].RequestID != requestID {
+		t.Fatalf("expected request id on persisted assistant message, got %#v", persisted.GetMessage()[1])
 	}
 
 	replay := env.dial(t, conversationID)
@@ -630,7 +638,7 @@ func TestChatAPIWebsocketDuplicateRequestIDDoesNotRegenerate(t *testing.T) {
 	}
 
 	response := readWebsocketResponse(t, replay)
-	if response.RequestID != requestID || response.RequestStatus != conversation.ChatRequestCompleted || !response.Accepted || !response.End {
+	if response.RequestID != requestID || response.RequestStatus != conversation.ChatRequestCompleted || !response.Accepted || response.End {
 		t.Fatalf("unexpected replay acknowledgement: %#v", response)
 	}
 	if got := atomic.LoadInt32(env.requestCount); got != 1 {
@@ -638,5 +646,33 @@ func TestChatAPIWebsocketDuplicateRequestIDDoesNotRegenerate(t *testing.T) {
 	}
 	if got := waitForConversationMessages(t, env.db, env.rootID, conversationID, 2).GetMessageLength(); got != 2 {
 		t.Fatalf("expected replay to preserve exactly two messages, got %d", got)
+	}
+}
+
+func TestChatAPIWebsocketDeclaresRequestAckCapability(t *testing.T) {
+	env := newWebsocketChatTestEnv(t)
+	conn := env.dial(t, -1)
+	defer conn.Close()
+	if err := conn.WriteJSON(conversation.FormMessage{Type: CapabilitiesType}); err != nil {
+		t.Fatalf("request capability frame: %v", err)
+	}
+
+	_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	var response globals.ChatSegmentResponse
+	if err := conn.ReadJSON(&response); err != nil {
+		t.Fatalf("read capability frame: %v", err)
+	}
+	if response.ResponseType != "capabilities" {
+		t.Fatalf("expected capabilities frame, got %#v", response)
+	}
+	found := false
+	for _, capability := range response.Capabilities {
+		if capability == chatRequestAckCapability {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected request ACK capability, got %#v", response.Capabilities)
 	}
 }

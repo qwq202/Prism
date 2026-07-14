@@ -253,6 +253,8 @@ func CreateChatRequestTable(db *sql.DB) {
 		  conversation_id INT,
 		  status VARCHAR(24) NOT NULL DEFAULT 'reserved',
 		  reserved_at BIGINT NOT NULL,
+		  owner_token VARCHAR(64) NOT NULL DEFAULT '',
+		  lease_expires_at BIGINT NOT NULL DEFAULT 0,
 		  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		  PRIMARY KEY (user_id, request_id)
 		);

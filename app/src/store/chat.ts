@@ -49,8 +49,10 @@ import {
   clearPendingChatRequestsForConversation,
   createChatRequestID,
   enqueuePendingChatRequest,
+  getChatOutboxScope,
   getPendingChatRequests,
 } from "@/utils/chat-outbox.ts";
+import { selectAuthenticated } from "@/store/auth.ts";
 import { isHiddenToolCallName } from "@/api/tool-calls.ts";
 import {
   type AskUserResult,
@@ -2069,6 +2071,7 @@ export function useMessageActions() {
   const persona_about_user = useSelector(personaAboutUserSelector);
   const memory_enabled = useSelector(memoryEnabledSelector);
   const memory_history_enabled = useSelector(memoryHistoryEnabledSelector);
+  const authenticated = useSelector(selectAuthenticated);
 
   const personalizationInstruction = buildPersonalizationInstruction({
     persona_style,
@@ -2204,11 +2207,13 @@ export function useMessageActions() {
 
       logClientEvent("chat.action", "send-start", requestSummary);
 
+      const outboxScope = getChatOutboxScope();
+      stack.bindAuthScope(outboxScope);
       if (!stack.hasConnection(current)) {
         stack.createConnection(current);
       }
 
-      const requestID = createChatRequestID();
+      const requestID = authenticated ? createChatRequestID() : undefined;
       const chatProps: ChatProps = {
         type: "chat",
         request_id: requestID,
@@ -2249,6 +2254,8 @@ export function useMessageActions() {
           : undefined,
         response_format: requestOptions?.response_format,
         thinking: requestOptions?.thinking,
+        mask_context:
+          current === -1 && mask?.context.length ? mask.context : undefined,
         model: targetModel,
         context: history,
         ignore_context: !context,
@@ -2264,25 +2271,28 @@ export function useMessageActions() {
         repetition_penalty,
       };
 
-      try {
-        await enqueuePendingChatRequest({
-          requestId: requestID,
-          conversationId: current,
-          props: chatProps,
-          createdAt: Date.now(),
-        });
-      } catch (error) {
-        logClientEvent(
-          "chat.action",
-          "outbox-persist-failed",
-          {
-            ...requestSummary,
-            request_id: requestID,
-            error: String(error),
-          },
-          "error",
-        );
-        return false;
+      if (requestID) {
+        try {
+          await enqueuePendingChatRequest({
+            requestId: requestID,
+            conversationId: current,
+            props: chatProps,
+            createdAt: Date.now(),
+            scope: outboxScope,
+          });
+        } catch (error) {
+          logClientEvent(
+            "chat.action",
+            "outbox-persist-failed",
+            {
+              ...requestSummary,
+              request_id: requestID,
+              error: String(error),
+            },
+            "error",
+          );
+          return false;
+        }
       }
 
       if (current === -1 && mask && mask.context.length > 0) {
@@ -2290,7 +2300,9 @@ export function useMessageActions() {
         dispatch(fillMaskItem());
       }
 
-      const state = stack.send(current, t, chatProps);
+      const state = stack.send(current, t, chatProps, {
+        scope: outboxScope,
+      });
       if (!state) {
         logClientEvent(
           "chat.action",
@@ -2334,12 +2346,15 @@ export function useMessageActions() {
       return true;
     },
     resumePending: async () => {
-      const pending = await getPendingChatRequests();
+      if (!authenticated) return 0;
+      const scope = getChatOutboxScope();
+      stack.bindAuthScope(scope);
+      const pending = await getPendingChatRequests(scope);
       for (const request of pending) {
-        if (!stack.hasConnection(request.conversationId)) {
-          stack.createConnection(request.conversationId);
-        }
-        stack.send(request.conversationId, t, request.props);
+        stack.send(request.conversationId, t, request.props, {
+          scope: request.scope,
+          resumed: true,
+        });
       }
       if (pending.length > 0) {
         logClientEvent("chat.action", "outbox-resumed", {
@@ -2658,7 +2673,11 @@ export function useMessageActions() {
         dispatch(renameHistory({ id, name: message.title }));
       }
 
-      if (id !== -1 && message.request_id && message.accepted) {
+      if (
+        id !== -1 &&
+        message.request_id &&
+        message.request_status === "completed"
+      ) {
         await refresh({ useCache: false });
       }
 

@@ -20,6 +20,7 @@ import {
   selectCurrent,
   selectModel,
   selectSupportModels,
+  stack,
   useMessageActions,
   useMessages,
   usePendingAskUser,
@@ -54,6 +55,7 @@ import { VoiceAction } from "@/components/VoiceProvider.tsx";
 import { AnimatePresence, motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { blobEvent, filePanelEvent } from "@/events/blob.ts";
+import { getChatOutboxScope } from "@/utils/chat-outbox.ts";
 
 const loadChatInterface = () => import("@/components/home/ChatInterface.tsx");
 let chatInterfacePromise: ReturnType<typeof loadChatInterface> | undefined;
@@ -193,12 +195,13 @@ function ChatWrapper() {
     if (!init) return;
 
     const resume = () => {
+      stack.bindAuthScope(getChatOutboxScope());
       void resumePendingRef.current();
     };
     resume();
     window.addEventListener("online", resume);
     return () => window.removeEventListener("online", resume);
-  }, [init]);
+  }, [auth, init]);
 
   useEffect(() => {
     const openFilePanel = (event: DragEvent) => {

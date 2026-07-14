@@ -132,6 +132,20 @@ func doMysqlMigration(execer migrationExecer) error {
 		return err
 	}
 
+	if err := execSql(execer, `
+		ALTER TABLE chat_request
+		ADD COLUMN owner_token VARCHAR(64) NOT NULL DEFAULT '';
+	`); err != nil {
+		return err
+	}
+
+	if err := execSql(execer, `
+		ALTER TABLE chat_request
+		ADD COLUMN lease_expires_at BIGINT NOT NULL DEFAULT 0;
+	`); err != nil {
+		return err
+	}
+
 	// add batch_id to redeem table for batch history tracking
 	if err := execSql(execer, `
 		ALTER TABLE redeem
@@ -243,6 +257,20 @@ func doSqliteMigration(execer migrationExecer) error {
 	if err := execSql(execer, `
 		ALTER TABLE conversation
 		ADD COLUMN favorite BOOLEAN DEFAULT FALSE;
+	`); err != nil {
+		return err
+	}
+
+	if err := execSql(execer, `
+		ALTER TABLE chat_request
+		ADD COLUMN owner_token VARCHAR(64) NOT NULL DEFAULT '';
+	`); err != nil {
+		return err
+	}
+
+	if err := execSql(execer, `
+		ALTER TABLE chat_request
+		ADD COLUMN lease_expires_at BIGINT NOT NULL DEFAULT 0;
 	`); err != nil {
 		return err
 	}

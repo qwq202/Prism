@@ -40,13 +40,19 @@ func TestReserveChatRequestDeduplicatesAndRecoversPersistedMessage(t *testing.T)
 	}) {
 		t.Fatalf("persist request message")
 	}
+	accepted, err := MarkChatRequestStatusOwned(
+		db, userID, requestID, instance.GetId(), record.OwnerToken, ChatRequestAccepted,
+	)
+	if err != nil || !accepted {
+		t.Fatalf("mark request accepted: accepted=%v err=%v", accepted, err)
+	}
 
 	recovered, recoveredOwner, err := ReserveChatRequest(db, userID, requestID, instance.GetId())
 	if err != nil {
 		t.Fatalf("recover persisted request: %v", err)
 	}
 	if recoveredOwner || recovered.Status != ChatRequestAccepted {
-		t.Fatalf("expected persisted duplicate to recover as accepted, got owner=%v record=%#v", recoveredOwner, recovered)
+		t.Fatalf("expected persisted duplicate to recover as accepted without a second owner, got owner=%v record=%#v", recoveredOwner, recovered)
 	}
 
 	stored := LoadConversation(db, userID, instance.GetId())
@@ -58,15 +64,36 @@ func TestReserveChatRequestDeduplicatesAndRecoversPersistedMessage(t *testing.T)
 		t.Fatalf("unexpected persisted request message: %#v", message)
 	}
 
-	if err := MarkChatRequestStatus(db, userID, requestID, instance.GetId(), ChatRequestCompleted); err != nil {
-		t.Fatalf("mark request completed: %v", err)
+	staleAt := time.Now().Add(-time.Second).UnixMilli()
+	if _, err := globals.ExecDb(db, `
+		UPDATE chat_request SET lease_expires_at = ?, status = ?
+		WHERE user_id = ? AND request_id = ?
+	`, staleAt, ChatRequestAccepted, userID, requestID); err != nil {
+		t.Fatalf("age accepted request: %v", err)
 	}
-	completed, err := LookupChatRequest(db, userID, requestID)
+	aged, agedOwner, err := ReserveChatRequest(db, userID, requestID, instance.GetId())
 	if err != nil {
-		t.Fatalf("lookup completed request: %v", err)
+		t.Fatalf("inspect old accepted request: %v", err)
 	}
-	if completed == nil || completed.Status != ChatRequestCompleted {
-		t.Fatalf("expected completed request, got %#v", completed)
+	if !agedOwner || !aged.Recovered || aged.Status != ChatRequestAccepted || aged.OwnerToken == record.OwnerToken {
+		t.Fatalf("expected expired accepted request to receive a fenced recovery owner, got owner=%v record=%#v", agedOwner, aged)
+	}
+	if oldOwned, err := MarkChatRequestStatusOwned(
+		db, userID, requestID, instance.GetId(), record.OwnerToken, ChatRequestCompleted,
+	); err != nil || oldOwned {
+		t.Fatalf("expected the expired owner token to be fenced, owned=%v err=%v", oldOwned, err)
+	}
+
+	stored.AddMessage(globals.Message{Role: globals.Assistant, Content: "done", RequestID: requestID})
+	if !stored.SaveConversation(db) {
+		t.Fatalf("persist completed assistant response")
+	}
+	completed, completedOwner, err := ReserveChatRequest(db, userID, requestID, instance.GetId())
+	if err != nil {
+		t.Fatalf("recover completed request: %v", err)
+	}
+	if completedOwner || completed.Status != ChatRequestCompleted {
+		t.Fatalf("expected assistant metadata to recover completion, got owner=%v record=%#v", completedOwner, completed)
 	}
 
 	if !stored.DeleteConversation(db) {
@@ -94,9 +121,9 @@ func TestReserveChatRequestReclaimsStaleUnpersistedReservation(t *testing.T) {
 		t.Fatalf("reserve request: owner=%v record=%#v err=%v", owner, record, err)
 	}
 
-	staleAt := time.Now().Add(-chatRequestStaleAfter - time.Second).UnixMilli()
+	staleAt := time.Now().Add(-time.Second).UnixMilli()
 	if _, err := globals.ExecDb(db, `
-		UPDATE chat_request SET reserved_at = ?
+		UPDATE chat_request SET lease_expires_at = ?
 		WHERE user_id = ? AND request_id = ?
 	`, staleAt, userID, requestID); err != nil {
 		t.Fatalf("age reservation: %v", err)
@@ -106,7 +133,7 @@ func TestReserveChatRequestReclaimsStaleUnpersistedReservation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reclaim stale request: %v", err)
 	}
-	if !reclaimedOwner || reclaimed.ConversationID != 2 || reclaimed.Status != ChatRequestReserved {
+	if !reclaimedOwner || reclaimed.ConversationID != 2 || reclaimed.Status != ChatRequestReserved || reclaimed.OwnerToken == record.OwnerToken {
 		t.Fatalf("expected stale reservation to be reclaimed, got owner=%v record=%#v", reclaimedOwner, reclaimed)
 	}
 }
