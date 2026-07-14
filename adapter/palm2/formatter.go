@@ -134,32 +134,84 @@ func getGeminiFunctionCallPart(name string, arguments string) GeminiChatPart {
 	}
 }
 
-func getToolNameByID(history []globals.Message, id string) string {
-	for _, message := range history {
+func getToolCallByID(history []globals.Message, id string) (*globals.Message, int, bool) {
+	for messageIndex := range history {
+		message := &history[messageIndex]
 		if message.ToolCalls == nil {
 			continue
 		}
 
-		for _, call := range *message.ToolCalls {
+		for callIndex, call := range *message.ToolCalls {
 			if call.Id == id {
-				return call.Function.Name
+				return message, callIndex, true
 			}
 		}
 	}
 
-	return ""
+	return nil, -1, false
 }
 
-func getGeminiToolResponsePart(history []globals.Message, message globals.Message) *GeminiChatPart {
+func geminiRequiresThoughtSignatures(model string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(model))
+	normalized = strings.TrimPrefix(normalized, "models/")
+	return strings.HasPrefix(normalized, "gemini-3")
+}
+
+func geminiFunctionCallCount(message globals.Message) int {
+	if message.ToolCalls != nil {
+		return len(*message.ToolCalls)
+	}
+	if message.FunctionCall != nil {
+		return 1
+	}
+	return 0
+}
+
+func hasCompleteGeminiFunctionCallSignatures(model string, message globals.Message) bool {
+	if !geminiRequiresThoughtSignatures(model) {
+		return true
+	}
+
+	callCount := geminiFunctionCallCount(message)
+	if callCount == 0 {
+		return true
+	}
+
+	metadata := message.GeminiHiddenMetadata.Normalized(globals.GeminiThoughtSignatureLimit)
+	return metadata != nil && len(metadata.ThoughtSignatures) >= callCount
+}
+
+func getGeminiFallbackToolResponsePart(name string, content string) *GeminiChatPart {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return nil
+	}
+
+	text := fmt.Sprintf("The user supplied this result for the %s tool:\n%s", name, content)
+	return &GeminiChatPart{Text: &text}
+}
+
+func getGeminiToolResponsePart(model string, history []globals.Message, message globals.Message) *GeminiChatPart {
 	name := ""
+	replayable := true
 	if message.Name != nil {
 		name = *message.Name
+		if geminiRequiresThoughtSignatures(model) {
+			replayable = false
+		}
 	} else if message.ToolCallId != nil {
-		name = getToolNameByID(history, *message.ToolCallId)
+		assistant, callIndex, found := getToolCallByID(history, *message.ToolCallId)
+		if found && assistant.ToolCalls != nil && callIndex >= 0 && callIndex < len(*assistant.ToolCalls) {
+			name = (*assistant.ToolCalls)[callIndex].Function.Name
+			replayable = hasCompleteGeminiFunctionCallSignatures(model, *assistant)
+		}
 	}
 
 	if len(name) == 0 {
 		return nil
+	}
+	if !replayable {
+		return getGeminiFallbackToolResponsePart(name, message.Content)
 	}
 
 	return &GeminiChatPart{
@@ -239,16 +291,22 @@ func getGeminiParts(model string, history []globals.Message, message globals.Mes
 	var parts []GeminiChatPart
 
 	if message.ToolCalls != nil && len(*message.ToolCalls) > 0 {
+		if !hasCompleteGeminiFunctionCallSignatures(model, message) {
+			return getGeminiContent(make([]GeminiChatPart, 0), message.Content, model)
+		}
 		parts = make([]GeminiChatPart, 0, len(*message.ToolCalls))
 		for _, call := range *message.ToolCalls {
 			parts = append(parts, getGeminiFunctionCallPart(call.Function.Name, call.Function.Arguments))
 		}
 	} else if message.FunctionCall != nil {
+		if !hasCompleteGeminiFunctionCallSignatures(model, message) {
+			return getGeminiContent(make([]GeminiChatPart, 0), message.Content, model)
+		}
 		parts = []GeminiChatPart{
 			getGeminiFunctionCallPart(message.FunctionCall.Name, message.FunctionCall.Arguments),
 		}
 	} else if message.Role == globals.Tool {
-		part := getGeminiToolResponsePart(history, message)
+		part := getGeminiToolResponsePart(model, history, message)
 		if part != nil {
 			parts = []GeminiChatPart{*part}
 		}

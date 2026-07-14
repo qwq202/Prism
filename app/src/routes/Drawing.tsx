@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Wand2,
   Plus,
@@ -137,6 +138,27 @@ const WORKSPACE_ACCENTS = [
     idle: "from-sky-500/8 to-indigo-500/6",
   },
 ];
+
+const drawingPageVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      duration: 0.15,
+      when: "beforeChildren",
+      staggerChildren: 0.08,
+    },
+  },
+};
+
+const drawingSectionVariants = {
+  hidden: { opacity: 0, y: 18 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.4, ease: "easeOut" },
+  },
+};
 
 type DrawingOptionSelectProps<T extends string> = {
   icon: ComponentType<{ className?: string }>;
@@ -291,6 +313,7 @@ function DrawingOptionSelect<T extends string>({
 
 function Drawing() {
   const { t, i18n } = useTranslation();
+  const reduceMotion = useReducedMotion();
   const supportModels = useSelector(selectSupportModels);
   const [requestedDrawingModelId] = useState(getRequestedDrawingModelId);
   const handledRequestedDrawingModel = useRef(false);
@@ -1390,7 +1413,8 @@ function Drawing() {
   ) : null;
 
   const renderWorkspaceRail = (vertical: boolean) => (
-    <aside
+    <motion.aside
+      variants={drawingSectionVariants}
       className={cn(
         "z-20 shrink-0 border-border/60 bg-card/70",
         vertical
@@ -1525,12 +1549,15 @@ function Drawing() {
           <Trash2 className="h-4 w-4" />
         </button>
       )}
-    </aside>
+    </motion.aside>
   );
 
   return (
-    <div
+    <motion.div
       className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background text-foreground lg:flex-row"
+      variants={drawingPageVariants}
+      initial={reduceMotion ? false : "hidden"}
+      animate="visible"
       onPaste={(event) => {
         if (!canAcceptReferences) return;
         const pastedImages = getClipboardImageFiles(event.clipboardData);
@@ -1540,12 +1567,18 @@ function Drawing() {
         blobEvent.emit(pastedImages);
       }}
     >
-      <aside className="z-10 hidden min-h-0 w-72 shrink-0 flex-col border-r border-border/60 bg-card/50 lg:flex">
+      <motion.aside
+        variants={drawingSectionVariants}
+        className="z-10 hidden min-h-0 w-72 shrink-0 flex-col border-r border-border/60 bg-card/50 lg:flex"
+      >
         <div className="flex-1 overflow-y-auto p-5">{settingsPanel}</div>
-      </aside>
+      </motion.aside>
 
       {/* Main Area */}
-      <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <motion.main
+        variants={drawingSectionVariants}
+        className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+      >
         <div className="relative z-30 flex h-14 shrink-0 items-center justify-between border-b border-border/60 bg-background px-3 lg:hidden">
           <button
             type="button"
@@ -1760,12 +1793,6 @@ function Drawing() {
                     <p className="mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">
                       {t("drawing.noModelsPrompt")}
                     </p>
-                    <a
-                      href="/model"
-                      className="mt-5 inline-flex h-10 items-center rounded-xl bg-foreground px-4 text-sm font-medium text-background transition-opacity hover:opacity-85"
-                    >
-                      {t("drawing.goSettings")}
-                    </a>
                   </div>
                 ) : generatedImages.length === 0 &&
                   !activeWorkspacePending &&
@@ -2090,7 +2117,7 @@ function Drawing() {
             </div>
           </div>
         </div>
-      </main>
+      </motion.main>
 
       {renderWorkspaceRail(false)}
       {renderWorkspaceRail(true)}
@@ -2294,7 +2321,7 @@ function Drawing() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </motion.div>
   );
 }
 

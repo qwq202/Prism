@@ -3,6 +3,7 @@ package palm2
 import (
 	adaptercommon "chat/adapter/common"
 	"chat/globals"
+	"strings"
 	"testing"
 )
 
@@ -74,7 +75,75 @@ func TestGetGeminiContentsReplaySignaturesOnFunctionCalls(t *testing.T) {
 	}
 }
 
-func TestGetGeminiContentsWithoutMetadataKeepsLegacySameRoleMerge(t *testing.T) {
+func TestGetGeminiContentsFallsBackWhenGemini3ToolSignatureIsMissing(t *testing.T) {
+	instance := &ChatInstance{}
+	callID := "call-ask-user"
+	toolCalls := globals.ToolCalls{
+		{
+			Type: "function",
+			Id:   callID,
+			Function: globals.ToolCallFunction{
+				Name:      "ask_user",
+				Arguments: `{"questions":[{"id":"genre"}]}`,
+			},
+		},
+	}
+
+	messages := []globals.Message{
+		{Role: globals.User, Content: "先问我几个问题"},
+		{Role: globals.Assistant, ToolCalls: &toolCalls},
+		{Role: globals.Tool, ToolCallId: &callID, Content: `{"genre":"科幻奇幻"}`},
+	}
+
+	contents := instance.GetGeminiContents("gemini-3.1-pro-preview", messages)
+	if len(contents) != 1 || contents[0].Role != GeminiUserType {
+		t.Fatalf("expected missing-signature exchange to collapse into user context, got %#v", contents)
+	}
+
+	foundAnswer := false
+	for _, part := range contents[0].Parts {
+		if part.FunctionCall != nil || part.FunctionResponse != nil || part.ThoughtSignature != nil {
+			t.Fatalf("expected no invalid Gemini tool replay parts, got %#v", part)
+		}
+		if part.Text != nil && strings.Contains(*part.Text, "ask_user") && strings.Contains(*part.Text, "科幻奇幻") {
+			foundAnswer = true
+		}
+	}
+	if !foundAnswer {
+		t.Fatalf("expected fallback context to preserve the ask_user answer, got %#v", contents[0].Parts)
+	}
+}
+
+func TestGetGeminiContentsKeepsLegacyToolReplayForGemini25WithoutSignature(t *testing.T) {
+	instance := &ChatInstance{}
+	callID := "call-weather"
+	toolCalls := globals.ToolCalls{
+		{
+			Type: "function",
+			Id:   callID,
+			Function: globals.ToolCallFunction{
+				Name:      "lookup_weather",
+				Arguments: `{"city":"shanghai"}`,
+			},
+		},
+	}
+
+	messages := []globals.Message{
+		{Role: globals.User, Content: "天气如何"},
+		{Role: globals.Assistant, ToolCalls: &toolCalls},
+		{Role: globals.Tool, ToolCallId: &callID, Content: `{"temperature":27}`},
+	}
+
+	contents := instance.GetGeminiContents("gemini-2.5-flash", messages)
+	if len(contents) != 3 {
+		t.Fatalf("expected Gemini 2.5 native tool exchange to remain intact, got %#v", contents)
+	}
+	if contents[1].Parts[0].FunctionCall == nil || contents[2].Parts[0].FunctionResponse == nil {
+		t.Fatalf("expected native function call and response parts, got %#v", contents)
+	}
+}
+
+func TestGetGemini25ContentsWithoutMetadataKeepsLegacySameRoleMerge(t *testing.T) {
 	instance := &ChatInstance{}
 	toolCalls1 := globals.ToolCalls{
 		{
@@ -112,7 +181,7 @@ func TestGetGeminiContentsWithoutMetadataKeepsLegacySameRoleMerge(t *testing.T) 
 		},
 	}
 
-	contents := instance.GetGeminiContents("gemini-3.0-flash", messages)
+	contents := instance.GetGeminiContents("gemini-2.5-flash", messages)
 	if len(contents) != 2 {
 		t.Fatalf("expected legacy same-role merge when no metadata exists, got %d contents", len(contents))
 	}
