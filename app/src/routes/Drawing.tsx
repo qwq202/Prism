@@ -1669,7 +1669,7 @@ function Drawing() {
         <div className="thin-scrollbar relative z-10 flex-1 min-h-0 overflow-y-auto">
           <div
             className={cn(
-              "mx-auto min-h-full w-full max-w-6xl px-4 sm:px-6",
+              "mx-auto flex min-h-full w-full max-w-6xl flex-col px-4 sm:px-6",
               files.length > 0 ? "pb-80" : "pb-56",
               drawingModelCapabilities.supportsEditing
                 ? "pt-20 lg:pt-24"
@@ -1750,7 +1750,7 @@ function Drawing() {
                 )}
 
                 {drawingModels.length === 0 ? (
-                  <div className="flex min-h-[28rem] flex-col items-center justify-center text-center">
+                  <div className="flex flex-1 flex-col items-center justify-center text-center">
                     <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-border/70 bg-background">
                       <ImageIcon className="h-7 w-7 text-muted-foreground" />
                     </div>
