@@ -32,22 +32,23 @@ type TaskOptions struct {
 }
 
 type Task struct {
-	ID          int64            `json:"-"`
-	TaskID      string           `json:"task_id"`
-	UserID      int64            `json:"-"`
-	WorkspaceID string           `json:"workspace_id"`
-	Status      string           `json:"status"`
-	Model       string           `json:"model"`
-	Prompt      string           `json:"prompt"`
-	Message     string           `json:"-"`
-	Options     TaskOptions      `json:"options,omitempty"`
-	Images      []GeneratedImage `json:"images,omitempty"`
-	Error       string           `json:"error,omitempty"`
-	Quota       float64          `json:"quota,omitempty"`
-	CreatedAt   string           `json:"created_at,omitempty"`
-	UpdatedAt   string           `json:"updated_at,omitempty"`
-	StartedAt   string           `json:"started_at,omitempty"`
-	CompletedAt string           `json:"completed_at,omitempty"`
+	ID           int64            `json:"-"`
+	NewlyCreated bool             `json:"-"`
+	TaskID       string           `json:"task_id"`
+	UserID       int64            `json:"-"`
+	WorkspaceID  string           `json:"workspace_id"`
+	Status       string           `json:"status"`
+	Model        string           `json:"model"`
+	Prompt       string           `json:"prompt"`
+	Message      string           `json:"-"`
+	Options      TaskOptions      `json:"options,omitempty"`
+	Images       []GeneratedImage `json:"images,omitempty"`
+	Error        string           `json:"error,omitempty"`
+	Quota        float64          `json:"quota,omitempty"`
+	CreatedAt    string           `json:"created_at,omitempty"`
+	UpdatedAt    string           `json:"updated_at,omitempty"`
+	StartedAt    string           `json:"started_at,omitempty"`
+	CompletedAt  string           `json:"completed_at,omitempty"`
 }
 
 type saveWorkspaceForm struct {
@@ -56,6 +57,7 @@ type saveWorkspaceForm struct {
 }
 
 type createTaskForm struct {
+	RequestID      string          `json:"request_id,omitempty"`
 	WorkspaceID    string          `json:"workspace_id" binding:"required"`
 	Model          string          `json:"model" binding:"required"`
 	Prompt         string          `json:"prompt" binding:"required"`

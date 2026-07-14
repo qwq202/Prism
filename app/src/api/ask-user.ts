@@ -1,6 +1,7 @@
 import type { MessageToolCall } from "@/api/types.ts";
 
 export const ASK_USER_TOOL_NAME = "ask_user";
+export const MAX_ASK_USER_QUESTIONS = 4;
 
 export type AskUserQuestionType = "single" | "multiple";
 
@@ -74,7 +75,9 @@ export function parseAskUserToolInput(
 
     const usedIds = new Set<string>();
     const questions: AskUserQuestion[] = [];
-    for (const [index, raw] of parsed.questions.slice(0, 3).entries()) {
+    for (const [index, raw] of parsed.questions
+      .slice(0, MAX_ASK_USER_QUESTIONS)
+      .entries()) {
       if (!isRecord(raw)) continue;
       const question =
         typeof raw.question === "string" ? raw.question.trim() : "";

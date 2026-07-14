@@ -6,6 +6,7 @@ import (
 	"chat/utils"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"mime"
 	"net/http"
@@ -20,6 +21,7 @@ const (
 	maxDrawingImageBytes             = 100 * 1024 * 1024
 	maxDrawingActiveTasksPerUser     = 4
 	maxDrawingTaskWorkspaceIDBytes   = 128
+	maxDrawingTaskRequestIDBytes     = 64
 	maxDrawingTaskModelBytes         = 255
 	maxDrawingTaskPromptBytes        = 32 * 1024
 	maxDrawingTaskMessageBytes       = 8 * 1024 * 1024
@@ -360,6 +362,7 @@ func normalizeAndValidateTaskOption(name string, raw json.RawMessage) (json.RawM
 }
 
 func normalizeAndValidateCreateTaskForm(form createTaskForm) (createTaskForm, error) {
+	form.RequestID = strings.TrimSpace(form.RequestID)
 	form.WorkspaceID = strings.TrimSpace(form.WorkspaceID)
 	form.Model = strings.TrimSpace(form.Model)
 	form.Prompt = strings.TrimSpace(form.Prompt)
@@ -370,6 +373,15 @@ func normalizeAndValidateCreateTaskForm(form createTaskForm) (createTaskForm, er
 	}
 	if len(form.WorkspaceID) > maxDrawingTaskWorkspaceIDBytes {
 		return createTaskForm{}, fmt.Errorf("workspace id is too long")
+	}
+	if len(form.RequestID) > maxDrawingTaskRequestIDBytes {
+		return createTaskForm{}, fmt.Errorf("request id is too long")
+	}
+	for _, char := range form.RequestID {
+		if (char < 'a' || char > 'z') && (char < 'A' || char > 'Z') &&
+			(char < '0' || char > '9') && char != '-' && char != '_' {
+			return createTaskForm{}, fmt.Errorf("invalid request id")
+		}
 	}
 	if len(form.Model) > maxDrawingTaskModelBytes {
 		return createTaskForm{}, fmt.Errorf("model is too long")
@@ -515,6 +527,18 @@ func CreateTask(db *sql.DB, userID int64, form createTaskForm) (*Task, error) {
 	createLock := drawingTaskCreateLock(userID)
 	createLock.Lock()
 	defer createLock.Unlock()
+	if form.RequestID != "" {
+		existing, loadErr := LoadTask(db, userID, form.RequestID)
+		if loadErr == nil {
+			if existing.WorkspaceID != form.WorkspaceID || existing.Model != form.Model || existing.Prompt != form.Prompt {
+				return nil, fmt.Errorf("request id already used")
+			}
+			return existing, nil
+		}
+		if !errors.Is(loadErr, sql.ErrNoRows) {
+			return nil, loadErr
+		}
+	}
 
 	active, err := HasActiveTask(db, userID, form.WorkspaceID)
 	if err != nil {
@@ -531,11 +555,6 @@ func CreateTask(db *sql.DB, userID int64, form createTaskForm) (*Task, error) {
 		return nil, fmt.Errorf("too many active drawing tasks")
 	}
 
-	storedMessage, err := storeDrawingImagesInText(form.Message)
-	if err != nil {
-		return nil, err
-	}
-
 	options := TaskOptions{
 		ResponseFormat: normalizeJSONRaw(form.ResponseFormat),
 		Thinking:       normalizeJSONRaw(form.Thinking),
@@ -543,19 +562,69 @@ func CreateTask(db *sql.DB, userID int64, form createTaskForm) (*Task, error) {
 	now := time.Now().Format("20060102150405")
 	var lastErr error
 	for i := 0; i < 3; i++ {
-		taskID := fmt.Sprintf("draw_%s_%s", now, utils.GenerateChar(12))
+		taskID := form.RequestID
+		if taskID == "" {
+			taskID = fmt.Sprintf("draw_%s_%s", now, utils.GenerateChar(12))
+		}
 		_, err := globals.ExecDb(db, `
 			INSERT INTO drawing_task (
 				task_id, user_id, workspace_id, status, model, prompt,
 				message, request_options, result_images
 			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, taskID, userID, form.WorkspaceID, TaskStatusQueued, form.Model, form.Prompt, storedMessage, taskOptionsToJSON(options), "[]")
+		`, taskID, userID, form.WorkspaceID, TaskStatusQueued, form.Model, form.Prompt, form.Message, taskOptionsToJSON(options), "[]")
 		if err == nil {
-			return LoadTask(db, userID, taskID)
+			task, loadErr := LoadTask(db, userID, taskID)
+			if loadErr != nil {
+				return nil, loadErr
+			}
+			task.NewlyCreated = true
+			return task, nil
 		}
 		lastErr = err
+		if form.RequestID != "" {
+			existing, loadErr := LoadTask(db, userID, form.RequestID)
+			if loadErr == nil && existing.WorkspaceID == form.WorkspaceID && existing.Model == form.Model && existing.Prompt == form.Prompt {
+				return existing, nil
+			}
+			break
+		}
 	}
 	return nil, lastErr
+}
+
+// PrepareTaskMessage moves embedded reference images into attachment storage.
+// It runs after the queued task is visible to clients so slow local/remote
+// storage cannot make task creation look like a failed request.
+func PrepareTaskMessage(db *sql.DB, userID int64, taskID string) (*Task, error) {
+	task, err := LoadTask(db, userID, taskID)
+	if err != nil {
+		return nil, err
+	}
+	if task.Status != TaskStatusQueued {
+		return task, nil
+	}
+
+	storedMessage, err := storeDrawingImagesInText(task.Message)
+	if err != nil {
+		return nil, err
+	}
+	if storedMessage != task.Message {
+		result, updateErr := globals.ExecDb(db, `
+			UPDATE drawing_task
+			SET message = ?, updated_at = CURRENT_TIMESTAMP
+			WHERE user_id = ? AND task_id = ? AND status = ?
+		`, storedMessage, userID, strings.TrimSpace(taskID), TaskStatusQueued)
+		if updateErr != nil {
+			return nil, updateErr
+		}
+		if rows, rowsErr := result.RowsAffected(); rowsErr != nil {
+			return nil, rowsErr
+		} else if rows == 0 {
+			return LoadTask(db, userID, taskID)
+		}
+	}
+	task.Message = storedMessage
+	return task, nil
 }
 
 func countActiveTasks(db *sql.DB, userID int64) (int, error) {

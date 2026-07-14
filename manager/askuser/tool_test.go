@@ -133,3 +133,34 @@ func TestParseToolInputRejectsMoreThanMaximumQuestions(t *testing.T) {
 		t.Fatalf("expected too many questions to fail")
 	}
 }
+
+func TestValidateAnswerAcceptsMaximumQuestions(t *testing.T) {
+	call := globals.ToolCall{
+		Id:   "call_ask_4",
+		Type: "function",
+		Function: globals.ToolCallFunction{
+			Name: ToolName,
+			Arguments: `{
+				"questions": [
+					{"id":"q1","question":"Q1?","type":"single","options":["A","B"]},
+					{"id":"q2","question":"Q2?","type":"single","options":["A","B"]},
+					{"id":"q3","question":"Q3?","type":"multiple","options":["A","B"]},
+					{"id":"q4","question":"Q4?","type":"multiple","options":["A","B"]}
+				]
+			}`,
+		},
+	}
+	raw := json.RawMessage(`{
+		"type":"ask_user_answer",
+		"answers":{
+			"q1":{"type":"single","value":"A","custom":false,"skipped":false},
+			"q2":{"type":"single","value":"","custom":false,"skipped":true},
+			"q3":{"type":"multiple","value":["A","B"],"custom":false,"skipped":false},
+			"q4":{"type":"multiple","value":[],"custom":false,"skipped":true}
+		}
+	}`)
+
+	if _, err := ValidateAnswer(call, raw); err != nil {
+		t.Fatalf("expected four answers to validate: %v", err)
+	}
+}

@@ -43,12 +43,20 @@ func runTask(db *sql.DB, cache *redis.Client, userID int64, taskID string) {
 	if IsTaskCancellationRequested(db, taskID) {
 		return
 	}
+	task, err := PrepareTaskMessage(db, userID, taskID)
+	if err != nil {
+		_ = MarkTaskFailed(db, taskID, err)
+		return
+	}
+	if task.Status == TaskStatusCanceling || task.Status == TaskStatusCanceled {
+		return
+	}
 	if err := MarkTaskRunning(db, taskID); err != nil {
 		globals.Warn(fmt.Sprintf("[drawing] failed to mark task running: %s (task: %s)", err.Error(), taskID))
 		return
 	}
 
-	task, err := LoadTask(db, userID, taskID)
+	task, err = LoadTask(db, userID, taskID)
 	if err != nil {
 		globals.Warn(fmt.Sprintf("[drawing] failed to load task: %s (task: %s)", err.Error(), taskID))
 		return

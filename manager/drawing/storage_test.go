@@ -131,7 +131,7 @@ func TestSaveWorkspaceStateStoresDataURLImagesAsAttachments(t *testing.T) {
 	}
 }
 
-func TestCreateTaskStoresMessageImagesAsAttachments(t *testing.T) {
+func TestPrepareTaskMessageStoresImagesAsAttachments(t *testing.T) {
 	t.Chdir(t.TempDir())
 	db := openDrawingWorkspaceTestDB(t)
 
@@ -145,11 +145,47 @@ func TestCreateTaskStoresMessageImagesAsAttachments(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create task: %v", err)
 	}
+	if !strings.Contains(task.Message, "data:image/") {
+		t.Fatalf("expected task creation to return before storing references, got %s", task.Message)
+	}
+	task, err = PrepareTaskMessage(db, 7, task.TaskID)
+	if err != nil {
+		t.Fatalf("prepare task message: %v", err)
+	}
 	if strings.Contains(task.Message, "data:image/") {
 		t.Fatalf("expected task message image data to be stored as attachment, got %s", task.Message)
 	}
 	if !strings.Contains(task.Message, "/attachments/") {
 		t.Fatalf("expected task message to reference attachment, got %s", task.Message)
+	}
+}
+
+func TestCreateTaskIsIdempotentForRequestID(t *testing.T) {
+	db := openDrawingWorkspaceTestDB(t)
+	form := validDrawingTaskForm("workspace-idempotent")
+	form.RequestID = "draw_request_1"
+
+	first, err := CreateTask(db, 7, form)
+	if err != nil {
+		t.Fatalf("create first task: %v", err)
+	}
+	second, err := CreateTask(db, 7, form)
+	if err != nil {
+		t.Fatalf("retry task creation: %v", err)
+	}
+	if !first.NewlyCreated || second.NewlyCreated {
+		t.Fatalf("expected only first request to create a task: first=%v second=%v", first.NewlyCreated, second.NewlyCreated)
+	}
+	if first.TaskID != form.RequestID || second.TaskID != first.TaskID {
+		t.Fatalf("expected retry to return the same task: first=%q second=%q", first.TaskID, second.TaskID)
+	}
+
+	var count int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM drawing_task WHERE user_id = ? AND task_id = ?`, 7, form.RequestID).Scan(&count); err != nil {
+		t.Fatalf("count idempotent tasks: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected one persisted task, got %d", count)
 	}
 }
 

@@ -41,6 +41,7 @@ type DrawingTaskResponse<TImage = unknown> = {
   data?: DrawingTask<TImage>;
   message?: string;
   error?: string;
+  uncertain?: boolean;
 };
 
 type DrawingTaskListResponse<TImage = unknown> = {
@@ -51,6 +52,7 @@ type DrawingTaskListResponse<TImage = unknown> = {
 };
 
 export type CreateDrawingTaskPayload = {
+  request_id: string;
   workspace_id: string;
   model: string;
   prompt: string;
@@ -77,14 +79,13 @@ export async function createDrawingTask<TImage>(
   payload: CreateDrawingTaskPayload,
 ): Promise<DrawingTaskResponse<TImage>> {
   try {
-    const response = await axios.post("/drawing/tasks", payload, {
-      timeout: 30_000,
-    });
+    const response = await axios.post("/drawing/tasks", payload);
     return response.data as DrawingTaskResponse<TImage>;
   } catch (error) {
     return {
       status: false,
       error: getErrorMessage(error),
+      uncertain: true,
     };
   }
 }

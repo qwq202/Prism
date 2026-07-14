@@ -86,7 +86,9 @@ func CreateTaskAPI(c *gin.Context) {
 		return
 	}
 
-	StartTask(db, cache, userID, task.TaskID)
+	if task.NewlyCreated {
+		StartTask(db, cache, userID, task.TaskID)
+	}
 	c.JSON(http.StatusOK, gin.H{"status": true, "data": task})
 }
 

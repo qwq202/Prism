@@ -139,6 +139,30 @@ const WORKSPACE_ACCENTS = [
   },
 ];
 
+function createDrawingRequestId(): string {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
+    return `draw_${crypto.randomUUID()}`;
+  }
+  return `draw_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
+async function recoverDrawingTask(
+  requestId: string,
+): Promise<DrawingTask<DrawingGeneratedImage> | undefined> {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const response = await listDrawingTasks<DrawingGeneratedImage>();
+    const task = response.data?.find((item) => item.task_id === requestId);
+    if (response.status && task) return task;
+    if (attempt < 9) {
+      await new Promise((resolve) => window.setTimeout(resolve, 750));
+    }
+  }
+  return undefined;
+}
+
 const drawingPageVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -1110,6 +1134,20 @@ function Drawing() {
       return;
     }
 
+    const requestId = createDrawingRequestId();
+    const requestOptions = buildDrawingRequestOptions(
+      options,
+      drawingModelCapabilities,
+    );
+    const payload = {
+      request_id: requestId,
+      workspace_id: workspaceId,
+      message: formatMessage(files, text),
+      prompt: text,
+      model: selectedDrawingModelId,
+      response_format: requestOptions.response_format,
+      thinking: requestOptions.thinking,
+    };
     updateWorkspaceById(workspaceId, {
       model: selectedDrawingModelId,
       pending: true,
@@ -1119,18 +1157,23 @@ function Drawing() {
       lastPrompt: text,
     });
     try {
-      const requestOptions = buildDrawingRequestOptions(
-        options,
-        drawingModelCapabilities,
-      );
-      const response = await createDrawingTask<DrawingGeneratedImage>({
-        workspace_id: workspaceId,
-        message: formatMessage(files, text),
-        prompt: text,
-        model: selectedDrawingModelId,
-        response_format: requestOptions.response_format,
-        thinking: requestOptions.thinking,
-      });
+      let response = await createDrawingTask<DrawingGeneratedImage>(payload);
+      if (response.uncertain) {
+        const recoveredTask = await recoverDrawingTask(requestId);
+        if (recoveredTask) {
+          response = { status: true, data: recoveredTask };
+        } else {
+          // The task id makes this retry idempotent if the first response was
+          // lost after the server accepted the request.
+          response = await createDrawingTask<DrawingGeneratedImage>(payload);
+          if (response.uncertain) {
+            const retriedTask = await recoverDrawingTask(requestId);
+            if (retriedTask) {
+              response = { status: true, data: retriedTask };
+            }
+          }
+        }
+      }
       if (!response.status || !response.data) {
         throw new Error(response.message || response.error || "");
       }
@@ -1144,6 +1187,7 @@ function Drawing() {
           : t("drawing.generateFailed");
       updateWorkspaceById(workspaceId, {
         pending: false,
+        taskId: undefined,
         taskStatus: "failed",
         taskError: message,
       });
