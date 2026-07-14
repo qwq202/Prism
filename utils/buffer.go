@@ -86,10 +86,11 @@ func (b *Buffer) MarshalJSON() ([]byte, error) {
 func initInputToken(model string, history []globals.Message) int {
 	if globals.IsVisionModel(model) || globals.IsDrawingModel("", model) {
 		history = Each(history, func(message globals.Message) globals.Message {
-			if message.Role == globals.User {
-				raw, _ := ExtractImages(message.Content, true)
-				message.Content = raw
-			}
+			// Strip inline/base64 images from every role. Assistant turns from
+			// image models may still carry data-URL payloads when storage is off
+			// or when older messages were persisted before StoreImage was wired.
+			raw, _ := ExtractImages(message.Content, true)
+			message.Content = raw
 			return message
 		})
 	}

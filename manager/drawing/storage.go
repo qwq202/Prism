@@ -733,6 +733,28 @@ func MarkTaskFailed(db *sql.DB, taskID string, err error) error {
 	return execErr
 }
 
+func AcknowledgeTask(db *sql.DB, userID int64, taskID string) error {
+	if db == nil {
+		return fmt.Errorf("database is not initialized")
+	}
+
+	result, err := globals.ExecDb(db, `
+		DELETE FROM drawing_task
+		WHERE user_id = ? AND task_id = ? AND status IN (?, ?, ?)
+	`, userID, strings.TrimSpace(taskID), TaskStatusSucceeded, TaskStatusFailed, TaskStatusCanceled)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return fmt.Errorf("drawing task is not ready to acknowledge")
+	}
+	return nil
+}
+
 func RequestTaskCancellation(db *sql.DB, userID int64, taskID string) (*Task, error) {
 	if db == nil {
 		return nil, fmt.Errorf("database is not initialized")

@@ -136,6 +136,7 @@ export async function quickBlobParser(
   file: File,
   model: Model,
   onProgress?: (progress: number) => void,
+  localOnly = false,
 ): Promise<string> {
   onProgress?.(0);
   if (file.size === 0 || file.name.length === 0) {
@@ -154,6 +155,11 @@ export async function quickBlobParser(
     console.log("[parser] hit image/* file, using local parser");
     const imageFile = await ensureGrokCompatibleImage(file, model);
     onProgress?.(40);
+    if (localOnly) {
+      const content = await readFileAsDataURL(imageFile);
+      onProgress?.(100);
+      return content;
+    }
     const attachmentUrl = await uploadImageAttachment(imageFile);
     if (attachmentUrl) {
       onProgress?.(100);
@@ -164,6 +170,15 @@ export async function quickBlobParser(
     console.error("[parser] local image parser failed:", e);
     throw e instanceof Error ? e : new Error("Failed to process image");
   }
+}
+
+function readFileAsDataURL(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 }
 
 async function uploadImageAttachment(file: File): Promise<string> {

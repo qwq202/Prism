@@ -82,13 +82,6 @@ func runTask(db *sql.DB, cache *redis.Client, userID int64, taskID string) {
 	if IsTaskCancellationRequested(db, taskID) {
 		return
 	}
-	if err := AppendImagesToWorkspace(db, userID, task.WorkspaceID, task.Model, images, task.Prompt); err != nil {
-		_ = MarkTaskFailed(db, taskID, err)
-		return
-	}
-	if IsTaskCancellationRequested(db, taskID) {
-		return
-	}
 	_ = MarkTaskSucceeded(db, taskID, images, quota)
 }
 

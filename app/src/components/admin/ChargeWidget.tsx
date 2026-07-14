@@ -16,6 +16,11 @@ import {
   timesBilling,
   tokenBilling,
 } from "@/admin/charge.ts";
+import {
+  countImagePreviewQuota,
+  getImagePriceForKey,
+  normalizeImageChargeConfig,
+} from "@/admin/image-charge.ts";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input.tsx";
 import { useMemo, useReducer, useState } from "react";
@@ -140,118 +145,6 @@ const imageMissingPricePolicies = [
   imageMissingPricePolicyDefault,
   imageMissingPricePolicyReject,
 ];
-
-function normalizePriceMap(values?: Record<string, number>) {
-  const next: Record<string, number> = {};
-  Object.entries(values || {}).forEach(([key, value]) => {
-    const name = key.trim();
-    const price = Number(value);
-    if (name && Number.isFinite(price) && price > 0) {
-      next[name] = price;
-    }
-  });
-  return next;
-}
-
-function normalizeImageChargeConfig(
-  image?: ImageChargeConfig,
-  fallback = 0,
-): ImageChargeConfig {
-  const config = image || {};
-  const defaultPrice = Math.max(0, Number(config.default ?? fallback ?? 0));
-  const request = Math.max(0, Number(config.request ?? 0));
-  const reference = Math.max(0, Number(config.reference ?? 0));
-  const outputCount = Math.max(1, Number(config.output_count ?? 1));
-
-  return {
-    mode: imageBillingModes.includes(config.mode || "")
-      ? config.mode
-      : imageBillingModePerImage,
-    missing_price_policy: imageMissingPricePolicies.includes(
-      config.missing_price_policy || "",
-    )
-      ? config.missing_price_policy
-      : imageMissingPricePolicyDefault,
-    default: defaultPrice,
-    request,
-    reference,
-    output_count: outputCount,
-    billing_unit: config.billing_unit || "final_image",
-    size: normalizePriceMap(config.size),
-    quality: normalizePriceMap(config.quality),
-    rules: (config.rules || []).map((rule) => ({
-      size: rule.size?.trim() || undefined,
-      quality: rule.quality?.trim() || undefined,
-      mime_type: rule.mime_type?.trim() || undefined,
-      aspect_ratio: rule.aspect_ratio?.trim() || undefined,
-      quota: Math.max(0, Number(rule.quota || 0)),
-    })),
-    usage: {
-      input: Math.max(0, Number(config.usage?.input ?? 0)),
-      output: Math.max(0, Number(config.usage?.output ?? 0)),
-      image: Math.max(0, Number(config.usage?.image ?? 0)),
-    },
-  };
-}
-
-function getImagePriceForKey(
-  prices: Record<string, number> | undefined,
-  key: string,
-): number {
-  if (!prices) return 0;
-  const normalized = key.trim().toLowerCase();
-  const hit = Object.entries(prices).find(
-    ([name]) => name.trim().toLowerCase() === normalized,
-  );
-  return hit ? Number(hit[1]) || 0 : 0;
-}
-
-function countImagePreviewQuota(
-  image: ImageChargeConfig | undefined,
-  size: string,
-  quality: string,
-  referenceImages: number,
-  usageTokens?: { input: number; output: number; image: number },
-) {
-  const config = normalizeImageChargeConfig(image);
-  if (config.mode === imageBillingModeOfficialUsage) {
-    return (
-      (config.request || 0) +
-      (config.reference || 0) * Math.max(0, referenceImages) +
-      (Math.max(0, usageTokens?.input || 0) / 1000) *
-        Math.max(0, config.usage?.input || 0) +
-      (Math.max(0, usageTokens?.output || 0) / 1000) *
-        Math.max(0, config.usage?.output || 0) +
-      (Math.max(0, usageTokens?.image || 0) / 1000) *
-        Math.max(0, config.usage?.image || 0)
-    );
-  }
-  const matchedRule = (config.rules || []).find((rule) => {
-    const ruleSize = (rule.size || "").trim().toLowerCase();
-    const ruleQuality = (rule.quality || "").trim().toLowerCase();
-    return (
-      (!ruleSize || ruleSize === size.trim().toLowerCase()) &&
-      (!ruleQuality || ruleQuality === quality.trim().toLowerCase())
-    );
-  });
-  if (config.mode === imageBillingModeMatrix && matchedRule?.quota) {
-    return (
-      (config.request || 0) +
-      matchedRule.quota * Math.max(1, config.output_count || 1) +
-      (config.reference || 0) * Math.max(0, referenceImages)
-    );
-  }
-  const sizePrice = getImagePriceForKey(config.size, size);
-  const qualityPrice = getImagePriceForKey(config.quality, quality);
-  const unitPrice =
-    (sizePrice > 0 ? sizePrice : config.default || 0) + qualityPrice;
-
-  return (
-    (config.request || 0) +
-    unitPrice * Math.max(1, config.output_count || 1) +
-    (config.reference || 0) * Math.max(0, referenceImages)
-  );
-}
 
 function formatImageChargeSummary(charge: ChargeProps) {
   const image = normalizeImageChargeConfig(charge.image, charge.output);

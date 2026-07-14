@@ -109,6 +109,15 @@ func NumTokensFromResponse(response string, model string) int {
 		return 0
 	}
 
+	// Image-generation / vision replies may embed data-URL payloads. Count only
+	// the surrounding text so base64 never inflates output token estimates.
+	if globals.IsVisionModel(model) || globals.IsDrawingModel("", model) {
+		response, _ = ExtractImages(response, true)
+		if len(response) == 0 {
+			return 0
+		}
+	}
+
 	return NumTokensFromMessages([]globals.Message{{Content: response}}, model, true)
 }
 

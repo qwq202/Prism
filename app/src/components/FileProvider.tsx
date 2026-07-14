@@ -117,6 +117,7 @@ type FileProviderProps = {
   dispatch: Dispatch<FileProviderAction>;
   modelId?: string;
   forceImageUpload?: boolean;
+  localImageOnly?: boolean;
   maxFiles?: number;
   onUploadingChange?: (uploading: boolean) => void;
   trigger?: (props: {
@@ -131,6 +132,7 @@ function FileProvider({
   dispatch,
   modelId,
   forceImageUpload = false,
+  localImageOnly = false,
   maxFiles,
   onUploadingChange,
   trigger,
@@ -253,15 +255,20 @@ function FileProvider({
             payload: { id, file, progress: 0 },
           });
 
-          const task = quickBlobParser(file, uploadModelInfo, (progress) => {
-            console.debug(
-              `[parser] task ${id} progress: ${progress.toFixed(2)}%`,
-            );
-            taskDispatch({
-              type: "update-progress",
-              payload: { id, progress },
-            });
-          });
+          const task = quickBlobParser(
+            file,
+            uploadModelInfo,
+            (progress) => {
+              console.debug(
+                `[parser] task ${id} progress: ${progress.toFixed(2)}%`,
+              );
+              taskDispatch({
+                type: "update-progress",
+                payload: { id, progress },
+              });
+            },
+            localImageOnly,
+          );
 
           toast.promise(task, {
             loading: t("file.uploading-prompt"),
@@ -297,6 +304,7 @@ function FileProvider({
       fileLimit,
       files.length,
       hasFileLimit,
+      localImageOnly,
       showFileLimitToast,
       t,
       tasks.tasks.length,

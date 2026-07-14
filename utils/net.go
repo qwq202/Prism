@@ -23,11 +23,15 @@ const (
 	maxHTTPLogBodyBytes       = 64 * 1024
 	maxHTTPErrorBodyBytes     = 1024 * 1024
 	minBase64LogRedactLength  = 256
+	// Oversized opaque blobs (Gemini thoughtSignature, etc.) are redacted even
+	// when the JSON key is not in the known base64-key list.
+	maxOpaqueBase64LogBytes   = 2048
 	redactedLogSecretValue    = "[redacted]"
 	redactedLogBase64Template = "[base64 omitted, encoded=%s (%d chars)]"
 )
 
 var dataURLBase64LogPattern = regexp.MustCompile(`data:[\w.+-]+/[\w.+-]+;base64,[A-Za-z0-9+/=\r\n]+`)
+var rawBase64JSONLogPattern = regexp.MustCompile(`("(?:data|b64_json|b64Json|base64|image_data|imageData|audio_data|audioData|video_data|videoData|thoughtSignature|thought_signature)"\s*:\s*")([A-Za-z0-9+/=\r\n_-]{256,})(")`)
 
 func newClient(c []globals.ProxyConfig) *http.Client {
 	client := &http.Client{
@@ -302,7 +306,16 @@ func sanitizeLogString(key string, value string) (string, bool) {
 		return redacted, true
 	}
 
-	if shouldRedactBase64LogKey(key) && isLikelyBase64LogValue(value) {
+	if !isLikelyBase64LogValue(value) {
+		return value, false
+	}
+
+	if shouldRedactBase64LogKey(key) {
+		return formatRedactedBase64LogValue(value), true
+	}
+
+	// Catch oversized opaque blobs even when the key is unfamiliar.
+	if len(removeLogBase64Whitespace(value)) >= maxOpaqueBase64LogBytes {
 		return formatRedactedBase64LogValue(value), true
 	}
 
@@ -321,7 +334,8 @@ func shouldRedactBase64LogKey(key string) bool {
 		normalized == "b64json" ||
 		normalized == "imagedata" ||
 		normalized == "audiodata" ||
-		normalized == "videodata"
+		normalized == "videodata" ||
+		normalized == "thoughtsignature"
 }
 
 func isLikelyBase64LogValue(value string) bool {
@@ -339,7 +353,9 @@ func isLikelyBase64LogValue(value string) bool {
 			(char >= '0' && char <= '9') ||
 			char == '+' ||
 			char == '/' ||
-			char == '=' {
+			char == '=' ||
+			char == '-' ||
+			char == '_' {
 			continue
 		}
 		return false
@@ -386,6 +402,27 @@ func redactDataURLBase64(value string) (string, bool) {
 func formatRedactedBase64LogValue(value string) string {
 	normalized := removeLogBase64Whitespace(value)
 	return fmt.Sprintf(redactedLogBase64Template, formatSize(len(normalized)), len(normalized))
+}
+
+func redactRawBase64ForLog(text string) string {
+	if text == "" {
+		return text
+	}
+
+	if redacted, ok := redactDataURLBase64(text); ok {
+		text = redacted
+	}
+
+	// Fallback for huge JSON bodies that fail Unmarshal, or for bare base64
+	// blobs under keys like "data" / "thoughtSignature" that never become
+	// structured values.
+	return rawBase64JSONLogPattern.ReplaceAllStringFunc(text, func(match string) string {
+		parts := rawBase64JSONLogPattern.FindStringSubmatch(match)
+		if len(parts) != 4 {
+			return match
+		}
+		return parts[1] + formatRedactedBase64LogValue(parts[2]) + parts[3]
+	})
 }
 
 func formatBodyForLog(data []byte, contentType string) string {
@@ -437,18 +474,19 @@ func formatBodyForLog(data []byte, contentType string) string {
 		return fmt.Sprintf("[Binary Content] Type: %s, Size: %s (%d bytes)", detectedType, sizeStr, size)
 	}
 
-	if sanitized, ok := sanitizeJSONLogBody(data); ok {
+	// Redact base64 payloads before JSON parse so multi-MB Gemini image
+	// responses never get fully unmarshaled just for debug logging.
+	text := redactRawBase64ForLog(string(data))
+	if sanitized, ok := sanitizeJSONLogBody([]byte(text)); ok {
 		content, truncated := truncateLogText([]byte(sanitized))
 		return appendTruncatedNotice(content, truncated, maxHTTPLogBodyBytes)
 	}
 
-	text := string(data)
 	if sanitized, ok := sanitizeSSELogText(text); ok {
 		content, truncated := truncateLogText([]byte(sanitized))
 		return appendTruncatedNotice(content, truncated, maxHTTPLogBodyBytes)
 	}
 
-	text, _ = sanitizeLogString("", text)
 	content, truncated := truncateLogText([]byte(text))
 	return appendTruncatedNotice(content, truncated, maxHTTPLogBodyBytes)
 }

@@ -106,6 +106,21 @@ func GetTaskAPI(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": true, "data": task})
 }
 
+func AcknowledgeTaskAPI(c *gin.Context) {
+	user := auth.RequireAuth(c)
+	if user == nil {
+		return
+	}
+
+	db := utils.GetDBFromContext(c)
+	if err := AcknowledgeTask(db, user.GetID(db), c.Param("id")); err != nil {
+		c.JSON(http.StatusOK, gin.H{"status": false, "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": true})
+}
+
 func CancelTaskAPI(c *gin.Context) {
 	user := auth.RequireAuth(c)
 	if user == nil {

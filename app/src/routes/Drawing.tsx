@@ -24,6 +24,7 @@ import {
   RotateCcw,
   SlidersHorizontal,
   X,
+  Coins,
 } from "lucide-react";
 import {
   Select,
@@ -44,12 +45,12 @@ import FileProvider, {
 } from "@/components/FileProvider.tsx";
 import type { FileArray } from "@/api/file.ts";
 import {
+  acknowledgeDrawingTask,
   cancelDrawingTask,
   createDrawingTask,
   getDrawingTask,
   listDrawingTasks,
-  loadDrawingWorkspaceState,
-  saveDrawingWorkspaceState,
+  type DrawingTask,
 } from "@/api/drawing.ts";
 import { formatMessage } from "@/utils/processor.ts";
 import { toast } from "sonner";
@@ -99,14 +100,24 @@ import {
   normalizeDrawingOptions,
   normalizeDrawingReferences,
   normalizeDrawingWorkspaces,
-  preserveLocalActiveTaskState,
-  saveActiveWorkspaceId,
-  saveDrawingWorkspaceSnapshot,
   type DrawingGeneratedImage,
   type DrawingModel,
   type DrawingOptions,
   type DrawingWorkspace,
 } from "@/routes/drawing/domain.ts";
+import {
+  loadDrawingLocalBootstrap,
+  loadDrawingLocalState,
+  saveDrawingLocalBootstrap,
+  saveDrawingLocalState,
+} from "@/routes/drawing/storage.ts";
+import {
+  imageBilling,
+  imageBillingModeOfficialUsage,
+  nonBilling,
+} from "@/admin/charge.ts";
+import { estimateImageQuota } from "@/admin/image-charge.ts";
+import { formatDecimal } from "@/utils/base.ts";
 
 const WORKSPACE_ACCENTS = [
   {
@@ -171,6 +182,80 @@ function formatGeneratedImageDate(timestamp: number, locale: string) {
   }
 }
 
+function readBlobAsDataURL(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function localizeDrawingImageSource(source: string): Promise<string> {
+  if (source.startsWith("data:image/")) return source;
+
+  const response = await fetch(normalizeImageURL(source), {
+    credentials: "same-origin",
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to cache drawing image: ${response.status}`);
+  }
+  return readBlobAsDataURL(await response.blob());
+}
+
+async function localizeDrawingWorkspaceAssets(
+  workspaces: DrawingWorkspace[],
+): Promise<DrawingWorkspace[]> {
+  return Promise.all(
+    workspaces.map(async (workspace) => ({
+      ...workspace,
+      references: await Promise.all(
+        workspace.references.map(async (reference) => {
+          try {
+            return {
+              ...reference,
+              content: await localizeDrawingImageSource(reference.content),
+            };
+          } catch (error) {
+            console.debug("[drawing] failed to migrate local reference", error);
+            return reference;
+          }
+        }),
+      ),
+      images: await Promise.all(
+        workspace.images.map(async (image) => {
+          try {
+            return {
+              ...image,
+              src: await localizeDrawingImageSource(image.src),
+            };
+          } catch (error) {
+            console.debug("[drawing] failed to migrate local result", error);
+            return image;
+          }
+        }),
+      ),
+    })),
+  );
+}
+
+async function localizeDrawingTaskImages(
+  task: DrawingTask<DrawingGeneratedImage>,
+): Promise<DrawingTask<DrawingGeneratedImage>> {
+  if (task.status !== "succeeded" || !task.images?.length) return task;
+
+  const images = await Promise.all(
+    task.images.map(async (image) => {
+      return {
+        ...image,
+        src: await localizeDrawingImageSource(image.src),
+      };
+    }),
+  );
+
+  return { ...task, images };
+}
+
 function DrawingOptionSelect<T extends string>({
   icon: Icon,
   label,
@@ -210,17 +295,26 @@ function Drawing() {
   const [requestedDrawingModelId] = useState(getRequestedDrawingModelId);
   const handledRequestedDrawingModel = useRef(false);
   const dragDepthRef = useRef(0);
-  const latestWorkspaceSnapshotRef = useRef("");
-  const latestActiveWorkspaceIdRef = useRef("");
-  const [workspaces, setWorkspaces] = useState<DrawingWorkspace[]>(() =>
-    loadDrawingWorkspaces(),
+  const pendingTaskAcksRef = useRef(new Set<string>());
+  const [initialLocalState] = useState(() => {
+    const bootstrap = loadDrawingLocalBootstrap();
+    return {
+      state: bootstrap ?? {
+        workspaces: loadDrawingWorkspaces(),
+        activeWorkspaceId: loadActiveWorkspaceId(),
+      },
+      hasBootstrap: bootstrap !== null,
+    };
+  });
+  const [workspaces, setWorkspaces] = useState<DrawingWorkspace[]>(
+    initialLocalState.state.workspaces,
   );
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState(() =>
-    loadActiveWorkspaceId(),
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState(
+    initialLocalState.state.activeWorkspaceId,
   );
-  const [cloudSyncEnabled, setCloudSyncEnabled] = useState(false);
-  const [cloudSyncReady, setCloudSyncReady] = useState(false);
-  const [cloudSyncError, setCloudSyncError] = useState("");
+  const legacyLocalStateRef = useRef(initialLocalState.state);
+  const [localStateReady, setLocalStateReady] = useState(false);
+  const settingsStateReady = initialLocalState.hasBootstrap || localStateReady;
   const [focused, setFocused] = useState(false);
   const [draggingReferences, setDraggingReferences] = useState(false);
   const [referenceUploadPending, setReferenceUploadPending] = useState(false);
@@ -262,6 +356,56 @@ function Drawing() {
   );
   const referenceImageLimit = drawingModelCapabilities.maxReferenceImages;
   const canAcceptReferences = referenceImageLimit > 0;
+  const drawingQuotaEstimate = useMemo(() => {
+    const price = selectedDrawingModel?.price;
+    if (!price || price.type === nonBilling) {
+      return price?.type === nonBilling ? 0 : null;
+    }
+
+    return estimateImageQuota(
+      price,
+      {
+        size:
+          drawingModelCapabilities.imageSizes.length > 0
+            ? options.imageSize
+            : "",
+        mimeType:
+          drawingModelCapabilities.mimeTypes.length > 0
+            ? options.mimeType
+            : "",
+        aspectRatio:
+          drawingModelCapabilities.aspectRatios.length > 0
+            ? options.aspectRatio
+            : "",
+      },
+      files.length,
+    );
+  }, [
+    drawingModelCapabilities.aspectRatios.length,
+    drawingModelCapabilities.imageSizes.length,
+    drawingModelCapabilities.mimeTypes.length,
+    files.length,
+    options.aspectRatio,
+    options.imageSize,
+    options.mimeType,
+    selectedDrawingModel,
+  ]);
+  const drawingQuotaEstimateState = useMemo(() => {
+    const price = selectedDrawingModel?.price;
+    if (!price || price.type === nonBilling) {
+      return price?.type === nonBilling ? "free" : null;
+    }
+    if (drawingQuotaEstimate !== null) {
+      return "value";
+    }
+    if (
+      price.type === imageBilling &&
+      price.image?.mode === imageBillingModeOfficialUsage
+    ) {
+      return "usage";
+    }
+    return "unavailable";
+  }, [drawingQuotaEstimate, selectedDrawingModel]);
   const uploadReferenceTitle = t("drawing.uploadReferenceWithLimit", {
     limit: referenceImageLimit,
   });
@@ -295,13 +439,13 @@ function Drawing() {
   const canGenerate = Boolean(
     prompt.trim() &&
     selectedDrawingModelId &&
-    cloudSyncReady &&
+    localStateReady &&
     !requestInFlight &&
     !referenceUploadPending,
   );
   const generateDisabledReason = !selectedDrawingModelId
     ? t("drawing.needModel")
-    : !cloudSyncReady
+    : !localStateReady
       ? t("drawing.loadingWorkspace")
       : !prompt.trim()
         ? t("drawing.needPrompt")
@@ -391,65 +535,74 @@ function Drawing() {
   useEffect(() => {
     let cancelled = false;
 
-    void loadDrawingWorkspaceState<DrawingWorkspace>().then(
-      async (response) => {
-        if (cancelled) return;
+    const initializeLocalState = async () => {
+      const legacyState = legacyLocalStateRef.current;
+      let nextWorkspaces = normalizeDrawingWorkspaces(legacyState.workspaces);
+      let nextActiveWorkspaceId = legacyState.activeWorkspaceId;
 
-        if (!response.status || !response.data) {
-          setCloudSyncEnabled(false);
-          setCloudSyncError(
-            response.message || response.error || t("drawing.syncUnavailable"),
-          );
-          setCloudSyncReady(true);
-          return;
+      try {
+        const stored = await loadDrawingLocalState();
+        if (stored?.workspaces?.length) {
+          nextWorkspaces = normalizeDrawingWorkspaces(stored.workspaces);
+          nextActiveWorkspaceId = stored.activeWorkspaceId;
         }
-
-        setCloudSyncEnabled(true);
-        setCloudSyncError("");
-        let normalized: DrawingWorkspace[] | undefined;
-        const serverWorkspaces = response.data.workspaces;
-        if (Array.isArray(serverWorkspaces) && serverWorkspaces.length > 0) {
-          normalized = normalizeDrawingWorkspaces(serverWorkspaces);
-
-          const serverActiveWorkspaceId =
-            response.data.active_workspace_id &&
-            normalized.some(
-              (workspace) =>
-                workspace.id === response.data?.active_workspace_id,
-            )
-              ? response.data.active_workspace_id
-              : normalized[0]?.id;
-          if (serverActiveWorkspaceId) {
-            setActiveWorkspaceId(serverActiveWorkspaceId);
-          }
-        }
+        nextWorkspaces = await localizeDrawingWorkspaceAssets(nextWorkspaces);
 
         const tasksResponse = await listDrawingTasks<DrawingGeneratedImage>();
         if (cancelled) return;
-        if (!tasksResponse.status) {
-          setCloudSyncError(
-            tasksResponse.message ||
-              tasksResponse.error ||
-              t("drawing.syncUnavailable"),
+        if (tasksResponse.status && tasksResponse.data?.length) {
+          const localizedTasks = await Promise.all(
+            tasksResponse.data.map(async (task) => {
+              try {
+                return await localizeDrawingTaskImages(task);
+              } catch (error) {
+                console.debug(
+                  "[drawing] failed to cache recovered task images",
+                  error,
+                );
+                return null;
+              }
+            }),
           );
+          nextWorkspaces = localizedTasks
+            .filter(
+              (task): task is DrawingTask<DrawingGeneratedImage> =>
+                task !== null,
+            )
+            .reduce(applyDrawingTaskToWorkspaces, nextWorkspaces);
+          localizedTasks.forEach((task) => {
+            if (
+              task &&
+              (task.status === "succeeded" ||
+                task.status === "failed" ||
+                task.status === "canceled")
+            ) {
+              pendingTaskAcksRef.current.add(task.task_id);
+            }
+          });
         }
-        const tasks = tasksResponse.status ? tasksResponse.data || [] : [];
-        if (normalized) {
-          setWorkspaces(tasks.reduce(applyDrawingTaskToWorkspaces, normalized));
-        } else if (tasks.length > 0) {
-          setWorkspaces((current) =>
-            tasks.reduce(applyDrawingTaskToWorkspaces, current),
-          );
-        }
+      } catch (error) {
+        console.debug("[drawing] failed to load local drawing state", error);
+      }
 
-        setCloudSyncReady(true);
-      },
-    );
+      if (cancelled) return;
+      setWorkspaces(nextWorkspaces);
+      setActiveWorkspaceId(
+        nextWorkspaces.some(
+          (workspace) => workspace.id === nextActiveWorkspaceId,
+        )
+          ? nextActiveWorkspaceId
+          : nextWorkspaces[0]?.id || "",
+      );
+      setLocalStateReady(true);
+    };
+
+    void initializeLocalState();
 
     return () => {
       cancelled = true;
     };
-  }, [t]);
+  }, []);
 
   useEffect(() => {
     const firstWorkspaceId = workspaces[0]?.id;
@@ -534,95 +687,39 @@ function Drawing() {
   ]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
+    if (!localStateReady) {
       return;
     }
 
-    latestWorkspaceSnapshotRef.current = JSON.stringify(workspaces);
-    latestActiveWorkspaceIdRef.current = activeWorkspaceIdForStorage;
-
-    try {
-      saveDrawingWorkspaceSnapshot(latestWorkspaceSnapshotRef.current);
-    } catch (error) {
-      console.debug("[drawing] local workspace cache is full", error);
-    }
-  }, [activeWorkspaceIdForStorage, workspaces]);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !activeWorkspaceIdForStorage) {
-      return;
-    }
-
-    try {
-      saveActiveWorkspaceId(activeWorkspaceIdForStorage);
-    } catch (error) {
-      console.debug("[drawing] failed to cache active workspace", error);
-    }
-  }, [activeWorkspaceIdForStorage]);
-
-  useEffect(() => {
-    if (!cloudSyncReady || !cloudSyncEnabled) {
-      return;
-    }
-
-    const workspacesSnapshot = JSON.stringify(workspaces);
-    const activeWorkspaceIdSnapshot = activeWorkspaceIdForStorage;
+    saveDrawingLocalBootstrap({
+      activeWorkspaceId: activeWorkspaceIdForStorage,
+      workspaces,
+    });
 
     const timer = setTimeout(() => {
-      void saveDrawingWorkspaceState<DrawingWorkspace>({
-        active_workspace_id: activeWorkspaceIdSnapshot,
+      void saveDrawingLocalState({
+        activeWorkspaceId: activeWorkspaceIdForStorage,
         workspaces,
-      }).then((response) => {
-        if (!response.status || !response.data) {
-          setCloudSyncError(
-            response.message || response.error || t("drawing.syncUnavailable"),
+      })
+        .then(async () => {
+          const taskIds = [...pendingTaskAcksRef.current];
+          await Promise.all(
+            taskIds.map(async (taskId) => {
+              if (await acknowledgeDrawingTask(taskId)) {
+                pendingTaskAcksRef.current.delete(taskId);
+              }
+            }),
           );
-          return;
-        }
-        setCloudSyncError("");
-
-        if (
-          latestWorkspaceSnapshotRef.current !== workspacesSnapshot ||
-          latestActiveWorkspaceIdRef.current !== activeWorkspaceIdSnapshot
-        ) {
-          return;
-        }
-
-        const normalized = preserveLocalActiveTaskState(
-          normalizeDrawingWorkspaces(response.data.workspaces),
-          workspaces,
-        );
-        const normalizedSnapshot = JSON.stringify(normalized);
-        if (normalizedSnapshot !== workspacesSnapshot) {
-          setWorkspaces(normalized);
-        }
-
-        const nextActiveWorkspaceId =
-          response.data.active_workspace_id &&
-          normalized.some(
-            (workspace) => workspace.id === response.data?.active_workspace_id,
-          )
-            ? response.data.active_workspace_id
-            : normalized[0]?.id;
-        if (
-          nextActiveWorkspaceId &&
-          nextActiveWorkspaceId !== activeWorkspaceIdSnapshot
-        ) {
-          setActiveWorkspaceId(nextActiveWorkspaceId);
-        }
-      });
-    }, 700);
+        })
+        .catch((error) => {
+          console.debug("[drawing] failed to save local drawing state", error);
+        });
+    }, 350);
 
     return () => {
       clearTimeout(timer);
     };
-  }, [
-    activeWorkspaceIdForStorage,
-    cloudSyncEnabled,
-    cloudSyncReady,
-    t,
-    workspaces,
-  ]);
+  }, [activeWorkspaceIdForStorage, localStateReady, workspaces]);
 
   const updateActiveWorkspace = useCallback(
     (
@@ -712,16 +809,29 @@ function Drawing() {
         );
         if (cancelled) return;
         if (!response.status || !response.data) {
-          setCloudSyncError(
-            response.message || response.error || t("drawing.syncUnavailable"),
+          console.debug(
+            "[drawing] failed to poll generation task",
+            response.message || response.error,
           );
           continue;
         }
 
-        setCloudSyncError("");
-        setWorkspaces((current) =>
-          applyDrawingTaskToWorkspaces(current, response.data!),
-        );
+        try {
+          const localizedTask = await localizeDrawingTaskImages(response.data);
+          if (cancelled) return;
+          if (
+            localizedTask.status === "succeeded" ||
+            localizedTask.status === "failed" ||
+            localizedTask.status === "canceled"
+          ) {
+            pendingTaskAcksRef.current.add(localizedTask.task_id);
+          }
+          setWorkspaces((current) =>
+            applyDrawingTaskToWorkspaces(current, localizedTask),
+          );
+        } catch (error) {
+          console.debug("[drawing] failed to cache generated images", error);
+        }
       }
 
       if (!cancelled) {
@@ -736,7 +846,7 @@ function Drawing() {
       controller.abort();
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [activeTaskKey, t]);
+  }, [activeTaskKey]);
 
   const getCapabilitiesForModelId = useCallback(
     (modelId: string) =>
@@ -1152,7 +1262,7 @@ function Drawing() {
     activeWorkspace?.taskStatus === "failed" ||
     activeWorkspace?.taskStatus === "canceled";
 
-  const settingsPanel = (
+  const settingsPanel = settingsStateReady ? (
     <div className="space-y-5">
       <div className="space-y-2.5">
         <label className="text-sm font-medium text-foreground">
@@ -1251,8 +1361,33 @@ function Drawing() {
           </div>
         </div>
       )}
+
+      {drawingModels.length > 0 && drawingQuotaEstimateState && (
+        <div className="rounded-xl border border-border/60 bg-muted/20 px-3.5 py-3">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Coins className="h-3.5 w-3.5" />
+            <span>{t("drawing.estimatedQuota")}</span>
+          </div>
+          <p className="mt-1.5 text-xl font-semibold tabular-nums text-foreground">
+            {drawingQuotaEstimateState === "free" &&
+              t("drawing.estimatedQuotaFree")}
+            {drawingQuotaEstimateState === "usage" &&
+              t("drawing.estimatedQuotaUsage")}
+            {drawingQuotaEstimateState === "unavailable" &&
+              t("drawing.estimatedQuotaUnavailable")}
+            {drawingQuotaEstimateState === "value" && (
+              <>
+                {formatDecimal(drawingQuotaEstimate ?? 0)}
+                <span className="ml-1.5 text-sm font-normal text-muted-foreground">
+                  {t("quota")}
+                </span>
+              </>
+            )}
+          </p>
+        </div>
+      )}
     </div>
-  );
+  ) : null;
 
   const renderWorkspaceRail = (vertical: boolean) => (
     <aside
@@ -1541,22 +1676,8 @@ function Drawing() {
                 : "pt-6",
             )}
           >
-            {cloudSyncReady && (
+            {localStateReady && (
               <>
-                {cloudSyncError && (
-                  <div
-                    className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/8 px-3 py-2.5 text-sm text-foreground"
-                    role="status"
-                  >
-                    <span className="font-medium">
-                      {t("drawing.syncUnavailable")}
-                    </span>
-                    <span className="ml-2 text-muted-foreground">
-                      {cloudSyncError}
-                    </span>
-                  </div>
-                )}
-
                 {activeWorkspacePending && (
                   <div
                     className="mb-4 rounded-xl border border-border/60 bg-card p-4"
@@ -1810,6 +1931,7 @@ function Drawing() {
                 dispatch={dispatchFiles}
                 modelId={selectedDrawingModelId}
                 forceImageUpload
+                localImageOnly
                 maxFiles={referenceImageLimit}
                 onUploadingChange={setReferenceUploadPending}
                 trigger={({ disabled, filesCount, open }) =>
@@ -2051,7 +2173,7 @@ function Drawing() {
           if (!open) setPreviewImage(null);
         }}
       >
-        <DialogContent className="h-[min(680px,88dvh)] w-[calc(100vw-2rem)] max-w-[1080px] gap-0 overflow-hidden rounded-2xl p-0">
+        <DialogContent className="flex h-[min(600px,88dvh)] w-[calc(100vw-2rem)] max-w-[960px] flex-col gap-0 overflow-hidden rounded-2xl p-0 md:max-w-[960px]">
           <DialogHeader className="sr-only">
             <DialogTitle>{t("drawing.detailsTitle")}</DialogTitle>
             <DialogDescription>
@@ -2059,15 +2181,16 @@ function Drawing() {
             </DialogDescription>
           </DialogHeader>
           {previewImage && previewMetadata && (
-            <div className="thin-scrollbar grid h-full min-h-0 overflow-y-auto md:grid-cols-2 md:overflow-hidden lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-              <div className="relative flex min-h-[280px] items-center justify-center overflow-hidden bg-muted/35 p-[16px] sm:p-[24px] md:min-h-0">
+            <div className="grid min-h-0 flex-1 grid-rows-[minmax(240px,1fr)_auto] md:grid-cols-2 md:grid-rows-1">
+              <div className="relative min-h-0 overflow-hidden bg-muted/40">
                 <img
                   src={previewImage.src}
                   alt={t("drawing.generatedImage")}
-                  className="h-full w-full rounded-xl object-contain"
+                  className="absolute inset-0 h-full w-full object-cover"
                 />
               </div>
-              <div className="thin-scrollbar flex min-h-0 flex-col p-5 sm:p-6 md:overflow-y-auto">
+
+              <div className="flex min-h-0 flex-col border-t border-border/50 p-5 sm:p-6 md:border-l md:border-t-0">
                 <DialogHeader notTextCentered className="pr-8">
                   <DialogTitle>{t("drawing.detailsTitle")}</DialogTitle>
                   <DialogDescription>
@@ -2078,7 +2201,7 @@ function Drawing() {
                   </DialogDescription>
                 </DialogHeader>
 
-                <section className="mt-6">
+                <section className="mt-5">
                   <div className="text-xs font-medium text-muted-foreground">
                     {t("drawing.promptLabel")}
                   </div>
@@ -2087,7 +2210,7 @@ function Drawing() {
                   </p>
                 </section>
 
-                <section className="mt-6">
+                <section className="mt-5">
                   <div className="text-xs font-medium text-muted-foreground">
                     {t("drawing.options.title")}
                   </div>
@@ -2132,24 +2255,18 @@ function Drawing() {
                   </div>
                 </section>
 
-                <div
-                  className={cn(
-                    "mt-8 grid gap-2 border-t border-border/60 pt-4 md:mt-auto",
-                    canAcceptReferences
-                      ? "grid-cols-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
-                      : "grid-cols-[minmax(0,1fr)_auto]",
-                  )}
-                >
+                <div className="mt-6 flex items-center justify-end gap-2 border-t border-border/60 pt-4 md:mt-auto">
                   {canAcceptReferences && (
                     <button
                       type="button"
-                      onClick={() => addGeneratedImageAsReference(previewImage)}
-                      className="inline-flex h-10 min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                      onClick={() =>
+                        addGeneratedImageAsReference(previewImage)
+                      }
+                      aria-label={t("drawing.useAsReference")}
+                      title={t("drawing.useAsReference")}
+                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-background text-foreground transition-colors hover:bg-muted"
                     >
-                      <ImagePlus className="h-4 w-4 shrink-0" />
-                      <span className="min-w-0 truncate">
-                        {t("drawing.useAsReference")}
-                      </span>
+                      <ImagePlus className="h-4 w-4" />
                     </button>
                   )}
                   <a
@@ -2157,23 +2274,19 @@ function Drawing() {
                     download={`drawing.${getDrawingImageExtension(previewImage.src)}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex h-10 min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-foreground px-3 text-sm font-medium text-background transition-opacity hover:opacity-85"
+                    aria-label={t("drawing.downloadImage")}
+                    title={t("drawing.downloadImage")}
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-foreground text-background transition-opacity hover:opacity-85"
                   >
-                    <Download className="h-4 w-4 shrink-0" />
-                    <span className="min-w-0 truncate">
-                      {t("drawing.downloadImage")}
-                    </span>
+                    <Download className="h-4 w-4" />
                   </a>
                   <button
                     type="button"
                     onClick={() => removeGeneratedImage(previewImage.id)}
-                    className={cn(
-                      "inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-destructive/10 px-3 text-sm font-medium text-destructive transition-colors hover:bg-destructive hover:text-destructive-foreground",
-                      canAcceptReferences && "col-span-2 sm:col-span-1",
-                    )}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-destructive/10 px-3.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive hover:text-destructive-foreground"
                   >
                     <Trash2 className="h-4 w-4 shrink-0" />
-                    <span className="min-w-0 truncate">{t("delete")}</span>
+                    {t("delete")}
                   </button>
                 </div>
               </div>

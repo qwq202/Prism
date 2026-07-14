@@ -19,7 +19,6 @@ import {
   Github,
   Globe,
   Image,
-  Link,
   Search,
   Snail,
   Sparkles,
@@ -42,7 +41,6 @@ import {
 } from "@/store/chat.ts";
 import { levelSelector } from "@/store/subscription.ts";
 import { selectAuthenticated } from "@/store/auth.ts";
-import { docsEndpoint } from "@/conf/env.ts";
 import { goAuth } from "@/utils/app.ts";
 import { cn } from "@/components/ui/lib/utils.ts";
 import { includingModelFromPlan } from "@/conf/subscription.tsx";
@@ -390,6 +388,154 @@ function formatQuotaValue(value: unknown): string {
   return String(parseFloat(normalized.toPrecision(8)));
 }
 
+function sortPricingKey(a: string, b: string): number {
+  const parsePixels = (value: string) => {
+    const numbers = value.match(/\d+/g);
+    if (!numbers?.length) return 0;
+    return numbers.reduce((sum, item) => sum + Number(item), 0);
+  };
+
+  const delta = parsePixels(a) - parsePixels(b);
+  if (delta !== 0) return delta;
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+}
+
+type GroupedPriceEntry = {
+  price: string;
+  keys: string[];
+};
+
+function groupPriceEntries(
+  entries: [string, unknown][],
+): GroupedPriceEntry[] {
+  const groups = new Map<string, string[]>();
+
+  for (const [key, value] of entries) {
+    const price = formatQuotaValue(value);
+    const keys = groups.get(price) ?? [];
+    keys.push(key);
+    groups.set(price, keys);
+  }
+
+  return Array.from(groups.entries())
+    .map(([price, keys]) => ({
+      price,
+      keys: keys.sort(sortPricingKey),
+    }))
+    .sort((a, b) => Number(a.price) - Number(b.price));
+}
+
+const PRICE_BREAKDOWN_PREVIEW_COUNT = 5;
+
+type ImagePriceBreakdownProps = {
+  title: string;
+  entries: [string, unknown][];
+  formatLabel: (key: string) => string;
+  formatValue?: (price: string) => string;
+};
+
+function ImagePriceBreakdown({
+  title,
+  entries,
+  formatLabel,
+  formatValue = (price) => price,
+}: ImagePriceBreakdownProps) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const groups = useMemo(() => groupPriceEntries(entries), [entries]);
+
+  if (groups.length === 0) return null;
+
+  const uniformPrice =
+    groups.length === 1 && groups[0].keys.length === entries.length;
+  const visibleGroups = expanded
+    ? groups
+    : groups.slice(0, PRICE_BREAKDOWN_PREVIEW_COUNT);
+  const hiddenGroupCount = groups.length - visibleGroups.length;
+
+  return (
+    <div className="rounded-lg border bg-background p-3">
+      <div className="mb-2.5 flex items-center justify-between gap-2">
+        <p className="text-xs font-medium text-muted-foreground">{title}</p>
+        {uniformPrice && entries.length > 1 && (
+          <span className="rounded-full bg-muted px-2 py-0.5 text-2xs text-muted-foreground">
+            {t("admin.charge.image-price-variant-count", {
+              count: entries.length,
+            })}
+          </span>
+        )}
+      </div>
+
+      {uniformPrice ? (
+        <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/35 px-3 py-2.5">
+          <span className="text-sm text-foreground">
+            {t("admin.charge.image-price-uniform")}
+          </span>
+          <span className="shrink-0 text-sm font-semibold tabular-nums">
+            {formatValue(groups[0].price)} {t("quota")}
+          </span>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-lg border">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 border-b bg-muted/30 px-3 py-2 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
+            <span>{t("admin.charge.image-price-spec")}</span>
+            <span className="text-right">{t("quota")}</span>
+          </div>
+          <div className="divide-y">
+            {visibleGroups.map((group) => (
+              <div
+                key={`${group.price}-${group.keys.join("-")}`}
+                className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 px-3 py-2.5"
+              >
+                <div className="min-w-0">
+                  {group.keys.length === 1 ? (
+                    <span className="text-sm font-medium">
+                      {formatLabel(group.keys[0])}
+                    </span>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {group.keys.map((key) => (
+                        <span
+                          key={key}
+                          className="rounded-md bg-muted/50 px-1.5 py-0.5 text-xs text-foreground"
+                        >
+                          {formatLabel(key)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <span className="shrink-0 self-start pt-0.5 text-sm font-semibold tabular-nums">
+                  {formatValue(group.price)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!uniformPrice && hiddenGroupCount > 0 && (
+        <button
+          type="button"
+          className="mt-2 text-xs font-medium text-primary hover:underline"
+          onClick={() => setExpanded(true)}
+        >
+          {t("admin.charge.image-show-more", { count: hiddenGroupCount })}
+        </button>
+      )}
+      {!uniformPrice && expanded && groups.length > PRICE_BREAKDOWN_PREVIEW_COUNT && (
+        <button
+          type="button"
+          className="mt-2 text-xs font-medium text-primary hover:underline"
+          onClick={() => setExpanded(false)}
+        >
+          {t("admin.charge.image-show-less")}
+        </button>
+      )}
+    </div>
+  );
+}
+
 type ImagePricingDetailsProps = {
   image?: ImageChargeConfig;
   fallbackOutput: number;
@@ -450,19 +596,21 @@ function ImagePricingDetails({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.16, duration: 0.18 }}
     >
-      <div className="flex flex-wrap items-start gap-2">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
-          <Image className="h-4 w-4" />
+      <div className="space-y-2">
+        <div className="flex items-start gap-2">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
+            <Image className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold leading-snug">
+              {t("admin.charge.image-billing-title")}
+            </p>
+            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+              {t("admin.charge.image-billing-desc")}
+            </p>
+          </div>
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">
-            {t("admin.charge.image-billing-title")}
-          </p>
-          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-            {t("admin.charge.image-billing-desc")}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5 pl-10">
           <span className="rounded-md border bg-background px-2 py-1 text-xs font-medium">
             {t(`admin.charge.image-billing-mode-${mode}`)}
           </span>
@@ -476,15 +624,20 @@ function ImagePricingDetails({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {stats.map((stat) => (
-          <div key={stat.label} className="rounded-lg border bg-background p-3">
-            <p className="text-xs text-muted-foreground">{stat.label}</p>
-            <div className="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-              <span className="text-xl font-bold tabular-nums">
+          <div
+            key={stat.label}
+            className="rounded-lg border bg-background px-3 py-2.5"
+          >
+            <p className="truncate text-2xs text-muted-foreground">
+              {stat.label}
+            </p>
+            <div className="mt-1 flex items-baseline gap-1">
+              <span className="text-lg font-bold tabular-nums leading-none">
                 {stat.value}
               </span>
-              <span className="text-2xs text-muted-foreground">
+              <span className="truncate text-2xs text-muted-foreground">
                 {stat.unit}
               </span>
             </div>
@@ -551,41 +704,23 @@ function ImagePricingDetails({
       )}
 
       {(sizePrices.length > 0 || qualityPrices.length > 0) && (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="space-y-2">
           {sizePrices.length > 0 && (
-            <div className="rounded-lg border bg-background p-3">
-              <p className="mb-2 text-xs font-medium text-muted-foreground">
-                {t("admin.charge.image-size-prices")}
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {sizePrices.map(([size, price]) => (
-                  <span
-                    key={size}
-                    className="rounded-md bg-muted/50 px-2 py-1 text-xs tabular-nums"
-                  >
-                    {size}: {formatQuotaValue(price)}
-                  </span>
-                ))}
-              </div>
-            </div>
+            <ImagePriceBreakdown
+              title={t("admin.charge.image-size-prices")}
+              entries={sizePrices}
+              formatLabel={(size) => size}
+            />
           )}
           {qualityPrices.length > 0 && (
-            <div className="rounded-lg border bg-background p-3">
-              <p className="mb-2 text-xs font-medium text-muted-foreground">
-                {t("admin.charge.image-quality-prices")}
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {qualityPrices.map(([quality, price]) => (
-                  <span
-                    key={quality}
-                    className="rounded-md bg-muted/50 px-2 py-1 text-xs tabular-nums"
-                  >
-                    {t(`admin.charge.image-quality-${quality}`, quality)}: +
-                    {formatQuotaValue(price)}
-                  </span>
-                ))}
-              </div>
-            </div>
+            <ImagePriceBreakdown
+              title={t("admin.charge.image-quality-prices")}
+              entries={qualityPrices}
+              formatLabel={(quality) =>
+                t(`admin.charge.image-quality-${quality}`, quality)
+              }
+              formatValue={(price) => `+${price}`}
+            />
           )}
         </div>
       )}
@@ -615,8 +750,8 @@ function formatCardThroughput(
     metrics.tps >= 100
       ? metrics.tps.toFixed(0)
       : metrics.tps >= 10
-      ? metrics.tps.toFixed(1)
-      : metrics.tps.toFixed(2);
+        ? metrics.tps.toFixed(1)
+        : metrics.tps.toFixed(2);
   return `${value}tps`;
 }
 
@@ -1655,30 +1790,6 @@ function MarketHeader() {
   );
 }
 
-function MarketFooter() {
-  const { t } = useTranslation();
-
-  return (
-    <motion.div
-      className={`market-footer`}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <motion.a
-        href={docsEndpoint}
-        target={`_blank`}
-        rel={`noopener noreferrer`}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-      >
-        <Link size={14} className={`mr-1`} />
-        {t("pricing")}
-      </motion.a>
-    </motion.div>
-  );
-}
-
 function Model() {
   const { t } = useTranslation();
   const [displayPricing, setDisplayPricing] = useState<boolean>(true);
@@ -1749,7 +1860,6 @@ function Model() {
             show1mPricing={show1mPricing}
             onSelect={setSelectedModel}
           />
-          <MarketFooter />
         </motion.div>
       </ScrollArea>
       <AnimatePresence>

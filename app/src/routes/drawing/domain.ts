@@ -353,7 +353,7 @@ export function buildDrawingRequestOptions(
 function normalizeDrawingImages(value: unknown): DrawingGeneratedImage[] {
   if (!Array.isArray(value)) return [];
 
-  return value
+  const images = value
     .map((item): DrawingGeneratedImage | null => {
       if (!item || typeof item !== "object") return null;
       const image = item as Partial<DrawingGeneratedImage>;
@@ -381,6 +381,17 @@ function normalizeDrawingImages(value: unknown): DrawingGeneratedImage[] {
       };
     })
     .filter((image): image is DrawingGeneratedImage => Boolean(image));
+
+  const seenIds = new Set<string>();
+  const seenSources = new Set<string>();
+  return images.filter((image) => {
+    if (seenIds.has(image.id) || seenSources.has(image.src)) {
+      return false;
+    }
+    seenIds.add(image.id);
+    seenSources.add(image.src);
+    return true;
+  });
 }
 
 function normalizeDrawingImageOptions(
@@ -481,14 +492,18 @@ function mergeGeneratedImages(
 ): DrawingGeneratedImage[] {
   if (incoming.length === 0) return current;
 
-  const indexes = new Map(
+  const indexesById = new Map(
+    current.map((image, index) => [image.id, index] as const),
+  );
+  const indexesBySource = new Map(
     current.map((image, index) => [image.src, index] as const),
   );
   const next = [...current];
   const additions: DrawingGeneratedImage[] = [];
   let changed = false;
   incoming.forEach((image) => {
-    const existingIndex = indexes.get(image.src);
+    const existingIndex =
+      indexesById.get(image.id) ?? indexesBySource.get(image.src);
     if (existingIndex !== undefined) {
       if (existingIndex < 0) return;
       const existing = next[existingIndex];
@@ -500,7 +515,8 @@ function mergeGeneratedImages(
       }
       return;
     }
-    indexes.set(image.src, -1);
+    indexesById.set(image.id, -1);
+    indexesBySource.set(image.src, -1);
     additions.push(image);
     changed = true;
   });
@@ -559,11 +575,13 @@ export function applyDrawingTaskToWorkspaces(
     }
 
     if (task.status === "succeeded") {
-      const taskImages = (task.images ?? []).map((image) => ({
-        ...image,
-        model: image.model || task.model,
-        options: image.options || task.options,
-      }));
+      const taskImages = normalizeDrawingImages(task.images ?? []).map(
+        (image) => ({
+          ...image,
+          model: image.model || task.model,
+          options: image.options || task.options,
+        }),
+      );
       const images = reconcileGeneratedImagesForTask(
         workspace.images,
         task.task_id,

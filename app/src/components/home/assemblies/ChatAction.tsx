@@ -83,7 +83,7 @@ import { Label } from "@/components/ui/label.tsx";
 import { ButtonProps } from "@/components/ui/button.tsx";
 import { getBooleanMemory, setMemory } from "@/utils/memory.ts";
 import { useMobile } from "@/utils/device.ts";
-import { ClaudeRangeSlider } from "./ClaudeRangeSlider.tsx";
+import { ThinkingEffortSteps } from "./ThinkingEffortSteps.tsx";
 
 const geminiThinkingPresets = [
   { label: "off", budget: 0 },
@@ -113,7 +113,7 @@ function EffortPopoverHeader({ levelLabel, tip }: EffortPopoverHeaderProps) {
     <div className="flex items-center justify-between gap-2">
       <div className="flex min-w-0 items-center gap-2 text-sm">
         <h2 className="shrink-0 font-medium text-muted-foreground">
-          {t("chat.effort-label")}
+          {t("chat.openai-reasoning-depth")}
         </h2>
         <span className="relative min-w-0">
           <span className="sr-only">{levelLabel}</span>
@@ -643,11 +643,11 @@ export function GeminiThinkingAction() {
         </div>
       </PopoverTrigger>
       <PopoverContent
-        className="w-[220px] border-border/60 p-4 shadow-lg"
+        className="w-[248px] border-border/60 p-3.5 shadow-lg"
         side="top"
         align="start"
       >
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3.5">
           <EffortPopoverHeader
             levelLabel={currentLabel}
             tip={t("chat.gemini-thinking-tip")}
@@ -673,14 +673,14 @@ export function GeminiThinkingAction() {
             />
           </div>
 
-          <ClaudeRangeSlider
+          <ThinkingEffortSteps
             levels={activeLevels.map((item) => item.label)}
+            labels={activeLevels.map((item) =>
+              t(`chat.gemini-thinking-level-${item.label}`),
+            )}
             index={sliderIndex}
             disabled={!enabled}
-            fasterLabel={t("chat.effort-faster")}
-            smarterLabel={t("chat.effort-smarter")}
-            ariaLabel={t("chat.effort-label")}
-            ariaValueText={currentLabel}
+            ariaLabel={t("chat.openai-reasoning-depth")}
             onIndexChange={(nextIndex) => {
               const next = activeLevels[nextIndex];
               next && dispatch(setGeminiThinkingBudget(next.budget));
@@ -952,11 +952,11 @@ export function OpenAIReasoningAction() {
         </div>
       </PopoverTrigger>
       <PopoverContent
-        className="w-[220px] border-border/60 p-4 shadow-lg"
+        className="w-[248px] border-border/60 p-3.5 shadow-lg"
         side="top"
         align="start"
       >
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3.5">
           <EffortPopoverHeader levelLabel={currentEffortLabel} tip={tipText} />
 
           <div className="flex items-center justify-between gap-2">
@@ -978,14 +978,14 @@ export function OpenAIReasoningAction() {
           </div>
 
           {availableEfforts.length > 1 && (
-            <ClaudeRangeSlider
+            <ThinkingEffortSteps
               levels={availableEfforts}
+              labels={availableEfforts.map((effort) =>
+                t(`chat.openai-reasoning-level-${effort}`),
+              )}
               index={levelIndex}
               disabled={!enabled}
-              fasterLabel={t("chat.effort-faster")}
-              smarterLabel={t("chat.effort-smarter")}
-              ariaLabel={t("chat.effort-label")}
-              ariaValueText={currentEffortLabel}
+              ariaLabel={t("chat.openai-reasoning-depth")}
               onIndexChange={(nextIndex) => {
                 const next = availableEfforts[nextIndex];
                 next && dispatch(setOpenAIReasoningEffort(next));

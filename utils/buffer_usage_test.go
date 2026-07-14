@@ -253,3 +253,35 @@ func TestNewBufferDoesNotCountBase64FileContentForDrawingModel(t *testing.T) {
 		t.Fatalf("expected only drawing text prompt to be counted, got %d tokens", buffer.CountInputToken())
 	}
 }
+
+func TestNewBufferStripsAssistantInlineImagesForDrawingModel(t *testing.T) {
+	image := "data:image/png;base64," + strings.Repeat("A", 20000)
+	history := []globals.Message{
+		{Role: globals.User, Content: "画一只猪"},
+		{Role: globals.Assistant, Content: "![image](" + image + ")"},
+		{Role: globals.User, Content: "再画一只"},
+	}
+	rawTokens := NumTokensFromMessages(history, globals.GPT3Turbo, false)
+	buffer := NewBuffer(globals.Gemini31FlashImage, history, usageTestCharge{})
+
+	if buffer.CountInputToken() >= rawTokens {
+		t.Fatalf("expected assistant inline image to be stripped, got %d >= %d", buffer.CountInputToken(), rawTokens)
+	}
+	if buffer.CountInputToken() > 80 {
+		t.Fatalf("expected only text turns to be counted, got %d tokens", buffer.CountInputToken())
+	}
+}
+
+func TestNumTokensFromResponseStripsInlineImagesForDrawingModel(t *testing.T) {
+	image := "data:image/png;base64," + strings.Repeat("A", 20000)
+	response := "done\n\n![image](" + image + ")"
+	rawTokens := NumTokensFromResponse(response, globals.GPT3Turbo)
+	tokens := NumTokensFromResponse(response, globals.Gemini31FlashImage)
+
+	if tokens >= rawTokens {
+		t.Fatalf("expected drawing response to strip base64 before token count, got %d >= %d", tokens, rawTokens)
+	}
+	if tokens > 10 {
+		t.Fatalf("expected only surrounding text to be counted, got %d tokens", tokens)
+	}
+}

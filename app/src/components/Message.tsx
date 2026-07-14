@@ -46,6 +46,7 @@ import {
   type AskUserResult,
   getAskUserToolCalls,
   isAskUserToolCallName,
+  isPendingAskUserToolCall,
 } from "@/api/ask-user.ts";
 import { AskUserCard } from "@/components/AskUserCard.tsx";
 
@@ -343,10 +344,11 @@ function MessageContent({
   );
   const hasToolCalls =
     askUserToolCalls.length > 0 || standardToolCalls.length > 0;
-  const isAskUserOnlyMessage =
+  const isPendingAskUserOnlyMessage =
     !hasContent &&
     askUserToolCalls.length > 0 &&
-    standardToolCalls.length === 0;
+    standardToolCalls.length === 0 &&
+    askUserToolCalls.every(isPendingAskUserToolCall);
   const user = useSelector(selectUsername);
   const supportModels = useSelector(selectSupportModels);
 
@@ -420,7 +422,7 @@ function MessageContent({
       <div
         className={cn(
           "relative message-content",
-          isAskUserOnlyMessage
+          isPendingAskUserOnlyMessage
             ? "ask-user-only-message"
             : "dark:bg-muted/40 border dark:border-transparent hover:border-border",
         )}

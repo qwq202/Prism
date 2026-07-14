@@ -157,7 +157,7 @@ export function AskUserCard({ toolCall, onSubmit }: AskUserCardProps) {
   if (answered) {
     return (
       <section
-        className="mt-3 border-t border-border/60 pt-3"
+        className="py-1"
         aria-label={t("ask-user.answered")}
       >
         <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">

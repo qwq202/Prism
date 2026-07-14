@@ -768,6 +768,37 @@ func TestLoadTaskKeepsOnlyFinalLegacyGeminiImage(t *testing.T) {
 	}
 }
 
+func TestAcknowledgeTaskDeletesOnlyTerminalOwnedTask(t *testing.T) {
+	db := openDrawingWorkspaceTestDB(t)
+	active, err := CreateTask(db, 7, validDrawingTaskForm("workspace-active"))
+	if err != nil {
+		t.Fatalf("create active task: %v", err)
+	}
+	if err := AcknowledgeTask(db, 7, active.TaskID); err == nil {
+		t.Fatal("expected active task acknowledgement to fail")
+	}
+
+	terminal, err := CreateTask(db, 7, validDrawingTaskForm("workspace-terminal"))
+	if err != nil {
+		t.Fatalf("create terminal task: %v", err)
+	}
+	if err := MarkTaskSucceeded(db, terminal.TaskID, []GeneratedImage{{
+		ID:  terminal.TaskID + "-0",
+		Src: "/attachments/final.png",
+	}}, 1); err != nil {
+		t.Fatalf("mark task succeeded: %v", err)
+	}
+	if err := AcknowledgeTask(db, 8, terminal.TaskID); err == nil {
+		t.Fatal("expected another user acknowledgement to fail")
+	}
+	if err := AcknowledgeTask(db, 7, terminal.TaskID); err != nil {
+		t.Fatalf("acknowledge terminal task: %v", err)
+	}
+	if _, err := LoadTask(db, 7, terminal.TaskID); err == nil {
+		t.Fatal("expected acknowledged task to be deleted")
+	}
+}
+
 func TestNormalizeTaskResultImagesPreservesNonGeminiOutputs(t *testing.T) {
 	images := []GeneratedImage{
 		{ID: "task-1-0", Src: "/attachments/first.png"},

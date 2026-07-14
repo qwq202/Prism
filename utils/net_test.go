@@ -37,8 +37,38 @@ func TestFormatBodyForLogRedactsGeminiInlineData(t *testing.T) {
 	if !strings.Contains(got, "[base64 omitted") {
 		t.Fatalf("expected base64 redaction notice, got %q", got)
 	}
-	if !strings.Contains(got, `"mimeType": "image/png"`) {
+	if !strings.Contains(got, `"mimeType"`) || !strings.Contains(got, `image/png`) {
 		t.Fatalf("expected non-sensitive metadata to remain, got %q", got)
+	}
+}
+
+func TestFormatBodyForLogRedactsHugeInvalidJSONBase64(t *testing.T) {
+	imageData := strings.Repeat("A", minBase64LogRedactLength+20)
+	// Trailing comma makes Unmarshal fail; raw-string redaction must still run.
+	body := `{"output_image":{"mime_type":"image/png","data":"` + imageData + `"},}`
+
+	got := formatBodyForLog([]byte(body), "application/json")
+	if strings.Contains(got, imageData) {
+		t.Fatalf("expected raw base64 fallback redaction, got %q", got)
+	}
+	if !strings.Contains(got, "[base64 omitted") {
+		t.Fatalf("expected base64 redaction notice, got %q", got)
+	}
+}
+
+func TestFormatBodyForLogRedactsThoughtSignature(t *testing.T) {
+	signature := strings.Repeat("C", maxOpaqueBase64LogBytes+20)
+	body := `{"candidates":[{"content":{"parts":[{"text":"ok","thoughtSignature":"` + signature + `"}]}}]}`
+
+	got := formatBodyForLog([]byte(body), "application/json")
+	if strings.Contains(got, signature) {
+		t.Fatalf("expected thoughtSignature to be redacted, got %q", got)
+	}
+	if !strings.Contains(got, "[base64 omitted") {
+		t.Fatalf("expected base64 redaction notice, got %q", got)
+	}
+	if !strings.Contains(got, `"text"`) || !strings.Contains(got, `ok`) {
+		t.Fatalf("expected surrounding text to remain, got %q", got)
 	}
 }
 

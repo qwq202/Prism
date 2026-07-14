@@ -1,12 +1,6 @@
 import axios from "axios";
 import { getErrorMessage } from "@/utils/base.ts";
 
-export type DrawingWorkspaceSyncState<TWorkspace> = {
-  active_workspace_id: string;
-  workspaces: TWorkspace[];
-  updated_at?: string;
-};
-
 export type DrawingTaskStatus =
   | "queued"
   | "running"
@@ -42,13 +36,6 @@ export type DrawingTask<TImage = unknown> = {
   completed_at?: string;
 };
 
-type DrawingWorkspaceSyncResponse<TWorkspace> = {
-  status: boolean;
-  data?: DrawingWorkspaceSyncState<TWorkspace>;
-  message?: string;
-  error?: string;
-};
-
 type DrawingTaskResponse<TImage = unknown> = {
   status: boolean;
   data?: DrawingTask<TImage>;
@@ -71,20 +58,6 @@ export type CreateDrawingTaskPayload = {
   response_format?: unknown;
   thinking?: unknown;
 };
-
-export async function loadDrawingWorkspaceState<TWorkspace>(): Promise<
-  DrawingWorkspaceSyncResponse<TWorkspace>
-> {
-  try {
-    const response = await axios.get("/drawing/workspaces");
-    return response.data as DrawingWorkspaceSyncResponse<TWorkspace>;
-  } catch (error) {
-    return {
-      status: false,
-      error: getErrorMessage(error),
-    };
-  }
-}
 
 export async function listDrawingTasks<TImage>(): Promise<
   DrawingTaskListResponse<TImage>
@@ -148,16 +121,12 @@ export async function cancelDrawingTask<TImage>(
   }
 }
 
-export async function saveDrawingWorkspaceState<TWorkspace>(
-  state: DrawingWorkspaceSyncState<TWorkspace>,
-): Promise<DrawingWorkspaceSyncResponse<TWorkspace>> {
+export async function acknowledgeDrawingTask(taskId: string): Promise<boolean> {
   try {
-    const response = await axios.post("/drawing/workspaces", state);
-    return response.data as DrawingWorkspaceSyncResponse<TWorkspace>;
+    const response = await axios.delete(`/drawing/tasks/${taskId}`);
+    return Boolean(response.data?.status);
   } catch (error) {
-    return {
-      status: false,
-      error: getErrorMessage(error),
-    };
+    console.debug("[drawing] failed to acknowledge local task", getErrorMessage(error));
+    return false;
   }
 }

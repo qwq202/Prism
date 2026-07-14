@@ -129,7 +129,10 @@ type MarketAction =
   | { type: "upward"; payload: MarketIndexedPayload }
   | { type: "downward"; payload: MarketIndexedPayload }
   | { type: "move"; payload: { fromIndex: number; toIndex: number } }
-  | { type: "bulk-update-default"; payload: { ids: string[]; default: boolean } };
+  | {
+      type: "bulk-update-default";
+      payload: { ids: string[]; default: boolean };
+    };
 
 type MarketDispatch = Dispatch<MarketAction>;
 
@@ -504,7 +507,9 @@ function reducer(state: MarketForm, action: MarketAction): MarketForm {
     case "bulk-update-default": {
       const idSet = new Set(action.payload.ids);
       return state.map((model) =>
-        idSet.has(model.id) ? { ...model, default: action.payload.default } : model
+        idSet.has(model.id)
+          ? { ...model, default: action.payload.default }
+          : model,
       );
     }
     default:
@@ -519,12 +524,7 @@ type MarketTagsProps = {
   dispatch: MarketDispatch;
 };
 
-function MarketTags({
-  tag,
-  lockedTags = [],
-  idx,
-  dispatch,
-}: MarketTagsProps) {
+function MarketTags({ tag, lockedTags = [], idx, dispatch }: MarketTagsProps) {
   const { t } = useTranslation();
   const lockedTagSet = useMemo(() => new Set(lockedTags), [lockedTags]);
   const tags = useMemo((): Record<string, boolean> => {
@@ -590,14 +590,17 @@ function CustomMarketImage({ image, idx, dispatch }: MarketImageProps) {
     image.trim().length > 0 && !deprecatedModelImages.includes(image),
   );
 
-  const setAvatar = useCallback((source: string) =>
-    dispatch({
-      type: "set-avatar",
-      payload: {
-        idx,
-        avatar: source,
-      },
-    }), [dispatch, idx]);
+  const setAvatar = useCallback(
+    (source: string) =>
+      dispatch({
+        type: "set-avatar",
+        payload: {
+          idx,
+          avatar: source,
+        },
+      }),
+    [dispatch, idx],
+  );
 
   useEffect(() => {
     if (!customizedImage) {
@@ -1324,7 +1327,9 @@ function GroupSection({
             <ChevronDown className="h-4 w-4" />
           )}
           <span>{groupName || t("admin.market.ungrouped")}</span>
-          <span className="text-xs text-muted-foreground ml-1">({models.length})</span>
+          <span className="text-xs text-muted-foreground ml-1">
+            ({models.length})
+          </span>
         </button>
         <div className="grow" />
         <Button
@@ -1474,8 +1479,7 @@ function Market() {
   );
 
   const unusedModels = useMemo(
-    (): string[] =>
-      allModels.filter((model) => !formModelIds.has(model)),
+    (): string[] => allModels.filter((model) => !formModelIds.has(model)),
     [formModelIds, allModels],
   );
 
@@ -1504,40 +1508,37 @@ function Market() {
     });
   }, [formModelIds]);
 
-  const marketDispatch = useCallback(
-    (action: MarketAction) => {
-      if (action.type === "remove") {
-        const removedModelId = action.payload.id?.trim();
-        if (removedModelId) {
-          setHiddenUnusedModels((prev) => {
-            const next = new Set(prev);
-            next.add(removedModelId);
-            return next;
-          });
-        }
-      }
-
-      if (action.type === "new-template") {
+  const marketDispatch = useCallback((action: MarketAction) => {
+    if (action.type === "remove") {
+      const removedModelId = action.payload.id?.trim();
+      if (removedModelId) {
         setHiddenUnusedModels((prev) => {
-          if (!prev.has(action.payload.id)) return prev;
           const next = new Set(prev);
-          next.delete(action.payload.id);
+          next.add(removedModelId);
           return next;
         });
       }
+    }
 
-      if (action.type === "batch-new-template") {
-        setHiddenUnusedModels((prev) => {
-          const next = new Set(prev);
-          for (const model of action.payload) next.delete(model.id);
-          return next.size === prev.size ? prev : next;
-        });
-      }
+    if (action.type === "new-template") {
+      setHiddenUnusedModels((prev) => {
+        if (!prev.has(action.payload.id)) return prev;
+        const next = new Set(prev);
+        next.delete(action.payload.id);
+        return next;
+      });
+    }
 
-      dispatch(action);
-    },
-    [],
-  );
+    if (action.type === "batch-new-template") {
+      setHiddenUnusedModels((prev) => {
+        const next = new Set(prev);
+        for (const model of action.payload) next.delete(model.id);
+        return next.size === prev.size ? prev : next;
+      });
+    }
+
+    dispatch(action);
+  }, []);
 
   const loading = stepSupport || stepAll;
   const update = async () => {

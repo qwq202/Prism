@@ -521,9 +521,7 @@ func appendGeminiInteractionImage(builder *strings.Builder, image GeminiInteract
 	}
 
 	if url != "" {
-		builder.WriteString("![image](")
-		builder.WriteString(url)
-		builder.WriteString(")")
+		builder.WriteString(utils.GetImageMarkdown(utils.StoreImage(url)))
 		return
 	}
 
@@ -535,11 +533,8 @@ func appendGeminiInteractionImage(builder *strings.Builder, image GeminiInteract
 		mimeType = "image/png"
 	}
 
-	builder.WriteString("![image](data:")
-	builder.WriteString(mimeType)
-	builder.WriteString(";base64,")
-	builder.WriteString(data)
-	builder.WriteString(")")
+	stored := utils.StoreImage(fmt.Sprintf("data:%s;base64,%s", mimeType, data))
+	builder.WriteString(utils.GetImageMarkdown(stored))
 }
 
 func appendGeminiInteractionContent(builder *strings.Builder, content GeminiInteractionContent) {
