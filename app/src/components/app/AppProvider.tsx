@@ -17,6 +17,7 @@ import { useEffect } from "react";
 import { getClientCache, setClientCache } from "@/utils/client-cache.ts";
 import type { Model, Plan } from "@/api/types.tsx";
 import { apiEndpoint } from "@/conf/bootstrap.ts";
+import { syncSiteInfo } from "@/admin/api/info.ts";
 
 const marketCacheKey = `market:${apiEndpoint}`;
 const plansCacheKey = `plans:${apiEndpoint}`;
@@ -28,11 +29,14 @@ function AppProvider({ children }: { children?: React.ReactNode }) {
   useEffect(() => {
     infoEvent.bind((data) => dispatch(setForm(data)));
     themeEvent.bind((theme) => dispatch(setTheme(theme)));
+    syncSiteInfo();
+  }, [dispatch]);
 
+  useEffect(() => {
     stack.setCallback(async (id, message) => {
       await receive(id, message);
     });
-  }, [dispatch, receive]);
+  }, [receive]);
 
   useEffectAsync(async () => {
     const [cachedMarket, cachedPlans] = await Promise.all([

@@ -6,6 +6,7 @@ import { BroadcastEvent, getBroadcast } from "@/api/broadcast";
 import { getClientCache, setClientCache } from "@/utils/client-cache.ts";
 
 const siteInfoCacheKey = "site-info";
+let siteInfoRefreshPromise: Promise<SiteInfo> | null = null;
 
 function getSiteInfoCacheKey(): string {
   return `${siteInfoCacheKey}:${axios.defaults.baseURL || "default"}`;
@@ -104,21 +105,32 @@ function applySiteInfo(info: SiteInfo) {
   infoEvent.emit(info);
 }
 
-export async function refreshSiteInfo(): Promise<SiteInfo> {
-  const info = await getFreshSiteInfo();
-  info.broadcast = await getBroadcast();
-  void setClientCache(getSiteInfoCacheKey(), info);
+export function refreshSiteInfo(): Promise<SiteInfo> {
+  if (siteInfoRefreshPromise) return siteInfoRefreshPromise;
 
-  applySiteInfo(info);
-  return info;
+  siteInfoRefreshPromise = (async () => {
+    const info = await getFreshSiteInfo();
+    info.broadcast = await getBroadcast();
+    void setClientCache(getSiteInfoCacheKey(), info);
+
+    applySiteInfo(info);
+    return info;
+  })().finally(() => {
+    siteInfoRefreshPromise = null;
+  });
+
+  return siteInfoRefreshPromise;
 }
 
 export function syncSiteInfo() {
-  void getCachedSiteInfo().then((info) => {
+  void (async () => {
+    const info = await getCachedSiteInfo();
     if (info) applySiteInfo(info);
-  });
 
-  setTimeout(async () => {
-    await refreshSiteInfo();
-  }, 25);
+    try {
+      await refreshSiteInfo();
+    } catch (error) {
+      console.debug("[site-info] failed to refresh site info", error);
+    }
+  })();
 }

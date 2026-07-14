@@ -4,7 +4,6 @@ import {
   getTokenField,
   getWebsocketApi,
 } from "@/conf/env.ts";
-import { syncSiteInfo } from "@/admin/api/info.ts";
 import { setAxiosConfig } from "@/conf/api.ts";
 import { version as _version } from "./version.json";
 
@@ -20,5 +19,3 @@ setAxiosConfig({
   endpoint: apiEndpoint,
   token: tokenField,
 });
-
-syncSiteInfo();

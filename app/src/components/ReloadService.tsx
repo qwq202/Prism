@@ -4,7 +4,7 @@ import { getMemory, setMemory } from "@/utils/memory.ts";
 import { Badge } from "@/components/ui/badge.tsx";
 import { toast } from "sonner";
 import { useEffect, useRef } from "react";
-import { getFreshSiteInfo } from "@/admin/api/info.ts";
+import { refreshSiteInfo } from "@/admin/api/info.ts";
 
 const serverUpdateCheckInterval = 60_000;
 
@@ -15,12 +15,24 @@ function ReloadPrompt() {
 
   useEffect(() => {
     let closed = false;
+    let checking = false;
+    let lastCheckedAt = 0;
 
     const checkServerRuntime = async () => {
-      if (document.visibilityState === "hidden") return;
+      const now = Date.now();
+      if (
+        document.visibilityState === "hidden" ||
+        checking ||
+        now - lastCheckedAt < 1_000
+      ) {
+        return;
+      }
+
+      checking = true;
+      lastCheckedAt = now;
 
       try {
-        const info = await getFreshSiteInfo();
+        const info = await refreshSiteInfo();
         const runtimeID = (info.runtime_id || "").trim();
         if (!runtimeID || closed) return;
 
@@ -47,6 +59,14 @@ function ReloadPrompt() {
         });
       } catch (error) {
         console.debug("[service] cannot check server runtime", error);
+      } finally {
+        checking = false;
+      }
+    };
+
+    const checkWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        void checkServerRuntime();
       }
     };
 
@@ -55,10 +75,14 @@ function ReloadPrompt() {
       checkServerRuntime,
       serverUpdateCheckInterval,
     );
+    window.addEventListener("focus", checkWhenVisible);
+    document.addEventListener("visibilitychange", checkWhenVisible);
 
     return () => {
       closed = true;
       window.clearInterval(timer);
+      window.removeEventListener("focus", checkWhenVisible);
+      document.removeEventListener("visibilitychange", checkWhenVisible);
     };
   }, [t]);
 
