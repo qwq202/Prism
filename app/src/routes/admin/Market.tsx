@@ -75,6 +75,7 @@ import { withNotify } from "@/api/common.ts";
 import { DRAWING_MODEL_TAG, isDrawingModel } from "@/conf/model.ts";
 import {
   DEFAULT_REASONING_EFFORTS,
+  getMaintainedReasoningEfforts,
   isMaintainedReasoningModel,
   normalizeConfiguredReasoningEfforts,
   REASONING_EFFORT_DISPLAY_LEVELS,
@@ -145,6 +146,13 @@ function normalizeMarketModel(model: Model): Model {
   const isDrawing = isDrawingModel(next);
   const reasoningConfigurable =
     next.reasoning_configurable ?? !isMaintainedReasoningModel(next.id);
+  const maintainedReasoningEfforts = normalizeConfiguredReasoningEfforts(
+    next.reasoning_available_efforts ??
+      getMaintainedReasoningEfforts(next.id) ??
+      [],
+  );
+  const isMaintainedReasoning =
+    !reasoningConfigurable && maintainedReasoningEfforts.length > 0;
   const isCustomReasoning = reasoningConfigurable && !!next.reasoning_model;
   const configuredReasoningEfforts = normalizeConfiguredReasoningEfforts(
     next.reasoning_efforts,
@@ -160,18 +168,30 @@ function normalizeMarketModel(model: Model): Model {
     isDrawing && !resolvedTags.includes(DRAWING_MODEL_TAG)
       ? [...resolvedTags, DRAWING_MODEL_TAG]
       : resolvedTags;
-  if (isCustomReasoning && !normalizedTags.includes("reasoning")) {
+  if (
+    (isMaintainedReasoning || isCustomReasoning) &&
+    !normalizedTags.includes("reasoning")
+  ) {
     normalizedTags = [...normalizedTags, "reasoning"];
   }
 
   next.drawing_model = isDrawing;
   next.reasoning_configurable = reasoningConfigurable;
-  next.reasoning_model = isCustomReasoning;
-  next.reasoning_efforts = isCustomReasoning
-    ? configuredReasoningEfforts.length > 0
-      ? configuredReasoningEfforts
-      : [...DEFAULT_REASONING_EFFORTS]
-    : [];
+  next.reasoning_available_efforts = maintainedReasoningEfforts;
+  next.reasoning_model = isMaintainedReasoning || isCustomReasoning;
+  if (isMaintainedReasoning) {
+    const selected = configuredReasoningEfforts.filter((effort) =>
+      maintainedReasoningEfforts.includes(effort),
+    );
+    next.reasoning_efforts =
+      selected.length > 0 ? selected : maintainedReasoningEfforts;
+  } else {
+    next.reasoning_efforts = isCustomReasoning
+      ? configuredReasoningEfforts.length > 0
+        ? configuredReasoningEfforts
+        : [...DEFAULT_REASONING_EFFORTS]
+      : [];
+  }
   next.tag = normalizedTags;
 
   return next;
@@ -282,20 +302,23 @@ function reducer(state: MarketForm, action: MarketAction): MarketForm {
       return [
         ...state.map((model, idx) => {
           if (idx === action.payload.idx) {
-            const reasoningConfigurable = !isMaintainedReasoningModel(
+            const maintainedReasoningEfforts = getMaintainedReasoningEfforts(
               action.payload.id,
             );
+            const reasoningConfigurable =
+              maintainedReasoningEfforts === undefined;
             return normalizeMarketModel({
               ...model,
               id: action.payload.id,
               drawing_model: isDrawingModel(action.payload.id),
               reasoning_configurable: reasoningConfigurable,
+              reasoning_available_efforts: maintainedReasoningEfforts ?? [],
               reasoning_model: reasoningConfigurable
                 ? model.reasoning_model
-                : false,
+                : (maintainedReasoningEfforts?.length ?? 0) > 0,
               reasoning_efforts: reasoningConfigurable
                 ? model.reasoning_efforts
-                : [],
+                : (maintainedReasoningEfforts ?? []),
             });
           }
           return model;
@@ -386,13 +409,17 @@ function reducer(state: MarketForm, action: MarketAction): MarketForm {
       });
     case "update-reasoning-effort":
       return state.map((model, idx) => {
-        if (
-          idx !== action.payload.idx ||
-          !model.reasoning_model ||
-          model.reasoning_configurable === false
-        ) {
+        if (idx !== action.payload.idx || !model.reasoning_model) {
           return model;
         }
+
+        const available =
+          model.reasoning_configurable === false
+            ? normalizeConfiguredReasoningEfforts(
+                model.reasoning_available_efforts,
+              )
+            : [...REASONING_EFFORT_DISPLAY_LEVELS];
+        if (!available.includes(action.payload.effort)) return model;
 
         const current = normalizeConfiguredReasoningEfforts(
           model.reasoning_efforts,
@@ -694,6 +721,13 @@ const MarketItem = React.memo(function MarketItem({
     () => normalizeConfiguredReasoningEfforts(model.reasoning_efforts),
     [model.reasoning_efforts],
   );
+  const availableReasoningEfforts = useMemo(
+    () =>
+      model.reasoning_configurable === false
+        ? normalizeConfiguredReasoningEfforts(model.reasoning_available_efforts)
+        : [...REASONING_EFFORT_DISPLAY_LEVELS],
+    [model.reasoning_available_efforts, model.reasoning_configurable],
+  );
 
   useEffect(() => {
     setStackedFilled(stacked);
@@ -916,40 +950,45 @@ const MarketItem = React.memo(function MarketItem({
                   }}
                 />
               </div>
-              {model.reasoning_model && (
-                <div className="market-row border-t pt-3 md:col-span-2">
-                  <span className="self-start pt-1">
-                    <Brain className="mr-1.5 h-4 w-4 text-muted-foreground" />
-                    {t("chat.openai-reasoning-depth")}
-                  </span>
-                  <div className="flex min-w-0 flex-1 flex-wrap gap-2">
-                    {REASONING_EFFORT_DISPLAY_LEVELS.map((effort) => {
-                      const pressed = reasoningEfforts.includes(effort);
-                      const isLastEnabledEffort =
-                        pressed && reasoningEfforts.length === 1;
-
-                      return (
-                        <Toggle
-                          key={effort}
-                          variant="outline"
-                          size="sm"
-                          pressed={pressed}
-                          disabled={isLastEnabledEffort}
-                          onPressedChange={(enabled) => {
-                            dispatch({
-                              type: "update-reasoning-effort",
-                              payload: { idx: index, effort, enabled },
-                            });
-                          }}
-                        >
-                          {t(`chat.openai-reasoning-level-${effort}`)}
-                        </Toggle>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
             </>
+          )}
+          {model.reasoning_model && availableReasoningEfforts.length > 0 && (
+            <div className="market-row border-t pt-3 md:col-span-2">
+              <span className="self-start pt-1">
+                <Brain className="mr-1.5 h-4 w-4 text-muted-foreground" />
+                {t("chat.openai-reasoning-depth")}
+                {model.reasoning_configurable === false && (
+                  <Tips content={t("admin.market.managed-reasoning-tip")} />
+                )}
+              </span>
+              <div className="flex min-w-0 flex-1 flex-wrap gap-2">
+                {REASONING_EFFORT_DISPLAY_LEVELS.filter((effort) =>
+                  availableReasoningEfforts.includes(effort),
+                ).map((effort) => {
+                  const pressed = reasoningEfforts.includes(effort);
+                  const isLastEnabledEffort =
+                    pressed && reasoningEfforts.length === 1;
+
+                  return (
+                    <Toggle
+                      key={effort}
+                      variant="outline"
+                      size="sm"
+                      pressed={pressed}
+                      disabled={isLastEnabledEffort}
+                      onPressedChange={(enabled) => {
+                        dispatch({
+                          type: "update-reasoning-effort",
+                          payload: { idx: index, effort, enabled },
+                        });
+                      }}
+                    >
+                      {t(`chat.openai-reasoning-level-${effort}`)}
+                    </Toggle>
+                  );
+                })}
+              </div>
+            </div>
           )}
           <CustomMarketImage
             image={model.avatar}

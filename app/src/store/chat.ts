@@ -592,6 +592,25 @@ function isXiaomiMiMoModel(model: string): boolean {
   return normalized.startsWith("mimo-v2") && !normalized.includes("tts");
 }
 
+function restrictMaintainedReasoningCapabilities(
+  model: Model,
+  capabilities: OpenAIResponsesCapabilities,
+): OpenAIResponsesCapabilities {
+  if (model.reasoning_configurable !== false) return capabilities;
+
+  const configured = normalizeConfiguredReasoningEfforts(
+    model.reasoning_efforts,
+  );
+  if (configured.length === 0) return capabilities;
+
+  return {
+    ...capabilities,
+    reasoningEfforts: capabilities.reasoningEfforts.filter((effort) =>
+      configured.includes(effort),
+    ),
+  };
+}
+
 export function getOpenAIResponsesCapabilities(
   supportModels: Model[],
   model: string | undefined | null,
@@ -608,15 +627,15 @@ export function getOpenAIResponsesCapabilities(
   const normalized = model.trim().toLowerCase();
   if (channelType === "xiaomi-mimo" || channelType === "xiaomi-token-plan-cn") {
     return isXiaomiMiMoModel(normalized)
-      ? {
+      ? restrictMaintainedReasoningCapabilities(current, {
           nativeWeb: false,
           reasoningEfforts: ["none", "high"],
           reasoningSummary: false,
-        }
+        })
       : emptyOpenAIResponsesCapabilities();
   }
 
-  if (current.reasoning_model) {
+  if (current.reasoning_model && current.reasoning_configurable !== false) {
     const reasoningEfforts = normalizeConfiguredReasoningEfforts(
       current.reasoning_efforts,
     );
@@ -634,52 +653,52 @@ export function getOpenAIResponsesCapabilities(
   }
 
   if (normalized === "gpt-5.6" || normalized.startsWith("gpt-5.6-")) {
-    return {
+    return restrictMaintainedReasoningCapabilities(current, {
       nativeWeb: true,
       reasoningEfforts: ["none", "low", "medium", "high", "xhigh", "max"],
       reasoningSummary: true,
-    };
+    });
   }
   if (normalized === "gpt-5.5" || normalized.startsWith("gpt-5.5-")) {
-    return {
+    return restrictMaintainedReasoningCapabilities(current, {
       nativeWeb: true,
       reasoningEfforts: ["none", "low", "medium", "high", "xhigh"],
       reasoningSummary: true,
-    };
+    });
   }
   if (normalized.startsWith("gpt-5.4-pro")) {
-    return {
+    return restrictMaintainedReasoningCapabilities(current, {
       nativeWeb: true,
       reasoningEfforts: ["medium", "high", "xhigh"],
       reasoningSummary: true,
-    };
+    });
   }
   if (normalized.startsWith("gpt-5.4-mini")) {
-    return {
+    return restrictMaintainedReasoningCapabilities(current, {
       nativeWeb: true,
       reasoningEfforts: ["none", "low", "medium", "high", "xhigh"],
       reasoningSummary: true,
-    };
+    });
   }
   if (normalized.startsWith("gpt-5.4-nano")) {
     return { nativeWeb: true, reasoningEfforts: [], reasoningSummary: true };
   }
   if (normalized === "gpt-5.2-pro" || normalized.startsWith("gpt-5.2-pro-")) {
-    return {
+    return restrictMaintainedReasoningCapabilities(current, {
       nativeWeb: true,
       reasoningEfforts: ["medium", "high", "xhigh"],
       reasoningSummary: true,
-    };
+    });
   }
   if (normalized === "gpt-5.2-chat-latest") {
     return { nativeWeb: true, reasoningEfforts: [], reasoningSummary: true };
   }
   if (normalized === "gpt-5-pro" || normalized.startsWith("gpt-5-pro-")) {
-    return {
+    return restrictMaintainedReasoningCapabilities(current, {
       nativeWeb: true,
       reasoningEfforts: ["high"],
       reasoningSummary: true,
-    };
+    });
   }
   if (normalized === "gpt-5-mini" || normalized.startsWith("gpt-5-mini-")) {
     return { nativeWeb: true, reasoningEfforts: [], reasoningSummary: true };
@@ -688,49 +707,49 @@ export function getOpenAIResponsesCapabilities(
     return { nativeWeb: true, reasoningEfforts: [], reasoningSummary: true };
   }
   if (normalized.startsWith("gpt-5.4")) {
-    return {
+    return restrictMaintainedReasoningCapabilities(current, {
       nativeWeb: true,
       reasoningEfforts: ["none", "low", "medium", "high", "xhigh"],
       reasoningSummary: true,
-    };
+    });
   }
   if (normalized.startsWith("gpt-5.2")) {
-    return {
+    return restrictMaintainedReasoningCapabilities(current, {
       nativeWeb: true,
       reasoningEfforts: ["none", "low", "medium", "high", "xhigh"],
       reasoningSummary: true,
-    };
+    });
   }
   if (normalized.startsWith("gpt-5.1")) {
-    return {
+    return restrictMaintainedReasoningCapabilities(current, {
       nativeWeb: true,
       reasoningEfforts: ["none", "low", "medium", "high"],
       reasoningSummary: true,
-    };
+    });
   }
   if (normalized === "gpt-5") {
-    return {
+    return restrictMaintainedReasoningCapabilities(current, {
       nativeWeb: true,
       reasoningEfforts: ["minimal", "low", "medium", "high"],
       reasoningSummary: true,
-    };
+    });
   }
   if (normalized === "gpt-5.3-chat-latest") {
     return { nativeWeb: true, reasoningEfforts: [], reasoningSummary: true };
   }
   if (normalized === "o3" || normalized.startsWith("o3-")) {
-    return {
+    return restrictMaintainedReasoningCapabilities(current, {
       nativeWeb: true,
       reasoningEfforts: ["low", "medium", "high"],
       reasoningSummary: true,
-    };
+    });
   }
   if (normalized === "o1" || normalized.startsWith("o1-")) {
-    return {
+    return restrictMaintainedReasoningCapabilities(current, {
       nativeWeb: false,
       reasoningEfforts: ["low", "medium", "high"],
       reasoningSummary: true,
-    };
+    });
   }
   if (normalized.startsWith("gpt-4.5")) {
     return emptyOpenAIResponsesCapabilities();

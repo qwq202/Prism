@@ -46,7 +46,7 @@ var reasoningEffortOrder = []string{
 	"max",
 }
 
-var customReasoningCapabilities = struct {
+var configuredReasoningCapabilities = struct {
 	sync.RWMutex
 	efforts map[string][]string
 }{
@@ -76,22 +76,72 @@ func SetCustomReasoningEfforts(config map[string][]string) {
 	for model, efforts := range config {
 		model = normalizeModelName(model)
 		normalized := NormalizeCustomReasoningEfforts(efforts)
+		if HasManagedReasoningCapabilities("", model) {
+			managed := ManagedReasoningEfforts(model)
+			normalized = intersectReasoningEfforts(managed, normalized)
+		}
 		if model == "" || len(normalized) == 0 {
 			continue
 		}
 		next[model] = normalized
 	}
 
-	customReasoningCapabilities.Lock()
-	customReasoningCapabilities.efforts = next
-	customReasoningCapabilities.Unlock()
+	configuredReasoningCapabilities.Lock()
+	configuredReasoningCapabilities.efforts = next
+	configuredReasoningCapabilities.Unlock()
 }
 
-func customReasoningEfforts(model string) []string {
-	customReasoningCapabilities.RLock()
-	efforts := customReasoningCapabilities.efforts[normalizeModelName(model)]
-	customReasoningCapabilities.RUnlock()
+func configuredReasoningEfforts(model string) []string {
+	configuredReasoningCapabilities.RLock()
+	efforts := configuredReasoningCapabilities.efforts[normalizeModelName(model)]
+	configuredReasoningCapabilities.RUnlock()
 	return append([]string(nil), efforts...)
+}
+
+func intersectReasoningEfforts(available []string, configured []string) []string {
+	selected := make(map[string]bool, len(configured))
+	for _, effort := range configured {
+		selected[effort] = true
+	}
+
+	result := make([]string, 0, len(available))
+	for _, effort := range available {
+		if selected[effort] {
+			result = append(result, effort)
+		}
+	}
+	return result
+}
+
+// ManagedReasoningEfforts returns the complete set of levels maintained by the
+// application for a model. Admin configuration may only narrow this set.
+func ManagedReasoningEfforts(model string) []string {
+	normalizedModel := normalizeModelName(model)
+	switch {
+	case IsDeepseekV4Model(normalizedModel):
+		return []string{"high", "max"}
+	case SupportGeminiThinkingLevel(normalizedModel), SupportGeminiThinkingBudget(normalizedModel):
+		return []string{"low", "medium", "high"}
+	case isXiaomiMiMoModel(normalizedModel):
+		return []string{"none", "high"}
+	default:
+		return openAIResponsesReasoningEfforts(normalizedModel)
+	}
+}
+
+// ReasoningEffortsForModel returns the effective levels after applying an
+// administrator's restriction. Maintained models always remain constrained to
+// the built-in capability table.
+func ReasoningEffortsForModel(model string) []string {
+	managed := ManagedReasoningEfforts(model)
+	configured := configuredReasoningEfforts(model)
+	if len(managed) == 0 {
+		return configured
+	}
+	if len(configured) == 0 {
+		return managed
+	}
+	return intersectReasoningEfforts(managed, configured)
 }
 
 func CapabilitiesFor(channelType string, model string) ModelCapabilities {
@@ -113,11 +163,17 @@ func CapabilitiesFor(channelType string, model string) ModelCapabilities {
 		applyXiaomiTokenPlanCapabilities(&capabilities, normalizedModel)
 	}
 
-	if !HasManagedReasoningCapabilities(normalizedChannel, normalizedModel) {
-		if efforts := customReasoningEfforts(normalizedModel); len(efforts) > 0 {
-			capabilities.ReasoningEfforts = efforts
-			capabilities.SamplingRestriction = SamplingRestrictionWithReasoning
+	configured := configuredReasoningEfforts(normalizedModel)
+	if HasManagedReasoningCapabilities(normalizedChannel, normalizedModel) {
+		if len(configured) > 0 && len(capabilities.ReasoningEfforts) > 0 {
+			capabilities.ReasoningEfforts = intersectReasoningEfforts(
+				capabilities.ReasoningEfforts,
+				configured,
+			)
 		}
+	} else if len(configured) > 0 {
+		capabilities.ReasoningEfforts = configured
+		capabilities.SamplingRestriction = SamplingRestrictionWithReasoning
 	}
 
 	capabilities.Search = capabilities.NativeWebSearch || capabilities.XSearch

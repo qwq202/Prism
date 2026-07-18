@@ -34,47 +34,90 @@ export function normalizeConfiguredReasoningEfforts(
 }
 
 export function isMaintainedReasoningModel(model: string): boolean {
+  return getMaintainedReasoningEfforts(model) !== undefined;
+}
+
+export function getMaintainedReasoningEfforts(
+  model: string,
+): string[] | undefined {
   const normalized = model
     .trim()
     .toLowerCase()
     .replace(/^xiaomi\//, "");
-  if (!normalized) return false;
+  if (!normalized) return undefined;
 
-  if (
-    normalized === "deepseek-v4-flash" ||
-    normalized === "deepseek-v4-pro" ||
-    (normalized.startsWith("mimo-v2") && !normalized.includes("tts"))
-  ) {
-    return true;
+  if (normalized === "deepseek-v4-flash" || normalized === "deepseek-v4-pro") {
+    return ["high", "max"];
   }
 
+  if (normalized.startsWith("mimo-v2") && !normalized.includes("tts")) {
+    return ["none", "high"];
+  }
+
+  if (normalized === "gpt-5.6" || normalized.startsWith("gpt-5.6-")) {
+    return ["none", "low", "medium", "high", "xhigh", "max"];
+  }
+  if (normalized === "gpt-5.5" || normalized.startsWith("gpt-5.5-")) {
+    return ["none", "low", "medium", "high", "xhigh"];
+  }
+  if (normalized.startsWith("gpt-5.4-pro")) {
+    return ["medium", "high", "xhigh"];
+  }
+  if (normalized.startsWith("gpt-5.4-mini")) {
+    return ["none", "low", "medium", "high", "xhigh"];
+  }
+  if (normalized.startsWith("gpt-5.4-nano")) {
+    return [];
+  }
+  if (normalized === "gpt-5.4" || normalized.startsWith("gpt-5.4-")) {
+    return ["none", "low", "medium", "high", "xhigh"];
+  }
+  if (normalized === "gpt-5.2-pro" || normalized.startsWith("gpt-5.2-pro-")) {
+    return ["medium", "high", "xhigh"];
+  }
+  if (normalized === "gpt-5.2-chat-latest") {
+    return [];
+  }
+  if (normalized === "gpt-5.2" || normalized.startsWith("gpt-5.2-")) {
+    return ["none", "low", "medium", "high", "xhigh"];
+  }
+  if (normalized === "gpt-5.1" || normalized.startsWith("gpt-5.1-")) {
+    return ["none", "low", "medium", "high"];
+  }
+  if (normalized === "gpt-5-pro" || normalized.startsWith("gpt-5-pro-")) {
+    return ["high"];
+  }
   if (
-    normalized === "gpt-5" ||
-    normalized.startsWith("gpt-5-") ||
-    normalized === "gpt-5.1" ||
-    normalized.startsWith("gpt-5.1-") ||
-    normalized === "gpt-5.2" ||
-    normalized.startsWith("gpt-5.2-") ||
-    normalized === "gpt-5.3-chat-latest" ||
-    normalized === "gpt-5.4" ||
-    normalized.startsWith("gpt-5.4-") ||
-    normalized === "gpt-5.5" ||
-    normalized.startsWith("gpt-5.5-") ||
-    normalized === "gpt-5.6" ||
-    normalized.startsWith("gpt-5.6-") ||
-    normalized === "o1" ||
-    normalized.startsWith("o1-") ||
-    normalized === "o3" ||
-    normalized.startsWith("o3-") ||
+    normalized === "gpt-5-mini" ||
+    normalized.startsWith("gpt-5-mini-") ||
+    normalized === "gpt-5-nano" ||
+    normalized.startsWith("gpt-5-nano-") ||
+    normalized === "gpt-5.3-chat-latest"
+  ) {
+    return [];
+  }
+  if (normalized === "gpt-5") {
+    return ["minimal", "low", "medium", "high"];
+  }
+  if (normalized.startsWith("gpt-5-")) {
+    return [];
+  }
+  if (normalized === "o1" || normalized.startsWith("o1-")) {
+    return ["low", "medium", "high"];
+  }
+  if (normalized === "o3" || normalized.startsWith("o3-")) {
+    return ["low", "medium", "high"];
+  }
+  if (
     normalized === "o4-mini" ||
     normalized.startsWith("o4-mini-") ||
     normalized === "gpt-4.5" ||
     normalized.startsWith("gpt-4.5-")
   ) {
-    return true;
+    return [];
   }
 
-  return (
+  const isGeminiThinkingModel =
     normalized === "gemini-2.5-flash" ||
     normalized.startsWith("gemini-2.5-flash-preview-") ||
     normalized === "gemini-2.5-flash-lite" ||
@@ -99,6 +142,7 @@ export function isMaintainedReasoningModel(model: string): boolean {
     normalized === "gemini-3-pro-image" ||
     normalized.startsWith("gemini-3-pro-image-") ||
     normalized === "gemini-3-pro-preview" ||
-    normalized.startsWith("gemini-3-pro-preview-")
-  );
+    normalized.startsWith("gemini-3-pro-preview-");
+
+  return isGeminiThinkingModel ? ["low", "medium", "high"] : undefined;
 }

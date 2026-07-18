@@ -37,6 +37,7 @@ type MarketModelView struct {
 	ReverseModel          bool     `json:"reverse_model"`
 	ReasoningModel        bool     `json:"reasoning_model"`
 	ReasoningEfforts      []string `json:"reasoning_efforts,omitempty"`
+	ReasoningAvailable    []string `json:"reasoning_available_efforts,omitempty"`
 	ReasoningConfigurable bool     `json:"reasoning_configurable"`
 	Avatar                string   `json:"avatar"`
 	Tag                   ModelTag `json:"tag"`
@@ -87,7 +88,23 @@ func normalizeMarketModels(models MarketModelList) MarketModelList {
 	normalized := make(MarketModelList, len(models))
 	for index, model := range models {
 		model.ReasoningEfforts = globals.NormalizeCustomReasoningEfforts(model.ReasoningEfforts)
-		if model.ReasoningModel {
+		managedEfforts := globals.ManagedReasoningEfforts(model.Id)
+		if globals.HasManagedReasoningCapabilities("", model.Id) {
+			model.ReasoningModel = false
+			if len(managedEfforts) == 0 {
+				model.ReasoningEfforts = nil
+			} else if len(model.ReasoningEfforts) == 0 {
+				model.ReasoningEfforts = append([]string(nil), managedEfforts...)
+			} else {
+				model.ReasoningEfforts = intersectMarketReasoningEfforts(
+					managedEfforts,
+					model.ReasoningEfforts,
+				)
+				if len(model.ReasoningEfforts) == 0 {
+					model.ReasoningEfforts = append([]string(nil), managedEfforts...)
+				}
+			}
+		} else if model.ReasoningModel {
 			if len(model.ReasoningEfforts) == 0 {
 				model.ReasoningEfforts = append([]string(nil), defaultCustomReasoningEfforts...)
 			}
@@ -99,10 +116,25 @@ func normalizeMarketModels(models MarketModelList) MarketModelList {
 	return normalized
 }
 
+func intersectMarketReasoningEfforts(available []string, selected []string) []string {
+	enabled := make(map[string]bool, len(selected))
+	for _, effort := range selected {
+		enabled[effort] = true
+	}
+
+	result := make([]string, 0, len(available))
+	for _, effort := range available {
+		if enabled[effort] {
+			result = append(result, effort)
+		}
+	}
+	return result
+}
+
 func syncCustomReasoningCapabilities(models MarketModelList) {
 	config := make(map[string][]string)
 	for _, model := range models {
-		if model.ReasoningModel {
+		if model.ReasoningModel || len(globals.ManagedReasoningEfforts(model.Id)) > 0 {
 			config[model.Id] = model.ReasoningEfforts
 		}
 	}
@@ -139,8 +171,9 @@ func (m *Market) GetViewModels() []MarketModelView {
 		}
 
 		drawingModel := globals.IsDrawingModel(channelType, model.Id)
+		managedEfforts := globals.ManagedReasoningEfforts(model.Id)
 		reasoningConfigurable := !globals.HasManagedReasoningCapabilities(channelType, model.Id)
-		reasoningModel := reasoningConfigurable && model.ReasoningModel
+		reasoningModel := len(managedEfforts) > 0 || (reasoningConfigurable && model.ReasoningModel)
 		reasoningEfforts := []string(nil)
 		if reasoningModel {
 			reasoningEfforts = append(reasoningEfforts, model.ReasoningEfforts...)
@@ -160,6 +193,7 @@ func (m *Market) GetViewModels() []MarketModelView {
 			ReverseModel:          model.ReverseModel,
 			ReasoningModel:        reasoningModel,
 			ReasoningEfforts:      reasoningEfforts,
+			ReasoningAvailable:    append([]string(nil), managedEfforts...),
 			ReasoningConfigurable: reasoningConfigurable,
 			Avatar:                model.Avatar,
 			Tag:                   tags,

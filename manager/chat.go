@@ -157,8 +157,81 @@ func buildDeepseekThinkingConfig(instance *conversation.Conversation, model stri
 		return map[string]interface{}{"type": "disabled"}, nil
 	}
 
-	effort := instance.GetDeepseekReasoningEffort()
+	effort := normalizeConfiguredReasoningEffort(
+		model,
+		instance.GetDeepseekReasoningEffort(),
+	)
+	if effort == "" {
+		return nil, nil
+	}
 	return map[string]interface{}{"type": "enabled"}, &effort
+}
+
+func normalizeConfiguredReasoningEffort(model string, requested string) string {
+	available := globals.ReasoningEffortsForModel(model)
+	for _, effort := range available {
+		if effort == requested {
+			return requested
+		}
+	}
+	if len(available) > 0 {
+		return available[0]
+	}
+	return ""
+}
+
+func normalizeConfiguredGeminiThinkingBudget(model string, requested int) int {
+	if requested <= 0 {
+		return requested
+	}
+
+	requestedLevel := "high"
+	switch {
+	case requested <= 2048:
+		requestedLevel = "low"
+	case requested <= 6144:
+		requestedLevel = "medium"
+	}
+
+	available := globals.ReasoningEffortsForModel(model)
+	for _, effort := range available {
+		if effort == requestedLevel {
+			return requested
+		}
+	}
+
+	for _, fallback := range []struct {
+		level  string
+		budget int
+	}{
+		{level: "medium", budget: 4096},
+		{level: "low", budget: 1024},
+		{level: "high", budget: 8192},
+	} {
+		for _, effort := range available {
+			if effort == fallback.level {
+				return fallback.budget
+			}
+		}
+	}
+
+	return requested
+}
+
+func configuredGeminiThinkingBudget(
+	instance *conversation.Conversation,
+	model string,
+) *int {
+	if instance == nil {
+		return nil
+	}
+	budget := instance.GetGeminiThinkingBudget()
+	if budget == nil || (!globals.SupportGeminiThinkingLevel(model) &&
+		!globals.SupportGeminiThinkingBudget(model)) {
+		return budget
+	}
+	normalized := normalizeConfiguredGeminiThinkingBudget(model, *budget)
+	return &normalized
 }
 
 func sendToolCallEvents(conn *Connection, calls *globals.ToolCalls, status string, quota float32, plan bool) error {
@@ -722,7 +795,7 @@ func buildChatProps(
 		EnableWebSearch:      instance.IsEnableWebSearch(),
 		EnableURLContext:     instance.IsEnableURLContext(),
 		EnableXSearch:        instance.IsEnableXSearch(),
-		GeminiThinkingBudget: instance.GetGeminiThinkingBudget(),
+		GeminiThinkingBudget: configuredGeminiThinkingBudget(instance, model),
 		Thinking:             thinking,
 		ReasoningEffort:      reasoningEffort,
 		MaxTokens:            instance.GetMaxTokens(),
@@ -1584,7 +1657,7 @@ func createChatTask(
 			EnableWebSearch:      instance.IsEnableWebSearch(),
 			EnableURLContext:     instance.IsEnableURLContext(),
 			EnableXSearch:        instance.IsEnableXSearch(),
-			GeminiThinkingBudget: instance.GetGeminiThinkingBudget(),
+			GeminiThinkingBudget: configuredGeminiThinkingBudget(instance, model),
 			MaxTokens:            instance.GetMaxTokens(),
 			Temperature:          instance.GetTemperature(),
 			TopP:                 instance.GetTopP(),

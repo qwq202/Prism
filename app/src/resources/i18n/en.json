@@ -1524,6 +1524,7 @@
       "reverse-model-tip": "If the reverse engineering model supports full file parsing by URL (such as PDF, word), this option can be turned on, and all types of file parsing will be provided by the upstream, reducing token consumption. If it is not turned on by default, it will be resolved by this project, which is applicable to most models. Please ensure that the file parsing service has configured an external URL storage scheme (such as S3/R2/MinIO, etc.), and that external URL parsing files are supported upstream of the model.",
       "thinking-model": "Reasoning model",
       "thinking-model-tip": "Only available for models whose capabilities are not maintained by the system. Enable it to choose which reasoning effort levels users may select; maintained models continue to use built-in capabilities.",
+      "managed-reasoning-tip": "These levels come from the maintained capability table. Administrators may limit which levels users can select, but cannot enable unsupported levels.",
       "grouped-view": "Group by Tag",
       "enable-all": "Enable All",
       "disable-all": "Disable All",

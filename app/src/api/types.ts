@@ -89,6 +89,7 @@ export type Model = {
   reverse_model?: boolean;
   reasoning_model?: boolean;
   reasoning_efforts?: string[];
+  reasoning_available_efforts?: string[];
   reasoning_configurable?: boolean;
   avatar: string;
   tag?: string[];

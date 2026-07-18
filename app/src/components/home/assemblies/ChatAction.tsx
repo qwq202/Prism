@@ -84,6 +84,7 @@ import { ButtonProps } from "@/components/ui/button.tsx";
 import { getBooleanMemory, setMemory } from "@/utils/memory.ts";
 import { useMobile } from "@/utils/device.ts";
 import { ThinkingEffortSteps } from "./ThinkingEffortSteps.tsx";
+import { normalizeConfiguredReasoningEfforts } from "@/conf/reasoning.ts";
 
 const geminiThinkingPresets = [
   { label: "off", budget: 0 },
@@ -98,6 +99,20 @@ const deepSeekProMaxWarningMemoryKey =
 
 function formatModelLabel(model: string): string {
   return model.trim().toUpperCase();
+}
+
+function getAdminReasoningEfforts(
+  supportModels: ReturnType<typeof selectSupportModels>,
+  model: string,
+  defaults: string[],
+): string[] {
+  const current = supportModels.find((item) => item.id === model);
+  if (!current || current.reasoning_configurable !== false) return defaults;
+
+  const configured = normalizeConfiguredReasoningEfforts(
+    current.reasoning_efforts,
+  ).filter((effort) => defaults.includes(effort));
+  return configured.length > 0 ? configured : defaults;
 }
 
 type EffortPopoverHeaderProps = {
@@ -614,6 +629,7 @@ export function GeminiThinkingAction() {
   const { t } = useTranslation();
   const dispatch = useDispatch();
   const model = useSelector(selectModel);
+  const supportModels = useSelector(selectSupportModels);
   const geminiThinkingBudget = useSelector(selectGeminiThinkingBudget);
 
   if (!supportsGeminiThinkingBudgetControl(model)) {
@@ -621,16 +637,26 @@ export function GeminiThinkingAction() {
   }
 
   const enabled = geminiThinkingBudget > 0;
-  const levelIndex = Math.max(
-    1,
-    geminiThinkingPresets.findIndex(
-      (item) => item.budget === geminiThinkingBudget,
-    ),
+  const availableLabels = getAdminReasoningEfforts(
+    supportModels,
+    model,
+    geminiThinkingPresets.slice(1).map((item) => item.label),
   );
-  const activeLevels = geminiThinkingPresets.slice(1);
-  const sliderIndex = Math.max(0, levelIndex - 1);
+  const activeLevels = geminiThinkingPresets.filter((item) =>
+    availableLabels.includes(item.label),
+  );
+  const requestedLevel = geminiThinkingPresets.find(
+    (item) => item.budget === geminiThinkingBudget,
+  );
+  const currentLevel =
+    requestedLevel && availableLabels.includes(requestedLevel.label)
+      ? requestedLevel
+      : activeLevels.includes(geminiThinkingPresets[2])
+        ? geminiThinkingPresets[2]
+        : activeLevels[0];
+  const sliderIndex = Math.max(0, activeLevels.indexOf(currentLevel));
   const currentLabel = enabled
-    ? t(`chat.gemini-thinking-level-${geminiThinkingPresets[levelIndex].label}`)
+    ? t(`chat.gemini-thinking-level-${currentLevel.label}`)
     : t("chat.gemini-thinking-level-off");
 
   return (
@@ -665,27 +691,27 @@ export function GeminiThinkingAction() {
               checked={enabled}
               onCheckedChange={(state) => {
                 dispatch(
-                  setGeminiThinkingBudget(
-                    state ? geminiThinkingPresets[2].budget : 0,
-                  ),
+                  setGeminiThinkingBudget(state ? currentLevel.budget : 0),
                 );
               }}
             />
           </div>
 
-          <ThinkingEffortSteps
-            levels={activeLevels.map((item) => item.label)}
-            labels={activeLevels.map((item) =>
-              t(`chat.gemini-thinking-level-${item.label}`),
-            )}
-            index={sliderIndex}
-            disabled={!enabled}
-            ariaLabel={t("chat.openai-reasoning-depth")}
-            onIndexChange={(nextIndex) => {
-              const next = activeLevels[nextIndex];
-              next && dispatch(setGeminiThinkingBudget(next.budget));
-            }}
-          />
+          {activeLevels.length > 1 && (
+            <ThinkingEffortSteps
+              levels={activeLevels.map((item) => item.label)}
+              labels={activeLevels.map((item) =>
+                t(`chat.gemini-thinking-level-${item.label}`),
+              )}
+              index={sliderIndex}
+              disabled={!enabled}
+              ariaLabel={t("chat.openai-reasoning-depth")}
+              onIndexChange={(nextIndex) => {
+                const next = activeLevels[nextIndex];
+                next && dispatch(setGeminiThinkingBudget(next.budget));
+              }}
+            />
+          )}
         </div>
       </PopoverContent>
     </Popover>
@@ -696,6 +722,7 @@ export function DeepSeekThinkingAction() {
   const { t } = useTranslation();
   const dispatch = useDispatch();
   const model = useSelector(selectModel);
+  const supportModels = useSelector(selectSupportModels);
   const deepSeekThinkingEnabled = useSelector(selectDeepSeekThinkingEnabled);
   const deepSeekReasoningEffort = useSelector(selectDeepSeekReasoningEffort);
   const [proMaxWarningOpen, setProMaxWarningOpen] = React.useState(false);
@@ -706,14 +733,19 @@ export function DeepSeekThinkingAction() {
   const [doNotRemindProMax, setDoNotRemindProMax] = React.useState(false);
 
   const isDeepSeekProModel = model.trim().toLowerCase() === "deepseek-v4-pro";
-  const currentEffort = deepSeekReasoningEfforts.includes(
+  const availableReasoningEfforts = getAdminReasoningEfforts(
+    supportModels,
+    model,
+    deepSeekReasoningEfforts,
+  );
+  const currentEffort = availableReasoningEfforts.includes(
     deepSeekReasoningEffort,
   )
     ? deepSeekReasoningEffort
-    : "high";
+    : availableReasoningEfforts[0];
   const currentEffortIndex = Math.max(
     0,
-    deepSeekReasoningEfforts.indexOf(currentEffort),
+    availableReasoningEfforts.indexOf(currentEffort),
   );
   const proMaxWarningLocked = proMaxWarningCountdown > 0;
 
@@ -812,18 +844,29 @@ export function DeepSeekThinkingAction() {
                 </span>
               </div>
 
-              <div className="relative grid grid-cols-2 gap-1 overflow-hidden rounded-md border border-black/10 bg-white p-1 dark:border-white/15 dark:bg-black">
+              <div
+                className={cn(
+                  "relative grid gap-1 overflow-hidden rounded-md border border-black/10 bg-white p-1 dark:border-white/15 dark:bg-black",
+                  availableReasoningEfforts.length > 1
+                    ? "grid-cols-2"
+                    : "grid-cols-1",
+                )}
+              >
                 <span
                   className="absolute inset-y-1 left-1 rounded-sm bg-black transition-transform duration-300 ease-out dark:bg-white"
                   style={{
-                    width: "calc(50% - 0.375rem)",
+                    width:
+                      availableReasoningEfforts.length > 1
+                        ? "calc(50% - 0.375rem)"
+                        : "calc(100% - 0.5rem)",
                     transform:
-                      currentEffortIndex === 0
+                      currentEffortIndex === 0 ||
+                      availableReasoningEfforts.length === 1
                         ? "translateX(0)"
                         : "translateX(calc(100% + 0.25rem))",
                   }}
                 />
-                {deepSeekReasoningEfforts.map((effort) => (
+                {availableReasoningEfforts.map((effort) => (
                   <button
                     key={effort}
                     type="button"
@@ -910,7 +953,10 @@ export function OpenAIReasoningAction() {
   const openAIResponsesWebSearch = useSelector(selectOpenAIResponsesWebSearch);
   const capabilities = getOpenAIResponsesCapabilities(supportModels, model);
 
-  if (capabilities.reasoningEfforts.length === 0) {
+  if (
+    capabilities.reasoningEfforts.filter((effort) => effort !== "none")
+      .length === 0
+  ) {
     return null;
   }
 

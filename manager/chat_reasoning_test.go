@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"chat/globals"
 	"chat/manager/conversation"
 	"testing"
 )
@@ -137,5 +138,36 @@ func TestBuildDeepseekThinkingConfigDisablesThinking(t *testing.T) {
 	}
 	if effort != nil {
 		t.Fatalf("expected no reasoning effort when deepseek thinking is disabled, got %#v", effort)
+	}
+}
+
+func TestBuildDeepseekThinkingConfigAppliesAdminRestriction(t *testing.T) {
+	globals.SetCustomReasoningEfforts(map[string][]string{
+		"deepseek-v4-pro": {"high"},
+	})
+	t.Cleanup(func() {
+		globals.SetCustomReasoningEfforts(nil)
+	})
+
+	instance := &conversation.Conversation{}
+	instance.SetDeepseekThinkingEnabled(true)
+	instance.SetDeepseekReasoningEffort("max")
+
+	_, effort := buildDeepseekThinkingConfig(instance, "deepseek-v4-pro")
+	if effort == nil || *effort != "high" {
+		t.Fatalf("expected restricted deepseek effort high, got %#v", effort)
+	}
+}
+
+func TestNormalizeConfiguredGeminiThinkingBudgetAppliesAdminRestriction(t *testing.T) {
+	globals.SetCustomReasoningEfforts(map[string][]string{
+		"gemini-3.1-pro-preview": {"low"},
+	})
+	t.Cleanup(func() {
+		globals.SetCustomReasoningEfforts(nil)
+	})
+
+	if got := normalizeConfiguredGeminiThinkingBudget("gemini-3.1-pro-preview", 8192); got != 1024 {
+		t.Fatalf("expected restricted gemini low budget, got %d", got)
 	}
 }

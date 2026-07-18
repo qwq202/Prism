@@ -333,7 +333,22 @@ func TestCapabilitiesForCustomReasoningModel(t *testing.T) {
 	}
 }
 
-func TestCustomReasoningCannotOverrideMaintainedModel(t *testing.T) {
+func TestConfiguredReasoningCanRestrictMaintainedModel(t *testing.T) {
+	SetCustomReasoningEfforts(map[string][]string{
+		"gpt-5.6": {"low", "high"},
+	})
+	t.Cleanup(func() {
+		SetCustomReasoningEfforts(nil)
+	})
+
+	capabilities := CapabilitiesFor(OpenAIResponsesChannelType, "gpt-5.6")
+	want := []string{"low", "high"}
+	if !reflect.DeepEqual(capabilities.ReasoningEfforts, want) {
+		t.Fatalf("expected configured maintained restriction: got %#v want %#v", capabilities.ReasoningEfforts, want)
+	}
+}
+
+func TestConfiguredReasoningCannotExpandMaintainedModel(t *testing.T) {
 	SetCustomReasoningEfforts(map[string][]string{
 		"gpt-5.6": {"minimal"},
 	})
@@ -344,7 +359,7 @@ func TestCustomReasoningCannotOverrideMaintainedModel(t *testing.T) {
 	capabilities := CapabilitiesFor(OpenAIResponsesChannelType, "gpt-5.6")
 	want := []string{"none", "low", "medium", "high", "xhigh", "max"}
 	if !reflect.DeepEqual(capabilities.ReasoningEfforts, want) {
-		t.Fatalf("expected maintained capabilities to win: got %#v want %#v", capabilities.ReasoningEfforts, want)
+		t.Fatalf("expected unsupported configured level to be ignored: got %#v want %#v", capabilities.ReasoningEfforts, want)
 	}
 }
 

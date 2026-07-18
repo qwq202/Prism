@@ -139,20 +139,41 @@ func TestGetViewModelsExposesCustomReasoningConfiguration(t *testing.T) {
 	}
 }
 
-func TestGetViewModelsSuppressesCustomReasoningForMaintainedModel(t *testing.T) {
-	market := &Market{Models: MarketModelList{{
+func TestNormalizeMarketModelsDefaultsMaintainedReasoningEfforts(t *testing.T) {
+	models := normalizeMarketModels(MarketModelList{{
+		Id:   "gpt-5.6",
+		Name: "GPT 5.6",
+	}})
+
+	want := globals.ManagedReasoningEfforts("gpt-5.6")
+	if !reflect.DeepEqual(models[0].ReasoningEfforts, want) {
+		t.Fatalf("unexpected maintained defaults: got %#v want %#v", models[0].ReasoningEfforts, want)
+	}
+	if models[0].ReasoningModel {
+		t.Fatalf("expected maintained model not to persist the custom reasoning switch")
+	}
+}
+
+func TestGetViewModelsExposesMaintainedReasoningRestriction(t *testing.T) {
+	market := &Market{Models: normalizeMarketModels(MarketModelList{{
 		Id:               "gpt-5.6",
 		Name:             "GPT 5.6",
 		ReasoningModel:   true,
-		ReasoningEfforts: []string{"minimal"},
-	}}}
+		ReasoningEfforts: []string{"low", "high", "invalid"},
+	}})}
 
 	views := market.GetViewModels()
 	if len(views) != 1 {
 		t.Fatalf("expected one market view, got %d", len(views))
 	}
 	view := views[0]
-	if view.ReasoningConfigurable || view.ReasoningModel || len(view.ReasoningEfforts) != 0 {
-		t.Fatalf("expected maintained model to use built-in reasoning capabilities, got %#v", view)
+	if view.ReasoningConfigurable || !view.ReasoningModel {
+		t.Fatalf("expected maintained model to expose levels without the custom switch, got %#v", view)
+	}
+	if !reflect.DeepEqual(view.ReasoningEfforts, []string{"low", "high"}) {
+		t.Fatalf("unexpected maintained selected efforts: %#v", view.ReasoningEfforts)
+	}
+	if !reflect.DeepEqual(view.ReasoningAvailable, globals.ManagedReasoningEfforts("gpt-5.6")) {
+		t.Fatalf("unexpected maintained available efforts: %#v", view.ReasoningAvailable)
 	}
 }
