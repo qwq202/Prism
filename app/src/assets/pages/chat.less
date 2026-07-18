@@ -38,6 +38,8 @@
   display: flex;
   gap: 6px;
   flex-direction: column;
+  min-width: 0;
+  width: 100%;
   max-width: 100%;
 
   pre {
@@ -55,6 +57,7 @@
   .content-wrapper {
     display: flex;
     flex-direction: row;
+    min-width: 0;
     max-width: 100%;
 
     .message-toolbar {
@@ -122,6 +125,7 @@
     min-width: 0;
     flex-direction: column;
     max-width: 100%;
+    overflow-wrap: anywhere;
     padding: 8px 16px;
     border-radius: var(--radius);
     transition: 0.25s linear;
@@ -212,7 +216,10 @@
 }
 
 .markdown-body {
+  min-width: 0;
+  width: 100%;
   max-width: 100%;
+  overflow-wrap: anywhere;
   padding: 4px 0;
   background: none !important;
   color: hsl(var(--text));
