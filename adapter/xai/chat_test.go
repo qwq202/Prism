@@ -111,6 +111,24 @@ func TestGetChatBodyLeavesStoreUnsetForTextOnlyRequests(t *testing.T) {
 	}
 }
 
+func TestGetChatBodyIncludesReasoningEffort(t *testing.T) {
+	instance := &ChatInstance{}
+	effort := "medium"
+	props := &adaptercommon.ChatProps{
+		Model:           "grok-4.5",
+		ReasoningEffort: &effort,
+		Message: []globals.Message{{
+			Role:    globals.User,
+			Content: "你好",
+		}},
+	}
+
+	body := instance.GetChatBody(props, false)
+	if body.ReasoningEffort == nil || *body.ReasoningEffort != "medium" {
+		t.Fatalf("expected xAI reasoning_effort medium, got %#v", body.ReasoningEffort)
+	}
+}
+
 func TestGetChatBodyKeepsSystemMessagesInInput(t *testing.T) {
 	instance := &ChatInstance{}
 	props := &adaptercommon.ChatProps{

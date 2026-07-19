@@ -26,6 +26,7 @@ type ResponseRequest struct {
 	Model              string         `json:"model"`
 	Input              interface{}    `json:"input"`
 	MaxOutputTokens    *int           `json:"max_output_tokens,omitempty"`
+	ReasoningEffort    *string        `json:"reasoning_effort,omitempty"`
 	Temperature        *float32       `json:"temperature,omitempty"`
 	TopP               *float32       `json:"top_p,omitempty"`
 	Tools              []ResponseTool `json:"tools,omitempty"`

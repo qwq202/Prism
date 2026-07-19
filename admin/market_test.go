@@ -177,3 +177,19 @@ func TestGetViewModelsExposesMaintainedReasoningRestriction(t *testing.T) {
 		t.Fatalf("unexpected maintained available efforts: %#v", view.ReasoningAvailable)
 	}
 }
+
+func TestGetViewModelsTreatsGrok45AsMaintainedReasoningModel(t *testing.T) {
+	market := &Market{Models: normalizeMarketModels(MarketModelList{{
+		Id:             "grok-4.5",
+		Name:           "Grok 4.5",
+		ReasoningModel: true,
+	}})}
+
+	view := market.GetViewModels()[0]
+	if view.ReasoningConfigurable || !view.ReasoningModel {
+		t.Fatalf("expected Grok 4.5 to hide the custom reasoning switch, got %#v", view)
+	}
+	if !reflect.DeepEqual(view.ReasoningAvailable, []string{"low", "medium", "high"}) {
+		t.Fatalf("unexpected Grok 4.5 reasoning levels: %#v", view.ReasoningAvailable)
+	}
+}

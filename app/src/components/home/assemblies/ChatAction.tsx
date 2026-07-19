@@ -952,6 +952,7 @@ export function OpenAIReasoningAction() {
   const openAIReasoningEffort = useSelector(selectOpenAIReasoningEffort);
   const openAIResponsesWebSearch = useSelector(selectOpenAIResponsesWebSearch);
   const capabilities = getOpenAIResponsesCapabilities(supportModels, model);
+  const reasoningAlwaysEnabled = isXAIModelId(model);
 
   if (
     capabilities.reasoningEfforts.filter((effort) => effort !== "none")
@@ -967,11 +968,16 @@ export function OpenAIReasoningAction() {
         )
       : capabilities.reasoningEfforts.filter((item) => item !== "none");
   const enabled =
-    openAIReasoningEffort !== "none" && availableEfforts.length > 0;
+    reasoningAlwaysEnabled ||
+    (openAIReasoningEffort !== "none" && availableEfforts.length > 0);
   const modelLabel = formatModelLabel(model);
-  const fallbackEffort = availableEfforts.includes("medium")
-    ? "medium"
-    : availableEfforts[0];
+  const fallbackEffort = reasoningAlwaysEnabled
+    ? availableEfforts.includes("high")
+      ? "high"
+      : availableEfforts[availableEfforts.length - 1]
+    : availableEfforts.includes("medium")
+      ? "medium"
+      : availableEfforts[0];
   const currentEffort = enabled
     ? availableEfforts.includes(openAIReasoningEffort)
       ? openAIReasoningEffort
@@ -1005,23 +1011,25 @@ export function OpenAIReasoningAction() {
         <div className="flex flex-col gap-3.5">
           <EffortPopoverHeader levelLabel={currentEffortLabel} tip={tipText} />
 
-          <div className="flex items-center justify-between gap-2">
-            <Label
-              htmlFor="openai-reasoning-toggle"
-              className="min-w-0 truncate text-xs text-muted-foreground"
-            >
-              {t("chat.openai-reasoning-enable-short")}
-            </Label>
-            <Switch
-              id="openai-reasoning-toggle"
-              checked={enabled}
-              onCheckedChange={(state) => {
-                dispatch(
-                  setOpenAIReasoningEffort(state ? fallbackEffort : "none"),
-                );
-              }}
-            />
-          </div>
+          {!reasoningAlwaysEnabled && (
+            <div className="flex items-center justify-between gap-2">
+              <Label
+                htmlFor="openai-reasoning-toggle"
+                className="min-w-0 truncate text-xs text-muted-foreground"
+              >
+                {t("chat.openai-reasoning-enable-short")}
+              </Label>
+              <Switch
+                id="openai-reasoning-toggle"
+                checked={enabled}
+                onCheckedChange={(state) => {
+                  dispatch(
+                    setOpenAIReasoningEffort(state ? fallbackEffort : "none"),
+                  );
+                }}
+              />
+            </div>
+          )}
 
           {availableEfforts.length > 1 && (
             <ThinkingEffortSteps

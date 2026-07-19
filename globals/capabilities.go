@@ -124,6 +124,8 @@ func ManagedReasoningEfforts(model string) []string {
 		return []string{"low", "medium", "high"}
 	case isXiaomiMiMoModel(normalizedModel):
 		return []string{"none", "high"}
+	case isXAIGrok45Model(normalizedModel):
+		return []string{"low", "medium", "high"}
 	default:
 		return openAIResponsesReasoningEfforts(normalizedModel)
 	}
@@ -192,7 +194,8 @@ func HasManagedReasoningCapabilities(_ string, model string) bool {
 		SupportGeminiThinkingLevel(normalizedModel) ||
 		SupportGeminiThinkingBudget(normalizedModel) ||
 		isManagedOpenAIResponsesReasoningModel(normalizedModel) ||
-		isXiaomiMiMoModel(normalizedModel) {
+		isXiaomiMiMoModel(normalizedModel) ||
+		isXAIGrok45Model(normalizedModel) {
 		return true
 	}
 	return false
@@ -277,6 +280,16 @@ func applyXAICapabilities(capabilities *ModelCapabilities, model string) {
 
 	capabilities.NativeWebSearch = true
 	capabilities.XSearch = true
+	if isXAIGrok45Model(model) {
+		capabilities.ReasoningEfforts = []string{"low", "medium", "high"}
+	}
+}
+
+func isXAIGrok45Model(model string) bool {
+	model = normalizeModelName(model)
+	return model == "grok-4.5" ||
+		strings.HasPrefix(model, "grok-4.5-") ||
+		model == "grok-build-latest"
 }
 
 func applyXiaomiTokenPlanCapabilities(capabilities *ModelCapabilities, model string) {

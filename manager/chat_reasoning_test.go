@@ -122,6 +122,33 @@ func TestBuildDeepseekThinkingConfigRequestsReasoningEffort(t *testing.T) {
 	}
 }
 
+func TestBuildXAIReasoningEffortAppliesMaintainedLevels(t *testing.T) {
+	instance := &conversation.Conversation{}
+	instance.SetOpenAIReasoningEffort("medium")
+
+	effort := buildXAIReasoningEffort(instance, "grok-4.5")
+	if effort == nil || *effort != "medium" {
+		t.Fatalf("expected xAI reasoning effort medium, got %#v", effort)
+	}
+}
+
+func TestBuildXAIReasoningEffortDefaultsToHighestAvailableLevel(t *testing.T) {
+	globals.SetCustomReasoningEfforts(map[string][]string{
+		"grok-4.5": {"low", "medium"},
+	})
+	t.Cleanup(func() {
+		globals.SetCustomReasoningEfforts(nil)
+	})
+
+	instance := &conversation.Conversation{}
+	instance.SetOpenAIReasoningEffort("none")
+
+	effort := buildXAIReasoningEffort(instance, "grok-4.5")
+	if effort == nil || *effort != "medium" {
+		t.Fatalf("expected restricted xAI default medium, got %#v", effort)
+	}
+}
+
 func TestBuildDeepseekThinkingConfigDisablesThinking(t *testing.T) {
 	instance := &conversation.Conversation{}
 	instance.SetDeepseekThinkingEnabled(false)

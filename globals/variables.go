@@ -193,6 +193,7 @@ var VisionModels = []string{
 	Gemini25FlashImage, Gemini35Flash, Gemini3Flash, Gemini3ProPreview, Gemini31FlashLiteImage, Gemini31FlashImage, Gemini3ProImage, "gemini-3-flash-preview", "gemini-3.1-pro-preview", "gemini-3.1-pro-preview-customtools", "gemini-3.1-flash-lite-preview", // gemini
 	Claude3,                                    // anthropic
 	MiMoV25, MiMoV25Pro, MiMoV2Omni, MiMoV2Pro, // xiaomi mimo
+	"grok-4.5", "grok-build-latest", // xAI
 }
 
 var VisionSkipModels = []string{
@@ -263,6 +264,15 @@ func SupportOpenAIResponsesReasoningControl(model string) bool {
 
 func SupportXiaomiTokenPlanThinkingControl(model string) bool {
 	return CapabilitiesFor(XiaomiTokenPlanCNChannelType, model).ReasoningControl
+}
+
+func SupportXAIReasoningControl(model string) bool {
+	return CapabilitiesFor(XAIChannelType, model).ReasoningControl
+}
+
+func NormalizeXAIReasoningEffort(model string, effort string) string {
+	capabilities := CapabilitiesFor(XAIChannelType, model)
+	return NormalizeReasoningEffort(capabilities, effort)
 }
 
 func NormalizeOpenAIResponsesReasoningEffort(model string, effort string, nativeWebEnabled bool) string {

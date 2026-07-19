@@ -162,6 +162,7 @@ func (c *ChatInstance) GetChatBody(props *adaptercommon.ChatProps, stream bool) 
 		Model:           props.Model,
 		Input:           input,
 		MaxOutputTokens: props.MaxTokens,
+		ReasoningEffort: props.ReasoningEffort,
 		Temperature:     props.Temperature,
 		TopP:            props.TopP,
 		Tools:           tools,

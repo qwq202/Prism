@@ -276,8 +276,14 @@ func TestCapabilitiesForXAIModels(t *testing.T) {
 	if !capabilities.Search {
 		t.Fatalf("expected grok to expose aggregate search capability")
 	}
-	if capabilities.ReasoningControl {
-		t.Fatalf("expected grok to not expose OpenAI-style reasoning control")
+	if !capabilities.ReasoningControl {
+		t.Fatalf("expected grok 4.5 to expose reasoning control")
+	}
+	if !reflect.DeepEqual(capabilities.ReasoningEfforts, []string{"low", "medium", "high"}) {
+		t.Fatalf("unexpected grok 4.5 reasoning efforts: %#v", capabilities.ReasoningEfforts)
+	}
+	if !capabilities.Vision {
+		t.Fatalf("expected grok 4.5 to support image input")
 	}
 }
 

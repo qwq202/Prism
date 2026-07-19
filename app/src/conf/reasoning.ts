@@ -54,6 +54,14 @@ export function getMaintainedReasoningEfforts(
     return ["none", "high"];
   }
 
+  if (
+    normalized === "grok-4.5" ||
+    normalized.startsWith("grok-4.5-") ||
+    normalized === "grok-build-latest"
+  ) {
+    return ["low", "medium", "high"];
+  }
+
   if (normalized === "gpt-5.6" || normalized.startsWith("gpt-5.6-")) {
     return ["none", "low", "medium", "high", "xhigh", "max"];
   }

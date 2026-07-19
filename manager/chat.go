@@ -167,6 +167,22 @@ func buildDeepseekThinkingConfig(instance *conversation.Conversation, model stri
 	return map[string]interface{}{"type": "enabled"}, &effort
 }
 
+func buildXAIReasoningEffort(instance *conversation.Conversation, model string) *string {
+	if instance == nil || !globals.SupportXAIReasoningControl(model) {
+		return nil
+	}
+
+	effort := globals.NormalizeXAIReasoningEffort(model, instance.GetOpenAIReasoningEffort())
+	if effort == "" {
+		available := globals.ReasoningEffortsForModel(model)
+		if len(available) == 0 {
+			return nil
+		}
+		effort = available[len(available)-1]
+	}
+	return &effort
+}
+
 func normalizeConfiguredReasoningEffort(model string, requested string) string {
 	available := globals.ReasoningEffortsForModel(model)
 	for _, effort := range available {
@@ -764,8 +780,8 @@ func buildChatProps(
 	disableCache bool,
 ) *adaptercommon.ChatProps {
 	thinking := buildThinkingConfig(instance, model)
-	var reasoningEffort *string
-	if thinking == nil {
+	reasoningEffort := buildXAIReasoningEffort(instance, model)
+	if thinking == nil && reasoningEffort == nil {
 		thinking, reasoningEffort = buildDeepseekThinkingConfig(instance, model)
 	}
 	if instance.GetThinking() != nil {
