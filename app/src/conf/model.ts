@@ -62,6 +62,15 @@ export function supportsImageUpload(
   return !!model?.vision_model;
 }
 
+export function isMaintainedVisionModel(modelId: string): boolean {
+  const normalized = modelId.trim().toLowerCase();
+  return (
+    normalized === "grok-4.5" ||
+    normalized.startsWith("grok-4.5-") ||
+    normalized === "grok-build-latest"
+  );
+}
+
 function matchesDrawingModelList(modelId: string, list: string[]): boolean {
   const normalized = modelId.trim().toLowerCase();
   return list.some(

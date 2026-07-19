@@ -87,6 +87,9 @@ func ensureReasoningMarketTag(tags ModelTag, reasoningModel bool) ModelTag {
 func normalizeMarketModels(models MarketModelList) MarketModelList {
 	normalized := make(MarketModelList, len(models))
 	for index, model := range models {
+		if globals.IsXAIModel(model.Id) && globals.IsVisionModel(model.Id) {
+			model.VisionModel = true
+		}
 		model.ReasoningEfforts = globals.NormalizeCustomReasoningEfforts(model.ReasoningEfforts)
 		managedEfforts := globals.ManagedReasoningEfforts(model.Id)
 		if globals.HasManagedReasoningCapabilities("", model.Id) {

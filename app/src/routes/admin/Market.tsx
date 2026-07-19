@@ -72,7 +72,11 @@ import {
 import { Label } from "@/components/ui/label.tsx";
 import { uploadResource } from "@/admin/api/system.ts";
 import { withNotify } from "@/api/common.ts";
-import { DRAWING_MODEL_TAG, isDrawingModel } from "@/conf/model.ts";
+import {
+  DRAWING_MODEL_TAG,
+  isDrawingModel,
+  isMaintainedVisionModel,
+} from "@/conf/model.ts";
 import {
   DEFAULT_REASONING_EFFORTS,
   getMaintainedReasoningEfforts,
@@ -142,7 +146,8 @@ const generateSeed = () => generateRandomChar(8);
 function normalizeMarketModel(model: Model): Model {
   const next = { ...model };
   const tags = Array.from(new Set(next.tag || []));
-  const isMultimodal = !!next.vision_model;
+  const isMultimodal =
+    !!next.vision_model || isMaintainedVisionModel(next.id);
   const isDrawing = isDrawingModel(next);
   const reasoningConfigurable =
     next.reasoning_configurable ?? !isMaintainedReasoningModel(next.id);
@@ -176,6 +181,7 @@ function normalizeMarketModel(model: Model): Model {
   }
 
   next.drawing_model = isDrawing;
+  next.vision_model = isMultimodal;
   next.reasoning_configurable = reasoningConfigurable;
   next.reasoning_available_efforts = maintainedReasoningEfforts;
   next.reasoning_model = isMaintainedReasoning || isCustomReasoning;

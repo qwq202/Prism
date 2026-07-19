@@ -192,4 +192,7 @@ func TestGetViewModelsTreatsGrok45AsMaintainedReasoningModel(t *testing.T) {
 	if !reflect.DeepEqual(view.ReasoningAvailable, []string{"low", "medium", "high"}) {
 		t.Fatalf("unexpected Grok 4.5 reasoning levels: %#v", view.ReasoningAvailable)
 	}
+	if !view.VisionModel {
+		t.Fatalf("expected Grok 4.5 multimodal input capability to be maintained")
+	}
 }
