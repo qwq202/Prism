@@ -119,6 +119,21 @@ func TestApplyPromptCacheDefaultsMarksGeminiImplicitEligible(t *testing.T) {
 	}
 }
 
+func TestApplyPromptCacheDefaultsUsesGemini36FlashThreshold(t *testing.T) {
+	withPromptCacheConfig(t, true, 0)
+	props := newPromptCacheTestProps(globals.PalmChannelType, globals.Gemini36Flash, 4096)
+
+	ApplyPromptCacheDefaults(props)
+
+	detail := props.Buffer.GetPromptCache()
+	if detail == nil || detail.Provider != "gemini" || detail.ThresholdTokens != 4096 {
+		t.Fatalf("unexpected Gemini 3.6 prompt cache detail: %#v", detail)
+	}
+	if detail.Status != "attempted" || !detail.Attempted || !detail.Eligible {
+		t.Fatalf("expected Gemini 3.6 to be eligible at 4096 tokens, got %#v", detail)
+	}
+}
+
 func TestApplyPromptCacheDefaultsHonorsDisabledConfig(t *testing.T) {
 	withPromptCacheConfig(t, false, 0)
 	props := newPromptCacheTestProps(globals.OpenAIChannelType, "gpt-5.5", 1500)

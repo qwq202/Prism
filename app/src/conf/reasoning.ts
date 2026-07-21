@@ -133,6 +133,8 @@ export function getMaintainedReasoningEfforts(
     normalized === "gemini-2.5-pro" ||
     normalized.startsWith("gemini-2.5-pro-preview-") ||
     normalized.startsWith("gemini-2.5-pro-exp-") ||
+    normalized === "gemini-3.6-flash" ||
+    normalized.startsWith("gemini-3.6-flash-") ||
     normalized === "gemini-3.5-flash" ||
     normalized.startsWith("gemini-3.5-flash-") ||
     normalized === "gemini-3-flash-preview" ||

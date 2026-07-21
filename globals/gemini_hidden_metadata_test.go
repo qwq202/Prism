@@ -73,3 +73,21 @@ func TestGemini35FlashCapabilities(t *testing.T) {
 		t.Fatalf("expected %q to not use gemini thinkingBudget control", Gemini35Flash)
 	}
 }
+
+func TestGemini36FlashCapabilities(t *testing.T) {
+	if !IsVisionModel(Gemini36Flash) {
+		t.Fatalf("expected %q to support vision inputs", Gemini36Flash)
+	}
+
+	if !SupportGeminiThinkingLevel(Gemini36Flash) {
+		t.Fatalf("expected %q to use gemini thinkingLevel control", Gemini36Flash)
+	}
+
+	if !SupportGeminiThinkingLevel("gemini-3.6-flash-preview") {
+		t.Fatalf("expected gemini-3.6-flash- prefix variants to use thinkingLevel control")
+	}
+
+	if SupportGeminiThinkingBudget(Gemini36Flash) {
+		t.Fatalf("expected %q to not use gemini thinkingBudget control", Gemini36Flash)
+	}
+}

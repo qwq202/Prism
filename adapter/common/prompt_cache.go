@@ -85,7 +85,8 @@ func promptCacheSessionKey(props *ChatProps) string {
 func geminiImplicitCacheThreshold(model string) int {
 	model = strings.ToLower(strings.TrimSpace(model))
 	switch {
-	case strings.HasPrefix(model, "gemini-3.5-flash"),
+	case strings.HasPrefix(model, "gemini-3.6-flash"),
+		strings.HasPrefix(model, "gemini-3.5-flash"),
 		strings.HasPrefix(model, "gemini-3.1-pro"):
 		return 4096
 	case strings.HasPrefix(model, "gemini-2.5-flash"),

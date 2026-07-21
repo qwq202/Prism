@@ -125,6 +125,8 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "anthropic/claude-haiku-4.5",
       "google/gemini-2.5-pro",
       "google/gemini-2.5-flash",
+      "google/gemini-3.6-flash",
+      "google/gemini-3.5-flash",
       "deepseek/deepseek-chat-v3.1",
     ],
     description:
@@ -301,6 +303,7 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "gemini-2.5-flash-lite",
       "gemini-2.5-flash-lite-preview-06-17",
       "gemini-2.5-flash-lite-preview-09-2025",
+      "gemini-3.6-flash",
       "gemini-3.5-flash",
       "gemini-3-flash",
       "gemini-3-flash-preview",
@@ -317,7 +320,7 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "> Google Gemini 密钥格式为 **api-key**，接入点填写 `https://generativelanguage.googleapis.com` 或其反代地址。 \n" +
       "> 系统已适配当前官方 `generateContent` / `streamGenerateContent` 请求结构，并支持 `system_instruction`、Google Search、URL Context 与 function calling。 \n" +
       "> Gemini 原生图像生成模型（如 **gemini-3.1-flash-image**、**gemini-3-pro-image**、**gemini-2.5-flash-image**）使用官方 **Interactions API**，按模型支持不同的 `response_format` 参数；其中 **gemini-3.1-flash-image** 额外支持 `thinking_level`，并解析图片输出。 \n" +
-      "> Gemini 2.5 系列使用 `thinkingBudget`，Gemini 3 系列使用官方推荐的 `thinkingLevel` 参数，系统会按模型自动选择。 \n" +
+      "> Gemini 2.5 系列使用 `thinkingBudget`，Gemini 3 / 3.5 / 3.6 系列使用官方推荐的 `thinkingLevel` 参数，系统会按模型自动选择。 \n" +
       "> 为兼容官方稳定版与预览版模型，系统会自动在 `v1` 与 `v1beta` 之间选择合适的 Gemini API 版本。 \n" +
       "> Google 对请求 IP 地域有限制，可能出现 **User Location Is Not Supported** 的错误，可通过可用地区 IP 或反代接入解决。\n",
   },
@@ -330,6 +333,7 @@ export const ChannelInfos: Record<string, ChannelInfo> = {
       "gemini-2.5-pro",
       "gemini-2.5-flash-preview-09-2025",
       "gemini-2.5-flash-lite-preview-09-2025",
+      "gemini-3.6-flash",
       "gemini-3.5-flash",
       "gemini-3-flash",
       "gemini-3-flash-preview",
