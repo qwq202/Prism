@@ -278,6 +278,13 @@ func ChatAPI(c *gin.Context) {
 						break
 					}
 				}
+				if _, generationReady := instance.BeginGeneration(db, requestID); !generationReady {
+					if lease != nil {
+						lease.close()
+					}
+					sendChatRequestState(buf, requestID, instance.GetId(), "rejected", false, true, "Failed to create generation task. Please retry.", true)
+					break
+				}
 				response := ChatHandler(buf, user, instance, false)
 				response.RequestID = requestID
 				leaseOwned := lease == nil || lease.stillOwns()
@@ -313,6 +320,7 @@ func ChatAPI(c *gin.Context) {
 			// reset the params if set
 			instance.ApplyParam(form)
 
+			_, _ = instance.BeginGeneration(db, "")
 			response := ChatHandler(buf, user, instance, true)
 			if instance.SaveResponse(db, response) {
 				if hasVisibleAssistantText(response) {
@@ -323,8 +331,7 @@ func ChatAPI(c *gin.Context) {
 			instance.LoadMask(form.Message)
 		case EditType:
 			if id, message, err := splitMessage(form.Message); err == nil {
-				instance.EditMessage(id, message)
-				instance.SaveConversation(db)
+				instance.EditMessagePersisted(db, id, message)
 			} else {
 				return err
 			}
@@ -334,8 +341,7 @@ func ChatAPI(c *gin.Context) {
 				return err
 			}
 
-			instance.RemoveMessage(id)
-			instance.SaveConversation(db)
+			instance.RemoveMessagePersisted(db, id)
 		case ToolResultType:
 			instance = refreshPersistedConversation(db, id, instance)
 			toolMessage, answerErr := buildAskUserAnswerMessage(instance, form)
@@ -357,6 +363,9 @@ func ChatAPI(c *gin.Context) {
 				break
 			}
 
+			if !instance.IsTransient() {
+				_, _ = instance.BeginGeneration(db, "")
+			}
 			response := ChatHandler(buf, user, instance, false)
 			responseDB := db
 			if instance.IsTransient() {

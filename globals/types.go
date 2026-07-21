@@ -50,9 +50,11 @@ func (m *GeminiHiddenMetadata) UnmarshalJSON(data []byte) error {
 }
 
 type Message struct {
+	MessageID            string                 `json:"id,omitempty"`
 	Role                 string                 `json:"role"`
 	Content              string                 `json:"content"`
 	RequestID            string                 `json:"request_id,omitempty"` // client idempotency key; stripped before model requests
+	Status               string                 `json:"status,omitempty"`
 	CacheControl         map[string]interface{} `json:"cache_control,omitempty"`
 	Model                string                 `json:"model,omitempty"`
 	Name                 *string                `json:"name,omitempty"`

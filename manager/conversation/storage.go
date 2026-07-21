@@ -82,6 +82,8 @@ func loadGlobalAttachmentNames(db *sql.DB) (map[string]struct{}, error) {
 	rows, err := globals.QueryDb(db, `
 		SELECT data FROM conversation
 		UNION ALL
+		SELECT data FROM conversation_message
+		UNION ALL
 		SELECT data FROM drawing_workspace
 		UNION ALL
 		SELECT message FROM drawing_task
@@ -210,6 +212,7 @@ func (c *Conversation) SaveConversation(db *sql.DB) bool {
 		return true
 	}
 
+	ensureMessagesMetadata(c.Message)
 	data := utils.ToJson(c.GetMessage())
 	var taskID sql.NullString
 	if c.TaskID != "" {
@@ -236,7 +239,7 @@ func (c *Conversation) SaveConversation(db *sql.DB) bool {
 		globals.Info(fmt.Sprintf("execute error during save conversation: %s", err.Error()))
 		return false
 	}
-	return true
+	return c.syncNewMessageRecords(db)
 }
 
 // HandleNewMessageWithRequest atomically persists the first user message and
@@ -292,12 +295,23 @@ func (c *Conversation) HandleNewMessageWithRequest(db *sql.DB, form *FormMessage
 			_ = tx.Rollback()
 			break
 		}
+		for position, message := range c.Message {
+			if err := upsertMessageRecord(tx, c.UserID, c.Id, position, message, false); err != nil {
+				if isMissingMessageTableError(err) {
+					break
+				}
+				_ = tx.Rollback()
+				c.Message = c.Message[:previousLength]
+				c.Name = previousName
+				return false
+			}
+		}
 		if err := tx.Commit(); err != nil {
 			break
 		}
 
 		c.Persisted = true
-		return true
+		return c.syncNewMessageRecords(db)
 	}
 
 	c.Message = c.Message[:previousLength]
@@ -319,7 +333,7 @@ func (c *Conversation) insertNewConversation(db *sql.DB, data string, taskID sql
 
 		if err == nil {
 			c.Persisted = true
-			return true
+			return c.syncNewMessageRecords(db)
 		}
 
 		if !isDuplicateConversationIDError(err) {
@@ -379,6 +393,15 @@ func LoadConversation(db *sql.DB, userId int64, conversationId int64) *Conversat
 	if err != nil {
 		return nil
 	}
+	if messages, found, messageErr := loadMessageRecords(db, userId, conversationId); messageErr == nil && found {
+		conversation.Message = messages
+	} else if messageErr == nil || isMissingMessageTableError(messageErr) {
+		if persistErr := persistLegacyMessages(db, &conversation); persistErr != nil && !isMissingMessageTableError(persistErr) {
+			globals.Warn(fmt.Sprintf("[conversation] migrate legacy messages failed: %s", persistErr.Error()))
+		}
+	} else {
+		globals.Warn(fmt.Sprintf("[conversation] load independent messages failed: %s", messageErr.Error()))
+	}
 
 	return &conversation
 }
@@ -424,6 +447,14 @@ func (c *Conversation) DeleteConversation(db *sql.DB) bool {
 		_ = tx.Rollback()
 		return false
 	}
+	if _, err = globals.ExecTx(tx, "DELETE FROM generation_task WHERE user_id = ? AND conversation_id = ?", c.UserID, c.Id); err != nil && !isMissingMessageTableError(err) {
+		_ = tx.Rollback()
+		return false
+	}
+	if _, err = globals.ExecTx(tx, "DELETE FROM conversation_message WHERE user_id = ? AND conversation_id = ?", c.UserID, c.Id); err != nil && !isMissingMessageTableError(err) {
+		_ = tx.Rollback()
+		return false
+	}
 	if _, err = globals.ExecTx(tx, "DELETE FROM conversation WHERE user_id = ? AND conversation_id = ?", c.UserID, c.Id); err != nil {
 		_ = tx.Rollback()
 		return false
@@ -455,6 +486,14 @@ func DeleteAllConversations(db *sql.DB, user auth.User) error {
 		return err
 	}
 	if _, err = globals.ExecTx(tx, "DELETE FROM chat_request WHERE user_id = ?", userID); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if _, err = globals.ExecTx(tx, "DELETE FROM generation_task WHERE user_id = ?", userID); err != nil && !isMissingMessageTableError(err) {
+		_ = tx.Rollback()
+		return err
+	}
+	if _, err = globals.ExecTx(tx, "DELETE FROM conversation_message WHERE user_id = ?", userID); err != nil && !isMissingMessageTableError(err) {
 		_ = tx.Rollback()
 		return err
 	}

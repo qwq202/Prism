@@ -50,6 +50,9 @@ type Conversation struct {
 	CachedContentSnake       string                 `json:"cached_content,omitempty"`
 	Thinking                 interface{}            `json:"-"`
 	Transient                bool                   `json:"-"`
+	ActiveTaskID             string                 `json:"-"`
+	ActiveAssistantMessageID string                 `json:"-"`
+	checkpointWriter         *generationCheckpointWriter
 
 	MaxTokens         *int     `json:"max_tokens,omitempty"`
 	Temperature       *float32 `json:"temperature,omitempty"`
@@ -599,18 +602,22 @@ func (c *Conversation) GetLastMessage() globals.Message {
 }
 
 func (c *Conversation) AddMessage(message globals.Message) {
+	ensureMessageMetadata(&message)
 	c.Message = append(c.Message, message)
 }
 
 func (c *Conversation) AddMessages(messages []globals.Message) {
+	ensureMessagesMetadata(messages)
 	c.Message = append(c.Message, messages...)
 }
 
 func (c *Conversation) InsertMessage(message globals.Message, index int) {
+	ensureMessageMetadata(&message)
 	c.Message = append(c.Message[:index], append([]globals.Message{message}, c.Message[index:]...)...)
 }
 
 func (c *Conversation) InsertMessages(messages []globals.Message, index int) {
+	ensureMessagesMetadata(messages)
 	c.Message = append(c.Message[:index], append(messages, c.Message[index:]...)...)
 }
 
@@ -766,7 +773,6 @@ func (c *Conversation) appendPersistedFormMessage(db *sql.DB, form *FormMessage)
 			return true
 		}
 
-		expectedData := utils.ToJson(stored.Message)
 		head := len(stored.Message) == 0 || stored.Name == defaultConversationName
 		if err := stored.AddMessageFromForm(form); err != nil {
 			return false
@@ -779,11 +785,14 @@ func (c *Conversation) appendPersistedFormMessage(db *sql.DB, form *FormMessage)
 		if stored.TaskID != "" {
 			taskID = sql.NullString{String: stored.TaskID, Valid: true}
 		}
+		if !stored.syncNewMessageRecords(db) {
+			return false
+		}
 		result, err := globals.ExecDb(db, `
 			UPDATE conversation
 			SET conversation_name = ?, data = ?, model = ?, task_id = ?, updated_at = CURRENT_TIMESTAMP
-			WHERE user_id = ? AND conversation_id = ? AND data = ?
-		`, stored.Name, utils.ToJson(stored.Message), stored.Model, taskID, stored.UserID, stored.Id, expectedData)
+			WHERE user_id = ? AND conversation_id = ?
+		`, stored.Name, utils.ToJson(stored.Message), stored.Model, taskID, stored.UserID, stored.Id)
 		if err != nil {
 			return false
 		}
@@ -819,12 +828,23 @@ func (c *Conversation) GetLatestMessage() string {
 
 func (c *Conversation) SaveResponse(db *sql.DB, message globals.Message) bool {
 	message.Role = globals.Assistant
+	if message.Status == "" {
+		message.Status = MessageStatusCompleted
+	}
+	if c.ActiveAssistantMessageID != "" {
+		message.MessageID = c.ActiveAssistantMessageID
+		message.RequestID = c.ActiveTaskID
+	}
+	ensureMessageMetadata(&message)
 	if message.Model == "" {
 		message.Model = c.GetModel()
 	}
 
 	// Keep UI semantics stable: do not persist assistant messages with no visible payload.
 	if strings.TrimSpace(message.Content) == "" && message.FunctionCall == nil && (message.ToolCalls == nil || len(*message.ToolCalls) == 0) {
+		if c.ActiveAssistantMessageID != "" {
+			return c.discardGeneration(db)
+		}
 		return false
 	}
 
@@ -837,8 +857,16 @@ func (c *Conversation) SaveResponse(db *sql.DB, message globals.Message) bool {
 		return c.SaveConversation(db)
 	}
 
+	independentSaved := c.finishGeneration(db, message) == nil
+	if c.ActiveAssistantMessageID == "" {
+		independentSaved = c.updateMessageRecord(db, message, len(baseMessages)) == nil
+	}
+
 	merged, ok := c.mergeResponseIntoStoredConversation(db, baseMessages, message)
 	if !ok {
+		if independentSaved {
+			return true
+		}
 		c.Message = baseMessages
 		return false
 	}
@@ -907,6 +935,15 @@ func findResponseAnchorIndex(existing []globals.Message, base []globals.Message)
 }
 
 func mergeAssistantResponseMessages(existing []globals.Message, base []globals.Message, response globals.Message) []globals.Message {
+	if response.MessageID != "" {
+		for index := range existing {
+			if existing[index].MessageID == response.MessageID {
+				merged := CopyMessage(existing)
+				merged[index] = response
+				return merged
+			}
+		}
+	}
 	anchor := findResponseAnchorIndex(existing, base)
 	if anchor < 0 {
 		for _, message := range existing {
@@ -937,7 +974,6 @@ func (c *Conversation) mergeResponseIntoStoredConversation(db *sql.DB, base []gl
 			return nil, false
 		}
 
-		expectedData := utils.ToJson(stored.GetMessage())
 		merged := mergeAssistantResponseMessages(stored.GetMessage(), base, response)
 		data := utils.ToJson(merged)
 		var taskID sql.NullString
@@ -959,8 +995,8 @@ func (c *Conversation) mergeResponseIntoStoredConversation(db *sql.DB, base []gl
 		result, err := globals.ExecDb(db, `
 			UPDATE conversation
 			SET conversation_name = ?, data = ?, model = ?, task_id = ?, updated_at = CURRENT_TIMESTAMP
-			WHERE user_id = ? AND conversation_id = ? AND data = ?
-		`, name, data, model, taskID, c.UserID, c.Id, expectedData)
+			WHERE user_id = ? AND conversation_id = ?
+		`, name, data, model, taskID, c.UserID, c.Id)
 		if err != nil {
 			globals.Warn("failed to merge assistant response into stored conversation: " + err.Error())
 			return nil, false

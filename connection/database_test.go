@@ -122,3 +122,56 @@ func TestInitRootUserIgnoresInvalidConfiguredInitialPassword(t *testing.T) {
 		t.Fatalf("expected invalid configured root password to be ignored")
 	}
 }
+
+func TestRecoverInterruptedGenerationTasksReleasesRequestLease(t *testing.T) {
+	db := openConnectionTestDB(t)
+	CreateChatRequestTable(db)
+	CreateConversationMessageTable(db)
+	CreateGenerationTaskTable(db)
+
+	if _, err := globals.ExecDb(db, `
+		INSERT INTO chat_request (
+			user_id, request_id, conversation_id, status, reserved_at, owner_token, lease_expires_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, 1, "request-1", 9, "accepted", 1, "owner", 999999); err != nil {
+		t.Fatalf("insert chat request: %v", err)
+	}
+	if _, err := globals.ExecDb(db, `
+		INSERT INTO conversation_message (
+			user_id, conversation_id, message_id, request_id, position, role, status, data
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, 1, 9, "message-1", "request-1", 1, "assistant", "streaming", `{"id":"message-1","role":"assistant","content":"partial","status":"streaming"}`); err != nil {
+		t.Fatalf("insert assistant message: %v", err)
+	}
+	if _, err := globals.ExecDb(db, `
+		INSERT INTO generation_task (
+			user_id, task_id, conversation_id, assistant_message_id, status
+		) VALUES (?, ?, ?, ?, ?)
+	`, 1, "request-1", 9, "message-1", "streaming"); err != nil {
+		t.Fatalf("insert generation task: %v", err)
+	}
+
+	recoverInterruptedGenerationTasks(db)
+
+	var taskStatus string
+	if err := globals.QueryRowDb(db, "SELECT status FROM generation_task WHERE user_id = ? AND task_id = ?", 1, "request-1").Scan(&taskStatus); err != nil {
+		t.Fatalf("load task status: %v", err)
+	}
+	if taskStatus != "interrupted" {
+		t.Fatalf("expected interrupted task, got %q", taskStatus)
+	}
+	var messageStatus string
+	if err := globals.QueryRowDb(db, "SELECT status FROM conversation_message WHERE user_id = ? AND message_id = ?", 1, "message-1").Scan(&messageStatus); err != nil {
+		t.Fatalf("load message status: %v", err)
+	}
+	if messageStatus != "interrupted" {
+		t.Fatalf("expected interrupted message, got %q", messageStatus)
+	}
+	var leaseExpiresAt int64
+	if err := globals.QueryRowDb(db, "SELECT lease_expires_at FROM chat_request WHERE user_id = ? AND request_id = ?", 1, "request-1").Scan(&leaseExpiresAt); err != nil {
+		t.Fatalf("load request lease: %v", err)
+	}
+	if leaseExpiresAt != 0 {
+		t.Fatalf("expected released lease, got %d", leaseExpiresAt)
+	}
+}

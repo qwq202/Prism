@@ -62,6 +62,7 @@ func openOrphanAttachmentCleanupDB(t *testing.T) *sql.DB {
 	})
 
 	connection.CreateConversationTable(db)
+	connection.CreateConversationMessageTable(db)
 	connection.CreateDrawingWorkspaceTable(db)
 	connection.CreateDrawingTaskTable(db)
 	return db

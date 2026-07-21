@@ -456,7 +456,10 @@ function isStreamingConversation(
   conversation: ConversationSerialized,
 ): boolean {
   const last = conversation.messages[conversation.messages.length - 1];
-  return last?.role === AssistantRole && last.end === false;
+  return (
+    last?.role === AssistantRole &&
+    (last.end === false || last.status === "streaming")
+  );
 }
 
 function summarizeIncomingStreamMessage(
@@ -2782,7 +2785,9 @@ export function useWorking(): boolean {
     if (messages.length === 0) return false;
 
     const last = messages[messages.length - 1];
-    if (last.role !== AssistantRole || last.end === undefined) return false;
+    if (last.role !== AssistantRole) return false;
+    if (last.status === "streaming") return true;
+    if (last.end === undefined) return false;
     return !last.end;
   }, [messages]);
 }

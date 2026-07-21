@@ -234,6 +234,8 @@ export class Connection {
   protected requestAckSupported?: boolean;
   protected requestCapabilityTimer?: ReturnType<typeof setTimeout>;
   protected incomingQueue: Promise<void>;
+  protected pendingStreamMessage?: StreamMessage;
+  protected streamFrame?: number;
   public id: number;
   public state: boolean;
 
@@ -381,6 +383,8 @@ export class Connection {
     socket.onclose = null;
     socket.onerror = null;
     socket.onmessage = null;
+
+    this.flushPendingStreamMessage();
 
     if (
       socket.readyState === WebSocket.CONNECTING ||
@@ -550,10 +554,7 @@ export class Connection {
       return;
     }
 
-    if (
-      !this.connection ||
-      this.connection.readyState === WebSocket.CLOSED
-    ) {
+    if (!this.connection || this.connection.readyState === WebSocket.CLOSED) {
       this.init();
     }
 
@@ -799,7 +800,39 @@ export class Connection {
       });
     }
 
-    this.callback && this.callback(this.id, message);
+    const batchable =
+      !message.end &&
+      !message.request_id &&
+      !message.conversation &&
+      !message.title &&
+      !message.keyword &&
+      !message.tool_call &&
+      !message.search_query &&
+      !message.search_result &&
+      !message.search_index &&
+      !message.response_type;
+
+    if (batchable) {
+      const pending = this.pendingStreamMessage;
+      this.pendingStreamMessage = pending
+        ? {
+            ...pending,
+            ...message,
+            message: `${pending.message ?? ""}${message.message ?? ""}`,
+            quota: message.quota ?? pending.quota,
+            plan: message.plan ?? pending.plan,
+          }
+        : message;
+      if (this.streamFrame === undefined) {
+        this.streamFrame = window.requestAnimationFrame(() => {
+          this.streamFrame = undefined;
+          this.flushPendingStreamMessage();
+        });
+      }
+    } else {
+      this.flushPendingStreamMessage();
+      this.callback && this.callback(this.id, message);
+    }
 
     if (message.end) {
       this.streamStats = {
@@ -808,6 +841,13 @@ export class Connection {
         startedAt: performance.now(),
       };
     }
+  }
+
+  protected flushPendingStreamMessage(): void {
+    if (!this.pendingStreamMessage) return;
+    const pending = this.pendingStreamMessage;
+    this.pendingStreamMessage = undefined;
+    this.callback && this.callback(this.id, pending);
   }
 
   public setId(id: number): void {

@@ -656,11 +656,7 @@ func createRemoveSignalHandler(db *sql.DB, instance *conversation.Conversation) 
 		if instance == nil || db == nil {
 			return
 		}
-		removed := instance.RemoveMessage(index)
-		if removed.Role == "" {
-			return
-		}
-		instance.SaveConversation(db)
+		instance.RemoveMessagePersisted(db, index)
 	}
 }
 
@@ -844,6 +840,7 @@ func createRoundTask(
 	group string,
 	props *adaptercommon.ChatProps,
 	plan bool,
+	instance *conversation.Conversation,
 	onRemove removeSignalHandler,
 	limiter realtimeQuotaLimiter,
 ) (hit bool, err error, interrupted bool) {
@@ -963,6 +960,7 @@ func createRoundTask(
 					}
 				}
 				quota := realtimeQuotaForBuffer(streamBuffer)
+				queueAssistantCheckpoint(instance, streamBuffer, plan)
 
 				if !conn.TrySendClient(globals.ChatSegmentResponse{
 					Message: content,
@@ -1312,7 +1310,7 @@ func createToolChatTask(
 
 		streamBuffer := liveBuffer
 
-		hit, err, interrupted = createRoundTask(conn, user, roundBuffer, streamBuffer, db, cache, group, props, plan, createRemoveSignalHandler(db, instance), limiter)
+		hit, err, interrupted = createRoundTask(conn, user, roundBuffer, streamBuffer, db, cache, group, props, plan, instance, createRemoveSignalHandler(db, instance), limiter)
 		syncToolFinalMetadata(liveBuffer, roundBuffer)
 		if err != nil || interrupted {
 			return hit, err, interrupted
@@ -1412,7 +1410,7 @@ func createToolChatTask(
 		true,
 	)
 
-	hit, err, interrupted = createRoundTask(conn, user, finalBuffer, liveBuffer, db, cache, group, props, plan, createRemoveSignalHandler(db, instance), limiter)
+	hit, err, interrupted = createRoundTask(conn, user, finalBuffer, liveBuffer, db, cache, group, props, plan, instance, createRemoveSignalHandler(db, instance), limiter)
 	syncToolFinalMetadata(liveBuffer, finalBuffer)
 	if err != nil || interrupted {
 		return hit, err, interrupted
@@ -1759,6 +1757,7 @@ func createChatTask(
 
 			message := buffer.WriteChunk(data.Chunk)
 			quota := realtimeQuotaForBuffer(buffer)
+			queueAssistantCheckpoint(instance, buffer, plan)
 			if !conn.TrySendClient(globals.ChatSegmentResponse{
 				Message: message,
 				Quota:   quota,
@@ -1822,6 +1821,7 @@ func extractAssistantMessageFromBuffer(buffer *utils.Buffer, interrupted bool, p
 		GeminiHiddenMetadata: buffer.GetGeminiHiddenMetadata(),
 		ClaudeHiddenMetadata: buffer.GetClaudeHiddenMetadata(),
 		Plan:                 plan,
+		Status:               conversation.MessageStatusCompleted,
 	}
 	if buffer.GetCharge() != nil {
 		message.Quota = buffer.GetRecordQuota()
@@ -1831,6 +1831,7 @@ func extractAssistantMessageFromBuffer(buffer *utils.Buffer, interrupted bool, p
 	// Keep visible text, but avoid persisting broken function-calling state
 	// or incomplete hidden reasoning context.
 	if interrupted {
+		message.Status = conversation.MessageStatusInterrupted
 		return message
 	}
 
@@ -1840,13 +1841,32 @@ func extractAssistantMessageFromBuffer(buffer *utils.Buffer, interrupted bool, p
 	return message
 }
 
-func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conversation, restart bool) globals.Message {
+func queueAssistantCheckpoint(instance *conversation.Conversation, buffer *utils.Buffer, plan bool) {
+	if instance == nil || buffer == nil || !buffer.ShouldCheckpoint(500*time.Millisecond, 256) {
+		return
+	}
+	instance.QueueGenerationCheckpoint(globals.Message{
+		Role:             globals.Assistant,
+		Content:          buffer.Read(),
+		Model:            buffer.GetModel(),
+		ReasoningContent: buffer.GetReasoningContent(),
+		Plan:             plan,
+		Status:           conversation.MessageStatusStreaming,
+	})
+}
+
+func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conversation, restart bool) (result globals.Message) {
 	defer func() {
 		if err := recover(); err != nil {
 			stack := debug.Stack()
 			globals.Warn(fmt.Sprintf("caught panic from chat handler: %s (instance: %s, client: %s)\n%s",
 				err, instance.GetModel(), conn.GetCtx().ClientIP(), stack,
 			))
+			result = globals.Message{
+				Role:    globals.Assistant,
+				Content: defaultMessage,
+				Status:  conversation.MessageStatusFailed,
+			}
 		}
 	}()
 
@@ -1858,8 +1878,10 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 	toolCallsSupported := memory.CanUseToolCalls(model, group)
 	segment := conversation.CopyMessage(instance.GetChatMessage(restart))
 	for index := range segment {
-		// Request IDs are persistence metadata and must never be forwarded to model providers.
+		// Persistence metadata must never be forwarded to model providers.
+		segment[index].MessageID = ""
 		segment[index].RequestID = ""
+		segment[index].Status = ""
 	}
 	if web.ShouldUseFallbackSearch(instance.IsEnableWebSearch(), model, toolCallsSupported) {
 		segment = web.ToFallbackSearched(segment, group, cache)
@@ -1890,6 +1912,7 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 		return globals.Message{
 			Role:    globals.Assistant,
 			Content: message,
+			Status:  conversation.MessageStatusFailed,
 		}
 	}
 
@@ -1910,7 +1933,7 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 			Quota:   0,
 			End:     true,
 		})
-		return globals.Message{Role: globals.Assistant, Content: billingErr.Error()}
+		return globals.Message{Role: globals.Assistant, Content: billingErr.Error(), Status: conversation.MessageStatusFailed}
 	}
 	defer billingSession.Refund()
 	plan = billingSession.UsesPlan()
@@ -1935,7 +1958,7 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 			hit, err, interrupted = createToolChatTask(conn, user, buffer, db, cache, model, group, instance, segment, plan, memCtx, tools, maxToolRounds, limiter)
 		} else {
 			props := buildChatProps(conn, instance, model, segment, buffer, memCtx.MemoryPrompt, memCtx.RecentChatsPrompt, nil, nil, false)
-			hit, err, interrupted = createRoundTask(conn, user, buffer, buffer, db, cache, group, props, plan, createRemoveSignalHandler(db, instance), limiter)
+			hit, err, interrupted = createRoundTask(conn, user, buffer, buffer, db, cache, group, props, plan, instance, createRemoveSignalHandler(db, instance), limiter)
 		}
 	}
 
@@ -1960,6 +1983,7 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 		return globals.Message{
 			Role:    globals.Assistant,
 			Content: err.Error(),
+			Status:  conversation.MessageStatusFailed,
 		}
 	}
 
@@ -1993,7 +2017,9 @@ func ChatHandler(conn *Connection, user *auth.User, instance *conversation.Conve
 			Message: defaultMessage,
 			End:     true,
 		})
-		return extractAssistantMessageFromBuffer(buffer, interrupted, plan)
+		message := extractAssistantMessageFromBuffer(buffer, interrupted, plan)
+		message.Status = conversation.MessageStatusFailed
+		return message
 	}
 
 	conn.Send(globals.ChatSegmentResponse{

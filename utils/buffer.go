@@ -63,6 +63,8 @@ type Buffer struct {
 	dataBuilder           strings.Builder               `json:"-"`
 	outputTokenCache      int                           `json:"-"`
 	outputTokenCacheValid bool                          `json:"-"`
+	checkpointAt         time.Time                     `json:"-"`
+	checkpointCursor     int                           `json:"-"`
 }
 
 // MarshalJSON flushes the streaming builder into the existing Data field so
@@ -195,6 +197,22 @@ func (b *Buffer) WriteChunk(data *globals.Chunk) string {
 
 func (b *Buffer) GetChunk() string {
 	return b.Latest
+}
+
+func (b *Buffer) ShouldCheckpoint(interval time.Duration, minGrowth int) bool {
+	if b == nil || b.Cursor <= 0 {
+		return false
+	}
+	now := time.Now()
+	if b.checkpointAt.IsZero() {
+		b.checkpointAt = now
+	}
+	if b.Cursor-b.checkpointCursor < minGrowth && now.Sub(b.checkpointAt) < interval {
+		return false
+	}
+	b.checkpointAt = now
+	b.checkpointCursor = b.Cursor
+	return true
 }
 
 func (b *Buffer) InitVisionRecall() {

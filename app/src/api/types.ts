@@ -39,8 +39,11 @@ export const GetRoleIcon = (role: string) => {
 export const getRoleIcon = GetRoleIcon;
 
 export type Message = {
+  id?: string;
   role: string;
   content: string;
+  request_id?: string;
+  status?: "streaming" | "completed" | "failed" | "interrupted";
   model?: string;
   keyword?: string;
   quota?: number;

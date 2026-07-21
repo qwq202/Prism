@@ -104,6 +104,8 @@ func ConnectDatabase() *sql.DB {
 	CreateUserTable(db)
 	CreateConversationTable(db)
 	CreateChatRequestTable(db)
+	CreateConversationMessageTable(db)
+	CreateGenerationTaskTable(db)
 	CreateDrawingWorkspaceTable(db)
 	CreateDrawingTaskTable(db)
 	CreateMaskTable(db)
@@ -122,10 +124,40 @@ func ConnectDatabase() *sql.DB {
 	CreatePersonalizationSettingsTable(db)
 
 	migrateDatabaseOrPanic(db)
+	recoverInterruptedGenerationTasks(db)
 
 	DB = db
 
 	return db
+}
+
+func recoverInterruptedGenerationTasks(db *sql.DB) {
+	if _, err := globals.ExecDb(db, `
+		UPDATE generation_task
+		SET status = 'interrupted', error = 'service restarted during generation', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+		WHERE status = 'streaming'
+	`); err != nil {
+		panicDatabaseSetup("recover generation tasks", err)
+	}
+	if _, err := globals.ExecDb(db, `
+		UPDATE conversation_message
+		SET status = 'interrupted', updated_at = CURRENT_TIMESTAMP
+		WHERE status = 'streaming'
+	`); err != nil {
+		panicDatabaseSetup("recover streaming messages", err)
+	}
+	if _, err := globals.ExecDb(db, `
+		UPDATE chat_request
+		SET lease_expires_at = 0, updated_at = CURRENT_TIMESTAMP
+		WHERE status = 'accepted' AND EXISTS (
+			SELECT 1 FROM generation_task
+			WHERE generation_task.user_id = chat_request.user_id
+				AND generation_task.task_id = chat_request.request_id
+				AND generation_task.status = 'interrupted'
+		)
+	`); err != nil {
+		panicDatabaseSetup("release interrupted chat requests", err)
+	}
 }
 
 func panicDatabaseSetup(step string, err error) {
@@ -257,6 +289,41 @@ func CreateChatRequestTable(db *sql.DB) {
 		  lease_expires_at BIGINT NOT NULL DEFAULT 0,
 		  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		  PRIMARY KEY (user_id, request_id)
+		);
+	`)
+}
+
+func CreateConversationMessageTable(db *sql.DB) {
+	mustCreateTable(db, "conversation_message", `
+		CREATE TABLE IF NOT EXISTS conversation_message (
+		  user_id INT NOT NULL,
+		  conversation_id INT NOT NULL,
+		  message_id VARCHAR(64) NOT NULL,
+		  request_id VARCHAR(128) NOT NULL DEFAULT '',
+		  position INT NOT NULL,
+		  role VARCHAR(24) NOT NULL,
+		  status VARCHAR(24) NOT NULL DEFAULT 'completed',
+		  data MEDIUMTEXT NOT NULL,
+		  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		  PRIMARY KEY (user_id, conversation_id, message_id)
+		);
+	`)
+}
+
+func CreateGenerationTaskTable(db *sql.DB) {
+	mustCreateTable(db, "generation_task", `
+		CREATE TABLE IF NOT EXISTS generation_task (
+		  user_id INT NOT NULL,
+		  task_id VARCHAR(128) NOT NULL,
+		  conversation_id INT NOT NULL,
+		  assistant_message_id VARCHAR(64) NOT NULL,
+		  status VARCHAR(24) NOT NULL DEFAULT 'streaming',
+		  error TEXT,
+		  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		  completed_at DATETIME NULL,
+		  PRIMARY KEY (user_id, task_id)
 		);
 	`)
 }
