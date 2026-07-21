@@ -37,15 +37,12 @@ import { motion } from "framer-motion";
 import { ThinkContent } from "@/components/ThinkContent";
 import ModelAvatar from "@/components/ModelAvatar.tsx";
 import { selectSupportModels } from "@/store/chat.ts";
-import { ToolCallStatus } from "@/components/ToolCallStatus";
 import { parseThinkContent } from "@/utils/thinking";
 import { showQuotaSelector } from "@/store/settings.ts";
-import { getVisibleToolCalls } from "@/api/tool-calls.ts";
 import { MarkdownFile } from "@/components/plugins/file.tsx";
 import {
   type AskUserResult,
   getAskUserToolCalls,
-  isAskUserToolCallName,
   isPendingAskUserToolCall,
 } from "@/api/ask-user.ts";
 import { AskUserCard } from "@/components/AskUserCard.tsx";
@@ -335,19 +332,13 @@ function MessageContent({
   const hasContent = message.content.length > 0;
   const isAssistant = message.role === "assistant";
   const isOutput = message.end === false || message.status === "streaming";
-  const visibleToolCalls = isAssistant
-    ? getVisibleToolCalls(message.tool_calls)
+  const askUserToolCalls = isAssistant
+    ? getAskUserToolCalls(message.tool_calls)
     : [];
-  const askUserToolCalls = getAskUserToolCalls(visibleToolCalls);
-  const standardToolCalls = visibleToolCalls.filter(
-    (toolCall) => !isAskUserToolCallName(toolCall.function.name),
-  );
-  const hasToolCalls =
-    askUserToolCalls.length > 0 || standardToolCalls.length > 0;
+  const hasAskUserToolCalls = askUserToolCalls.length > 0;
   const isPendingAskUserOnlyMessage =
     !hasContent &&
-    askUserToolCalls.length > 0 &&
-    standardToolCalls.length === 0 &&
+    hasAskUserToolCalls &&
     askUserToolCalls.every(isPendingAskUserToolCall);
   const user = useSelector(selectUsername);
   const supportModels = useSelector(selectSupportModels);
@@ -446,9 +437,9 @@ function MessageContent({
               <MessageMarkdown loading={isOutput} content={message.content} />
             )}
           </>
-        ) : message.end === true && !hasToolCalls ? (
+        ) : message.end === true && !hasAskUserToolCalls ? (
           <CircleSlash className={`h-5 w-5 m-1`} />
-        ) : !hasToolCalls ? (
+        ) : !hasAskUserToolCalls ? (
           <Loader2 className={`h-5 w-5 m-1 animate-spin`} />
         ) : null}
 
@@ -461,10 +452,6 @@ function MessageContent({
             }
           />
         ))}
-
-        {standardToolCalls.length > 0 && (
-          <ToolCallStatus toolCalls={standardToolCalls} />
-        )}
 
         {isAssistant && hasContent && isOutput && (
           <Loader2
