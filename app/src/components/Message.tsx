@@ -334,7 +334,7 @@ function MessageContent({
   const isUser = message.role === "user";
   const hasContent = message.content.length > 0;
   const isAssistant = message.role === "assistant";
-  const isOutput = message.end === false;
+  const isOutput = message.end === false || message.status === "streaming";
   const visibleToolCalls = isAssistant
     ? getVisibleToolCalls(message.tool_calls)
     : [];
@@ -437,16 +437,13 @@ function MessageContent({
                 />
                 {parsedContent.restContent && (
                   <MessageMarkdown
-                    loading={message.end === false}
+                    loading={isOutput}
                     content={parsedContent.restContent}
                   />
                 )}
               </>
             ) : (
-              <MessageMarkdown
-                loading={message.end === false}
-                content={message.content}
-              />
+              <MessageMarkdown loading={isOutput} content={message.content} />
             )}
           </>
         ) : message.end === true && !hasToolCalls ? (

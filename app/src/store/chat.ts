@@ -174,6 +174,7 @@ type initialStateType = {
   custom_masks: CustomMask[];
   support_models: Model[];
   loadingConversationId: number | null;
+  active_requests: Record<number, string>;
 };
 
 const defaultConversation: ConversationSerialized = { messages: [] };
@@ -207,6 +208,7 @@ function resetLocalConversationState(state: initialStateType) {
   state.conversations = { [-1]: { ...defaultConversation } };
   state.current = -1;
   state.loadingConversationId = null;
+  state.active_requests = {};
   state.mask_item = null;
   setNumberMemory("history_conversation", -1);
 }
@@ -1078,6 +1080,7 @@ const chatSlice = createSlice({
     openai_reasoning_effort: getMemory("openai_reasoning_effort") || "none",
     current: -1,
     loadingConversationId: null,
+    active_requests: {},
     model: initialModel,
     model_list: getModelList(offline, getArrayMemory("model_mark_list")),
     market: false,
@@ -1167,6 +1170,7 @@ const chatSlice = createSlice({
       if (message.end) {
         instance.end = message.end;
         instance.tool_calls = finalizePendingToolCalls(instance.tool_calls);
+        delete state.active_requests[id];
       }
       if (hasPayload || message.end === true || message.plan === true) {
         instance.plan = message.plan;
@@ -1239,6 +1243,24 @@ const chatSlice = createSlice({
       markConversationPending(conversation);
 
       conversation.messages[conversation.messages.length - 1].end = true;
+      delete state.active_requests[id];
+    },
+    startGenerationRequest: (state, action) => {
+      const { id, requestId } = action.payload as {
+        id: number;
+        requestId: string;
+      };
+      state.active_requests[id] = requestId;
+    },
+    finishGenerationRequest: (state, action) => {
+      const { id, requestId } = action.payload as {
+        id: number;
+        requestId?: string;
+      };
+      const activeRequestId = state.active_requests[id];
+      if (!activeRequestId) return;
+      if (requestId && activeRequestId !== requestId) return;
+      delete state.active_requests[id];
     },
     raiseConversation: (state, action) => {
       // raise conversation `-1` to target id
@@ -1253,6 +1275,10 @@ const chatSlice = createSlice({
         id,
         conversation,
       );
+      if (state.active_requests[-1]) {
+        state.active_requests[id] = state.active_requests[-1];
+        delete state.active_requests[-1];
+      }
 
       state.conversations[-1] = { ...defaultConversation };
     },
@@ -1368,6 +1394,7 @@ const chatSlice = createSlice({
       if (!state.conversations[id]) return;
 
       closeConversationConnection(id);
+      delete state.active_requests[id];
       delete state.conversations[id];
     },
     deleteConversation: (state, action) => {
@@ -1393,6 +1420,7 @@ const chatSlice = createSlice({
       if (!state.conversations[id]) return;
 
       closeConversationConnection(id);
+      delete state.active_requests[id];
       delete state.conversations[id];
     },
     deleteAllConversation: (state) => {
@@ -1716,6 +1744,8 @@ export const {
   answerAskUserMessage,
   editMessage,
   stopMessage,
+  startGenerationRequest,
+  finishGenerationRequest,
   raiseConversation,
   importConversation,
   setConversation,
@@ -1766,6 +1796,8 @@ export const selectDeepSeekReasoningEffortByModel = (
 export const selectOpenAIReasoningEffort = (state: RootState): string =>
   state.chat.openai_reasoning_effort;
 export const selectCurrent = (state: RootState): number => state.chat.current;
+export const selectCurrentGenerationActive = (state: RootState): boolean =>
+  Boolean(state.chat.active_requests[state.chat.current]);
 export const selectConversationLoading = (state: RootState): boolean =>
   state.chat.loadingConversationId === state.chat.current;
 export const selectModelList = (state: RootState): string[] =>
@@ -2374,6 +2406,13 @@ export function useMessageActions() {
           model: targetModel,
         }),
       );
+      dispatch(
+        startGenerationRequest({
+          id: current,
+          requestId:
+            requestID ?? `local:${Date.now()}:${Math.random().toString(36)}`,
+        }),
+      );
 
       logClientEvent("chat.action", "send-dispatched", {
         current,
@@ -2518,6 +2557,12 @@ export function useMessageActions() {
 
       // remove the last message if it's from assistant and create a new message
       dispatch(restartMessage({ id: current, model }));
+      dispatch(
+        startGenerationRequest({
+          id: current,
+          requestId: `restart:${Date.now()}:${Math.random().toString(36)}`,
+        }),
+      );
     },
     answerAskUser: async (toolCallId: string, result: AskUserResult) => {
       if (conversationLoading) {
@@ -2629,6 +2674,12 @@ export function useMessageActions() {
           model: answerModel,
         }),
       );
+      dispatch(
+        startGenerationRequest({
+          id: current,
+          requestId: `tool-result:${Date.now()}:${Math.random().toString(36)}`,
+        }),
+      );
       logClientEvent("chat.action", "ask-user-answer", {
         current,
         tool_call_id: toolCallId,
@@ -2704,7 +2755,26 @@ export function useMessageActions() {
         });
       }
       const conversationModel = conversations[id]?.model;
+      if (message.request_id && message.accepted) {
+        dispatch(
+          startGenerationRequest({
+            id,
+            requestId: message.request_id,
+          }),
+        );
+      }
       dispatch(updateMessage({ id, message, model: conversationModel }));
+      if (
+        message.request_id &&
+        (message.request_status === "rejected" || message.retryable === false)
+      ) {
+        dispatch(
+          finishGenerationRequest({
+            id,
+            requestId: message.request_id,
+          }),
+        );
+      }
       if (message.title) {
         dispatch(renameHistory({ id, name: message.title }));
       }
@@ -2715,6 +2785,12 @@ export function useMessageActions() {
         message.request_status === "completed"
       ) {
         await refresh({ useCache: false });
+        dispatch(
+          finishGenerationRequest({
+            id,
+            requestId: message.request_id,
+          }),
+        );
       }
 
       // Request-state frames carry conversation metadata but no assistant payload.
@@ -2770,18 +2846,44 @@ export function useMessages(): Message[] {
   const conversations = useSelector(selectConversations);
   const current = useSelector(selectCurrent);
   const mask = useSelector(selectMaskItem);
+  const generationActive = useSelector(selectCurrentGenerationActive);
 
   return useMemo(() => {
     const messages = conversations[current]?.messages || [];
     const showMask = current === -1 && mask && messages.length === 0;
-    return !showMask ? messages : mask?.context;
-  }, [conversations, current, mask]);
+    const visibleMessages = !showMask ? messages : mask?.context || [];
+    const last = visibleMessages[visibleMessages.length - 1];
+
+    // Request lifecycle is authoritative. A remote refresh can briefly return
+    // the persisted user message before the streaming assistant placeholder;
+    // keep the loading card mounted until the request actually terminates.
+    const hasStreamingAssistant =
+      last?.role === AssistantRole &&
+      (("end" in last && last.end === false) ||
+        ("status" in last && last.status === "streaming"));
+    if (generationActive && !hasStreamingAssistant) {
+      return [
+        ...visibleMessages,
+        {
+          role: AssistantRole,
+          content: "",
+          model: conversations[current]?.model,
+          status: "streaming",
+          end: false,
+        },
+      ];
+    }
+
+    return visibleMessages;
+  }, [conversations, current, generationActive, mask]);
 }
 
 export function useWorking(): boolean {
   const messages = useMessages();
+  const generationActive = useSelector(selectCurrentGenerationActive);
 
   return useMemo(() => {
+    if (generationActive) return true;
     if (messages.length === 0) return false;
 
     const last = messages[messages.length - 1];
@@ -2789,7 +2891,7 @@ export function useWorking(): boolean {
     if (last.status === "streaming") return true;
     if (last.end === undefined) return false;
     return !last.end;
-  }, [messages]);
+  }, [generationActive, messages]);
 }
 
 export function usePendingAskUser(): MessageToolCall | undefined {
