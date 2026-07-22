@@ -2757,7 +2757,8 @@ export function useMessageActions() {
         });
       }
       const conversationModel = conversations[id]?.model;
-      if (message.request_id && message.accepted) {
+      const requestCompleted = message.request_status === "completed";
+      if (message.request_id && message.accepted && !requestCompleted) {
         dispatch(
           startGenerationRequest({
             id,
@@ -2781,18 +2782,16 @@ export function useMessageActions() {
         dispatch(renameHistory({ id, name: message.title }));
       }
 
-      if (
-        id !== -1 &&
-        message.request_id &&
-        message.request_status === "completed"
-      ) {
-        await refresh({ useCache: false });
+      if (id !== -1 && message.request_id && requestCompleted) {
+        // End the local generation lifecycle before refreshing remote state.
+        // Otherwise cloud latency can briefly render a synthetic loading card.
         dispatch(
           finishGenerationRequest({
             id,
             requestId: message.request_id,
           }),
         );
+        await refresh({ useCache: false });
       }
 
       // Request-state frames carry conversation metadata but no assistant payload.
