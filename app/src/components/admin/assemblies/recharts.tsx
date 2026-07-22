@@ -22,6 +22,7 @@ import { resolveChartColor } from "./chart-colors.ts";
 const chartGridStroke = "hsl(var(--border))";
 const chartTickColor = "hsl(var(--muted-foreground))";
 const chartCursorStroke = "hsl(var(--foreground) / 0.35)";
+const chartInitialDimension = { width: 1, height: 1 };
 
 type ChartDatum = Record<string, string | number | undefined>;
 
@@ -146,7 +147,12 @@ export function AreaChart({
 }: SeriesChartProps) {
   return (
     <div className={cn("common-chart", className)}>
-      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+      <ResponsiveContainer
+        width="100%"
+        height="100%"
+        minWidth={0}
+        initialDimension={chartInitialDimension}
+      >
         <RechartsAreaChart data={data} margin={{ left: 0, right: 8, top: 8 }}>
           <CartesianGrid
             stroke={chartGridStroke}
@@ -208,7 +214,12 @@ export function BarChart({
 
   return (
     <div className={cn("common-chart", className)}>
-      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+      <ResponsiveContainer
+        width="100%"
+        height="100%"
+        minWidth={0}
+        initialDimension={chartInitialDimension}
+      >
         <RechartsBarChart
           data={data}
           layout={vertical ? "vertical" : "horizontal"}
@@ -287,7 +298,12 @@ export function LineChart({
 }: SeriesChartProps) {
   return (
     <div className={cn("common-chart", className)}>
-      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+      <ResponsiveContainer
+        width="100%"
+        height="100%"
+        minWidth={0}
+        initialDimension={chartInitialDimension}
+      >
         <RechartsLineChart data={data} margin={{ left: 0, right: 8, top: 8 }}>
           <CartesianGrid
             stroke={chartGridStroke}
@@ -342,7 +358,12 @@ export function DonutChart({
 }: DonutChartProps) {
   return (
     <div className={cn("common-chart relative", className)}>
-      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+      <ResponsiveContainer
+        width="100%"
+        height="100%"
+        minWidth={0}
+        initialDimension={chartInitialDimension}
+      >
         <PieChart>
           <Pie
             data={data}
