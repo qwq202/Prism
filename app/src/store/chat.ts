@@ -98,6 +98,8 @@ function resolveOpenAIReasoningEffortForRequest(
   nativeWebEnabled: boolean,
 ): string | undefined {
   const capabilities = getOpenAIResponsesCapabilities(supportModels, model);
+  if (capabilities.reasoningEfforts.length === 0) return undefined;
+
   const normalized = normalizeOpenAIResponsesReasoningEffort(
     supportModels,
     model,
