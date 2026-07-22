@@ -137,3 +137,67 @@ func TestReserveChatRequestReclaimsStaleUnpersistedReservation(t *testing.T) {
 		t.Fatalf("expected stale reservation to be reclaimed, got owner=%v record=%#v", reclaimedOwner, reclaimed)
 	}
 }
+
+func TestRenewChatRequestLeaseAlwaysAdvancesOwnedLease(t *testing.T) {
+	db := openConversationTestDB(t, "chat-request-renewal.db")
+	connection.CreateChatRequestTable(db)
+
+	const (
+		userID    = int64(3)
+		requestID = "request-renewal"
+	)
+	record, owner, err := ReserveChatRequest(db, userID, requestID, 1)
+	if err != nil || !owner {
+		t.Fatalf("reserve request: owner=%v record=%#v err=%v", owner, record, err)
+	}
+	accepted, err := MarkChatRequestStatusOwned(
+		db, userID, requestID, 1, record.OwnerToken, ChatRequestAccepted,
+	)
+	if err != nil || !accepted {
+		t.Fatalf("mark request accepted: accepted=%v err=%v", accepted, err)
+	}
+
+	leaseExpiresAt := time.Now().Add(10 * time.Minute).UnixMilli()
+	if _, err := globals.ExecDb(db, `
+		UPDATE chat_request SET lease_expires_at = ?
+		WHERE user_id = ? AND request_id = ?
+	`, leaseExpiresAt, userID, requestID); err != nil {
+		t.Fatalf("set future lease: %v", err)
+	}
+
+	for attempt := 0; attempt < 3; attempt++ {
+		renewed, err := RenewChatRequestLease(db, userID, requestID, record.OwnerToken)
+		if err != nil || !renewed {
+			t.Fatalf("renew owned lease on attempt %d: renewed=%v err=%v", attempt+1, renewed, err)
+		}
+		var nextLeaseExpiresAt int64
+		if err := globals.QueryRowDb(db, `
+			SELECT lease_expires_at FROM chat_request
+			WHERE user_id = ? AND request_id = ?
+		`, userID, requestID).Scan(&nextLeaseExpiresAt); err != nil {
+			t.Fatalf("load renewed lease on attempt %d: %v", attempt+1, err)
+		}
+		if nextLeaseExpiresAt <= leaseExpiresAt {
+			t.Fatalf(
+				"expected renewal %d to advance lease beyond %d, got %d",
+				attempt+1,
+				leaseExpiresAt,
+				nextLeaseExpiresAt,
+			)
+		}
+		leaseExpiresAt = nextLeaseExpiresAt
+	}
+
+	if renewed, err := RenewChatRequestLease(db, userID, requestID, "not-the-owner"); err != nil || renewed {
+		t.Fatalf("expected wrong owner to be fenced, renewed=%v err=%v", renewed, err)
+	}
+	completed, err := MarkChatRequestStatusOwned(
+		db, userID, requestID, 1, record.OwnerToken, ChatRequestCompleted,
+	)
+	if err != nil || !completed {
+		t.Fatalf("mark request completed: completed=%v err=%v", completed, err)
+	}
+	if renewed, err := RenewChatRequestLease(db, userID, requestID, record.OwnerToken); err != nil || renewed {
+		t.Fatalf("expected completed request not to renew, renewed=%v err=%v", renewed, err)
+	}
+}

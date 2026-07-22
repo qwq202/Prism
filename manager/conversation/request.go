@@ -207,10 +207,14 @@ func RenewChatRequestLease(db *sql.DB, userID int64, requestID string, ownerToke
 	leaseExpiresAt := time.Now().Add(chatRequestLeaseDuration).UnixMilli()
 	result, err := globals.ExecDb(db, `
 		UPDATE chat_request
-		SET lease_expires_at = ?, updated_at = CURRENT_TIMESTAMP
+		SET lease_expires_at = CASE
+				WHEN lease_expires_at >= ? THEN lease_expires_at + 1
+				ELSE ?
+			END,
+			updated_at = CURRENT_TIMESTAMP
 		WHERE user_id = ? AND request_id = ? AND owner_token = ?
 			AND status <> ?
-	`, leaseExpiresAt, userID, requestID, ownerToken, ChatRequestCompleted)
+	`, leaseExpiresAt, leaseExpiresAt, userID, requestID, ownerToken, ChatRequestCompleted)
 	if err != nil {
 		return false, err
 	}
