@@ -63,7 +63,7 @@ import {
 } from "@/api/ask-user.ts";
 import { CustomMask, Mask } from "@/masks/types.ts";
 import { listMasks } from "@/api/mask.ts";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch, useSelector, useStore } from "react-redux";
 import { useMemo } from "react";
 import { ChatProps, ConnectionStack, StreamMessage } from "@/api/connection.ts";
 import { useTranslation } from "react-i18next";
@@ -175,6 +175,10 @@ type initialStateType = {
   support_models: Model[];
   loadingConversationId: number | null;
   active_requests: Record<number, string>;
+  generation_requests: Record<
+    number,
+    { requestId: string; settledRevision?: number }
+  >;
 };
 
 const defaultConversation: ConversationSerialized = { messages: [] };
@@ -209,6 +213,7 @@ function resetLocalConversationState(state: initialStateType) {
   state.current = -1;
   state.loadingConversationId = null;
   state.active_requests = {};
+  state.generation_requests = {};
   state.mask_item = null;
   setNumberMemory("history_conversation", -1);
 }
@@ -452,6 +457,18 @@ function getConversationLocalRevision(
   conversation: ConversationSerialized | undefined,
 ): number {
   return conversation?.local_revision ?? 0;
+}
+
+function canFinalizeGenerationRequest(
+  request: { requestId: string; settledRevision?: number } | undefined,
+  conversation: ConversationSerialized | undefined,
+  requestId: string,
+): boolean {
+  if (!request || request.requestId !== requestId) return false;
+  return (
+    request.settledRevision === undefined ||
+    request.settledRevision === getConversationLocalRevision(conversation)
+  );
 }
 
 function isStreamingConversation(
@@ -1083,6 +1100,7 @@ const chatSlice = createSlice({
     current: -1,
     loadingConversationId: null,
     active_requests: {},
+    generation_requests: {},
     model: initialModel,
     model_list: getModelList(offline, getArrayMemory("model_mark_list")),
     market: false,
@@ -1172,6 +1190,11 @@ const chatSlice = createSlice({
       if (message.end) {
         instance.end = message.end;
         instance.tool_calls = finalizePendingToolCalls(instance.tool_calls);
+        const generationRequest = state.generation_requests[id];
+        if (generationRequest) {
+          generationRequest.settledRevision =
+            getConversationLocalRevision(conversation);
+        }
         delete state.active_requests[id];
       }
       if (hasPayload || message.end === true || message.plan === true) {
@@ -1246,6 +1269,7 @@ const chatSlice = createSlice({
 
       conversation.messages[conversation.messages.length - 1].end = true;
       delete state.active_requests[id];
+      delete state.generation_requests[id];
     },
     startGenerationRequest: (state, action) => {
       const { id, requestId } = action.payload as {
@@ -1253,16 +1277,59 @@ const chatSlice = createSlice({
         requestId: string;
       };
       state.active_requests[id] = requestId;
+      state.generation_requests[id] = { requestId };
     },
-    finishGenerationRequest: (state, action) => {
+    acceptGenerationRequest: (state, action) => {
       const { id, requestId } = action.payload as {
         id: number;
-        requestId?: string;
+        requestId: string;
       };
-      const activeRequestId = state.active_requests[id];
-      if (!activeRequestId) return;
-      if (requestId && activeRequestId !== requestId) return;
+      const current = state.generation_requests[id];
+      if (current) return;
+
+      state.active_requests[id] = requestId;
+      state.generation_requests[id] = { requestId };
+    },
+    discardGenerationRequest: (state, action) => {
+      const { id, requestId } = action.payload as {
+        id: number;
+        requestId: string;
+      };
+      if (state.generation_requests[id]?.requestId !== requestId) return;
+
       delete state.active_requests[id];
+      delete state.generation_requests[id];
+    },
+    finishGenerationRequest: (state, action) => {
+      const { id, requestId, finalizeConversation } = action.payload as {
+        id: number;
+        requestId?: string;
+        finalizeConversation?: boolean;
+      };
+      const conversation = state.conversations[id];
+      if (
+        !requestId ||
+        !canFinalizeGenerationRequest(
+          state.generation_requests[id],
+          conversation,
+          requestId,
+        )
+      ) {
+        return;
+      }
+      delete state.active_requests[id];
+      delete state.generation_requests[id];
+
+      if (!finalizeConversation) return;
+      if (!conversation) return;
+
+      const last = conversation.messages[conversation.messages.length - 1];
+      if (last?.role === AssistantRole) {
+        last.end = true;
+        if (last.status === "streaming") last.status = "completed";
+        last.tool_calls = finalizePendingToolCalls(last.tool_calls);
+      }
+      conversation.local_pending_until = 0;
     },
     raiseConversation: (state, action) => {
       // raise conversation `-1` to target id
@@ -1280,6 +1347,10 @@ const chatSlice = createSlice({
       if (state.active_requests[-1]) {
         state.active_requests[id] = state.active_requests[-1];
         delete state.active_requests[-1];
+      }
+      if (state.generation_requests[-1]) {
+        state.generation_requests[id] = state.generation_requests[-1];
+        delete state.generation_requests[-1];
       }
 
       state.conversations[-1] = { ...defaultConversation };
@@ -1397,6 +1468,7 @@ const chatSlice = createSlice({
 
       closeConversationConnection(id);
       delete state.active_requests[id];
+      delete state.generation_requests[id];
       delete state.conversations[id];
     },
     deleteConversation: (state, action) => {
@@ -1423,6 +1495,7 @@ const chatSlice = createSlice({
 
       closeConversationConnection(id);
       delete state.active_requests[id];
+      delete state.generation_requests[id];
       delete state.conversations[id];
     },
     deleteAllConversation: (state) => {
@@ -1670,6 +1743,8 @@ const chatSlice = createSlice({
       state.current = -1;
       state.messages = [];
       state.loadingConversationId = null;
+      delete state.active_requests[-1];
+      delete state.generation_requests[-1];
       state.history = state.history.filter((item) => item.id !== -1);
       state.conversations[-1] = nextConversation;
       state.mask_item = mask;
@@ -1747,6 +1822,8 @@ export const {
   editMessage,
   stopMessage,
   startGenerationRequest,
+  acceptGenerationRequest,
+  discardGenerationRequest,
   finishGenerationRequest,
   raiseConversation,
   importConversation,
@@ -1824,6 +1901,7 @@ export function useConversation(): ConversationSerialized | undefined {
 
 export function useConversationActions() {
   const dispatch = useDispatch();
+  const store = useStore();
   const conversations = useSelector(selectConversations);
   const current = useSelector(selectCurrent);
   const mask = useSelector(selectMaskItem);
@@ -1854,7 +1932,11 @@ export function useConversationActions() {
   ) => {
     if (id === -1) return;
     const activate = options?.activate ?? true;
-    const requestedRevision = getConversationLocalRevision(conversations[id]);
+    const liveConversations = (store.getState() as RootState).chat
+      .conversations;
+    const requestedRevision = getConversationLocalRevision(
+      liveConversations[id],
+    );
     const requestSeq = nextConversationDetailRequestSeq(id);
 
     const result = await fetchConversation(id);
@@ -2092,6 +2174,7 @@ export function useConversationActions() {
 export function useMessageActions() {
   const { t } = useTranslation();
   const dispatch = useDispatch();
+  const store = useStore();
   const { refresh } = useConversationActions();
   const current = useSelector(selectCurrent);
   const conversations = useSelector(selectConversations);
@@ -2427,6 +2510,21 @@ export function useMessageActions() {
       const scope = getChatOutboxScope();
       stack.bindAuthScope(scope);
       const pending = await getPendingChatRequests(scope);
+      const latestPendingByConversation = new Map<
+        number,
+        (typeof pending)[number]
+      >();
+      for (const request of pending) {
+        latestPendingByConversation.set(request.conversationId, request);
+      }
+      for (const request of latestPendingByConversation.values()) {
+        dispatch(
+          acceptGenerationRequest({
+            id: request.conversationId,
+            requestId: request.requestId,
+          }),
+        );
+      }
       for (const request of pending) {
         stack.send(request.conversationId, t, request.props, {
           scope: request.scope,
@@ -2760,16 +2858,23 @@ export function useMessageActions() {
       const requestCompleted = message.request_status === "completed";
       if (message.request_id && message.accepted && !requestCompleted) {
         dispatch(
-          startGenerationRequest({
+          acceptGenerationRequest({
             id,
             requestId: message.request_id,
           }),
         );
       }
       dispatch(updateMessage({ id, message, model: conversationModel }));
+      const latestChatState = (store.getState() as RootState).chat;
+      const requestMatchesGeneration = Boolean(
+        message.request_id &&
+        latestChatState.generation_requests[id]?.requestId ===
+          message.request_id,
+      );
       if (
         message.request_id &&
-        (message.request_status === "rejected" || message.retryable === false)
+        (message.request_status === "rejected" ||
+          (!message.accepted && message.retryable === false))
       ) {
         dispatch(
           finishGenerationRequest({
@@ -2782,16 +2887,31 @@ export function useMessageActions() {
         dispatch(renameHistory({ id, name: message.title }));
       }
 
-      if (id !== -1 && message.request_id && requestCompleted) {
-        // End the local generation lifecycle before refreshing remote state.
-        // Otherwise cloud latency can briefly render a synthetic loading card.
-        dispatch(
-          finishGenerationRequest({
-            id,
-            requestId: message.request_id,
-          }),
+      if (message.request_id && requestCompleted) {
+        const canReconcileCompletion = canFinalizeGenerationRequest(
+          latestChatState.generation_requests[id],
+          latestChatState.conversations[id],
+          message.request_id,
         );
-        await refresh({ useCache: false });
+        if (canReconcileCompletion) {
+          // End the local generation lifecycle before refreshing remote state.
+          // Otherwise cloud latency can briefly render a synthetic loading card.
+          dispatch(
+            finishGenerationRequest({
+              id,
+              requestId: message.request_id,
+              finalizeConversation: true,
+            }),
+          );
+          if (id !== -1) await refresh({ useCache: false });
+        } else if (requestMatchesGeneration) {
+          dispatch(
+            discardGenerationRequest({
+              id,
+              requestId: message.request_id,
+            }),
+          );
+        }
       }
 
       // Request-state frames carry conversation metadata but no assistant payload.
@@ -2799,7 +2919,7 @@ export function useMessageActions() {
       if (
         id === -1 &&
         message.conversation &&
-        (!message.request_id || message.accepted)
+        (!message.request_id || (message.accepted && requestMatchesGeneration))
       ) {
         const target: number = message.conversation;
         logClientEvent("chat.action", "raise-conversation", {

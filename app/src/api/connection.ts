@@ -656,7 +656,10 @@ export class Connection {
       return;
     }
 
-    if (message.request_status === "rejected" || message.retryable === false) {
+    if (
+      message.request_status === "rejected" ||
+      (!message.accepted && message.retryable === false)
+    ) {
       const pending = this.pendingRequests.get(requestID);
       if (pending?.timer) clearTimeout(pending.timer);
       this.pendingRequests.delete(requestID);
